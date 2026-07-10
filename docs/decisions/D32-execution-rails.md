@@ -38,6 +38,10 @@ The 2026-07-10 P0 shakedown ran ten tasks in one day and exposed four process ho
 3. **Stack maintenance protocol** (dev-workflow §3): fixes land on the lowest affected branch and
    propagate in ONE batched cascade pass, never per-fix; stacked PRs merge bottom-up with
    **merge commits, never squash/rebase**, deleting each head branch so GitHub auto-retargets.
+   **Solo-mode merge:** the 1-approval rule is satisfied by Devesh exercising the ruleset bypass
+   himself (`gh pr merge <N> --merge --delete-branch --admin`) — the bypass is the human
+   approval; only green-checked PRs qualify, and the approval rule stays: it is what prevents
+   agent sessions from converting green CI into a self-merge.
 4. **Mode A rails parity** (dev-workflow §4A + root `.claude/settings.json`): the root repo
    carries the deny-list (merges, reviews, force-push variants, history rewriting, `.env`
    read/write, `supabase link`/remote `db push`); blanket `gh pr *` allows are forbidden; Mode A

@@ -80,6 +80,8 @@ Content collections for case studies/pages (markdown in, pages out); zero client
 
 **Stack maintenance (D32).** Fixes land on the *lowest* affected branch and propagate upward in **one batched cascade pass** — never per-fix (the 2026-07-10 shakedown left 41 of 69 commits on the stack tip as cascade merges). Stacked PRs merge bottom-up with **merge commits — never squash or rebase** (squash rewrites the patches and breaks every PR above it); delete each head branch on merge so GitHub retargets the next PR automatically.
 
+**Solo-mode merge (D32).** With one human, GitHub's no-self-approval rule means the 1-approval requirement is satisfied by the **ruleset bypass, exercised by Devesh personally**: `gh pr merge <N> --merge --delete-branch --admin` from his own terminal (or the web UI's bypass-rules merge). The bypass *is* the human approval — deliberate, logged, his alone. Two disciplines make it safe: bypass only PRs whose required `checks` run is **observed green** (S13.7 — an absent check is a stop signal, not a bypass candidate), and the approval rule itself is never removed — it is what stops any *agent* session (sharing Devesh's identity until S13.2's bot lands; holding a non-approving token after) from turning green CI into a self-merge.
+
 ## 4. Session protocols
 
 ### Mode A — single interactive session
