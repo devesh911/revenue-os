@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { type AuthEnv, requireAuth } from "./auth";
 import { logger } from "./logger";
 import { orgs } from "./routes/orgs";
+import { vapiWebhook } from "./vapi/receive";
 
 const app = new Hono<AuthEnv>();
 
@@ -16,6 +17,7 @@ app.get("/ready", (c) =>
 app.use("/orgs", requireAuth);
 app.use("/orgs/*", requireAuth);
 app.route("/", orgs);
+app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (S6.2)
 
 // S5.8: clients get clean statuses, never internals; detail goes to the log.
 app.onError((err, c) => {
