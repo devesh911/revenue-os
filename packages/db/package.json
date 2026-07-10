@@ -1,3 +1,13 @@
 {
-  "name": "@revenue-os/db"
+  "name": "@revenue-os/db",
+  "dependencies": {
+    "@revenue-os/shared": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.0"
+  },
+  "main": "src/index.ts",
+  "types": "src/index.ts"
 }

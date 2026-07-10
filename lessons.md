@@ -36,3 +36,32 @@
 - 2026-07-10 · task 2 · db-design §1 mandates the `app_service` role but no migration creates it, and
   its password can't live in SQL anyway. Role creation + grants need a decided home before task 3
   (packages/db client). → Suggested: an ADR on role bootstrap per environment.
+- 2026-07-10 · task 8 · The CLAUDE.md gotcha "upsert by provider_ref" needs a uniqueness guarantee
+  db-design §6 doesn't have (convo_provider is a plain index). Added partial unique index
+  (012_conversations_provider_ref.sql). → Suggested: amend db-design §6. Also: interim org
+  resolution for Vapi webhooks = org id in the per-assistant server URL + shared secret; final
+  assistant-id mapping is a spike exit criterion (S6.2) — REAL payloads must replace the synthetic
+  fixtures during the spike (needs VAPI_API_KEY, Devesh).
+- 2026-07-10 · CI · The scaffold's compact-YAML workflows were unparseable (`${{ }}` inside flow
+  maps) — GitHub recorded "workflow file issue" failures on every push and NO job ever ran; local
+  gates masked it. Fixed: block YAML + test-env export step + `supabase init` fallback + CLI pinned
+  2.109.1 (unpinned runner CLI rejected v2.109 config keys). → Suggested: S13.7 corollary for the
+  docs — "a red/absent check is a stop signal; verify the pipeline RAN, not just that code passed
+  locally"; and G2 explicitly covers the supabase CLI version.
+- 2026-07-10 · CI · gitleaks (once actually running) caught a real near-miss: a `git add -A` format
+  commit on feat/task-03 committed `apps/console/.env.local` because that branch's .gitignore
+  predates the `.env.local` line. Contents = the LOCAL demo anon key (designed-public, S7.3) —
+  no real exposure. Removed + path allowlisted in .gitleaks.toml with justification (history
+  rewrite would need force-push, which protocol forbids). → Suggested S-control: ignore rules for
+  env-file patterns belong in the FIRST commit of a repo, and `git add -A` is banned in fix
+  commits touching branches with older .gitignore snapshots.
+- 2026-07-10 · P0 merge · Bulk `gh pr merge --delete-branch` in a tight loop over the stacked PRs
+  raced GitHub's async base-retargeting: #4/#6/#8/#10 auto-closed (their bases were deleted via
+  API, which — unlike the web merge flow — does not retarget dependent PRs in time), and
+  #5/#7/#9/#11 merged into their stack-branch BASES instead of main. Result: main stopped at
+  task 2; tasks 3–10 stranded on side branches (no content lost — feat/task-09-csv-import ended
+  tree-identical to the reviewed stack tip 07da95f; verified with `git diff --stat`). Recovery:
+  one consolidation PR (task-09 branch → main). → Suggested: dev-workflow §3 solo-merge addendum —
+  stacked PRs merge ONE at a time; before each merge confirm the PR's base has retargeted to main
+  (`gh pr view N --json baseRefName`) or retarget explicitly (`gh pr edit N --base main`);
+  never loop `gh pr merge` over a stack.
