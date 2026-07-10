@@ -48,3 +48,10 @@
   2.109.1 (unpinned runner CLI rejected v2.109 config keys). → Suggested: S13.7 corollary for the
   docs — "a red/absent check is a stop signal; verify the pipeline RAN, not just that code passed
   locally"; and G2 explicitly covers the supabase CLI version.
+- 2026-07-10 · CI · gitleaks (once actually running) caught a real near-miss: a `git add -A` format
+  commit on feat/task-03 committed `apps/console/.env.local` because that branch's .gitignore
+  predates the `.env.local` line. Contents = the LOCAL demo anon key (designed-public, S7.3) —
+  no real exposure. Removed + path allowlisted in .gitleaks.toml with justification (history
+  rewrite would need force-push, which protocol forbids). → Suggested S-control: ignore rules for
+  env-file patterns belong in the FIRST commit of a repo, and `git add -A` is banned in fix
+  commits touching branches with older .gitignore snapshots.
