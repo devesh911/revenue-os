@@ -1,0 +1,14 @@
+{
+  "$schema": "https://biomejs.dev/schemas/latest/schema.json",
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 },
+  "linter": { "enabled": true, "rules": { "recommended": true } },
+  "overrides": [
+    {
+      "includes": ["packages/**"],
+      "linter": { "rules": { "style": { "noRestrictedImports": {
+        "level": "error",
+        "options": { "paths": { "bun": "G1: no Bun-only APIs in packages/* (tech-stack T1). Keep packages runtime-agnostic.", "bun:test": "G1: import from vitest-compatible surface only in packages if ever needed; prefer app-level tests.", "bun:sqlite": "G1", "bun:ffi": "G1" } }
+      } } } }
+    }
+  ]
+}

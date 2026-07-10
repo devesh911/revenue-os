@@ -1,0 +1,1 @@
+Delegate to the orchestrator: read orchestrator/CLAUDE.md and orchestrator/.claude/commands/goal.md, load orchestrator/.claude/state/HANDOFF.md, then run the /goal protocol from the orchestrator/ working directory. Hooks, agents, deny rules, and state all live under orchestrator/ — this shim only routes you there.

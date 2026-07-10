@@ -1,0 +1,1 @@
+{ "name": "worker", "scripts": { "dev": "bun --watch src/index.ts" } }

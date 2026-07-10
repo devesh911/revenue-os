@@ -1,0 +1,20 @@
+name: deploy
+on:
+  push: { branches: [main] }          # -> staging
+  release: { types: [published] }     # tag -> prod
+jobs:
+  staging:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + ship to VPS (staging stack)
+        run: echo "TODO task-14: docker build, save, scp, compose up staging; then Playwright smoke"
+  prod:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: production           # secrets live here only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrations first, then image swap, then /health gate
+        run: echo "TODO task-14: supabase db push (prod), compose pull+up, curl /health + /ready"

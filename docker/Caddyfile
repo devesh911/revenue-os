@@ -1,0 +1,11 @@
+api.example.com {
+  @not_edge not header X-Edge-Auth {env.EDGE_SHARED_SECRET}
+  respond @not_edge 403           # S3.3: only Cloudflare (which injects the header) gets through
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options nosniff
+    Referrer-Policy strict-origin-when-cross-origin
+    -Server
+  }
+  reverse_proxy worker:8080
+}

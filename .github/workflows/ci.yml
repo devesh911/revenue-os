@@ -1,0 +1,20 @@
+name: ci
+on: { pull_request: {}, push: { branches: [main] } }
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "PIN_ME" }   # G2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint                  # includes G1 restricted-imports
+      - run: bun run typecheck
+      - uses: supabase/setup-cli@v1
+      - run: supabase start                # real local stack for integration tests
+      - run: bun test
+      - run: bun run rls:check
+        env: { LOCAL_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres }
+      - uses: gitleaks/gitleaks-action@v2  # S9.3
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
