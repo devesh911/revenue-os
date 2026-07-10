@@ -21,9 +21,17 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - run: bun audit # T14/S12.1 dependency audit (task 11)
+
       - run: bun run lint # includes G1 restricted-imports
 
       - run: bun run typecheck
+
+      - name: Console build (dummy env) + S1.2/S7.3 guards # task 11
+        run: |
+          VITE_SUPABASE_URL="https://dummy.invalid" VITE_SUPABASE_ANON_KEY="dummy-not-a-key" \
+            bun run --filter console build
+          bun run guards
 
       - uses: supabase/setup-cli@v1
         with:
@@ -50,6 +58,9 @@ jobs:
       - run: bun run rls:check
         env:
           LOCAL_DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+      - name: Build worker image (T14 — build only; deploy stays task 14) # task 11
+        run: docker build -f docker/Dockerfile -t revenue-os-worker:ci .
 
       - uses: gitleaks/gitleaks-action@v2 # S9.3
         env:

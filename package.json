@@ -20,6 +20,7 @@
     "db:seed": "bun scripts/seed.ts",
     "rls:check": "psql \"$LOCAL_DB_URL\" -f tests/rls_coverage.sql",
     "evals": "bun scripts/evals.ts",
+    "guards": "bash scripts/guards.sh",
     "dev:console": "bun run --filter console dev"
   },
   "devDependencies": {

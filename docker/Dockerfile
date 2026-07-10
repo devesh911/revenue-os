@@ -2,6 +2,9 @@
 FROM oven/bun:1.3.11 AS base
 WORKDIR /app
 COPY package.json bun.lock ./
+# every workspace manifest the lockfile knows must be present, or frozen install refuses
+# (console ships no code into this image — its package.json only satisfies the workspace set)
+COPY apps/console/package.json ./apps/console/package.json
 COPY packages ./packages
 COPY services/worker ./services/worker
 RUN bun install --frozen-lockfile --production
