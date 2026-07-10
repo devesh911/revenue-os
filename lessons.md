@@ -72,3 +72,21 @@
   one repo); envelope verified empirically by orchestrator/scripts/preflight_check.sh (can
   branch/commit/PR; cannot touch workflows, self-approve, merge, or reach settings). → D35 amends
   S13.2; reversal: repo moves to an org (org-owner fine-grained PATs) or a GitHub App replaces PATs.
+
+## 2026-07-11 · audit-db-schema (read-only, main@6666534) — doc-vs-code conflict found
+- **webhook_events append-only contradiction:** db-design §2 lists `webhook_events` among
+  append-only tables ("no UPDATE/DELETE policies exist → immutable by RLS") and the D33 mapping
+  says sel+ins only — but 007_ops.sql ships an `upd` policy (operator), and the doc's OWN DDL
+  requires it: `status`/`processed_at` columns and the `webhooks_pending (status, received_at)
+  where status='received'` partial index only make sense with status transitions. Code is
+  functionally right; §2's classification looks wrong. → §13 decision needed: amend §2 to move
+  webhook_events into a "lifecycle" class (raw `payload` stays immutable by convention), or drop
+  the upd policy and redesign processing. Escalated in orchestrator HANDOFF.
+- Minor: `packages/db/src/contacts.ts` merge-update uses `where id = $1` without `org_id` —
+  deviates from docs/patterns/drizzle-query.md "org_id in EVERY where". Safe today (id comes from
+  an org-scoped lookup inside the same withOrg tx; RLS is the net) — one-line defense-in-depth fix.
+- Doc-consistency batch (no code change): §2 "every table: created_at" vs DDL (dispositions,
+  field_definitions, pipelines, pipeline_stages, knowledge_chunks lack it; guardrail_policies has
+  only updated_at); §2 soft-delete list omits `companies` (DDL has deleted_at); §2 "IDs: uuid" vs
+  messages bigint identity (intentional, volume); §9 seed path `seeds/` vs actual `supabase/seeds/`;
+  migration 011 functions (app.handle_new_user, app.user_orgs) undocumented in db-design.
