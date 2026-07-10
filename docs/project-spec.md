@@ -218,10 +218,10 @@ Doc-mandated obligations **not** covered by tasks 1–10 (the delta that makes "
 
 | Obligation | Source | Owner | Status |
 |---|---|---|---|
-| CI: dependency audit per PR | T14 · S12.1 | **task 11 (proposed): CI parity** | unowned → drafted here |
-| CI: `service_role` grep-guard (build fails if it appears outside `/.github/`) | S1.2 | task 11 | unowned → drafted here |
-| CI: secret-shaped grep over console `dist/` | S7.3 | task 11 (needs a console build step in CI) | unowned → drafted here |
-| CI: image build per PR | T14 | task 11 or task 14 (deploy) | unowned → drafted here |
+| CI: dependency audit per PR | T14 · S12.1 | task 11 — `bun audit` in ci.yml | **done (task 11)** |
+| CI: `service_role` grep-guard (build fails if it appears outside `/.github/`) | S1.2 | task 11 — `scripts/guards.sh` (scans app code: apps/packages/services/scripts/docker; migration role-grants + docs are legitimately outside the surface) | **done (task 11)** |
+| CI: secret-shaped grep over console `dist/` | S7.3 | task 11 — dummy-env console build + `scripts/guards.sh` in ci.yml | **done (task 11)** |
+| CI: image build per PR | T14 | task 11 — `docker build` in ci.yml (build only; deploy/push stays task 14) | **done (task 11)** |
 | S7.1 XSS-transcript render test in CI | S12.1 | P3 transcript-UI task | deferred by phase |
 | Playwright smoke over the four screens | T12 (layer 6) | P3 screen work (noted in PR #11) | deferred by phase |
 | Real Vapi call transcribed into DB (task 8 ✅) | §12.8 | **residual: Devesh** — VAPI key, number provisioning, real payload fixtures; S6.2 mechanism + VQG baseline | open |
