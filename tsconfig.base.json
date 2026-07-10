@@ -1,8 +1,25 @@
 {
   "compilerOptions": {
-    "strict": true, "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
-    "types": ["bun-types"], "skipLibCheck": true, "noUncheckedIndexedAccess": true,
-    "paths": { "@shared/*": ["packages/shared/src/*"], "@db/*": ["packages/db/src/*"],
-               "@harness/*": ["packages/harness/src/*"], "@channels/*": ["packages/channels/src/*"] }
-  }
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun-types"],
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./packages/shared/src/*"],
+      "@db/*": ["./packages/db/src/*"],
+      "@harness/*": ["./packages/harness/src/*"],
+      "@channels/*": ["./packages/channels/src/*"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "services/*/src/**/*.ts",
+    "apps/*/src/**/*.ts",
+    "apps/*/src/**/*.tsx",
+    "scripts/**/*.ts"
+  ]
 }
