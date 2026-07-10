@@ -96,3 +96,13 @@
   knows (apps/console/package.json) is missing from the build context. Fixed: COPY the manifest;
   rule: image-build verification only counts cold (`--no-cache`). Same family as the CI lesson —
   a gate that didn't actually RUN proves nothing (S13.7 corollary applies locally too).
+- 2026-07-11 · advisors · First `supabase db advisors --local` run (CLI ≥2.81.3; sanctioned by the
+  supabase plugin skill): ① auth_rls_initplan on profiles' three policies — fixed in 013 with the
+  (select auth.uid()) wrap; gotcha: the linter requires current_setting() to be the subselect's
+  IMMEDIATE target (nullif outside the wrap), both shapes initplan. ② function_search_path_mutable
+  on current_org_id/is_member — D31's own Consequences mandated search_path discipline on definer
+  functions; 010 added the definer flag without the pin. Fixed in 013 (search_path = ''; bodies are
+  fully qualified/builtin). ③ extension_in_public (vector, pg_trgm) — db-design §3 creates
+  extensions bare → public; Supabase convention is an `extensions` schema. → §13 decision: amend §3
+  + an expand-contract move, or accept and document. Also cosmetic: db-design §4's policy pattern
+  could adopt the (select …) wrap for future tables. Advisors belongs in the Friday cadence (S12.3).
