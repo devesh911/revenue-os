@@ -23,6 +23,25 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/**/*.test.ts", "packages/**/test/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "bun": "G1: no Bun-only APIs in packages/* (tech-stack T1). Keep packages runtime-agnostic.",
+                  "bun:sqlite": "G1",
+                  "bun:ffi": "G1"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
