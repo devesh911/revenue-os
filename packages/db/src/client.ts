@@ -8,7 +8,7 @@ import pg from "pg";
 export type { PoolClient } from "pg";
 
 export function createPool(connectionString: string): pg.Pool {
-	return new pg.Pool({ connectionString });
+  return new pg.Pool({ connectionString });
 }
 
 /**
@@ -17,26 +17,26 @@ export function createPool(connectionString: string): pg.Pool {
  * pooled connection (proven by test).
  */
 export async function withOrg<T>(
-	pool: pg.Pool,
-	orgId: string,
-	fn: (tx: pg.PoolClient) => Promise<T>,
+  pool: pg.Pool,
+  orgId: string,
+  fn: (tx: pg.PoolClient) => Promise<T>,
 ): Promise<T> {
-	const org = OrgIdSchema.parse(orgId);
-	const client = await pool.connect();
-	try {
-		await client.query("begin");
-		await client.query("select set_config('request.org_id', $1, true)", [org]);
-		const result = await fn(client);
-		await client.query("commit");
-		return result;
-	} catch (err) {
-		try {
-			await client.query("rollback");
-		} catch {
-			// connection-level failure: release() below discards the client
-		}
-		throw err;
-	} finally {
-		client.release();
-	}
+  const org = OrgIdSchema.parse(orgId);
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('request.org_id', $1, true)", [org]);
+    const result = await fn(client);
+    await client.query("commit");
+    return result;
+  } catch (err) {
+    try {
+      await client.query("rollback");
+    } catch {
+      // connection-level failure: release() below discards the client
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
