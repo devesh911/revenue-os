@@ -1,7 +1,7 @@
 # Database Design — Vertical-Agnostic Revenue OS (V1)
 
 > **Status:** Locked for V1 unless amended via the decision protocol (dev-workflow.md §13). This file is the single source of truth for the data layer.
-> **Consumer:** Claude Code. Migrations should be generated from the DDL in this file, in order, via `supabase migration new <name>`.
+> **Consumer:** Claude Code. Migrations should be generated from the DDL in this file, in order, via `supabase migration new <name>`. **Numbering truth (D33):** the V1 baseline `000`–`009` spans **§3–§8 + §13 + §14** — one file per `-- NNN_name.sql` marker; later migrations (`010`+) extend the baseline and are annotated inline where they amend it.
 > **Companion doc:** `project-spec.md` (holistic decisions, architecture, build order).
 
 ---
@@ -122,8 +122,11 @@ create index audit_resource on audit_log (org_id, resource_type, resource_id);
 
 ```sql
 -- 002_rls.sql
+-- SECURITY DEFINER added by migration 010 (D31): the function reads auth.jwt(), and the
+-- managed `postgres` role cannot grant auth-schema usage to custom roles (app_service) —
+-- member_role() below already uses the same pattern. Baseline 002 shipped without the flag.
 create or replace function app.current_org_id() returns uuid
-language sql stable as $$
+language sql stable security definer set search_path = public as $$
   select coalesce(
     nullif(current_setting('request.org_id', true), '')::uuid,
     (auth.jwt() ->> 'org_id')::uuid
@@ -145,9 +148,17 @@ returns boolean language sql stable as $$
     when min_role = 'admin'    then app.member_role(target_org) = 'admin'
   end
 $$;
+
+-- Grants (002, D33): policy expressions run as the QUERYING role — without USAGE on schema
+-- app, every policy fails with "permission denied for schema app" (verified on the local
+-- stack). app_service receives the same + DML on public via migration 010 (D31).
+grant usage on schema app to anon, authenticated, service_role;
+grant execute on all functions in schema app to anon, authenticated, service_role;
+alter default privileges in schema app
+  grant execute on functions to anon, authenticated, service_role;
 ```
 
-**Policy template — apply to every org-owned table** (shown once; repeat verbatim, adjusting the write role):
+**Policy pattern — illustrative, not positional** (D33). `contacts` is the example and does not exist until `003`: each migration carries the policies for its **own** tables — `002` holds only the helpers, grants, and policies for `001`'s tables. Repeat the pattern per table, taking the write role from the mapping below:
 
 ```sql
 alter table contacts enable row level security;
@@ -169,6 +180,12 @@ create policy del on contacts for delete
 
 Append-only tables get **only** `sel` + `ins` policies. `audit_log` insert is open to any member/service; no update/delete policies exist.
 
+**Write-role mapping (D33 — as implemented across 002–009):**
+- **Entities** (contacts, companies, deals, appointments, tasks, conversations, contact_memories, knowledge_documents/knowledge_chunks): write = `operator`.
+- **Org configuration** (pipelines, pipeline_stages, dispositions, field_definitions, guardrail_policies, integrations, api_keys, agents, workflows, campaigns, eval_scenarios): write = `admin`.
+- **Append-only** (§2 list): `sel` + `ins` only — immutability by RLS.
+- **Global template rows** (`org_id is null` on agents/workflows/eval_scenarios): readable by any member, writable by nobody via RLS — managed only by migrations/seeds.
+
 ---
 
 ## 5. Data core — CRM entities (Layer B)
@@ -188,7 +205,10 @@ create table companies (
   updated_at  timestamptz not null default now(),
   deleted_at  timestamptz
 );
-create index companies_org_name on companies using gin (org_id, name gin_trgm_ops);
+-- Split (D33): composite GIN over (uuid, trgm) fails on replay — uuid has no GIN operator
+-- class (42704) without btree_gin, which S2.7's extension allowlist excludes.
+create index companies_org on companies (org_id);
+create index companies_name_trgm on companies using gin (name gin_trgm_ops);
 
 create table contacts (
   id                 uuid primary key default gen_random_uuid(),
@@ -328,6 +348,10 @@ create table conversations (
 create index convo_org_time    on conversations (org_id, created_at desc);
 create index convo_contact     on conversations (org_id, contact_id, created_at desc);
 create index convo_provider    on conversations (provider, provider_ref);
+-- migration 012 (D33, task 8): "upsert by provider_ref" (CLAUDE.md gotcha) needs a uniqueness
+-- guarantee a plain index can't give — webhooks arrive out of order and must converge on ONE row.
+create unique index convo_provider_ref_uq on conversations (provider, provider_ref)
+  where provider_ref is not null;
 
 -- Every utterance / message / tool call. Append-only. Highest-volume table.
 create table messages (
@@ -601,7 +625,7 @@ create table integrations (
 -- Idempotent inbound event log (webhooks from Vapi, Meta, CRM). Append-only.
 create table webhook_events (
   id          bigint generated always as identity primary key,
-  org_id      uuid references orgs(id),                   -- nullable until resolved
+  org_id      uuid references orgs(id),                   -- nullable in DDL — see resolution rule below
   provider    text not null,
   event_type  text not null,
   dedupe_key  text not null unique,                       -- provider event id → exactly-once processing
@@ -612,6 +636,11 @@ create table webhook_events (
   processed_at timestamptz
 );
 create index webhooks_pending on webhook_events (status, received_at) where status = 'received';
+
+-- Org-resolution rule (D33): receivers MUST resolve org_id BEFORE insert. Org-scoped RLS makes
+-- org_id-NULL rows unreachable — select AND insert — for the RLS-bound backend, so "resolve
+-- later" rows are dead letters. Vapi interim: org id rides the per-assistant server URL
+-- (+ shared secret, S6.2); the assistant-id→org mapping is a task-8 spike exit criterion.
 
 -- Cost metering: every billable unit. Append-only. Margin per call = sum by conversation.
 create table usage_events (
