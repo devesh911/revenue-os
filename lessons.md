@@ -55,3 +55,13 @@
   rewrite would need force-push, which protocol forbids). → Suggested S-control: ignore rules for
   env-file patterns belong in the FIRST commit of a repo, and `git add -A` is banned in fix
   commits touching branches with older .gitignore snapshots.
+- 2026-07-10 · P0 merge · Bulk `gh pr merge --delete-branch` in a tight loop over the stacked PRs
+  raced GitHub's async base-retargeting: #4/#6/#8/#10 auto-closed (their bases were deleted via
+  API, which — unlike the web merge flow — does not retarget dependent PRs in time), and
+  #5/#7/#9/#11 merged into their stack-branch BASES instead of main. Result: main stopped at
+  task 2; tasks 3–10 stranded on side branches (no content lost — feat/task-09-csv-import ended
+  tree-identical to the reviewed stack tip 07da95f; verified with `git diff --stat`). Recovery:
+  one consolidation PR (task-09 branch → main). → Suggested: dev-workflow §3 solo-merge addendum —
+  stacked PRs merge ONE at a time; before each merge confirm the PR's base has retargeted to main
+  (`gh pr view N --json baseRefName`) or retarget explicitly (`gh pr edit N --base main`);
+  never loop `gh pr merge` over a stack.
