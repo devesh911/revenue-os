@@ -65,6 +65,13 @@
   stacked PRs merge ONE at a time; before each merge confirm the PR's base has retargeted to main
   (`gh pr view N --json baseRefName`) or retarget explicitly (`gh pr edit N --base main`);
   never loop `gh pr merge` over a stack.
+- 2026-07-11 · S13 preflight · S13.2 prescribes a fine-grained PAT "on this repo only", but GitHub
+  restricts fine-grained PATs to repos OWNED by the token's resource owner — a bot that is merely a
+  collaborator on a personal repo cannot mint one for it. Working mechanism: classic PAT with `repo`
+  scope only (no `workflow`), least privilege at the ACCOUNT level (bot = Write collaborator on this
+  one repo); envelope verified empirically by orchestrator/scripts/preflight_check.sh (can
+  branch/commit/PR; cannot touch workflows, self-approve, merge, or reach settings). → D35 amends
+  S13.2; reversal: repo moves to an org (org-owner fine-grained PATs) or a GitHub App replaces PATs.
 
 ## 2026-07-11 · audit-db-schema (read-only, main@6666534) — doc-vs-code conflict found
 - **webhook_events append-only contradiction:** db-design §2 lists `webhook_events` among
