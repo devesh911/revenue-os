@@ -23,6 +23,8 @@ jobs:
       - run: bun run typecheck
 
       - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1 # G2: pin the whole toolchain, CLI included
 
       - name: Start local Supabase stack # real local stack for integration tests
         run: |
