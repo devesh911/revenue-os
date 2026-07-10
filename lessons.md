@@ -90,3 +90,9 @@
   only updated_at); §2 soft-delete list omits `companies` (DDL has deleted_at); §2 "IDs: uuid" vs
   messages bigint identity (intentional, volume); §9 seed path `seeds/` vs actual `supabase/seeds/`;
   migration 011 functions (app.handle_new_user, app.user_orgs) undocumented in db-design.
+- 2026-07-11 · task 11 · Local `docker build` "verification" was a layer-cache false positive —
+  the RUN install layer resolved from cache and never executed; CI's cold build exposed that
+  `bun install --frozen-lockfile` fails inside the image when a workspace manifest the lockfile
+  knows (apps/console/package.json) is missing from the build context. Fixed: COPY the manifest;
+  rule: image-build verification only counts cold (`--no-cache`). Same family as the CI lesson —
+  a gate that didn't actually RUN proves nothing (S13.7 corollary applies locally too).
