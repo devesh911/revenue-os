@@ -92,7 +92,7 @@ Every identifier used across the docs is registered here. **Rule: no new prefix 
 
 | Phase | Weeks | Ships | Demo milestone |
 |---|---|---|---|
-| P0 Foundation rails | 0–2 | Supabase project, migrations 000–007 from db-design, RLS + CI coverage test, auth + org bootstrap, Vite SPA + Hono skeleton deployed, audit spine | **M0** two isolated tenants, login, audit rows |
+| P0 Foundation rails | 0–2 | Supabase project, migrations 000–009 from db-design (§3–§8 + §13 + §14 — D33), RLS + CI coverage test, auth + org bootstrap, Vite SPA + Hono skeleton deployed, audit spine | **M0** two isolated tenants, login, audit rows |
 | P1 Talking demo | 2–5 | Vapi assembled (EN+HI), runtime v1 + 3 tools (book_appointment, update_contact, send_confirmation), qualification workflow from seed template, transcripts → schema | **M1** ☎ a number anyone can call; AI qualifies + books. **Outreach starts.** |
 | P2 Workflow spine | 5–8 | pg-boss + workflow_runs scheduler, WhatsApp channel + abstraction, dedupe, guardrails enforcement, handoff, rolling memory + KB RAG | **M2** multi-day lifecycle replay (call → no-answer → WA 2h → re-call next 11:00 → booked). Pilot signable. |
 | P3 Operator surface (thin) | 8–10 | 4 console screens, 6-metric dashboard, CSV import connector (D19), calendar, metering live | **M3** ceramic staff onboarded; their list flowing |
@@ -202,7 +202,7 @@ pino logs {org_id, run_id, conversation_id}; money = numeric+currency; phones = 
 ## 12. First 10 tasks for Claude Code (P0 backlog, acceptance criteria included)
 
 1. Scaffold monorepo per §7 (Bun workspaces); CI = Biome (incl. G1 rule) + typecheck + bun test + rls_coverage.sql against local Supabase + gitleaks. ✅ `bun test` green on empty project.
-2. Write migrations 000–007 verbatim from db-design §3–8. ✅ `supabase db reset` clean; all tables RLS-on.
+2. Write migrations 000–009 verbatim from db-design §3–§8 + §13 + §14 (D33). ✅ `supabase db reset` clean; all tables RLS-on (`bun run rls:check`).
 3. `packages/db`: app_service client wrapper that opens tx + `set_config('request.org_id', …)`. ✅ unit test proves cross-org read fails.
 4. Auth + org bootstrap flow (create org, invite member, roles). ✅ two tenants isolated (M0 check).
 5. Seed loader: `bun db:seed real_estate | b2b_wholesale`. ✅ dispositions/pipelines/guardrails/agent v1 rows exist.
