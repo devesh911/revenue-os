@@ -1,0 +1,4 @@
+# S13.6 — docs and the working agreement require Devesh's review (enforced once the main ruleset
+# requires code-owner review; see security.md S13.1).
+docs/**    @devesh911
+CLAUDE.md  @devesh911
