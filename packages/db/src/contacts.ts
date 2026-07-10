@@ -48,12 +48,13 @@ export async function importContacts(
 					   first_name = coalesce(first_name, nullif($3, '')),
 					   last_name  = coalesce(last_name,  nullif($4, '')),
 					   updated_at = now()
-					 where id = $1`,
+					 where id = $1 and org_id = $5`,
           [
             existing.rows[0].contact_id,
             JSON.stringify(attributes),
             row.first_name ?? "",
             row.last_name ?? "",
+            orgId,
           ],
         );
         summary.merged++;
