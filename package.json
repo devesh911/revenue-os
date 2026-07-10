@@ -1,8 +1,14 @@
 {
   "name": "revenue-os",
   "private": true,
-  "workspaces": ["apps/*", "services/*", "packages/*"],
-  "engines": { "bun": "PIN_ME_run_bun_--version" },
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "engines": {
+    "bun": "1.3.11"
+  },
   "scripts": {
     "dev": "bun run --filter services/worker dev & bun run --filter apps/console dev",
     "test": "bun test",
@@ -14,5 +20,10 @@
     "db:seed": "bun scripts/seed.ts",
     "rls:check": "psql \"$LOCAL_DB_URL\" -f tests/rls_coverage.sql",
     "evals": "bun scripts/evals.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.3",
+    "bun-types": "1.3.14",
+    "typescript": "7.0.2"
   }
 }
