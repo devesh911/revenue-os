@@ -1,7 +1,13 @@
 // Org bootstrap + membership helpers — the only sanctioned queries for these flows (D21).
 // G1: runtime-agnostic.
-import type { AddMember, CreateOrg, OrgRole } from "@revenue-os/shared";
+import type {
+  AddMember,
+  CreateOrg,
+  OrgRole,
+  UpdateOrg,
+} from "@revenue-os/shared";
 import type pg from "pg";
+import { audit } from "./audit";
 import { withOrg } from "./client";
 
 export interface OrgRow {
@@ -26,8 +32,46 @@ export async function createOrgWithAdmin(
       `insert into org_members (org_id, user_id, role) values ($1, $2, 'admin')`,
       [id, input.userId],
     );
+    await audit(tx, id, {
+      actorType: "user",
+      actorId: input.userId,
+      action: "org.create",
+      resourceType: "org",
+      resourceId: id,
+      after: { name: input.name, slug: input.slug, vertical: input.vertical },
+    });
   });
   return { id };
+}
+
+/** Sample audited mutation (task 6): rename an org — before/after captured atomically. */
+export async function updateOrg(
+  pool: pg.Pool,
+  orgId: string,
+  patch: UpdateOrg,
+  actorUserId: string,
+): Promise<{ name: string }> {
+  return withOrg(pool, orgId, async (tx) => {
+    const before = await tx.query(
+      `select name from orgs where id = $1 for update`,
+      [orgId],
+    );
+    if (before.rows.length === 0) throw new Error("org not found");
+    const after = await tx.query(
+      `update orgs set name = $2, updated_at = now() where id = $1 returning name`,
+      [orgId, patch.name],
+    );
+    await audit(tx, orgId, {
+      actorType: "user",
+      actorId: actorUserId,
+      action: "org.update",
+      resourceType: "org",
+      resourceId: orgId,
+      before: { name: before.rows[0].name },
+      after: { name: after.rows[0].name },
+    });
+    return { name: after.rows[0].name };
+  });
 }
 
 /** The caller's effective role in an org, honoring support-access expiry (D28). */
