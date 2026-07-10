@@ -8,7 +8,7 @@
 
 ## 0. ID Registry (the naming convention — one table, no exceptions)
 
-Every identifier used across the docs is registered here. **Rule: no new prefix class exists until it has a row in this table.** Ids within every class are append-only — assigned once in creation order, never renumbered or reused; gaps and out-of-numeric-order placement in documents are normal and expected.
+Every identifier used across the docs is registered here. **Rule: no new prefix class exists until it has a row in this table.** Ids within every class are append-only — assigned once in creation order, never renumbered or reused; gaps and out-of-numeric-order placement in documents are normal and expected. **Cross-reference rule (D34):** a change that alters facts other documents cite — file counts, section spans, task scopes — patches every citing doc in the same PR; citations are part of the change surface.
 
 | Prefix | Means | Numbered where | Example |
 |---|---|---|---|
@@ -92,7 +92,7 @@ Every identifier used across the docs is registered here. **Rule: no new prefix 
 
 | Phase | Weeks | Ships | Demo milestone |
 |---|---|---|---|
-| P0 Foundation rails | 0–2 | Supabase project, migrations 000–007 from db-design, RLS + CI coverage test, auth + org bootstrap, Vite SPA + Hono skeleton deployed, audit spine | **M0** two isolated tenants, login, audit rows |
+| P0 Foundation rails | 0–2 | Supabase project, migrations 000–009 from db-design (§3–§8 + §13 + §14 — D33), RLS + CI coverage test, auth + org bootstrap, Vite SPA + Hono skeleton deployed, audit spine | **M0** two isolated tenants, login, audit rows |
 | P1 Talking demo | 2–5 | Vapi assembled (EN+HI), runtime v1 + 3 tools (book_appointment, update_contact, send_confirmation), qualification workflow from seed template, transcripts → schema | **M1** ☎ a number anyone can call; AI qualifies + books. **Outreach starts.** |
 | P2 Workflow spine | 5–8 | pg-boss + workflow_runs scheduler, WhatsApp channel + abstraction, dedupe, guardrails enforcement, handoff, rolling memory + KB RAG | **M2** multi-day lifecycle replay (call → no-answer → WA 2h → re-call next 11:00 → booked). Pilot signable. |
 | P3 Operator surface (thin) | 8–10 | 4 console screens, 6-metric dashboard, CSV import connector (D19), calendar, metering live | **M3** ceramic staff onboarded; their list flowing |
@@ -211,6 +211,22 @@ pino logs {org_id, run_id, conversation_id}; money = numeric+currency; phones = 
 8. Vapi spike: provision number, hello-world assistant from `agents` row, webhook → `conversations`+`messages`. ✅ real call transcribed into DB.
 9. Contact CSV import (ceramic path): upload → identities → dedupe on (org, phone). ✅ duplicate rows merge.
 10. Console shell: auth guard, org switcher, empty four screens routed. ✅ deployed on Cloudflare Pages; Hono API reachable on the VPS behind Cloudflare.
+
+### 12b. P0 traceability — obligation → owner (D34)
+
+Doc-mandated obligations **not** covered by tasks 1–10 (the delta that makes "all tasks done" ≠ "P0 obligations met"), plus open residuals. A row is added whenever an ADR or law-doc creates an obligation without an owning task; a row leaves only by landing in a merged task PR or an explicit descope ADR.
+
+| Obligation | Source | Owner | Status |
+|---|---|---|---|
+| CI: dependency audit per PR | T14 · S12.1 | **task 11 (proposed): CI parity** | unowned → drafted here |
+| CI: `service_role` grep-guard (build fails if it appears outside `/.github/`) | S1.2 | task 11 | unowned → drafted here |
+| CI: secret-shaped grep over console `dist/` | S7.3 | task 11 (needs a console build step in CI) | unowned → drafted here |
+| CI: image build per PR | T14 | task 11 or task 14 (deploy) | unowned → drafted here |
+| S7.1 XSS-transcript render test in CI | S12.1 | P3 transcript-UI task | deferred by phase |
+| Playwright smoke over the four screens | T12 (layer 6) | P3 screen work (noted in PR #11) | deferred by phase |
+| Real Vapi call transcribed into DB (task 8 ✅) | §12.8 | **residual: Devesh** — VAPI key, number provisioning, real payload fixtures; S6.2 mechanism + VQG baseline | open |
+| Console on Pages + API on VPS behind Cloudflare (task 10 ✅) | §12.10 | **residual: Devesh** — §2.6 cloud steps | open |
+| Staging/prod deploy pipeline | T22 · dev-workflow §10 | task 14 (scaffold TODO in deploy.yml) | not started |
 
 ---
 *Amendments: decision protocol (dev-workflow.md §13) → ADR in docs/decisions/ + edits here in one PR → Decisions table updated. This document is self-contained; no conversation is required context.*
