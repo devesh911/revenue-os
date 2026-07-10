@@ -26,3 +26,10 @@ export const AddMemberSchema = z
   })
   .strict();
 export type AddMember = z.infer<typeof AddMemberSchema>;
+
+export const UpdateOrgSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+  })
+  .strict();
+export type UpdateOrg = z.infer<typeof UpdateOrgSchema>;

@@ -1,15 +1,16 @@
-// Org bootstrap routes — docs/patterns/hono-route.md shape: validate → authorize → do.
-// (audit() lands in task 6 and wires into org.create as the sample mutation.)
+// Org bootstrap routes — docs/patterns/hono-route.md shape: validate → authorize → do → audit.
 import {
   addMember,
   createOrgWithAdmin,
   memberRole,
+  updateOrg,
   userOrgs,
 } from "@revenue-os/db";
 import {
   AddMemberSchema,
   CreateOrgSchema,
   OrgIdSchema,
+  UpdateOrgSchema,
 } from "@revenue-os/shared";
 import { Hono } from "hono";
 import type { AuthEnv } from "../auth";
@@ -28,6 +29,15 @@ export const orgs = new Hono<AuthEnv>()
   .get("/orgs", async (c) => {
     const actor = c.get("actor");
     return c.json(await userOrgs(pool, actor.userId));
+  })
+  .patch("/orgs/:orgId", async (c) => {
+    const orgId = OrgIdSchema.parse(c.req.param("orgId"));
+    const body = UpdateOrgSchema.parse(await c.req.json());
+    const actor = c.get("actor");
+    const callerRole = await memberRole(pool, orgId, actor.userId); // S1.7 — admin gate
+    if (callerRole !== "admin") return c.json({ error: "forbidden" }, 403);
+    const updated = await updateOrg(pool, orgId, body, actor.userId);
+    return c.json({ id: orgId, name: updated.name });
   })
   .post("/orgs/:orgId/members", async (c) => {
     const orgId = OrgIdSchema.parse(c.req.param("orgId"));
