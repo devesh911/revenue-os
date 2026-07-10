@@ -19,11 +19,7 @@ let orgA = "";
 let orgB = "";
 
 beforeAll(async () => {
-  // Local-only bootstrap: the role is NOLOGIN by design (migration 010); tests flip it on
-  // with a throwaway local password. Never done in prod SQL — see docs/decisions D31 draft.
-  await admin.query(
-    `alter role app_service with login password 'app_service_local'`,
-  );
+  // app_service LOGIN flip happens once in tests/setup.local.ts (bun test preload)
   const res = await admin.query(
     `insert into orgs (name, slug) values
 		   ('RLS Test Org A', 'rls-test-a'), ('RLS Test Org B', 'rls-test-b')
