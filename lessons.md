@@ -36,3 +36,9 @@
 - 2026-07-10 · task 2 · db-design §1 mandates the `app_service` role but no migration creates it, and
   its password can't live in SQL anyway. Role creation + grants need a decided home before task 3
   (packages/db client). → Suggested: an ADR on role bootstrap per environment.
+- 2026-07-10 · task 8 · The CLAUDE.md gotcha "upsert by provider_ref" needs a uniqueness guarantee
+  db-design §6 doesn't have (convo_provider is a plain index). Added partial unique index
+  (012_conversations_provider_ref.sql). → Suggested: amend db-design §6. Also: interim org
+  resolution for Vapi webhooks = org id in the per-assistant server URL + shared secret; final
+  assistant-id mapping is a spike exit criterion (S6.2) — REAL payloads must replace the synthetic
+  fixtures during the spike (needs VAPI_API_KEY, Devesh).

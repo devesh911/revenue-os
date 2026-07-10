@@ -33,3 +33,23 @@ export const UpdateOrgSchema = z
   })
   .strict();
 export type UpdateOrg = z.infer<typeof UpdateOrgSchema>;
+
+// Vapi webhook envelope — only the fields we consume; everything else passes through
+// untouched (S6.5: payloads stay untrusted even after the signature check).
+export const VapiWebhookSchema = z
+  .object({
+    message: z
+      .object({
+        type: z.string(),
+        id: z.string().optional(),
+        timestamp: z.string().optional(),
+        call: z.object({ id: z.string() }).passthrough().optional(),
+        role: z.enum(["assistant", "user"]).optional(),
+        transcript: z.string().optional(),
+        summary: z.string().optional(),
+        endedReason: z.string().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+export type VapiWebhook = z.infer<typeof VapiWebhookSchema>;
