@@ -14,12 +14,13 @@
     "test": "bun test",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc -b --noEmit || tsc --noEmit -p tsconfig.base.json",
+    "typecheck": "tsc --noEmit -p tsconfig.base.json && tsc --noEmit -p apps/console",
     "db:migrate": "supabase db push",
     "db:reset": "supabase db reset",
     "db:seed": "bun scripts/seed.ts",
     "rls:check": "psql \"$LOCAL_DB_URL\" -f tests/rls_coverage.sql",
-    "evals": "bun scripts/evals.ts"
+    "evals": "bun scripts/evals.ts",
+    "dev:console": "bun run --filter console dev"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.3",
