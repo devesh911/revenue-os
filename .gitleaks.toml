@@ -1,0 +1,9 @@
+# gitleaks config (S9.3). The ONLY allowlisted path is the local-stack env file that was
+# briefly committed on feat/task-03 (removed same day): it contains the supabase LOCAL demo
+# anon key — designed-public (S7.3), valid only against localhost:54321. History rewrite is
+# forbidden by protocol (no force-push), so the path is allowlisted instead of purged.
+[extend]
+useDefault = true
+
+[allowlist]
+paths = ['''apps/console/\.env\.local''']
