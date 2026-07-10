@@ -201,7 +201,7 @@ pino logs {org_id, run_id, conversation_id}; money = numeric+currency; phones = 
 
 ## 12. First 10 tasks for Claude Code (P0 backlog, acceptance criteria included)
 
-1. Scaffold monorepo per §7 (Bun workspaces); CI = Biome (incl. G1 rule) + typecheck + bun test + rls_coverage.sql against local Supabase + gitleaks. ✅ `bun test` green on empty project.
+1. Scaffold monorepo per §7 (Bun workspaces); CI = Biome (incl. G1 rule) + typecheck + bun test + rls_coverage.sql against local Supabase + gitleaks. ✅ `bun test` green on empty project **and the `checks` workflow run observed green on a GitHub PR (`gh pr checks`) — local gates never substitute for an executed pipeline (D32/S13.7)**.
 2. Write migrations 000–007 verbatim from db-design §3–8. ✅ `supabase db reset` clean; all tables RLS-on.
 3. `packages/db`: app_service client wrapper that opens tx + `set_config('request.org_id', …)`. ✅ unit test proves cross-org read fails.
 4. Auth + org bootstrap flow (create org, invite member, roles). ✅ two tenants isolated (M0 check).
