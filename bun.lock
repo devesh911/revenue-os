@@ -31,6 +31,12 @@
     },
     "packages/harness": {
       "name": "@revenue-os/harness",
+      "dependencies": {
+        "zod": "4.4.3",
+      },
+      "devDependencies": {
+        "@revenue-os/db": "workspace:*",
+      },
     },
     "packages/shared": {
       "name": "@revenue-os/shared",
