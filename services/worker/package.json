@@ -1,1 +1,9 @@
-{ "name": "worker", "scripts": { "dev": "bun --watch src/index.ts" } }
+{
+  "name": "worker",
+  "scripts": {
+    "dev": "bun --watch src/index.ts"
+  },
+  "dependencies": {
+    "hono": "4.12.29"
+  }
+}

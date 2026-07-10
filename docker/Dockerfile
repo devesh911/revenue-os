@@ -1,5 +1,5 @@
 # G2: pin exact versions. G3 fallback: swap base to node:22-slim + Hono node adapter (docs/runbooks/node-fallback.md)
-FROM oven/bun:PIN_ME AS base
+FROM oven/bun:1.3.11 AS base
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages ./packages
