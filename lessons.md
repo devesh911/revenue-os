@@ -42,3 +42,16 @@
   resolution for Vapi webhooks = org id in the per-assistant server URL + shared secret; final
   assistant-id mapping is a spike exit criterion (S6.2) — REAL payloads must replace the synthetic
   fixtures during the spike (needs VAPI_API_KEY, Devesh).
+- 2026-07-10 · CI · The scaffold's compact-YAML workflows were unparseable (`${{ }}` inside flow
+  maps) — GitHub recorded "workflow file issue" failures on every push and NO job ever ran; local
+  gates masked it. Fixed: block YAML + test-env export step + `supabase init` fallback + CLI pinned
+  2.109.1 (unpinned runner CLI rejected v2.109 config keys). → Suggested: S13.7 corollary for the
+  docs — "a red/absent check is a stop signal; verify the pipeline RAN, not just that code passed
+  locally"; and G2 explicitly covers the supabase CLI version.
+- 2026-07-10 · CI · gitleaks (once actually running) caught a real near-miss: a `git add -A` format
+  commit on feat/task-03 committed `apps/console/.env.local` because that branch's .gitignore
+  predates the `.env.local` line. Contents = the LOCAL demo anon key (designed-public, S7.3) —
+  no real exposure. Removed + path allowlisted in .gitleaks.toml with justification (history
+  rewrite would need force-push, which protocol forbids). → Suggested S-control: ignore rules for
+  env-file patterns belong in the FIRST commit of a repo, and `git add -A` is banned in fix
+  commits touching branches with older .gitignore snapshots.

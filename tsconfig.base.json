@@ -18,8 +18,6 @@
   "include": [
     "packages/*/src/**/*.ts",
     "services/*/src/**/*.ts",
-    "apps/*/src/**/*.ts",
-    "apps/*/src/**/*.tsx",
     "scripts/**/*.ts"
   ]
 }
