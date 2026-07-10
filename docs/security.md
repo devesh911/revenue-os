@@ -91,6 +91,7 @@ Threat: **every caller and every uploaded KB document is untrusted input that ge
 - [ ] **S9.3** gitleaks in CI on every PR + a one-time full-history scan at repo creation.
 - [ ] **S9.4** pino `redact` paths cover authorization headers, tokens, phone-shaped strings in error contexts.
 - [ ] **S9.5** Rotation calendar (quarterly + on any suspicion): checklist in `docs/runbooks/rotation.md`; every key's owner and rotation date tracked in that file.
+- [ ] **S9.6** Repo hygiene from commit zero (D32): env-file ignore patterns (`.env*`) ship in the repo's FIRST commit; `git add -A` is forbidden in fix commits touching branches whose `.gitignore` predates current ignore rules (the 2026-07-10 near-miss: a stale-snapshot stack branch committed `.env.local`); gitleaks allowlists are **commit- or fingerprint-scoped, never bare paths** — a path allowlist blinds the scanner to future real secrets at that path.
 
 ## S10 · Data protection, backups, DPDP
 
@@ -118,13 +119,13 @@ Threat: **every caller and every uploaded KB document is untrusted input that ge
 
 Threat framing: an autonomous coding loop with shell access is an **insider with superhuman typing speed and no fear**. Deny-lists are UX guardrails, not boundaries — `Bash(rm -rf:*)` denied still leaves `bash -c`, `find -delete`, `cat ../.env`, `git push origin +main`. Real controls live in the **platform, the environment, and the capability set** — where no prompt can reach.
 
-- [ ] **S13.1** GitHub ruleset on `main` BEFORE the first autonomous session: PRs required, CI required, force-pushes and branch deletion blocked, **1 approval required** (the agent's token cannot approve — so merge is structurally human).
+- [ ] **S13.1** GitHub ruleset on `main` BEFORE the first autonomous session: PRs required, CI required, force-pushes and branch deletion blocked, **1 approval required** (the agent's token cannot approve — so merge is structurally human). **Bypass discipline (D32):** ruleset bypass roles must exclude every identity agents run under. Until the S13.2 bot identity exists, interactive (Mode A) sessions share the owner's bypass-capable identity — compensating controls are mandatory meanwhile: `gh pr merge`/`gh pr review` and force-push variants deny-listed in **both** repos' agent settings (root `.claude/settings.json` + `orchestrator/`), and "agents never merge" stays absolute.
 - [ ] **S13.2** Agent PAT is fine-grained: `contents:write` + `pull_requests:write` on this repo only. No admin, no actions, no secrets, no workflows scope. Lives only on the orchestrator machine.
 - [ ] **S13.3** **Secret-free execution environment.** The orchestrator machine/worktree holds zero production credentials; `.env` contains local-stack values only. Bash can `cat` anything — the control is that there is nothing to cat. Prod secrets exist exclusively in GitHub Environments (CI) and the VPS.
 - [ ] **S13.4** Writer agents (worker, tester) run **without WebFetch/WebSearch** — breaks the prompt-injection → exfiltration chain (untrusted web content must never meet shell access). The read-only scout may search; anything it fetches is treated as untrusted input.
 - [ ] **S13.5** Deny-lists (`rm -rf`, force-push, `Read(.env)`, `Edit(docs/**)` …) are kept as friction + audit signal — and documented as bypassable, never relied on as the boundary.
 - [ ] **S13.6** Human gates are structural: PR merge (S13.1), prod deploys only via a tagged release cut by Devesh, and `docs/**` merges require Devesh's review (ruleset path rule). Agents may DRAFT ADRs; only a human merges them.
-- [ ] **S13.7** **CI is the trust anchor.** Local gate output from agents is advisory; merge decisions read the CI checks on the PR, never the agent's claim that "tests pass".
+- [ ] **S13.7** **CI is the trust anchor.** Local gate output from agents is advisory; merge decisions read the CI checks on the PR, never the agent's claim that "tests pass". **Corollary (D32):** a red or *absent* check is a stop signal — verify the pipeline **ran**, not merely that code passed locally. Every local gate can be green while CI is structurally dead (2026-07-10: unparseable workflow YAML meant no job had *ever* executed while ten PRs shipped); the per-task loop therefore observes `gh pr checks` green before proceeding (dev-workflow §4B).
 - [ ] **S13.8** Orchestrator runs in a disposable container/dedicated user where practical; `autoresume.log` + HANDOFF history retained (the audit trail of an autonomous night).
 - [ ] **S13.9** Kill-switch rehearsed: revoke the PAT + `gh auth logout` + stop the watchdog — in docs/runbooks/incident.md. `NEED_HUMAN` sentinels halt the loop by design; silence past a deadline is treated as failure, not success.
 

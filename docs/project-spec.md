@@ -201,10 +201,8 @@ pino logs {org_id, run_id, conversation_id}; money = numeric+currency; phones = 
 
 ## 12. First 10 tasks for Claude Code (P0 backlog, acceptance criteria included)
 
-> **Acceptance-criteria protocol (D34):** every ✅ is classed **agent-verifiable** (a session proves it with local/CI evidence) or **human-gated** (needs Devesh-held resources: keys, accounts, cloud). Human-gated leftovers are **residuals**: listed under ⚠ in the PR body and mirrored in HANDOFF ESCALATIONS; the task closes as *done (residual: …)*, never silently *done*. A residual is closed only by the human action it names — tracked in §12b until then.
-
-1. Scaffold monorepo per §7 (Bun workspaces); CI = Biome (incl. G1 rule) + typecheck + bun test + rls_coverage.sql against local Supabase + gitleaks. ✅ `bun test` green on empty project.
-2. Write migrations 000–009 verbatim from db-design §3–§8 + §13 + §14 (D33). ✅ `supabase db reset` clean; all tables RLS-on (`bun run rls:check`).
+1. Scaffold monorepo per §7 (Bun workspaces); CI = Biome (incl. G1 rule) + typecheck + bun test + rls_coverage.sql against local Supabase + gitleaks. ✅ `bun test` green on empty project **and the `checks` workflow run observed green on a GitHub PR (`gh pr checks`) — local gates never substitute for an executed pipeline (D32/S13.7)**.
+2. Write migrations 000–007 verbatim from db-design §3–8. ✅ `supabase db reset` clean; all tables RLS-on.
 3. `packages/db`: app_service client wrapper that opens tx + `set_config('request.org_id', …)`. ✅ unit test proves cross-org read fails.
 4. Auth + org bootstrap flow (create org, invite member, roles). ✅ two tenants isolated (M0 check).
 5. Seed loader: `bun db:seed real_estate | b2b_wholesale`. ✅ dispositions/pipelines/guardrails/agent v1 rows exist.
