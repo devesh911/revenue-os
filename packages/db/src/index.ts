@@ -3,6 +3,7 @@
 
 export { type ActorType, type AuditEntry, audit } from "./audit";
 export { createPool, type PoolClient, withOrg } from "./client";
+export { type ImportSummary, importContacts } from "./contacts";
 export {
   addMember,
   createOrgWithAdmin,
