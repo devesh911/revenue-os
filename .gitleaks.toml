@@ -1,15 +1,8 @@
-# gitleaks config (S9.3). The ONLY allowlisted findings are the two historical commits that
-# carried the supabase LOCAL demo anon key in apps/console/.env.local — briefly committed on
-# feat/task-03 (stale .gitignore) and removed the same day. The key is designed-public (S7.3),
-# valid only against localhost:54321. History rewrite is forbidden by protocol (no force-push),
-# so those exact commits are excused instead of purged. Commit-scoped, NEVER path-scoped: a
-# path allowlist would hide any FUTURE secret at that path (lessons.md 2026-07-10, D32).
-# Adding a sha here requires updating tests/gitleaks-config.test.ts in the same PR.
+# gitleaks config (S9.3).
+# History note: apps/console/.env.local (the LOCAL demo anon key — designed-public, S7.3) was
+# briefly committed at 4796388 and removed same day. A path allowlist used to live here; it was
+# removed 2026-07-11 because it permanently blinded the scanner to that path — the single
+# historical commit is ignored by fingerprint in .gitleaksignore instead (commit-scoped, so any
+# FUTURE secret landing on that path is caught again).
 [extend]
 useDefault = true
-
-[allowlist]
-commits = [
-  "479638836a9d8776095dadda4a85b22182c66e82", # env.local slipped into the biome-format commit
-  "b20759513e5bdbb5aa235df7051be937cedc31ec", # its removal — the deletion patch still shows the key
-]

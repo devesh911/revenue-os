@@ -1,0 +1,4 @@
+# Commit-scoped ignores (S9.3). Format: <commit>:<file>:<rule>:<line>
+# The local-stack demo anon key, committed once at 4796388 and removed same day —
+# designed-public (S7.3), valid only against localhost:54321. See lessons.md 2026-07-10.
+479638836a9d8776095dadda4a85b22182c66e82:apps/console/.env.local:jwt:2
