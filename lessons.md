@@ -211,3 +211,7 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   .gitleaksignore fingerprint, dropped the b207595 excusal; CI test caught it). Root cause: the
   queue item outlived its landing. Rule: before executing any queued/NEXT item, diff the intent
   against current main first; a red CI on a "fix" branch may mean main already has the fix.
+- 2026-07-11 (pgboss wiring): two 42501s worth remembering. ① The managed migration role cannot
+  `create schema … authorization app_service` (can't SET ROLE to a non-member role) — grant
+  usage+create on the schema instead. ② pg-boss boss.start() always attempts CREATE SCHEMA and
+  needs database-level CREATE — `createSchema: false` skips it; ship the schema in a migration.
