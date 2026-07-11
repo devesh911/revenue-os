@@ -140,6 +140,15 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   S3.3 edge-header + S5.9 header hygiene match spec (api.example.com placeholder = task 14).
 - Observed in parent tree, not mine: untracked supabase/migrations/013_advisors_hardening.sql.
 
+## 2026-07-11 · gitleaks commit-scoping (fix/gitleaks-commit-scoping)
+- Verified with the real binary (8.30.1, full history + planted-secret controls): old path allowlist
+  MISSED a fresh AKIA key committed at apps/console/.env.local; commit-scoped config catches it and
+  keeps history clean. Note: 8.30.1 flags only the ADD commit (4796388), not the removal's deletion
+  patch — b207595 stays excused defensively (its patch shows the key; action versions may differ).
+- Fresh worktrees can't run env-dependent integration tests: bun auto-loads .env from project root,
+  and .env* is deny-railed even for copying local demo values. Equivalence run in the main checkout
+  + CI-as-verdict (S13.7) is the protocol-clean gate for worktree sessions.
+
 ## 2026-07-11 · operating-model reset (v2) — session findings
 - "Everything looks broken" root cause: a stale worktree under .claude/worktrees/ (left by a parallel
   session) made `biome check .` fail repo-wide — Biome 2 treats a checked-out nested biome.json as a
