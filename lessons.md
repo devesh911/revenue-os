@@ -206,3 +206,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   anchor held) but the local rule is now: gates run BARE to a file (capture $? explicitly), and
   never in the same && chain as commit/push. The gates script being honest doesn't help if the
   invocation shape re-introduces the swallow.
+- 2026-07-11 (post-move session): a queued task ("gitleaks commit-scoping", PR #28) re-executed
+  work that had already merged as #21 — and the re-execution was WORSE than main (single-commit
+  .gitleaksignore fingerprint, dropped the b207595 excusal; CI test caught it). Root cause: the
+  queue item outlived its landing. Rule: before executing any queued/NEXT item, diff the intent
+  against current main first; a red CI on a "fix" branch may mean main already has the fix.
