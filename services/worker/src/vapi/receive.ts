@@ -9,6 +9,7 @@ import { withOrg } from "@revenue-os/db";
 import { OrgIdSchema, VapiWebhookSchema } from "@revenue-os/shared";
 import { Hono } from "hono";
 import { pool } from "../db";
+import { enqueueVapiProcess } from "../jobs";
 
 function secretMatches(
   candidate: string | undefined,
@@ -52,6 +53,10 @@ export const vapiWebhook = new Hono().post(
         [orgId, m.type, dedupeKey, raw],
       );
     });
+
+    // after the insert commits: nudge the consumer (still S6.4 — the side effects live
+    // in the processor; losing this nudge is safe, see jobs.ts)
+    await enqueueVapiProcess(orgId);
 
     return c.body(null, 202); // fast, information-free
   },

@@ -3,6 +3,7 @@
 import { Hono } from "hono";
 import { ZodError } from "zod";
 import { type AuthEnv, requireAuth } from "./auth";
+import { startJobs } from "./jobs";
 import { logger } from "./logger";
 import { contacts } from "./routes/contacts";
 import { conversations } from "./routes/conversations";
@@ -37,5 +38,14 @@ app.onError((err, c) => {
   return c.json({ error: "internal" }, 500);
 });
 
-// TODO task 7: mount packages/harness loop consumers; task 8: Vapi webhook (verify RAW-body signature -> webhook_events)
+// TODO task 7: mount packages/harness loop consumers
+// pg-boss consumers boot with the server, never on test import (import.meta.main is
+// false under bun test). Half-configured boot = refuse to run, same posture as env.ts.
+if (import.meta.main) {
+  startJobs().catch((err) => {
+    logger.error({ err }, "pg-boss failed to start — worker refuses to boot");
+    process.exit(1);
+  });
+}
+
 export default { port: 8080, fetch: app.fetch };

@@ -24,12 +24,12 @@ Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicat
 2. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
-3. Wire the P2 pg-boss consumer for webhook_events → processVapiEvents (processor currently invoked
-   only by tests/spike; receiver+processor both proven live-locally).
-4. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
+3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
 
 ## IN FLIGHT
-- (none)
+- feat/pgboss-webhook-consumer (this PR): P2 queue wiring — receiver enqueues
+  `webhook.process.vapi`, pg-boss consumer drains via processVapiEvents; migration 015
+  (pgboss schema home); worker boots consumers via import.meta.main (proven live).
 
 ## WAITING ON DEVESH
 - VPS box + Cloudflare Pages connect — NEXT 1 and 2 ride these (Supabase cloud + GitHub env are done).
@@ -49,6 +49,9 @@ Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicat
   whenever docs are next touched.
 - Extensions schema: DONE — migration 014 (#26) moved vector+pg_trgm to `extensions`; role
   search_path carries unqualified runtime access; migration DDL must qualify from now on.
+- The T26.4 closed job-type set gains `webhook.process.vapi` (receiver-enqueued drain; RLS makes
+  a cross-org sweep impossible for app_service, so the org id rides the job). Docs catch up
+  whenever tech-stack is next touched.
 - bun-types stays pinned to the bun engine version (both 1.3.11).
 - Cloudflare Bot Fight Mode stays OFF (S4.3 conflict): non-Enterprise BFM is zone-wide, no per-path
   skip, and would challenge Vapi webhooks (lost call events). Revisit when apps/www exists.
