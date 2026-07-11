@@ -106,3 +106,12 @@
   extensions bare → public; Supabase convention is an `extensions` schema. → §13 decision: amend §3
   + an expand-contract move, or accept and document. Also cosmetic: db-design §4's policy pattern
   could adopt the (select …) wrap for future tables. Advisors belongs in the Friday cadence (S12.3).
+
+## 2026-07-11 · gitleaks commit-scoping (fix/gitleaks-commit-scoping)
+- Verified with the real binary (8.30.1, full history + planted-secret controls): old path allowlist
+  MISSED a fresh AKIA key committed at apps/console/.env.local; commit-scoped config catches it and
+  keeps history clean. Note: 8.30.1 flags only the ADD commit (4796388), not the removal's deletion
+  patch — b207595 stays excused defensively (its patch shows the key; action versions may differ).
+- Fresh worktrees can't run env-dependent integration tests: bun auto-loads .env from project root,
+  and .env* is deny-railed even for copying local demo values. Equivalence run in the main checkout
+  + CI-as-verdict (S13.7) is the protocol-clean gate for worktree sessions.
