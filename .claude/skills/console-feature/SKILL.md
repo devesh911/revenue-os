@@ -21,5 +21,9 @@ description: Use BEFORE building or changing anything in apps/console — screen
 ## Commands
 `bun run dev:console` · `bun run typecheck` (covers the console project) · `bun test` · e2e = Playwright smoke (T12 — lands with P3 screen work).
 
+## Learned since this router was written (dynamic — run it, don't skip)
+`grep -inE 'console|react|tanstack|xss|S7|browser|cors|vite' lessons.md` and read `STATE.md → DECISIONS`.
+Findings there outrank this file; on contradiction follow the lesson and note that this skill needs a refresh.
+
 ## Before you finish
 Dev-workflow §6 DoD, including the line "frontend: R1–R9 respected". No `dangerouslySetInnerHTML` (S7.1). Contradiction found → `lessons.md` + §13 triage.

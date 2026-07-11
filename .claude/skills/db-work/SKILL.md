@@ -12,7 +12,7 @@ description: Use BEFORE any migration, schema, RLS policy, index, seed, or packa
 4. The § that owns your tables: §5 CRM · §6 conversations/outcomes · §7 harness · §8 ops · §13 prospects · §14 support access.
 5. `docs/dev-workflow.md` §7 — expand–contract only; **never edit applied migrations**.
 6. `docs/patterns/drizzle-query.md` — imitate over training memory.
-7. `lessons.md` — search `task 2`, `db`, `migration` before assuming the docs are complete.
+7. **Learned since (dynamic — run it, don't skip):** `grep -inE 'migration|rls|db-design|schema|index|seed|42501|42704' lessons.md` and read `STATE.md → DECISIONS`. Findings there outrank this file; on contradiction follow the lesson and note that this skill needs a refresh.
 
 ## Review-blocking (CLAUDE.md non-negotiables)
 - New table ⇒ `org_id` + policies in the same migration + `tests/rls_coverage.sql` expectation + a cross-tenant denial test (S1.1/S1.4).

@@ -21,3 +21,6 @@ Edit `docs/**` or `CLAUDE.md` outside such a PR · renumber or reuse D/T/S/G ids
 
 ## Reference examples in the repo
 `docs/decisions/D33-*` (execution-truth alignment) · `D34-*` (protocol change with §12b) · `D35-*` (constraint discovered by tooling). Imitate their shape.
+
+## Learned since this router was written (dynamic — run it, don't skip)
+`grep -inE 'doc|ADR|§13|spec|contradiction' lessons.md` and read `STATE.md → DECISIONS` — under the v2 operating model (AGENTS.md), docs are reference and STATE.md DECISIONS is where open forks live; several lessons entries are themselves pending doc amendments. Findings there outrank this file.
