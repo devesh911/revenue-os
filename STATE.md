@@ -27,10 +27,10 @@ Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicat
 3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
 
 ## IN FLIGHT
-- fix/worker-cors-preflight (this PR): the console had NEVER been browser-driven — the
-  preflight OPTIONS hit requireAuth → 401, killing every console→worker call. hono/cors
-  now answers preflights before auth, explicit origin allowlist via CORS_ORIGINS
-  (default localhost:5173). Found during the first live console demo.
+- feat/skills-dynamic-learning (this PR, #32): harness-agent skill router + dynamic
+  "learned since" stanzas (grep lessons.md + STATE.md DECISIONS at invocation) in all
+  six skills. task-loop's merge/Never text is stale vs v2.1 but classifier-locked
+  against agent edits — refresh is Devesh's (lessons.md 2026-07-11).
 
 ## WAITING ON DEVESH
 - VPS box + Cloudflare Pages connect — NEXT 1 and 2 ride these (Supabase cloud + GitHub env are done).
@@ -60,8 +60,8 @@ Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicat
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- #31 worker CORS preflight before auth — console→worker browser calls unblocked — 2026-07-11
 - #30 pg-boss webhook consumer — receiver enqueues, consumer drains; migration 015 — 2026-07-11
 - #29 STATE refresh post-move; #28 CLOSED unmerged (duplicate of #21) — 2026-07-11
 - #27 vapi spike local half (account verified, receiver 500→400, root dev script fixed) — 2026-07-11
 - #26 migration 014 — vector + pg_trgm to `extensions` schema — 2026-07-11
-- #25 transcript UI + S7.1 XSS render-as-text test (closes last S12.1 control) — 2026-07-11

@@ -22,5 +22,9 @@ description: Use BEFORE touching services/worker — webhook receivers or proces
 ## Commands
 `bun test services/worker` · full suite `bun test` · local env comes from `supabase status` (see the export step in `.github/workflows/ci.yml`).
 
+## Learned since this router was written (dynamic — run it, don't skip)
+`grep -inE 'webhook|vapi|pg-?boss|worker|hono|cors|dedupe' lessons.md` and read `STATE.md → DECISIONS`.
+Findings there outrank this file; on contradiction follow the lesson and note that this skill needs a refresh.
+
 ## Before you finish
-Dev-workflow §6 DoD. Contract tests must cover out-of-order + duplicate delivery (T12 layer 4). Synthetic fixtures are interim — real recorded payloads replace them at the task-8 spike (spec §12b residual).
+Dev-workflow §6 DoD. Contract tests must cover out-of-order + duplicate delivery (T12 layer 4). Synthetic fixtures are interim — real recorded payloads replace them at the task-8 spike (spec §12b residual). Browser-shaped surfaces need one browser-shaped verification before "done" (lessons.md 2026-07-11).

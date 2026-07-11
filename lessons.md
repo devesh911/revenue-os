@@ -219,3 +219,9 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   in-process app.fetch tests bypass CORS entirely, so the missing CORS layer (preflight OPTIONS
   hit requireAuth → 401) was invisible until a human opened localhost:5173. Browser-shaped
   surfaces need at least one browser-shaped verification before "done".
+- 2026-07-11 · skills-dynamic-learning · task-loop SKILL.md's merge section ("human-only", "merge
+  commits never squash") is stale vs the v2.1 autonomy grant in STATE.md, but the auto-mode
+  classifier blocks agents from editing it in the loosening direction — even to sync with an
+  already-granted posture, even via "STATE.md supersedes" pointer language. Correct boundary
+  (guard text is a guard). → Suggested: Devesh refreshes task-loop's Never/merge sections himself;
+  until then the skill's dynamic stanza + STATE.md carry the current posture.

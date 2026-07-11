@@ -25,3 +25,9 @@ Merge or approve anything · edit `docs/**`, `CLAUDE.md`, or applied migrations 
 
 ## Merge discipline (human-only; cite when asked)
 Stacked PRs merge ONE at a time · confirm the base retargeted to `main` before each (`gh pr view N --json baseRefName`) · merge commits, never squash · never loop `gh pr merge` (lessons.md, 2026-07-10).
+
+## Learned since this router was written (dynamic — run it, don't skip)
+`grep -inE 'gates|CI|pipe|worktree|queue|exit code' lessons.md` and read `STATE.md → DECISIONS`.
+Findings there outrank this file's snapshot; on contradiction follow the lesson and note that this skill
+needs a refresh. Standing examples this stanza would have caught: gates run BARE, pipes swallow exit
+codes · diff queued/NEXT items against current main before executing (the #28 duplicate).
