@@ -59,7 +59,9 @@ log("auth.assistant-list", {
     : null,
 });
 if (assistants.status === 401 || assistants.status === 403) {
-  console.error("Key rejected — check VAPI_API_KEY in .env (private key, not public).");
+  console.error(
+    "Key rejected — check VAPI_API_KEY in .env (private key, not public).",
+  );
   process.exit(1);
 }
 if (assistants.status !== 200) failures++;
@@ -117,3 +119,5 @@ if (!createdId) {
 
 log("spike.result", { failures });
 process.exit(failures === 0 ? 0 : 1);
+
+export {}; // top-level await requires module context (TS1375)
