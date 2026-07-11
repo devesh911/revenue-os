@@ -15,19 +15,22 @@ Updated: 2026-07-11 (autonomy-live refresh, after the #21→#23 merge train)
 - No cloud project exists yet — the extensions-schema move (migration 014) is still a cheap edit.
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Vapi real-call spike (task-8 residual) — blocked on VAPI_API_KEY (WAITING).
-2. Staging deploy per runbook (supabase cloud project + VPS/Cloudflare) — blocked on WAITING.
-3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
-(Everything unblocked is DONE — items 1–2 need Devesh's credentials; see WAITING.)
+1. Staging deploy per runbook (task 14): supabase cloud Phase 0–2 + VPS — blocked on WAITING.
+2. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+   confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
+   trunk — Exotel/Plivo; account has 0 numbers/credentials).
+3. Wire the P2 pg-boss consumer for webhook_events → processVapiEvents (processor currently invoked
+   only by tests/spike; receiver+processor both proven live-locally).
+4. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
 
 ## IN FLIGHT
-- feat/migration-014-extensions-schema (this PR): vector+pg_trgm → `extensions` schema; closes the
-  last advisors warning class and clears the pre-cloud-push precondition. Future migration DDL must
-  schema-qualify: `extensions.vector(1536)`, `extensions.gin_trgm_ops`.
+- feat/vapi-spike-local (this PR): Vapi local spike — account/key verified, S6.2 config half
+  confirmed, receiver 500→400 fix (repro-first), root `bun run dev` fixed (never worked),
+  scripts/spike-vapi.ts committed for post-VPS reruns.
 
 ## WAITING ON DEVESH
-- VAPI_API_KEY (task-8 acceptance + P1 talking demo).
-- Supabase cloud project (staging) when ready to deploy — runbook in orchestrator/state + session reports.
+- Supabase cloud project Phase 0–1 (runbook) + VPS box + Cloudflare Pages connect — the whole NEXT queue rides these.
+- Vapi India telephony decision inputs: Exotel vs Plivo SIP trunk account (spec risk #4).
 - Stale merged branches: agents are classifier-blocked from `git push origin --delete`; run flip-kit
   item 5 (orchestrator/state/FLIP-KIT-2026-07-11.md) or leave them.
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
@@ -41,6 +44,10 @@ Updated: 2026-07-11 (autonomy-live refresh, after the #21→#23 merge train)
 - Extensions schema: DONE — migration 014 moved vector+pg_trgm to `extensions` (this PR); role
   search_path carries unqualified runtime access; migration DDL must qualify from now on.
 - bun-types stays pinned to the bun engine version (both 1.3.11).
+- Cloudflare Bot Fight Mode stays OFF (S4.3 conflict): non-Enterprise BFM is zone-wide, no per-path
+  skip, and would challenge Vapi webhooks (lost call events). Revisit when apps/www exists.
+- Vapi `server.secret` is write-only at the API (GET never echoes it): .env/password-manager holds
+  the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
 - #23 task 13 pipeline hardening (.dockerignore, SHA pins, honest deploy skips, CI fail-fast) — 2026-07-11

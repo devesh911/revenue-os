@@ -91,6 +91,23 @@ describe("vapi webhook receiver (S6)", () => {
     expect(r.rows[0].n).toBe(0);
   });
 
+  it("malformed JSON with a valid secret is a clean 400, never a 5xx (S5.8)", async () => {
+    // repro from the 2026-07-11 local E2E spike: JSON.parse threw before safeParse,
+    // landing in onError as a logged internal -> 500 (invites provider retry storms)
+    const res = await app.fetch(
+      new Request(`http://localhost/webhooks/vapi/${orgId}`, {
+        method: "POST",
+        headers: new Headers({
+          "content-type": "application/json",
+          "x-vapi-secret": SECRET,
+        }),
+        body: "not json{{",
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_payload" });
+  });
+
   it("accepts a signed event fast (202) and dedupes exact replays (S6.3)", async () => {
     const ev = transcriptEvent(
       1,
