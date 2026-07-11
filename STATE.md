@@ -15,13 +15,15 @@ Updated: 2026-07-11 (autonomy-live refresh, after the #21→#23 merge train)
 - No cloud project exists yet — the extensions-schema move (migration 014) is still a cheap edit.
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Migration 014: move vector + pg_trgm from `public` to `extensions` schema — BEFORE first cloud push.
-2. Vapi real-call spike (task-8 residual) — blocked on VAPI_API_KEY (WAITING).
-3. Staging deploy per runbook (supabase cloud project + VPS/Cloudflare) — blocked on WAITING.
-4. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
+1. Vapi real-call spike (task-8 residual) — blocked on VAPI_API_KEY (WAITING).
+2. Staging deploy per runbook (supabase cloud project + VPS/Cloudflare) — blocked on WAITING.
+3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
+(Everything unblocked is DONE — items 1–2 need Devesh's credentials; see WAITING.)
 
 ## IN FLIGHT
-- feat/transcript-ui-s71 (this PR): transcript screen + S7.1 XSS test — closes the last S12.1 control.
+- feat/migration-014-extensions-schema (this PR): vector+pg_trgm → `extensions` schema; closes the
+  last advisors warning class and clears the pre-cloud-push precondition. Future migration DDL must
+  schema-qualify: `extensions.vector(1536)`, `extensions.gin_trgm_ops`.
 
 ## WAITING ON DEVESH
 - VAPI_API_KEY (task-8 acceptance + P1 talking demo).
@@ -36,7 +38,8 @@ Updated: 2026-07-11 (autonomy-live refresh, after the #21→#23 merge train)
   (secrets/cloud/tenancy/history/sends) unchanged; guard loosening remains human-only.
 - webhook_events is a lifecycle table: payload immutable, status/processed_at mutable. Docs catch up
   whenever docs are next touched.
-- Extensions schema: default = migration 014 moves vector+pg_trgm to `extensions` before any cloud push.
+- Extensions schema: DONE — migration 014 moved vector+pg_trgm to `extensions` (this PR); role
+  search_path carries unqualified runtime access; migration DDL must qualify from now on.
 - bun-types stays pinned to the bun engine version (both 1.3.11).
 
 ## RECENT (last 5 landings, newest first)
