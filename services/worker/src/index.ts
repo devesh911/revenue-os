@@ -1,8 +1,10 @@
 // ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (tech-stack T5/T7/T8, harness T26)
 // Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (G1).
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { ZodError } from "zod";
 import { type AuthEnv, requireAuth } from "./auth";
+import { env } from "./env";
 import { startJobs } from "./jobs";
 import { logger } from "./logger";
 import { contacts } from "./routes/contacts";
@@ -11,6 +13,17 @@ import { orgs } from "./routes/orgs";
 import { vapiWebhook } from "./vapi/receive";
 
 const app = new Hono<AuthEnv>();
+
+// CORS before EVERYTHING: browser preflights (OPTIONS) carry no Authorization, so this
+// must answer them before requireAuth. Explicit origin allowlist (S3/S4) — never "*".
+app.use(
+  "*",
+  cors({
+    origin: (origin) => (env.CORS_ORIGINS.includes(origin) ? origin : null),
+    allowHeaders: ["authorization", "content-type"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
 
 app.get("/health", (c) => c.json({ ok: true })); // S5.9: information-free
 app.get("/ready", (c) =>
