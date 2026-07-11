@@ -215,3 +215,7 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   `create schema … authorization app_service` (can't SET ROLE to a non-member role) — grant
   usage+create on the schema instead. ② pg-boss boss.start() always attempts CREATE SCHEMA and
   needs database-level CREATE — `createSchema: false` skips it; ship the schema in a migration.
+- 2026-07-11 (first live console drive): the console had never been driven from a real browser —
+  in-process app.fetch tests bypass CORS entirely, so the missing CORS layer (preflight OPTIONS
+  hit requireAuth → 401) was invisible until a human opened localhost:5173. Browser-shaped
+  surfaces need at least one browser-shaped verification before "done".
