@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     expose: ["8080"]
   caddy:
-    image: caddy:2
+    image: caddy:2.11.4 # G2: exact pin (was caddy:2 — the one floating tag in the stack)
     restart: unless-stopped
     ports: ["443:443", "80:80"]
     volumes: [ "./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data" ]

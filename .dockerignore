@@ -1,0 +1,14 @@
+# Deny-all; allowlist exactly what docker/Dockerfile COPYs (context is the repo root
+# for both CI and docker-compose). .env, .git, node_modules, dist must never reach the
+# docker daemon — a future `COPY . .` would otherwise bake secrets into a shipped layer.
+*
+!package.json
+!bun.lock
+!apps/console/package.json
+!packages
+!services/worker
+# nested junk inside the allowlisted trees
+**/node_modules
+**/dist
+**/.env*
+**/*.test.ts

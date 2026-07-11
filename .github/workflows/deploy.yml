@@ -5,20 +5,31 @@ on:
   release:
     types: [published] # tag -> prod
 
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false # deploys must not preempt each other mid-flight
+
 jobs:
   staging:
-    if: github.event_name == 'push'
+    # task-14 arms this (restore: github.event_name == 'push').
+    # Until then the job SKIPS — a 7s echo reporting "deploy success" on every
+    # main push made history indistinguishable from real deploys.
+    if: false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build + ship to VPS (staging stack)
         run: echo "TODO task-14 - docker build, save, scp, compose up staging, then Playwright smoke"
 
   prod:
-    if: github.event_name == 'release'
+    # task-14 arms this (restore: github.event_name == 'release')
+    if: false
     runs-on: ubuntu-latest
     environment: production # secrets live here only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Migrations first, then image swap, then health gate
         run: echo "TODO task-14 - supabase db push (prod), compose pull+up, curl /health + /ready"
