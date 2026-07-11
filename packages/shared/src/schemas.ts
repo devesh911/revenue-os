@@ -2,6 +2,7 @@
 import { z } from "zod";
 
 export const OrgIdSchema = z.string().uuid();
+export const ConversationIdSchema = z.string().uuid();
 
 export const OrgRoleSchema = z.enum(["admin", "operator", "viewer"]);
 export type OrgRole = z.infer<typeof OrgRoleSchema>;
