@@ -168,3 +168,16 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   docs-as-law turned every drift into governance work serialized through one human. v2: AGENTS.md is the
   one-page contract, STATE.md the single living state, docs/ demoted to reference (spec §12 + patterns/
   stay load-bearing). Product throughput is the metric that matters again.
+
+## 2026-07-11 · transcript-UI S7.1 (feat/transcript-ui-s71) — spec-authoring lesson
+- RED assertion bug: `not.toContain("onerror=")` on renderToStaticMarkup output can NEVER pass
+  together with "content survives as escaped text" — React escapes `<>&"'` but not `=`, so the
+  escaped TEXT legitimately contains the substring. Worker (Opus) proved the inseparability and
+  flagged it instead of silently editing the spec (correct behavior); its interim fix (zero-width
+  chars injected into `on…=`/`javascript:` markers) was rejected in review: transcripts are
+  evidence-grade tenant data — sanitizers must never rewrite them; escaping alone makes them inert.
+  Final spec asserts markup-CONTEXT (`/<[^>]*\bonerror\s*=/`) + verbatim round-trip + no U+200B.
+  Rule: XSS assertions target tag contexts, never raw substrings of escaped output.
+- react/react-dom added to ROOT devDependencies (same 19.2.7 as console): bun does not hoist
+  console's react to the root in a fresh install, so root tests/ importing react-dom/server would
+  fail in CI. Not a new dependency — a root-level declaration of an existing one.

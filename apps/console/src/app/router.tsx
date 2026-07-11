@@ -3,6 +3,7 @@ import { Link, Redirect, Route, Switch, useParams } from "wouter";
 import { useOrgsQuery } from "../features/orgs/api";
 import { supabase } from "../lib/supabase";
 import { ContactTimeline, Dashboard, LiveMonitor, TaskQueue } from "../screens";
+import { ConversationTranscript } from "../screens/transcript";
 import { OrgSwitcher } from "./OrgSwitcher";
 
 const SCREENS = [
@@ -68,6 +69,10 @@ function OrgLayout() {
 export function Router() {
   return (
     <Switch>
+      <Route
+        path="/o/:orgId/conversations/:conversationId"
+        component={ConversationTranscript}
+      />
       <Route path="/o/:orgId/:screen" component={OrgLayout} />
       <Route path="/" component={OrgHome} />
       <Route>

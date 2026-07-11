@@ -15,13 +15,13 @@ Updated: 2026-07-11 (autonomy-live refresh, after the #21→#23 merge train)
 - No cloud project exists yet — the extensions-schema move (migration 014) is still a cheap edit.
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. P1 transcript screen in console + S7.1 XSS render-as-text test (last unchecked S12.1 control; no external creds).
-2. Migration 014: move vector + pg_trgm from `public` to `extensions` schema — BEFORE first cloud push.
-3. Vapi real-call spike (task-8 residual) — blocked on VAPI_API_KEY (WAITING).
-4. Staging deploy per runbook (supabase cloud project + VPS/Cloudflare) — blocked on WAITING.
+1. Migration 014: move vector + pg_trgm from `public` to `extensions` schema — BEFORE first cloud push.
+2. Vapi real-call spike (task-8 residual) — blocked on VAPI_API_KEY (WAITING).
+3. Staging deploy per runbook (supabase cloud project + VPS/Cloudflare) — blocked on WAITING.
+4. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
 
 ## IN FLIGHT
-(nothing — this refresh is the only open PR when it merges)
+- feat/transcript-ui-s71 (this PR): transcript screen + S7.1 XSS test — closes the last S12.1 control.
 
 ## WAITING ON DEVESH
 - VAPI_API_KEY (task-8 acceptance + P1 talking demo).
