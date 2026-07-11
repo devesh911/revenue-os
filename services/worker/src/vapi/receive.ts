@@ -32,7 +32,13 @@ export const vapiWebhook = new Hono().post(
     }
 
     const orgId = OrgIdSchema.parse(c.req.param("orgId"));
-    const parsed = VapiWebhookSchema.safeParse(JSON.parse(raw));
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw); // malformed body = clean 400, never a logged 500 (S5.8)
+    } catch {
+      return c.json({ error: "invalid_payload" }, 400);
+    }
+    const parsed = VapiWebhookSchema.safeParse(payload);
     if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
 
     const m = parsed.data.message;

@@ -181,3 +181,28 @@ transcript screen (P1) — needs an explicit deferral note or the test.
 - react/react-dom added to ROOT devDependencies (same 19.2.7 as console): bun does not hoist
   console's react to the root in a fresh install, so root tests/ importing react-dom/server would
   fail in CI. Not a new dependency — a root-level declaration of an existing one.
+
+## 2026-07-11 · vapi spike, local half (feat/vapi-spike-local) — 3 bugs/findings from RUNNING things
+- Vapi account/key verified live (scripts/spike-vapi.ts, committed — rerunnable, secret-redacting):
+  assistant round-trip 201/200/200 with OUR server.url+secret shape (S6.2 config half CONFIRMED);
+  finding: `server.secret` is WRITE-ONLY — GET never echoes it, so env/password-manager is the only
+  copy. No phone numbers or provider credentials on the account yet — India path (BYO SIP trunk,
+  Exotel/Plivo per spec risk #4) still an open decision; delivery-half of S6.2 (x-vapi-secret header
+  on a real POST) needs the public URL (VPS) or a tunnel.
+- Live E2E caught: malformed JSON + valid secret ⇒ 500 (JSON.parse threw before safeParse, landed in
+  onError) — S5.8 violation + provider-retry-storm bait. Fixed with repro test first (400 now; suite
+  5/5). Contract tests all used well-formed JSON — only a real HTTP loop exposed it.
+- `bun run dev` NEVER worked: `--filter services/worker`/`--filter apps/console` are paths, filters
+  match package NAMES (worker, console). And via --filter the script runs with the PACKAGE dir as
+  cwd, so bun loads no root .env ⇒ worker's env Zod-check refuses boot. Fixed: root dev runs the
+  worker from repo root (`bun --watch services/worker/src/index.ts`) + `--filter console`.
+- webhook_events.org_id FK has NO cascade (unlike CRM tables) — org deletion is blocked while events
+  exist. Protective for evidence data; test/spike cleanup must delete children first (existing
+  vapi-webhook.test.ts cleanup already models this).
+- Live lifecycle proof: received→processed status transitions + conversation upsert by provider_ref
+  + summary stored VERBATIM (script payload included — rendered inert by the S7.1 screen).
+- META (same session): the pipe-swallow trap fired in the SHIP step itself — `bun run gates | tail
+  && git commit && git push` pushed a red-typecheck commit (tail exits 0). CI caught it (trust
+  anchor held) but the local rule is now: gates run BARE to a file (capture $? explicitly), and
+  never in the same && chain as commit/push. The gates script being honest doesn't help if the
+  invocation shape re-introduces the swallow.
