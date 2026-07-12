@@ -14,7 +14,7 @@ description: Use when running the per-task build loop — a /goal Mode B cycle o
 ## The loop (D32-amended; every step blocking)
 1. **WIP cap before anything:** ≥3 open unmerged task PRs ⇒ stop, emit `NEED_HUMAN: stack full — review bottom-up`.
 2. Branch off the stack tip: `feat/task-NN-slug`.
-3. **RED before GREEN** — failing tests from the acceptance criteria. Security/RLS/migration/guard-critical: the reviewer authors them itself (test-is-spec).
+3. **RED before GREEN** — failing tests from the acceptance criteria. Security/RLS/migration/guard-critical: the reviewer authors them itself (test-is-spec). **Dispatch, don't do (cost discipline):** when the `tester`/`worker`/`scout` agents are available, routine RED goes to `tester`, GREEN to `worker`, recon to `scout` — the main thread plans, briefs, and reviews only. Doing routine work in the main thread burns the expensive model on cheap work.
 4. Gates: `bun test` · `bun run lint` · `bun run typecheck` · `bun run rls:check` when the DB is touched.
 5. Push · `gh pr create` with the §6 checklist + a **⚠ residuals block** for human-gated criteria (D34).
 6. **Verify the pipeline RAN:** `gh pr checks <N>` must show the required `checks` run concluded green **on GitHub**. An absent or red check is a stop signal — fix it or emit `NEED_HUMAN` (S13.7/D32). Local gate output never substitutes.
