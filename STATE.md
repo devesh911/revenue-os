@@ -71,6 +71,10 @@ Updated: 2026-07-12 (deep clean: D36 phased posture, merge-authority contradicti
 - The T26.4 closed job-type set gains `webhook.process.vapi` (receiver-enqueued drain; RLS makes
   a cross-org sweep impossible for app_service, so the org id rides the job). Docs catch up
   whenever tech-stack is next touched.
+- **Agent dispatch economy (2026-07-12, Devesh):** worker/tester/scout agents now live in the
+  main repo `.claude/agents/` (shim-based /goal sessions could never see the orchestrator/ copies
+  — that's why usage was 100% Fable). Models: worker+tester=sonnet (downshifted from opus),
+  scout=haiku; the main thread orchestrates/reviews only, routine RED/GREEN/recon is dispatched.
 - bun-types stays pinned to the bun engine version (both 1.3.11).
 - Cloudflare Bot Fight Mode stays OFF (S4.3 conflict): non-Enterprise BFM is zone-wide, no per-path
   skip, and would challenge Vapi webhooks (lost call events). Revisit when apps/www exists.
