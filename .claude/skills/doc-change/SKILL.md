@@ -14,7 +14,10 @@ description: Use whenever a doc contradiction, gap, or needed amendment appears 
 1. **`lessons.md` first, always** — append-only: `date · task · finding · suggested doc change`. In Mode B, mirror to HANDOFF ESCALATIONS.
 2. **Triage (D34):** *blocking* (the task cannot proceed as documented) ⇒ draft the mini-ADR PR immediately and link it from the task PR · *cosmetic* ⇒ the Friday batch (§11).
 3. **Draft** = `docs/decisions/D<next>-slug.md` (Context · Decision · Alternatives · Consequences · Reversal trigger) **plus**, in the SAME PR: the law-doc edits, the citing-doc patches (§0), and a `project-spec §12b` row if the change creates an obligation without an owning task (D34).
-4. Open the PR against `main` — CODEOWNERS routes `docs/**` to Devesh; **only his merge makes it law**. Mark the ADR `DRAFT — awaiting Devesh's merge` until then.
+4. Open the PR against `main`. Merge follows the PHASE rule (D36, STATE.md line 1): SETUP — if
+   Devesh commissioned the change in-session, merge on observed green; otherwise mark the ADR
+   `DRAFT — awaiting Devesh's merge` and stop. LIVE — CODEOWNERS routes `docs/**` to Devesh;
+   **only his merge makes it law**, always.
 
 ## Never
 Edit `docs/**` or `CLAUDE.md` outside such a PR · renumber or reuse D/T/S/G ids (§0) · treat a lessons.md entry as law (lessons are findings; merged ADRs are decisions) · bundle unrelated code into a decision PR.

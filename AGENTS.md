@@ -9,7 +9,10 @@ One page. If a rule is not on it, it is advice, not law. **STATE.md** says where
 3. **Tenancy** — every table ships with org_id + RLS + a cross-tenant denial test. DB access only via packages/db (app_service + request.org_id). Never SUPABASE_SERVICE_ROLE_KEY in app code.
 4. **History** — migrations are append-only (expand-contract); never edit an applied one; never force-push a shared branch.
 5. **Sends** — outbound messages only through packages/channels guard(); tool side-effects pass autonomy checks.
-6. **main is PR-only with CI green** (required check: `checks`). Merging follows the repo ruleset — currently Devesh's act.
+6. **main is PR-only with CI green** (required check: `checks`). Merge authority follows the
+   **PHASE line at the top of STATE.md** (D36): SETUP = agents squash-merge independent PRs on
+   observed-green + tested evidence, base==main, one at a time; LIVE = ruleset-enforced human
+   merges only. On any conflict between older texts, the PHASE rule wins.
 
 ## The loop (any planner/executor/verifier, human or AI)
 1. Take the top item of `STATE.md → NEXT` (or Devesh's explicit ask). One task, one branch, one PR.

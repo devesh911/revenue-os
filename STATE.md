@@ -1,7 +1,9 @@
+PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force. Flip is Devesh-only, via docs/runbooks/go-live.md -->
+
 # STATE — single source of truth for "where are we"
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
-Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicate)
+Updated: 2026-07-12 (deep clean: D36 phased posture, merge-authority contradictions resolved)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -27,10 +29,9 @@ Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicat
 3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
 
 ## IN FLIGHT
-- feat/skills-dynamic-learning (this PR, #32): harness-agent skill router + dynamic
-  "learned since" stanzas (grep lessons.md + STATE.md DECISIONS at invocation) in all
-  six skills. task-loop's merge/Never text is stale vs v2.1 but classifier-locked
-  against agent edits — refresh is Devesh's (lessons.md 2026-07-11).
+- docs/d36-phased-security-posture (this PR): PHASE switch + D36 ADR + all six
+  merge-authority statements reconciled + docs/runbooks/go-live.md (Devesh's go-live
+  checklist). Commissioned deep clean, merge-on-green chosen explicitly.
 
 ## WAITING ON DEVESH
 - VPS box + Cloudflare Pages connect — NEXT 1 and 2 ride these (Supabase cloud + GitHub env are done).
@@ -40,9 +41,12 @@ Updated: 2026-07-11 (post-move refresh: #24–#27 landed, #28 closed as duplicat
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
-- **Autonomy v2.1 (2026-07-11, Devesh):** agents run PR-create → conflict-resolve → merge end-to-end on
-  green checks. Acknowledged trade-off; posture is "tighten as requirements follow". Hard rails
-  (secrets/cloud/tenancy/history/sends) unchanged; guard loosening remains human-only.
+- **D36 phased posture (2026-07-12, Devesh):** PHASE line above is the one truth. SETUP = agents
+  merge independent PRs (squash) on observed-green + tested evidence; LIVE = ruleset-enforced
+  human merges, full S13, monitoring on. Flip via docs/runbooks/go-live.md, Devesh-only. All
+  SETUP-era secrets are treated as burned (rotation is a go-live step). Supersedes the ad-hoc
+  autonomy-v2.1 wording; hard rails (secrets/tenancy/history/sends/webhooks/CI-anchor) are
+  phase-independent. Guard/deny-list loosening stays Devesh-only in both phases.
 - **#28 closed unmerged (2026-07-11):** the queued ".gitleaks.toml commit-scoping" task had already
   landed as #21; the re-execution would have regressed main (dropped the b207595 excusal). Queued
   tasks get checked against main before execution, not just against the queue.

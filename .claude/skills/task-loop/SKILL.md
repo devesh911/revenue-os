@@ -20,11 +20,11 @@ description: Use when running the per-task build loop — a /goal Mode B cycle o
 6. **Verify the pipeline RAN:** `gh pr checks <N>` must show the required `checks` run concluded green **on GitHub**. An absent or red check is a stop signal — fix it or emit `NEED_HUMAN` (S13.7/D32). Local gate output never substitutes.
 7. Update HANDOFF (incl. ESCALATIONS mirroring any `lessons.md` append) · checkpoint the orchestrator repo · take the next task or emit the sentinel. Never idle; never exceed the cap.
 
-## Never (structural, not advisory — dev-workflow §12, S13)
-Merge or approve anything · edit `docs/**`, `CLAUDE.md`, or applied migrations (blocking doc bug ⇒ §13 mini-ADR via the doc-change skill) · touch `.env`/secrets · force-push · add a dependency without a T24 BOM row · mutate an active agent/workflow version.
+## Never (structural, not advisory — dev-workflow §12, S13; phase-independent)
+Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a T24 BOM row · mutate an active agent/workflow version · approve a PR (in any phase) · edit `docs/**`/`CLAUDE.md` outside a commissioned or §13 ADR PR · merge anything while `STATE.md` says `PHASE: LIVE` (D36 — LIVE merges are ruleset-enforced human acts).
 
-## Merge discipline (human-only; cite when asked)
-Stacked PRs merge ONE at a time · confirm the base retargeted to `main` before each (`gh pr view N --json baseRefName`) · merge commits, never squash · never loop `gh pr merge` (lessons.md, 2026-07-10).
+## Merge discipline (phase-aware — D36; check STATE.md line 1 first)
+SETUP phase: agents merge — observed-green required `checks` + tested evidence + base==main confirmed (`gh pr view N --json baseRefName`) + ONE PR at a time, from the repo root. Independent branches squash; stacked branches keep merge commits (squash rewrites the patches above — D32). Never loop `gh pr merge` (lessons.md, 2026-07-10). LIVE phase: no agent merges, period.
 
 ## Learned since this router was written (dynamic — run it, don't skip)
 `grep -inE 'gates|CI|pipe|worktree|queue|exit code' lessons.md` and read `STATE.md → DECISIONS`.
