@@ -225,3 +225,9 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   already-granted posture, even via "STATE.md supersedes" pointer language. Correct boundary
   (guard text is a guard). → Suggested: Devesh refreshes task-loop's Never/merge sections himself;
   until then the skill's dynamic stanza + STATE.md carry the current posture.
+- 2026-07-12 (deep-clean goal): merge-authority stated differently in SIX places spanning three
+  policy generations (S13.1/S13.6 "structurally human" · task-loop "human-only, never squash" ·
+  orchestrator CLAUDE "Never merge" · AGENTS rail 6 "currently Devesh" · dev-workflow §3/§4B ·
+  doc-change "only his merge is law") while live reality was zero-approval ruleset + named grant +
+  agents squash-merging #30–#33. Rules written at different times, none reconciled. → D36: one
+  explicit PHASE switch (STATE.md), phase-conditional process rules, phase-independent hard rails.

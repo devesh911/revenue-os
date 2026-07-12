@@ -7,9 +7,9 @@
 
 ## 0. Roles and the three loops
 
-**Roles.** Devesh = architect, reviewer, merger of record — the only human gate. Claude Code = implementer (interactive Mode A, or orchestrated Mode B with sub-agents). Planning sessions = any Claude session that drafts plans/ADRs from these docs.
+**Roles.** Devesh = architect, reviewer, merger of record in LIVE phase (D36 — in SETUP, agents merge on observed green per the STATE.md PHASE rule). Claude Code = implementer (interactive Mode A, or orchestrated Mode B with sub-agents). Planning sessions = any Claude session that drafts plans/ADRs from these docs.
 
-**Loop 1 — Strategy.** A planning session (or Devesh) drafts an ADR + doc edits → PR → CI → **Devesh merges** (§13). Docs are law the moment they merge; agents treat `docs/` as read-only input.
+**Loop 1 — Strategy.** A planning session (or Devesh) drafts an ADR + doc edits → PR → CI → merge per the PHASE rule (D36: SETUP = agent merges commissioned doc changes on green, uncommissioned drafts stop at DRAFT PR; LIVE = **Devesh merges**, §13). Docs are law the moment they merge; agents treat `docs/` as read-only input outside such PRs.
 **Loop 2 — Build.** One task → branch → tests-first → implementation → gates → review vs §6 → PR. In Mode B this loop runs autonomously with structural human gates (§4B).
 **Loop 3 — Release.** Merge → staging auto-deploys; a git tag cut by Devesh promotes to prod; health-gated cutover; rollback = previous tag.
 
@@ -76,7 +76,7 @@ Content collections for case studies/pages (markdown in, pages out); zero client
 
 ## 3. Branches, commits, PRs
 
-`main` protected (ruleset above). One branch per task: `feat/task-NN-slug` · conventional commits · PR per task with the §6 checklist in the body. **Mode B stacks branches:** task N+1 branches off task N's tip; PR base = previous branch (first task bases on `main`); Devesh reviews bottom-up and merges the stack in order. Agents never approve or merge anything (structurally impossible per S13.1).
+`main` protected (ruleset above). One branch per task: `feat/task-NN-slug` · conventional commits · PR per task with the §6 checklist in the body. **Mode B stacks branches:** task N+1 branches off task N's tip; PR base = previous branch (first task bases on `main`); stacks merge bottom-up in order. Merge authority follows the PHASE rule (D36): SETUP = agents squash-merge independent PRs on observed green (stacks keep merge commits, D32); LIVE = human-only, structurally enforced (S13.1).
 
 **Stack maintenance (D32).** Fixes land on the *lowest* affected branch and propagate upward in **one batched cascade pass** — never per-fix (the 2026-07-10 shakedown left 41 of 69 commits on the stack tip as cascade merges). Stacked PRs merge bottom-up with **merge commits — never squash or rebase** (squash rewrites the patches and breaks every PR above it); delete each head branch on merge so GitHub retargets the next PR automatically.
 
@@ -100,7 +100,7 @@ One task, one session, one branch. Opening template: *"Read CLAUDE.md. Read docs
 
 **Findings ≠ decisions:** agents append findings to `lessons.md` + HANDOFF ESCALATIONS. Doc changes go through §13 only — and `Edit(docs/**)` is mechanically denied besides.
 
-**Safety rails — security.md S13, all nine, non-negotiable.** The short form: ruleset + minimal PAT before first run · secret-free machine · writer agents have no web access · deny-lists are friction, not boundaries · CI is the trust anchor · merges, prod tags, and docs are structurally human · kill-switch rehearsed.
+**Safety rails — security.md S13 (phase note applies, D36).** Phase-independent: secret-free machine · writer agents have no web access · deny-lists are friction, not boundaries · CI is the trust anchor · prod tags are always human. LIVE adds: ruleset + minimal PAT before any autonomous run · merges and docs structurally human · kill-switch rehearsed.
 
 ## 5. TDD mechanics
 Red (tests from acceptance criteria — reviewed/authored by the reviewer for critical work) → Green (minimal) → Refactor. Locations: unit colocated · integration vs `supabase start` + real pg-boss in `services/worker/test/`, `packages/db/test/` · RLS + cross-tenant denial in `tests/` · webhook fixtures (record real payloads; out-of-order + duplicate cases mandatory) · Playwright in `apps/console/e2e/`. Evals gate activations (`bun run evals`), not merges.
