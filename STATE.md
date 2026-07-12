@@ -17,6 +17,12 @@ Updated: 2026-07-12 (deep clean: D36 phased posture, merge-authority contradicti
 - **Autonomy v2.1 is live**: ruleset = PR + green `checks`, zero human approvals (Devesh flipped it);
   repo has allow_auto_merge + delete_branch_on_merge ON; agent sessions may create PRs, resolve
   conflicts, and merge on green (named grant, 2026-07-11). Guard loosening stays Devesh-only.
+- **Infra (2026-07-12):** VPS `168.144.147.90` hardened per runbook §2–§3 (deploy user, key-only
+  sshd, ufw 443/22-limit, fail2ban, Docker, 2GB swap, resized to 1vCPU/2GB/48GB; `~/app` staged,
+  `.env` pending). **Console is LIVE on Cloudflare Pages**: https://revenue-os-console.pages.dev
+  (project `revenue-os-console`, GitHub-connected, push-to-deploy on main; build env
+  SKIP_DEPENDENCY_INSTALL=1 + BUN_VERSION=1.3.11 — Pages' npm auto-install chokes on
+  `workspace:*`; VITE_ vars point at staging Supabase `ajtfillmkjhoffxllqja`, Mumbai).
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -34,7 +40,15 @@ Updated: 2026-07-12 (deep clean: D36 phased posture, merge-authority contradicti
   checklist). Commissioned deep clean, merge-on-green chosen explicitly.
 
 ## WAITING ON DEVESH
-- VPS box + Cloudflare Pages connect — NEXT 1 and 2 ride these (Supabase cloud + GitHub env are done).
+- **Domain purchase** — the Cloudflare zone (api DNS, Transform Rule, origin lockdown), Pages
+  custom domain, and the Vapi remote spike all wait on it (runbook §4 executes the day it exists).
+- **`supabase db push` from your terminal** — staging cloud is at migration 014; 015 (pgboss)
+  postdates the last push. The worker cannot boot against staging until this lands.
+- **VPS `~/app/.env`** — fill the five names in `.env.template` (password manager), then
+  `mv .env.template .env && chmod 600 .env`.
+- **CI deploy credentials** (classifier-blocked for agents): generate + wire the staging SSH key,
+  either by naming the action to an agent session or yourself:
+  `ssh deploy@168.144.147.90 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
 - Vapi India telephony decision inputs: Exotel vs Plivo SIP trunk account (spec risk #4).
 - Stale merged branches: agents are classifier-blocked from `git push origin --delete`; run flip-kit
   item 5 (orchestrator/state/FLIP-KIT-2026-07-11.md) or leave them.
