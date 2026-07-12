@@ -19,7 +19,7 @@
 set -euo pipefail
 
 PROJECT_REF="ajtfillmkjhoffxllqja"
-POOLER_HOST="aws-0-ap-south-1.pooler.supabase.com"
+POOLER_HOST="aws-1-ap-south-1.pooler.supabase.com" # from the dashboard Connect dialog — never guess pooler hosts (aws-0 vs aws-1 differs per project)
 VPS="deploy@168.144.147.90"
 SUPABASE_URL="https://${PROJECT_REF}.supabase.co"
 CORS_ORIGINS="https://revenue-os-console.pages.dev"
