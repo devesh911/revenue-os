@@ -13,8 +13,27 @@ concurrency:
   cancel-in-progress: false # deploys must not preempt each other mid-flight
 
 jobs:
-  staging:
-    # task-14 arms this (restore: github.event_name == 'push').
+  staging-migrations:
+    # Task 14a — armed 2026-07-12 (Devesh: "db push should be CI's job, not mine").
+    # Migrations are append-only (expand-contract), so applying on every main push is
+    # idempotent: `db push` applies only what the remote is missing.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging # SUPABASE_ACCESS_TOKEN + SUPABASE_DB_PASSWORD live here only
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1 branch tip 2026-07-11
+      - name: Apply migrations to staging
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref ajtfillmkjhoffxllqja
+          supabase db push --include-all
+          supabase migration list
+
+  staging-app:
+    # task-14b arms this once the VPS half is ready (image build, scp, compose up, smoke).
     # Until then the job SKIPS — a 7s echo reporting "deploy success" on every
     # main push made history indistinguishable from real deploys.
     if: false
@@ -22,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build + ship to VPS (staging stack)
-        run: echo "TODO task-14 - docker build, save, scp, compose up staging, then Playwright smoke"
+        run: echo "TODO task-14b - docker build, save, scp, compose up staging, then Playwright smoke"
 
   prod:
     # task-14 arms this (restore: github.event_name == 'release')

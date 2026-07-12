@@ -42,8 +42,9 @@ Updated: 2026-07-12 (deep clean: D36 phased posture, merge-authority contradicti
 ## WAITING ON DEVESH
 - **Domain purchase** — the Cloudflare zone (api DNS, Transform Rule, origin lockdown), Pages
   custom domain, and the Vapi remote spike all wait on it (runbook §4 executes the day it exists).
-- **`supabase db push` from your terminal** — staging cloud is at migration 014; 015 (pgboss)
-  postdates the last push. The worker cannot boot against staging until this lands.
+- ~~supabase db push~~ → CI's job now (task 14a armed 2026-07-12): `deploy.yml
+  staging-migrations` applies migrations on every main push; its first run delivers 015.
+  Verify the run once after this merges (gh run list --workflow deploy).
 - **VPS `~/app/.env`** — fill the five names in `.env.template` (password manager), then
   `mv .env.template .env && chmod 600 .env`.
 - **CI deploy credentials** (classifier-blocked for agents): generate + wire the staging SSH key,
