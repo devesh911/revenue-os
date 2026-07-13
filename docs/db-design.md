@@ -29,11 +29,11 @@
 
 ## 2. Conventions
 
-- **IDs:** `uuid` via `gen_random_uuid()`. Time-ordering comes from `created_at` (indexed).
-- **Timestamps:** `timestamptz` always. Every table: `created_at timestamptz not null default now()`; mutable tables add `updated_at` (trigger-maintained).
+- **IDs:** `uuid` via `gen_random_uuid()`. Time-ordering comes from `created_at` (indexed). Exception: `messages` uses `bigint generated always as identity` — a high-volume append-only table where a monotonic integer PK beats uuid.
+- **Timestamps:** `timestamptz` always. Every table: `created_at timestamptz not null default now()`, except the four config tables `pipelines`, `pipeline_stages`, `dispositions`, `guardrail_policies` which ship without it; mutable tables add `updated_at` (trigger-maintained).
 - **Tenancy:** every org-owned table has `org_id uuid not null references orgs(id)` as the **first** column after `id`, and composite indexes lead with `org_id`.
-- **Soft delete:** only where user-facing undo matters (`contacts`, `deals`): `deleted_at timestamptz`. Everything else deletes hard or never deletes (append-only).
-- **Append-only tables** (`audit_log`, `messages`, `interactions-as-messages`, `outcomes`, `contact_scores`, `usage_events`, `webhook_events`): no UPDATE/DELETE policies exist → immutable by RLS.
+- **Soft delete:** only where user-facing undo matters (`contacts`, `companies`, `deals`): `deleted_at timestamptz`. Everything else deletes hard or never deletes (append-only).
+- **Append-only tables** (`audit_log`, `messages`, `interactions-as-messages`, `outcomes`, `contact_scores`, `usage_events`): no UPDATE/DELETE policies exist → immutable by RLS. `webhook_events` is a **lifecycle** table, not append-only: `payload` is immutable but `status`/`processed_at` update as processing advances (sel+ins+upd policy).
 - **Org-configurable taxonomies** (dispositions, outcome kinds, pipeline stages) are **lookup tables seeded per vertical template**, not enums. Enums are reserved for sets we control forever.
 - **Custom fields:** `attributes jsonb not null default '{}'` on contacts/companies/deals/appointments, validated against `field_definitions`.
 - **Money:** `numeric(14,2)` + `currency char(3)`.
@@ -51,6 +51,8 @@ create extension if not exists pg_trgm;       -- fuzzy search on names/companies
 
 create schema if not exists app;              -- helper functions live here, not public
 ```
+
+**Migration 014** moved `vector` and `pg_trgm` out of `public` into a dedicated `extensions` schema (role `search_path` carries unqualified runtime access); migration DDL written from here on must schema-qualify references to these extensions.
 
 ---
 
@@ -117,6 +119,8 @@ create table audit_log (
 create index audit_org_time on audit_log (org_id, created_at desc);
 create index audit_resource on audit_log (org_id, resource_type, resource_id);
 ```
+
+**Migration 011** ships the app functions `handle_new_user` + `user_orgs` — org bootstrap on signup, read by the JWKS/ES256 JWT verification path (T9).
 
 ### RLS helpers + policy pattern
 
@@ -699,7 +703,7 @@ where n.nspname = 'public'
 
 ## 9. Seed templates (vertical packs)
 
-`seeds/real_estate.sql` and `seeds/b2b_wholesale.sql` insert, per new org of that vertical:
+`supabase/seeds/real_estate.sql` and `supabase/seeds/b2b_wholesale.sql` insert, per new org of that vertical:
 - **dispositions** — RE: interested / site_visit_agreed / callback / budget_mismatch / wrong_number / dnc / not_interested. B2B: interested / sample_requested / callback / send_catalog / price_objection / wrong_person / dnc.
 - **pipelines + stages** — RE: inquiry → qualified → site_visit → negotiation → token → closed. B2B: prospect → contacted → qualified → sample/quote → order → repeat.
 - **outcome kinds** (documented list, since `outcomes.kind` is free text): see §6 comment.
