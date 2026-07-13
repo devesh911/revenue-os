@@ -27,6 +27,10 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
   containerized psql as app_service → 33 public tables, then `pgboss,app` schemas after CI push.
   **CI `staging-migrations` GREEN** (token + DB password secrets fixed by Devesh; run 29191891317
   attempt 3): staging is at migration 015. Worker boot now waits ONLY on the domain.
+- **Console screens are REAL (task 15, 2026-07-13):** dashboard (six funnel tiles), task queue,
+  live monitor, contacts all render org-scoped data via new screens API; task/conversation rows
+  deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
+  outcomes. Verified in a live browser against the seeded real_estate org. 80/80 tests.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -36,11 +40,10 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
 2. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
-3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
-
 ## IN FLIGHT
-- chore/state-staging-pipeline-green (this PR): STATE refresh — staging pipeline green,
-  provisioning done, WAITING pruned to what's genuinely open.
+- feat/task-15-console-screens-live-data (this PR): the four console screens on real data —
+  screens API (tasks/contacts/conversations/metrics), six funnel tiles, seed-pack demo data;
+  task/conversation rows link to transcripts (closes the old NEXT-3 polish item).
 
 ## WAITING ON DEVESH
 - **Domain purchase** — the ONLY blocker left for worker first-boot: Cloudflare zone (api DNS,
@@ -76,6 +79,10 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
   main repo `.claude/agents/` (shim-based /goal sessions could never see the orchestrator/ copies
   — that's why usage was 100% Fable). Models: worker+tester=sonnet (downshifted from opus),
   scout=haiku; the main thread orchestrates/reviews only, routine RED/GREEN/recon is dispatched.
+- **Six funnel metrics (task 15, 2026-07-13):** spec E says "6 metrics" without naming them; the
+  boring derivable set shipped: new_leads · conversations_started · conversations_completed ·
+  qualified (outcomes) · bookings (outcomes) · open_tasks, rolling 30-day window except open_tasks.
+  Rename/re-cut freely when the pilot defines its success metric.
 - bun-types stays pinned to the bun engine version (both 1.3.11).
 - Cloudflare Bot Fight Mode stays OFF (S4.3 conflict): non-Enterprise BFM is zone-wide, no per-path
   skip, and would challenge Vapi webhooks (lost call events). Revisit when apps/www exists.
@@ -83,8 +90,8 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
 - #38+#39 task 14a: staging migrations ride CI (deploy.yml armed, CLI pinned 2.109.1) — 2026-07-12
 - #37 worker/tester/scout agents in main repo — sonnet/sonnet/haiku, dispatch-don't-do — 2026-07-12
 - #35+#36 VPS+Cloudflare runbook · STATE: VPS hardened, console live on Pages — 2026-07-12
-- #34 D36 phased security posture (PHASE switch, go-live runbook) — 2026-07-12

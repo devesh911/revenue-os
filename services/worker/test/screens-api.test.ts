@@ -126,6 +126,8 @@ describe("member reads real rows", () => {
     expect(task?.status).toBe("open");
     expect(task?.kind).toBe("approval");
     expect(task?.conversation_id).toBeTruthy();
+    // pg returns numeric as string unless cast — the console Zod-parses these as numbers
+    expect(typeof task?.priority).toBe("number");
   });
 
   it("contacts: the seeded contact with lifecycle + score fields", async () => {
@@ -138,8 +140,8 @@ describe("member reads real rows", () => {
     expect(row).toBeDefined();
     expect(row?.first_name).toBe("Asha");
     expect(row?.lifecycle_stage).toBe("new");
-    expect(row).toHaveProperty("score");
     expect(row).toHaveProperty("last_interaction_at");
+    if (row?.score != null) expect(typeof row.score).toBe("number");
   });
 
   it("conversations: both rows, each with channel/status/contact name for the monitor", async () => {
