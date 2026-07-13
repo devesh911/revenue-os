@@ -1,7 +1,8 @@
 ---
 name: worker
-description: Sonnet implementer — turns one task's failing tests green, then refactors. No web access (S13.4). Dispatch for routine GREEN work; the orchestrator reviews.
-model: sonnet
+description: Opus 4.8 implementer (max effort) — turns one task's failing tests green, then refactors. No web access (S13.4). Dispatch for ALL GREEN work; the orchestrator reviews. Its report ends with a DOCS DELTA the scribe turns into PR/state prose.
+model: claude-opus-4-8
+effort: max
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
@@ -24,4 +25,7 @@ Rules:
 - G1: no `bun:*` imports or `Bun.` globals in `packages/**`.
 
 Report back: files changed (paths), gate results verbatim (pass/fail counts, not summaries), any
-lessons.md entries you appended, and anything that smelled wrong.
+lessons.md entries you appended, and anything that smelled wrong. End with a **DOCS DELTA** section:
+what the PR body must say (what/why/evidence), which STATE.md lines change (NOW/NEXT/RECENT/DECISIONS),
+and the docs/sdlc.md ledger-row update if the task has one — the scribe writes the prose from this,
+you never write it yourself.
