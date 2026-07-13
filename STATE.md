@@ -3,7 +3,8 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 # STATE — single source of truth for "where are we"
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
-Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisioned, 015 on cloud)
+Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
+Updated: 2026-07-13 (SDLC ledger created — docs/sdlc.md)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -39,8 +40,9 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
 3. Link LiveMonitor/Contacts lists to `/o/:orgId/conversations/:id` transcripts (P3 polish, when those screens get data).
 
 ## IN FLIGHT
-- chore/state-staging-pipeline-green (this PR): STATE refresh — staging pipeline green,
-  provisioning done, WAITING pruned to what's genuinely open.
+- feat/task-15-console-screens-live-data: screens API + console live data — RED committed
+  (cb55953: auth gate, M0 denial, six funnel metrics), GREEN in progress in the main tree.
+- feat/sdlc-ledger (this PR): docs/sdlc.md — the SDLC task ledger.
 
 ## WAITING ON DEVESH
 - **Domain purchase** — the ONLY blocker left for worker first-boot: Cloudflare zone (api DNS,
@@ -56,6 +58,9 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **SDLC ledger (2026-07-13, Devesh):** docs/sdlc.md is the per-task ledger (registry + ≤8-line
+  detail blocks + doc map), updated in the same PR as the work. Division: STATE = "now",
+  spec §12/§12b = original P0 contract + obligations, sdlc.md = task history and specced backlog.
 - **D36 phased posture (2026-07-12, Devesh):** PHASE line above is the one truth. SETUP = agents
   merge independent PRs (squash) on observed-green + tested evidence; LIVE = ruleset-enforced
   human merges, full S13, monitoring on. Flip via docs/runbooks/go-live.md, Devesh-only. All
