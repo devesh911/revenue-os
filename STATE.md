@@ -88,8 +88,8 @@ Updated: 2026-07-13 (SDLC ledger created — docs/sdlc.md)
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
 - #38+#39 task 14a: staging migrations ride CI (deploy.yml armed, CLI pinned 2.109.1) — 2026-07-12
 - #37 worker/tester/scout agents in main repo — sonnet/sonnet/haiku, dispatch-don't-do — 2026-07-12
 - #35+#36 VPS+Cloudflare runbook · STATE: VPS hardened, console live on Pages — 2026-07-12
-- #34 D36 phased security posture (PHASE switch, go-live runbook) — 2026-07-12
