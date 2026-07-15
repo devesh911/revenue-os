@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-13 (SDLC ledger created — docs/sdlc.md)
+Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable assigns/reviews)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -58,6 +58,14 @@ Updated: 2026-07-13 (SDLC ledger created — docs/sdlc.md)
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Model routing v2 (2026-07-13, Devesh):** code and tests are authored by Opus 4.8 at effort max
+  (worker + tester agent defs repinned from sonnet); security/RLS/migration/guard-critical RED moves
+  to tester(opus) with mandatory orchestrator line-by-line test review before GREEN, superseding
+  dev-workflow §4B self-authorship. New scribe agent (Sonnet, effort max) writes PR bodies/STATE.md/
+  docs/sdlc.md ledger prose from the worker's DOCS DELTA; Fable orchestrator only assigns and reviews
+  (git/PR mechanics excepted) and may summon new agent classes when defined ones don't fit (hard
+  rails inherited). Supersedes the "Agent dispatch economy (2026-07-12)" entry's model choices (that
+  entry stays in place).
 - **SDLC ledger (2026-07-13, Devesh):** docs/sdlc.md is the per-task ledger (registry + ≤8-line
   detail blocks + doc map), updated in the same PR as the work. Division: STATE = "now",
   spec §12/§12b = original P0 contract + obligations, sdlc.md = task history and specced backlog.
