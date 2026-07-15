@@ -10,6 +10,7 @@ import { logger } from "./logger";
 import { contacts } from "./routes/contacts";
 import { conversations } from "./routes/conversations";
 import { orgs } from "./routes/orgs";
+import { screens } from "./routes/screens";
 import { vapiWebhook } from "./vapi/receive";
 
 const app = new Hono<AuthEnv>();
@@ -35,6 +36,7 @@ app.use("/orgs/*", requireAuth);
 app.route("/", orgs);
 app.route("/", contacts);
 app.route("/", conversations);
+app.route("/", screens);
 app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (S6.2)
 
 // S5.8: clients get clean statuses, never internals; detail goes to the log.
