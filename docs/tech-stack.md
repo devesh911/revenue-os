@@ -211,6 +211,7 @@ A `sync_vapi_assistant` job pushes active agent versions to Vapi via API; the Va
 | `score.contact` | contactId, trigger | features.extract → heuristic → contact_scores insert + tasks.priority update |
 | `kb.ingest` | documentId | chunk → embed → knowledge_chunks; status ready/failed |
 | `assistant.sync` | agentId | push agent version → Vapi |
+| `webhook.process.vapi` | webhookEventId | receiver-enqueued drain of a `webhook_events` row; org id rides the job payload because RLS makes a cross-org sweep impossible for `app_service` |
 
 **The scheduler tick, precisely:** `SELECT … FROM workflow_runs WHERE status IN ('pending','waiting') AND wake_at <= now() FOR UPDATE SKIP LOCKED LIMIT 50` → for each: load pinned workflow version → `interpret(def, state, {type:'wake'})` → inside **one transaction**: insert pg-boss jobs for `Transition.actions` + update the run (nextStep/wakeAt/status). Same-DB queue = job enqueue and state advance commit atomically — the exactly-once glue Temporal sells, at our size, for free.
 

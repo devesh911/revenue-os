@@ -78,13 +78,11 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
 - **#28 closed unmerged (2026-07-11):** the queued ".gitleaks.toml commit-scoping" task had already
   landed as #21; the re-execution would have regressed main (dropped the b207595 excusal). Queued
   tasks get checked against main before execution, not just against the queue.
-- webhook_events is a lifecycle table: payload immutable, status/processed_at mutable. Docs catch up
-  whenever docs are next touched.
+- webhook_events is a lifecycle table: payload immutable, status/processed_at mutable.
 - Extensions schema: DONE — migration 014 (#26) moved vector+pg_trgm to `extensions`; role
   search_path carries unqualified runtime access; migration DDL must qualify from now on.
 - The T26.4 closed job-type set gains `webhook.process.vapi` (receiver-enqueued drain; RLS makes
-  a cross-org sweep impossible for app_service, so the org id rides the job). Docs catch up
-  whenever tech-stack is next touched.
+  a cross-org sweep impossible for app_service, so the org id rides the job).
 - **Agent dispatch economy (2026-07-12, Devesh):** worker/tester/scout agents now live in the
   main repo `.claude/agents/` (shim-based /goal sessions could never see the orchestrator/ copies
   — that's why usage was 100% Fable). Models: worker+tester=sonnet (downshifted from opus),

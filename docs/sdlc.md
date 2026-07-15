@@ -51,6 +51,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Skills: six doc-routers + harness-agent + learned-since stanzas | ✅ | #18, #32, #33 | §5 |
 | worker/tester/scout agents in main repo (dispatch economy) | ✅ | #37 | §5 |
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
+| docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -186,6 +187,11 @@ outside agent sessions (hard rail #2) — CI is the mechanism.
   scout=haiku in `.claude/agents/`; main thread orchestrates and reviews only.
 - **Staging provisioning (#40, #41):** `scripts/provision-staging.sh` — machine-generated secrets,
   one-shot VPS .env install, pooler host aws-1.
+- **Docs reconciliation (#46, 2026-07-13):** settled 9 docs-vs-shipped-reality contradictions
+  in db-design.md/tech-stack.md/dev-workflow.md (webhook_events lifecycle, created_at exceptions,
+  soft-delete list, messages bigint PK, seed path, migration 011 app functions, migration 014
+  extensions schema, T26.4 `webhook.process.vapi` job, MODEL ROUTING v2 test-authorship); added
+  [runbooks/hygiene.md](runbooks/hygiene.md); paid the three dated STATE.md debt clauses.
 
 ---
 
