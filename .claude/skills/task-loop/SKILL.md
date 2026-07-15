@@ -21,7 +21,10 @@ description: Use when running the per-task build loop — a /goal Mode B cycle o
    its DOCS DELTA goes to `scribe` (sonnet, max) for PR body/STATE.md/ledger prose; recon to `scout`
    (haiku). The main thread assigns, reads the docs, reviews, and prompts to finish — it implements
    nothing; if no defined agent fits, it may summon a new class (Agent tool, explicit model, hard
-   rails inherited) and record it in HANDOFF.
+   rails inherited) and record it in HANDOFF. **Mechanical steps** (run a command, watch CI, collect
+   logs, git mechanics; scoped file/prose edits) route to the tool-capped drone shells — `drone-sh`
+   @ haiku (Bash+read) or `drone-edit` @ sonnet (Read/Edit/Write) — with a ROLE CARD per dispatch and
+   the model chosen per invocation; never a drone for code/tests.
 4. Gates: `bun test` · `bun run lint` · `bun run typecheck` · `bun run rls:check` when the DB is touched.
 5. Push · `gh pr create` with the §6 checklist + a **⚠ residuals block** for human-gated criteria (D34).
 6. **Verify the pipeline RAN:** `gh pr checks <N>` must show the required `checks` run concluded green **on GitHub**. An absent or red check is a stop signal — fix it or emit `NEED_HUMAN` (S13.7/D32). Local gate output never substitutes.
