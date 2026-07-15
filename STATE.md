@@ -3,7 +3,8 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 # STATE — single source of truth for "where are we"
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
-Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisioned, 015 on cloud)
+Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
+Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable assigns/reviews)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -59,6 +60,17 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Model routing v2 (2026-07-13, Devesh):** code and tests are authored by Opus 4.8 at effort max
+  (worker + tester agent defs repinned from sonnet); security/RLS/migration/guard-critical RED moves
+  to tester(opus) with mandatory orchestrator line-by-line test review before GREEN, superseding
+  dev-workflow §4B self-authorship. New scribe agent (Sonnet, effort max) writes PR bodies/STATE.md/
+  docs/sdlc.md ledger prose from the worker's DOCS DELTA; Fable orchestrator only assigns and reviews
+  (git/PR mechanics excepted) and may summon new agent classes when defined ones don't fit (hard
+  rails inherited). Supersedes the "Agent dispatch economy (2026-07-12)" entry's model choices (that
+  entry stays in place).
+- **SDLC ledger (2026-07-13, Devesh):** docs/sdlc.md is the per-task ledger (registry + ≤8-line
+  detail blocks + doc map), updated in the same PR as the work. Division: STATE = "now",
+  spec §12/§12b = original P0 contract + obligations, sdlc.md = task history and specced backlog.
 - **D36 phased posture (2026-07-12, Devesh):** PHASE line above is the one truth. SETUP = agents
   merge independent PRs (squash) on observed-green + tested evidence; LIVE = ruleset-enforced
   human merges, full S13, monitoring on. Flip via docs/runbooks/go-live.md, Devesh-only. All
@@ -68,13 +80,11 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
 - **#28 closed unmerged (2026-07-11):** the queued ".gitleaks.toml commit-scoping" task had already
   landed as #21; the re-execution would have regressed main (dropped the b207595 excusal). Queued
   tasks get checked against main before execution, not just against the queue.
-- webhook_events is a lifecycle table: payload immutable, status/processed_at mutable. Docs catch up
-  whenever docs are next touched.
+- webhook_events is a lifecycle table: payload immutable, status/processed_at mutable.
 - Extensions schema: DONE — migration 014 (#26) moved vector+pg_trgm to `extensions`; role
   search_path carries unqualified runtime access; migration DDL must qualify from now on.
 - The T26.4 closed job-type set gains `webhook.process.vapi` (receiver-enqueued drain; RLS makes
-  a cross-org sweep impossible for app_service, so the org id rides the job). Docs catch up
-  whenever tech-stack is next touched.
+  a cross-org sweep impossible for app_service, so the org id rides the job).
 - **Agent dispatch economy (2026-07-12, Devesh):** worker/tester/scout agents now live in the
   main repo `.claude/agents/` (shim-based /goal sessions could never see the orchestrator/ copies
   — that's why usage was 100% Fable). Models: worker+tester=sonnet (downshifted from opus),
@@ -90,6 +100,7 @@ Updated: 2026-07-12 (evening: staging pipeline green end-to-end, secrets provisi
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
 - #38+#39 task 14a: staging migrations ride CI (deploy.yml armed, CLI pinned 2.109.1) — 2026-07-12

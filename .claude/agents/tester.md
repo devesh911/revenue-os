@@ -1,7 +1,8 @@
 ---
 name: tester
-description: Sonnet RED-phase author — writes failing tests from a task's acceptance criteria. No web access (S13.4), no implementation code. Security/RLS/migration/guard-critical RED stays with the orchestrator (§4B).
-model: sonnet
+description: Opus 4.8 RED-phase author (max effort) — writes failing tests from a task's acceptance criteria, including security/RLS/migration/guard-critical RED (the orchestrator reviews those line-by-line before GREEN — directive v2 2026-07-13, supersedes §4B self-authorship). No web access (S13.4), no implementation code.
+model: claude-opus-4-8
+effort: max
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 

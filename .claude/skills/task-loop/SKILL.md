@@ -14,7 +14,14 @@ description: Use when running the per-task build loop — a /goal Mode B cycle o
 ## The loop (D32-amended; every step blocking)
 1. **WIP cap before anything:** ≥3 open unmerged task PRs ⇒ stop, emit `NEED_HUMAN: stack full — review bottom-up`.
 2. Branch off the stack tip: `feat/task-NN-slug`.
-3. **RED before GREEN** — failing tests from the acceptance criteria. Security/RLS/migration/guard-critical: the reviewer authors them itself (test-is-spec). **Dispatch, don't do (cost discipline):** when the `tester`/`worker`/`scout` agents are available, routine RED goes to `tester`, GREEN to `worker`, recon to `scout` — the main thread plans, briefs, and reviews only. Doing routine work in the main thread burns the expensive model on cheap work.
+3. **RED before GREEN** — failing tests from the acceptance criteria. **Dispatch, don't do (routing
+   v2, 2026-07-13):** ALL RED goes to `tester` (opus 4.8, max effort) — for security/RLS/migration/
+   guard-critical RED the orchestrator reviews the returned tests line-by-line BEFORE any GREEN
+   dispatch (test-is-spec review supersedes §4B self-authorship). GREEN to `worker` (opus 4.8, max);
+   its DOCS DELTA goes to `scribe` (sonnet, max) for PR body/STATE.md/ledger prose; recon to `scout`
+   (haiku). The main thread assigns, reads the docs, reviews, and prompts to finish — it implements
+   nothing; if no defined agent fits, it may summon a new class (Agent tool, explicit model, hard
+   rails inherited) and record it in HANDOFF.
 4. Gates: `bun test` · `bun run lint` · `bun run typecheck` · `bun run rls:check` when the DB is touched.
 5. Push · `gh pr create` with the §6 checklist + a **⚠ residuals block** for human-gated criteria (D34).
 6. **Verify the pipeline RAN:** `gh pr checks <N>` must show the required `checks` run concluded green **on GitHub**. An absent or red check is a stop signal — fix it or emit `NEED_HUMAN` (S13.7/D32). Local gate output never substitutes.
