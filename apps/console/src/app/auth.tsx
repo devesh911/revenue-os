@@ -1,18 +1,20 @@
 // Auth guard (S7.5): no session → login form; session → children. Supabase SDK owns tokens.
 import type { Session } from "@supabase/supabase-js";
 import { type ReactNode, useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { getSupabase } from "../lib/supabase";
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) =>
+    getSupabase()
+      .auth.getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setLoading(false);
+      });
+    const { data: sub } = getSupabase().auth.onAuthStateChange((_event, s) =>
       setSession(s),
     );
     return () => sub.subscription.unsubscribe();
@@ -31,7 +33,7 @@ function LoginScreen() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await getSupabase().auth.signInWithPassword({
       email,
       password,
     });
