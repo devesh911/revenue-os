@@ -231,3 +231,11 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   doc-change "only his merge is law") while live reality was zero-approval ruleset + named grant +
   agents squash-merging #30–#33. Rules written at different times, none reconciled. → D36: one
   explicit PHASE switch (STATE.md), phase-conditional process rules, phase-independent hard rails.
+- 2026-07-17 · task-16 (console boot honesty) · console white-screened on a missing env var
+  because lib/supabase.ts runs createClient(import.meta.env…) at MODULE scope and throws before
+  React mounts. Fix gates env in main.tsx and loads the app tree (app/App.tsx, which transitively
+  pulls lib/supabase) only via a post-validation dynamic import. Load-bearing invariant NOT pinned
+  by the env-free unit tests: lib/supabase must stay OUT of main.tsx's STATIC import graph — a
+  static import of it (or anything that pulls it) back onto the boot path reintroduces the
+  white-screen, and the createRoot path is CI/e2e-owned, invisible to in-process bun tests. →
+  Suggested: a browser/e2e boot check (empty .env → error screen, not blank) before console GA.
