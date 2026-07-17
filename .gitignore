@@ -4,6 +4,7 @@ dist
 .DS_Store
 supabase/.temp
 playwright-report
+test-results
 orchestrator/
 .env.local
 .claude/worktrees/
