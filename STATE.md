@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversation_id in screens API)
+Updated: 2026-07-17 (task 21 — lazy getSupabase(); boot static-import invariant deleted)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -35,7 +35,9 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
 - **Console boot is honest (task 16, this PR):** missing/empty VITE_SUPABASE_* renders a
   ConfigErrorScreen (names each var + apps/console/.env.example) instead of white-screening;
   OrgHome/OrgSwitcher show a distinct unreachable-API error state, separate from empty. +9
-  env-free tests.
+  env-free tests. **Task 21:** the mechanism is now a lazy memoized `getSupabase()` + a static
+  `App` import; the off-static-graph invariant and the separate boot chunk are gone; the
+  env-missing gate is preserved.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -109,8 +111,8 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
+- (this PR) console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
+- #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
 - #51 main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
 - #50 Contacts rows deep-link to latest conversation transcript (screens API latest_conversation_id) — 2026-07-17
 - #49 console boot honesty: env gate + ConfigErrorScreen + error≠empty — 2026-07-17
-- #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
