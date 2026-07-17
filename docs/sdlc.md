@@ -53,6 +53,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
+| Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + runtime run CI-owned (VITE_ env + browsers) |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
@@ -81,6 +82,13 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 - **Gates:** domain purchase (Devesh) + `STAGING_SSH_KEY` env secret (command ready in STATE WAITING).
 - **Docs:** [runbooks/vps-cloudflare-setup §4–§6](runbooks/vps-cloudflare-setup.md) · [tech-stack T14/T22](tech-stack.md).
 
+### Playwright smoke scaffold (e2e harness skeleton) 🚧
+- **Goal:** §12b e2e obligation (T12 layer 6) — Playwright smoke harness for the four console screens.
+- **Shape:** root `playwright.config.ts` + `apps/console/e2e/smoke.spec.ts`; `@playwright/test` exact-pinned (G2).
+- **Verified:** `bunx playwright test --list` (browser/env-free) — 1 test collected.
+- **Residual:** tech-stack T24 BOM row (Devesh) + CI arming (VITE_ env + browser install, runtime run CI-owned).
+- **Docs:** [tech-stack T12/T22/T24](tech-stack.md).
+
 ---
 
 ## 3. Queued (each block is the mini-spec; top of STATE NEXT wins)
@@ -101,7 +109,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
   carry data (natural successor to task 15).
 
 ### Deferred-by-phase obligations (spec §12b is the authority)
-- Playwright smoke over the four screens (T12 layer 6) — with P3 screen work.
+- Playwright smoke over the four screens (T12 layer 6) — harness skeleton scaffolded (this PR);
+  full four-screen runtime smoke still deferred to P3 + CI arming.
 - Go-live flip SETUP→LIVE (D36): secret rotation, ruleset re-arm, monitoring —
   [runbooks/go-live](runbooks/go-live.md), **Devesh-only**.
 

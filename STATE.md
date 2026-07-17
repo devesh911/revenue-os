@@ -32,6 +32,10 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   live monitor, contacts all render org-scoped data via new screens API; task/conversation rows
   deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
   outcomes. Verified in a live browser against the seeded real_estate org. 80/80 tests.
+- **§12b Playwright-smoke obligation (2026-07-17):** harness skeleton scaffolded — config
+  (`playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.spec.ts`), wiring proven by
+  `playwright test --list`; full four-screen runtime smoke + CI arming still deferred (env +
+  browsers).
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -54,6 +58,8 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   for migrations): generate + wire the staging SSH key,
   either by naming the action to an agent session or yourself:
   `ssh deploy@168.144.147.90 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
+- **tech-stack T24 BOM row for `@playwright/test@1.61.1`** — the playwright-smoke PR is
+  merge-blocked until it exists (dep policy).
 - Vapi India telephony decision inputs: Exotel vs Plivo SIP trunk account (spec risk #4).
 - Stale merged branches: agents are classifier-blocked from `git push origin --delete`; run flip-kit
   item 5 (orchestrator/state/FLIP-KIT-2026-07-11.md) or leave them.
@@ -100,9 +106,8 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; runtime run CI-owned) (this PR) — 2026-07-17
 - #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
 - #38+#39 task 14a: staging migrations ride CI (deploy.yml armed, CLI pinned 2.109.1) — 2026-07-12
-- #37 worker/tester/scout agents in main repo — sonnet/sonnet/haiku, dispatch-don't-do — 2026-07-12
-- #35+#36 VPS+Cloudflare runbook · STATE: VPS hardened, console live on Pages — 2026-07-12
