@@ -1,9 +1,11 @@
 // wouter routes behind the auth guard (S7.5). Org context lives in the URL (R7).
 import { Link, Redirect, Route, Switch, useParams } from "wouter";
 import { useOrgsQuery } from "../features/orgs/api";
+import { API_URL } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { ContactTimeline, Dashboard, LiveMonitor, TaskQueue } from "../screens";
 import { ConversationTranscript } from "../screens/transcript";
+import { OrgHomeView } from "./OrgHomeView";
 import { OrgSwitcher } from "./OrgSwitcher";
 
 const SCREENS = [
@@ -14,18 +16,17 @@ const SCREENS = [
 ];
 
 function OrgHome() {
-  const { data: orgs, isLoading } = useOrgsQuery();
-  if (isLoading)
-    return <div className="p-8 text-sm text-gray-500">Loading orgs…</div>;
+  const { data: orgs, isLoading, isError } = useOrgsQuery();
   const first = orgs?.[0];
-  if (!first)
-    return (
-      <div className="p-8 text-sm text-gray-500">
-        No orgs yet — create one via the API (console org-create UI lands in
-        P3).
-      </div>
-    );
-  return <Redirect to={`/o/${first.id}/tasks`} />;
+  if (first) return <Redirect to={`/o/${first.id}/tasks`} />;
+  return (
+    <OrgHomeView
+      isLoading={isLoading}
+      isError={isError}
+      orgs={orgs}
+      apiBase={API_URL}
+    />
+  );
 }
 
 function OrgLayout() {

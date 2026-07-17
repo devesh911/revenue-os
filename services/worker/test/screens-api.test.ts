@@ -46,6 +46,8 @@ let userA: { token: string; userId: string };
 let userB: { token: string; userId: string };
 let orgA = "";
 let contactId = "";
+let contactNoConvoId = "";
+let activeConvId = "";
 
 beforeAll(async () => {
   userA = await signup("screens-a");
@@ -75,6 +77,7 @@ beforeAll(async () => {
      values ($1, $2, 'whatsapp', 'inbound', 'active', now()) returning id`,
     [orgA, contactId],
   );
+  activeConvId = active.rows[0].id; // started 'now' — the newest for this contact
   await admin.query(
     `insert into conversations (org_id, contact_id, channel, direction, status, started_at, ended_at)
      values ($1, $2, 'voice', 'inbound', 'completed', now() - interval '1 hour', now())`,
@@ -91,6 +94,15 @@ beforeAll(async () => {
      values ($1, $2, $3, 'approval', 'open', 1, 'Approve quote for Asha')`,
     [orgA, contactId, active.rows[0].id],
   );
+
+  // task 17: a second contact with ZERO conversations. Created outside the 30-day window so it
+  // does NOT change the funnel new_leads count (kept at 1) — its latest_conversation_id is null.
+  const noConvo = await admin.query(
+    `insert into contacts (org_id, first_name, last_name, lifecycle_stage, created_at)
+     values ($1, 'Nomi', 'Novo', 'new', now() - interval '60 days') returning id`,
+    [orgA],
+  );
+  contactNoConvoId = noConvo.rows[0].id;
 });
 
 describe("auth gate (S1.5) on every screen endpoint", () => {
@@ -173,5 +185,48 @@ describe("member reads real rows", () => {
     expect(metrics.qualified).toBe(1);
     expect(metrics.bookings).toBe(1);
     expect(metrics.open_tasks).toBe(1);
+  });
+});
+
+// Task 17 (transcript links, docs/sdlc.md §3): the contacts row carries the id of the contact's
+// most recent conversation by started_at so the Contacts screen can deep-link to its transcript.
+// Same org-scoped screens path (no new endpoint / no new auth surface) — the auth + cross-org
+// denial blocks above already gate GET /orgs/:orgId/contacts, and the id is a subquery over
+// conversations inside listContacts' withOrg scope, so conversations RLS keeps it same-org.
+describe("task 17: contacts carry latest_conversation_id (deep-link to newest transcript)", () => {
+  it("a contact with two conversations → the newest by started_at", async () => {
+    const res = await api(`/orgs/${orgA}/contacts`, userA.token);
+    expect(res.status).toBe(200);
+    const { contacts } = (await res.json()) as {
+      contacts: Array<Record<string, unknown>>;
+    };
+    const row = contacts.find((c) => c.id === contactId);
+    expect(row).toBeDefined();
+    // active (started now) beats completed (started 1h earlier) → the active conversation's id.
+    expect(row?.latest_conversation_id).toBe(activeConvId);
+  });
+
+  it("a contact with no conversations → latest_conversation_id is null", async () => {
+    const res = await api(`/orgs/${orgA}/contacts`, userA.token);
+    expect(res.status).toBe(200);
+    const { contacts } = (await res.json()) as {
+      contacts: Array<Record<string, unknown>>;
+    };
+    const row = contacts.find((c) => c.id === contactNoConvoId);
+    expect(row).toBeDefined();
+    expect(row?.latest_conversation_id).toBeNull();
+  });
+
+  it("existing contacts shape is unchanged (regression guard for the added field)", async () => {
+    const res = await api(`/orgs/${orgA}/contacts`, userA.token);
+    expect(res.status).toBe(200);
+    const { contacts } = (await res.json()) as {
+      contacts: Array<Record<string, unknown>>;
+    };
+    const row = contacts.find((c) => c.id === contactId);
+    expect(row?.first_name).toBe("Asha");
+    expect(row?.lifecycle_stage).toBe("new");
+    expect(row).toHaveProperty("last_interaction_at");
+    expect(row).toHaveProperty("latest_conversation_id");
   });
 });

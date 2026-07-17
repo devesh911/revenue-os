@@ -33,7 +33,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | 12 | Org-scope the importContacts merge-update (audit F1) | P0+ | ✅ | #17 | — |
 | 13 | Pipeline hardening (dockerignore, SHA pins, honest deploy status) | P0+ | ✅ | #23 | — |
 | 14 | Staging deploy pipeline (a: migrations · b: image ship) | P2 | 🔨 | #38, #39 | 14b gated: domain + STAGING_SSH_KEY |
-| 15 | Console screens live data (screens API, six funnel metrics) | P3 | 🔨 | — (RED on branch) | GREEN in progress |
+| 15 | Console screens live data (screens API, six funnel metrics) | P3 | ✅ | #43 | — |
+| 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | (this PR) | — |
 
 ### Non-numbered engineering work
 
@@ -52,6 +53,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | worker/tester/scout agents in main repo (dispatch economy) | ✅ | #37 | §5 |
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
+| P3 polish — transcript links (Contacts deep-links) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -68,13 +70,6 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 ---
 
 ## 2. In flight
-
-### task 15 — console screens live data 🔨
-- **Goal:** the four console screens (task 10 shells) render real per-org data; dashboard shows the six funnel metrics (spec §5 M3).
-- **Shape:** worker `routes/screens.ts` (Hono, auth-gated) + `packages/db/screens.ts` queries + `apps/console/features/screens/` (TanStack Query).
-- **RED (committed, cb55953):** auth gate · M0 cross-org denial · six funnel metrics — `services/worker/test/screens-api.test.ts`.
-- **Branch:** `feat/task-15-console-screens-live-data`; GREEN uncommitted in the main working tree.
-- **Docs:** [security S1/S5/S7](security.md) · [patterns/tanstack-query](patterns/tanstack-query.md) · [patterns/hono-route](patterns/hono-route.md) · console-feature skill.
 
 ### task 14b — image ship to VPS 🚧
 - **Goal:** deploy.yml builds the worker image, ships to the VPS, `docker compose up`, Playwright smoke (T22, dev-workflow §10).
@@ -103,10 +98,6 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 - Cloudflare zone (api DNS, Transform Rule w/ EDGE_SHARED_SECRET, origin lockdown) · Pages custom
   domain · Caddy cert · `docker compose up` · smoke. All steps scripted in
   [runbooks/vps-cloudflare-setup](runbooks/vps-cloudflare-setup.md); .env already installed on-box (0600).
-
-### P3 polish — transcript links ⏳
-- LiveMonitor/Contacts lists link to `/o/:orgId/conversations/:id` transcripts once those screens
-  carry data (natural successor to task 15).
 
 ### Deferred-by-phase obligations (spec §12b is the authority)
 - Playwright smoke over the four screens (T12 layer 6) — harness skeleton scaffolded (this PR);
@@ -185,6 +176,22 @@ deploy.yml `staging-migrations` on every main push (supabase CLI pinned 2.109.1)
 retired. Staging verified at migration 015 via on-box psql as app_service. Cloud pushes remain
 outside agent sessions (hard rail #2) — CI is the mechanism.
 
+### task 15 — console screens live data (#43)
+- **Goal:** the four console screens (task 10 shells) render real per-org data; dashboard shows the six funnel metrics (spec §5 M3).
+- **Shape:** worker `routes/screens.ts` (Hono, auth-gated) + `packages/db/screens.ts` queries + `apps/console/features/screens/` (TanStack Query).
+- **RED (committed, cb55953):** auth gate · M0 cross-org denial · six funnel metrics — `services/worker/test/screens-api.test.ts`.
+- **Branch:** `feat/task-15-console-screens-live-data`; GREEN landed as #43, 2026-07-15.
+- **Docs:** [security S1/S5/S7](security.md) · [patterns/tanstack-query](patterns/tanstack-query.md) · [patterns/hono-route](patterns/hono-route.md) · console-feature skill.
+
+### task 16 — console boot honesty (this PR)
+Env validated at the boundary (`lib/env.ts` `parseConsoleEnv`, Zod, empty==missing); `main.tsx`
+gates then dynamically imports `app/App` so `lib/supabase`'s module-scope `createClient` can't
+white-screen; `ConfigErrorScreen` names each missing var + `apps/console/.env.example`. New pure
+views `OrgHomeView`/`OrgSwitcherView` separate ERROR from EMPTY. RED: `tests/console-boot-honesty.test.tsx`
+(9). Invariant recorded in lessons.md: keep `lib/supabase` off `main.tsx`'s static import graph.
+Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md) ·
+[patterns/zod-boundary](patterns/zod-boundary.md).
+
 ### Non-numbered blocks
 - **P0 recovery (#15):** stacked bulk-merge race stranded tasks 3–10; re-landed in one PR. Lesson:
   merge one at a time, base==main first — now contract law (AGENTS.md loop §5).
@@ -201,6 +208,14 @@ outside agent sessions (hard rail #2) — CI is the mechanism.
   soft-delete list, messages bigint PK, seed path, migration 011 app functions, migration 014
   extensions schema, T26.4 `webhook.process.vapi` job, MODEL ROUTING v2 test-authorship); added
   [runbooks/hygiene.md](runbooks/hygiene.md); paid the three dated STATE.md debt clauses.
+
+### P3 polish — transcript links (this PR)
+Split in two: **LiveMonitor half** = task 15 (#43). **Contacts half** = this PR —
+`latest_conversation_id` (newest by `started_at`) via a lateral left-join inside `listContacts`'
+existing `withOrg` scope (same RLS path, no new query); `ContactsTable.tsx` is a pure leaf
+(TranscriptView precedent). RED: `console-contact-links.test.tsx` (4) + 3 CI-owned
+`screens-api.test.ts` cases. Lesson: plain `<a>` not wouter `<Link>` — throws under
+`renderToStaticMarkup` with no Router — recorded in lessons.md.
 
 ---
 

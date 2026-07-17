@@ -40,6 +40,7 @@ export interface ContactRow {
   score: number | null;
   last_interaction_at: string | null;
   created_at: string;
+  latest_conversation_id: string | null;
 }
 
 export async function listContacts(
@@ -47,13 +48,27 @@ export async function listContacts(
   orgId: string,
 ): Promise<ContactRow[]> {
   return withOrg(pool, orgId, async (tx) => {
+    // latest_conversation_id (task 17, transcript deep-links): the contact's newest conversation,
+    // computed as a lateral sub-select INSIDE this withOrg scope. `conv.org_id = c.org_id` is the
+    // drizzle-query.md "org_id in EVERY where" belt-and-suspenders (RLS is the net; this holds even
+    // the day the query runs outside an RLS session). Ordering is deterministic: started_at desc,
+    // then the NOT-NULL created_at as a stable tiebreak so two conversations that share a started_at
+    // (or both null — queued/ringing) never pick arbitrarily. Left join → null when none exist.
     const result = await tx.query(
-      `select id, first_name, last_name, lifecycle_stage, score::float8 as score,
-              last_interaction_at::text as last_interaction_at,
-              created_at::text as created_at
-         from contacts
-        where deleted_at is null and merged_into_id is null
-        order by last_interaction_at desc nulls last, created_at desc
+      `select c.id, c.first_name, c.last_name, c.lifecycle_stage, c.score::float8 as score,
+              c.last_interaction_at::text as last_interaction_at,
+              c.created_at::text as created_at,
+              latest.id as latest_conversation_id
+         from contacts c
+         left join lateral (
+                     select conv.id
+                       from conversations conv
+                      where conv.contact_id = c.id and conv.org_id = c.org_id
+                      order by conv.started_at desc nulls last, conv.created_at desc
+                      limit 1
+                   ) latest on true
+        where c.deleted_at is null and c.merged_into_id is null
+        order by c.last_interaction_at desc nulls last, c.created_at desc
         limit 100`,
     );
     return result.rows;
