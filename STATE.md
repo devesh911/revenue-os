@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversation_id in screens API)
+Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws now show a reload card, not a blank page)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -35,7 +35,11 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
 - **Console boot is honest (task 16, #49):** missing/empty VITE_SUPABASE_* renders a
   ConfigErrorScreen (names each var + apps/console/.env.example) instead of white-screening;
   OrgHome/OrgSwitcher show a distinct unreachable-API error state, separate from empty. +9
-  env-free tests.
+  env-free tests. **Task 21:** the mechanism is now a lazy memoized `getSupabase()` + a static
+  `App` import; the off-static-graph invariant and the separate boot chunk are gone; the
+  env-missing gate is preserved. **Task 22:** a top-level `AppErrorBoundary` now catches
+  render-time throws anywhere in the App subtree — an honest reload card, not a blank page;
+  the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged.
 - **§12b Playwright-smoke obligation (2026-07-17):** harness skeleton scaffolded — config
   (`apps/console/playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.e2e.ts`),
   wiring proven by `bun run e2e -- --list`; full four-screen runtime smoke still deferred to P3;
@@ -79,6 +83,13 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
 - **SDLC ledger (2026-07-13, Devesh):** docs/sdlc.md is the per-task ledger (registry + ≤8-line
   detail blocks + doc map), updated in the same PR as the work. Division: STATE = "now",
   spec §12/§12b = original P0 contract + obligations, sdlc.md = task history and specced backlog.
+- **Waves (Step-2 parallel, 2026-07-17):** independent file-disjoint tasks may build/test/review in
+  PARALLEL, one worktree each under `.claude/worktrees/`, verifying env-free locally with CI as the
+  verdict; landing stays serial (one PR at a time, base==main re-confirmed, WIP cap 3), ≤1 migration
+  minter per wave, `STATE.md`/`docs/sdlc.md`/`lessons.md` exempt-shared. This supersedes
+  dev-workflow §3's stacked-branch mechanics; the §3 doc amendment itself is a pending §13 item
+  (docs/** is agent-denied). Mirrored into `.claude/skills/task-loop` + `.claude/agents/{worker,tester}`
+  (this PR); full protocol in `orchestrator/.claude/commands/goal.md`.
 - **D36 phased posture (2026-07-12, Devesh):** PHASE line above is the one truth. SETUP = agents
   merge independent PRs (squash) on observed-green + tested evidence; LIVE = ruleset-enforced
   human merges, full S13, monitoring on. Flip via docs/runbooks/go-live.md, Devesh-only. All
@@ -109,7 +120,7 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
 
 ## RECENT (last 5 landings, newest first)
 - (this PR) chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-17
-- #50 Contacts rows deep-link to latest conversation transcript (screens API latest_conversation_id) — 2026-07-17
-- #49 console boot honesty: env gate + ConfigErrorScreen + error≠empty — 2026-07-17
-- #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
-- #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
+- #55 ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
+- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
+- #53 console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
+- #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17

@@ -2,7 +2,7 @@
 import { Link, Redirect, Route, Switch, useParams } from "wouter";
 import { useOrgsQuery } from "../features/orgs/api";
 import { API_URL } from "../lib/api";
-import { supabase } from "../lib/supabase";
+import { getSupabase } from "../lib/supabase";
 import { ContactTimeline, Dashboard, LiveMonitor, TaskQueue } from "../screens";
 import { ConversationTranscript } from "../screens/transcript";
 import { OrgHomeView } from "./OrgHomeView";
@@ -56,7 +56,7 @@ function OrgLayout() {
           <button
             type="button"
             className="text-xs text-gray-500"
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => getSupabase().auth.signOut()}
           >
             Sign out
           </button>

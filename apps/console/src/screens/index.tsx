@@ -2,7 +2,7 @@
 // (features/screens/api.ts, R2); org context from the URL (R7). Text renders as plain
 // text nodes only — no raw-HTML injection anywhere (S7.1).
 import type { ReactNode } from "react";
-import { Link, useParams } from "wouter";
+import { useParams } from "wouter";
 import {
   useContactsQuery,
   useConversationsQuery,
@@ -10,6 +10,7 @@ import {
   useTasksQuery,
 } from "../features/screens/api";
 import { ContactsTable } from "./ContactsTable";
+import { ConversationLink } from "./ConversationLink";
 
 function ScreenShell({
   title,
@@ -64,16 +65,12 @@ export function TaskQueue() {
             {data.tasks.map((task) => (
               <tr key={task.id} className="border-b last:border-0">
                 <td className="py-2 pr-4">
-                  {task.conversation_id ? (
-                    <Link
-                      href={`/o/${orgId}/conversations/${task.conversation_id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {task.title}
-                    </Link>
-                  ) : (
-                    task.title
-                  )}
+                  <ConversationLink
+                    orgId={orgId}
+                    conversationId={task.conversation_id}
+                  >
+                    {task.title}
+                  </ConversationLink>
                 </td>
                 <td className="py-2 pr-4">{task.kind}</td>
                 <td className="py-2 pr-4">{task.status}</td>
@@ -130,12 +127,9 @@ export function LiveMonitor() {
             {data.conversations.map((convo) => (
               <tr key={convo.id} className="border-b last:border-0">
                 <td className="py-2 pr-4">
-                  <Link
-                    href={`/o/${orgId}/conversations/${convo.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
+                  <ConversationLink orgId={orgId} conversationId={convo.id}>
                     {convo.contact_name ?? "Unknown"}
-                  </Link>
+                  </ConversationLink>
                 </td>
                 <td className="py-2 pr-4">{convo.channel}</td>
                 <td className="py-2 pr-4">

@@ -34,7 +34,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | 13 | Pipeline hardening (dockerignore, SHA pins, honest deploy status) | P0+ | ✅ | #23 | — |
 | 14 | Staging deploy pipeline (a: migrations · b: image ship) | P2 | 🔨 | #38, #39 | 14b gated: domain + STAGING_SSH_KEY |
 | 15 | Console screens live data (screens API, six funnel metrics) | P3 | ✅ | #43 | — |
-| 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | (this PR) | — |
+| 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | #49 | — |
 
 ### Non-numbered engineering work
 
@@ -53,7 +53,10 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | worker/tester/scout agents in main repo (dispatch economy) | ✅ | #37 | §5 |
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
-| P3 polish — transcript links (Contacts deep-links) | ✅ | (this PR) | §5 |
+| P3 polish — transcript links (Contacts deep-links) | ✅ | #50 | §5 |
+| Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
+| App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
+| ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -188,7 +191,8 @@ Env validated at the boundary (`lib/env.ts` `parseConsoleEnv`, Zod, empty==missi
 gates then dynamically imports `app/App` so `lib/supabase`'s module-scope `createClient` can't
 white-screen; `ConfigErrorScreen` names each missing var + `apps/console/.env.example`. New pure
 views `OrgHomeView`/`OrgSwitcherView` separate ERROR from EMPTY. RED: `tests/console-boot-honesty.test.tsx`
-(9). Invariant recorded in lessons.md: keep `lib/supabase` off `main.tsx`'s static import graph.
+(9). Invariant recorded in lessons.md: keep `lib/supabase` off `main.tsx`'s static import graph
+(superseded by the lazy-getSupabase refactor, this PR — invariant deleted).
 Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md) ·
 [patterns/zod-boundary](patterns/zod-boundary.md).
 
@@ -216,6 +220,30 @@ existing `withOrg` scope (same RLS path, no new query); `ContactsTable.tsx` is a
 (TranscriptView precedent). RED: `console-contact-links.test.tsx` (4) + 3 CI-owned
 `screens-api.test.ts` cases. Lesson: plain `<a>` not wouter `<Link>` — throws under
 `renderToStaticMarkup` with no Router — recorded in lessons.md.
+
+### Lazy getSupabase() singleton (this PR)
+`lib/supabase.ts` now exports a lazy memoized `getSupabase()` (no module-scope `createClient`);
+`main.tsx` statically imports `App`; `auth.tsx`/`router.tsx`/`lib/api.ts` call the getter;
+`BootErrorScreen` + the dynamic-import gate are deleted — the task-16 "keep lib/supabase off the
+static import graph" invariant no longer exists (module load builds nothing, can't throw).
+env-missing → ConfigErrorScreen preserved. RED: `tests/console-boot-honesty.test.tsx` (12/12).
+Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md).
+
+### App-level error boundary — render-throw honesty (this PR)
+Completes the boot-honesty arc: #49 missing-env (`ConfigErrorScreen`) → #53 import-throw safety (lazy `getSupabase()`) → this render-throw — the #53 review's recommended follow-up.
+`AppErrorBoundary` (class — `getDerivedStateFromError`/`componentDidCatch` have no hooks equivalent) wraps `<App/>` in `main.tsx`; a render throw shows a "Something went wrong / Reload the page" card mirroring `ConfigErrorScreen` chrome.
+`ConfigErrorScreen` stays OUTSIDE the boundary (already crash-safe); `parseConsoleEnv` gate intact. RED: `tests/app-error-boundary.test.tsx` (5/5).
+Honest limit: React 19 SSR (`renderToStaticMarkup`/`renderToString`) rethrows child render errors rather than catching them — env-free tests compose `getDerivedStateFromError` + the fallback render.
+Live client-DOM catch + `onClick` reload are e2e-owned.
+Docs: [patterns/react-component](patterns/react-component.md) · [security S7](security.md).
+
+### ConversationLink shared leaf — console deep-link de-dup (this PR)
+Promoted the wouter `/o/<org>/conversations/<id>` anchor (`text-blue-600 hover:underline`) out of
+`TaskQueue`/`LiveMonitor`/`ContactsTable` into `apps/console/src/screens/ConversationLink.tsx` —
+[patterns/react-component](patterns/react-component.md) "second usage → promote"; idiom now lives in
+exactly one file (de-duplication, not a line-count cut — raw diff +52/−31). Nullable `conversationId`
+→ link-or-plain-text preserved; anchors byte-identical (`console-contact-links` regression, 4/4).
+RED: `tests/conversation-link.test.tsx` (6/6), env-free. No DB/schema change.
 
 ---
 

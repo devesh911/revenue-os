@@ -251,6 +251,24 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   can't `import "wouter"` — the static Router must come from a helper under `apps/console/`, where
   wouter resolves. (Round 1 wrongly concluded "use a plain `<a>`"; the Link/ssrPath path is better —
   it's SPA soft-nav, matching TaskQueue/LiveMonitor.)
+- 2026-07-17 · biome preset migration · `bunx biome migrate --write` MIS-migrates
+  `linter.rules.recommended: true` → `preset: "none"`, which DISABLES the whole recommended ruleset
+  (verified: a `==` no longer trips `noDoubleEquals`) while `biome check` still prints green — a silent
+  lint-gate gutting. The correct hand-fix is `preset: "recommended"` (verified: `noDoubleEquals` fires,
+  deprecation cleared, identical file scope). → Never trust `biome migrate` output for the
+  `recommended` field without a rule-still-fires probe.
+- 2026-07-17 · task-21 (lazy getSupabase) · RESOLVED the task-16 boot invariant + the deferred
+  getSupabase fast-follow: lib/supabase.ts is now a lazy memoized getSupabase(), main.tsx
+  statically imports App, BootErrorScreen + the dynamic-import gate deleted. The 'lib/supabase
+  must stay OUT of main.tsx's static import graph' invariant NO LONGER EXISTS — module load
+  builds nothing and cannot throw. env-missing → ConfigErrorScreen preserved (12/12). Residual
+  unchanged: the createRoot boot path is still CI/e2e-owned; a browser empty-.env boot check
+  before console GA remains the suggested guard.
+- 2026-07-17 · task-22 (app error boundary) · React 19 SSR (renderToStaticMarkup/renderToString)
+  RETHROWS child render errors — error boundaries are a client-render feature
+  (getDerivedStateFromError/componentDidCatch fire on the client, not in synchronous SSR).
+  Env-free tests must compose getDerivedStateFromError + the fallback render; the live
+  client-DOM catch + onClick reload are e2e-owned.
 - 2026-07-17 (task-18 playwright scaffold, CI red on PR #48): `bun test` sweeps `**/*.spec.ts` (and
   `.test.`) repo-wide, so Playwright specs must live OUTSIDE bun's test glob — name them `*.e2e.ts`
   and set Playwright `testMatch: "**/*.e2e.ts"`. Otherwise bun runs the spec outside its runner

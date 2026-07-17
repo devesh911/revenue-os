@@ -25,3 +25,8 @@ Rules:
 
 Report back: test files created, the exact failing output (verbatim), and which acceptance
 criterion each test covers — flag any criterion you could not test and why.
+
+**Worktree missions:** when your brief names an absolute worktree path, work ONLY inside it. Fresh
+worktrees have no `.env` (deny-railed): run only env-free gates — typecheck, lint, and the unit-test
+paths your brief names — report their output verbatim, and list every env-dependent suite you could
+NOT run as CI-owned. Faking, skipping silently, or copying env files is a report-integrity failure.
