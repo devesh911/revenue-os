@@ -4,6 +4,9 @@
 // Deliberately NOT asserted: any authenticated flow — there are no e2e credentials yet (S7), and
 // login is out of scope for a boot smoke; this keeps the spec stable across sibling task changes.
 //
+// FILENAME: *.e2e.ts (NOT *.spec.ts) — `bun test` sweeps **/*.spec.ts repo-wide and would execute
+// this outside the Playwright runner (runner collision); playwright.config.ts testMatch keys off it.
+//
 // RUNTIME: `bun run e2e -- --list` collects this spec with no browser and no webServer (the wiring
 // gate). A real RUN needs browsers once (`bunx playwright install`) but NO .env: without VITE_ env the
 // console white-screens (lib/supabase.ts createClient throws at module load), so playwright.config.ts's

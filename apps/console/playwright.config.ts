@@ -16,6 +16,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "e2e",
+  // *.e2e.ts (not .spec./.test.) keeps bun's repo-wide test glob from running this outside Playwright.
+  testMatch: "**/*.e2e.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI, // fail CI if a stray test.only was committed
   retries: process.env.CI ? 2 : 0, // 0 locally; trace is captured only on the first CI retry

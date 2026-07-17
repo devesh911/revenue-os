@@ -231,3 +231,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   doc-change "only his merge is law") while live reality was zero-approval ruleset + named grant +
   agents squash-merging #30–#33. Rules written at different times, none reconciled. → D36: one
   explicit PHASE switch (STATE.md), phase-conditional process rules, phase-independent hard rails.
+- 2026-07-17 (task-18 playwright scaffold, CI red on PR #48): `bun test` sweeps `**/*.spec.ts` (and
+  `.test.`) repo-wide, so Playwright specs must live OUTSIDE bun's test glob — name them `*.e2e.ts`
+  and set Playwright `testMatch: "**/*.e2e.ts"`. Otherwise bun runs the spec outside its runner
+  ("You are calling test() … two different versions of @playwright/test"). `playwright test --list`
+  cannot catch this class: each runner only sees its own discovery.
