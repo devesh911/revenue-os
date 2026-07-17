@@ -34,7 +34,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | 13 | Pipeline hardening (dockerignore, SHA pins, honest deploy status) | P0+ | ✅ | #23 | — |
 | 14 | Staging deploy pipeline (a: migrations · b: image ship) | P2 | 🔨 | #38, #39 | 14b gated: domain + STAGING_SSH_KEY |
 | 15 | Console screens live data (screens API, six funnel metrics) | P3 | ✅ | #43 | — |
-| 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | (this PR) | — |
+| 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | #49 | — |
 
 ### Non-numbered engineering work
 
@@ -53,7 +53,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | worker/tester/scout agents in main repo (dispatch economy) | ✅ | #37 | §5 |
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
-| P3 polish — transcript links (Contacts deep-links) | ✅ | (this PR) | §5 |
+| P3 polish — transcript links (Contacts deep-links) | ✅ | #50 | §5 |
+| Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -179,7 +180,8 @@ Env validated at the boundary (`lib/env.ts` `parseConsoleEnv`, Zod, empty==missi
 gates then dynamically imports `app/App` so `lib/supabase`'s module-scope `createClient` can't
 white-screen; `ConfigErrorScreen` names each missing var + `apps/console/.env.example`. New pure
 views `OrgHomeView`/`OrgSwitcherView` separate ERROR from EMPTY. RED: `tests/console-boot-honesty.test.tsx`
-(9). Invariant recorded in lessons.md: keep `lib/supabase` off `main.tsx`'s static import graph.
+(9). Invariant recorded in lessons.md: keep `lib/supabase` off `main.tsx`'s static import graph
+(superseded by the lazy-getSupabase refactor, this PR — invariant deleted).
 Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md) ·
 [patterns/zod-boundary](patterns/zod-boundary.md).
 
@@ -207,6 +209,14 @@ existing `withOrg` scope (same RLS path, no new query); `ContactsTable.tsx` is a
 (TranscriptView precedent). RED: `console-contact-links.test.tsx` (4) + 3 CI-owned
 `screens-api.test.ts` cases. Lesson: plain `<a>` not wouter `<Link>` — throws under
 `renderToStaticMarkup` with no Router — recorded in lessons.md.
+
+### Lazy getSupabase() singleton (this PR)
+`lib/supabase.ts` now exports a lazy memoized `getSupabase()` (no module-scope `createClient`);
+`main.tsx` statically imports `App`; `auth.tsx`/`router.tsx`/`lib/api.ts` call the getter;
+`BootErrorScreen` + the dynamic-import gate are deleted — the task-16 "keep lib/supabase off the
+static import graph" invariant no longer exists (module load builds nothing, can't throw).
+env-missing → ConfigErrorScreen preserved. RED: `tests/console-boot-honesty.test.tsx` (12/12).
+Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md).
 
 ---
 

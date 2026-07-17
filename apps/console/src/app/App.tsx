@@ -1,7 +1,8 @@
-// The mounted app tree (§1b wiring: providers + auth guard + router). Split out of main.tsx so
-// it can be dynamically imported ONLY after env validation passes. Importing it eagerly would
-// pull lib/supabase's module-scope createClient(import.meta.env…), which throws
-// "supabaseUrl is required." when env is absent — the white-screen defect task-16 fixes.
+// The mounted app tree (§1b wiring: providers + auth guard + router). Kept out of main.tsx so the
+// boot entry stays a thin env-gate. lib/supabase constructs its client lazily (getSupabase), so
+// importing this tree — even statically, before env is validated — builds no client and cannot
+// throw "supabaseUrl is required." at module scope (task-21; supersedes the task-16 dynamic-import
+// workaround). main.tsx renders <App /> only when parseConsoleEnv is ok.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { AuthGuard } from "./auth";

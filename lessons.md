@@ -257,3 +257,10 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   lint-gate gutting. The correct hand-fix is `preset: "recommended"` (verified: `noDoubleEquals` fires,
   deprecation cleared, identical file scope). → Never trust `biome migrate` output for the
   `recommended` field without a rule-still-fires probe.
+- 2026-07-17 · task-21 (lazy getSupabase) · RESOLVED the task-16 boot invariant + the deferred
+  getSupabase fast-follow: lib/supabase.ts is now a lazy memoized getSupabase(), main.tsx
+  statically imports App, BootErrorScreen + the dynamic-import gate deleted. The 'lib/supabase
+  must stay OUT of main.tsx's static import graph' invariant NO LONGER EXISTS — module load
+  builds nothing and cannot throw. env-missing → ConfigErrorScreen preserved (12/12). Residual
+  unchanged: the createRoot boot path is still CI/e2e-owned; a browser empty-.env boot check
+  before console GA remains the suggested guard.
