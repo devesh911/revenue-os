@@ -1,9 +1,11 @@
 // Task 17 (transcript links — docs/sdlc.md §3 P3 polish): the Contacts screen's presentational
-// leaf. Pure and prop-driven like TranscriptView — it imports no query hooks, no lib/api, and no
-// lib/supabase (the ContactsResponse import is type-only, erased at runtime), so it renders under
-// renderToStaticMarkup with no Router / QueryClient / env (test-pinned, env-free). A contact WITH
-// a latest_conversation_id deep-links its name to that conversation's transcript; null renders as
-// plain text, exactly as before. Names render as inert text nodes only — no raw HTML (S7.1).
+// leaf. Prop-driven and env-free to import — no query hooks, no lib/api, no lib/supabase (the
+// ContactsResponse import is type-only, erased at runtime). A contact WITH a latest_conversation_id
+// deep-links its name via wouter <Link> (SPA soft-nav, matching TaskQueue/LiveMonitor) to that
+// conversation's transcript; null renders as plain text. Names render as inert text nodes only — no
+// raw HTML (S7.1). <Link> reads a Router from context: the app supplies one at runtime; the unit
+// test renders this leaf inside a static SSR Router (apps/console/test/router.tsx).
+import { Link } from "wouter";
 import type { ContactsResponse } from "../features/screens/api";
 
 type ContactRow = ContactsResponse["contacts"][number];
@@ -36,12 +38,12 @@ export function ContactsTable({
           <tr key={contact.id} className="border-b last:border-0">
             <td className="py-2 pr-4">
               {contact.latest_conversation_id ? (
-                <a
+                <Link
                   href={`/o/${orgId}/conversations/${contact.latest_conversation_id}`}
                   className="text-blue-600 hover:underline"
                 >
                   {contactName(contact)}
-                </a>
+                </Link>
               ) : (
                 contactName(contact)
               )}

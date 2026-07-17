@@ -1,10 +1,11 @@
 // Task 17 (transcript links — docs/sdlc.md §3 P3 polish): Contacts rows deep-link to the
 // contact's latest conversation transcript. RED / test-is-spec. Env-free: renders over an
-// isolated presentational leaf (the TranscriptView precedent), so it needs no Router,
-// QueryClient, DB, or supabase module load — it runs in CI's plain `bun test`.
+// isolated presentational leaf (the TranscriptView precedent), so it needs no QueryClient, DB, or
+// supabase module load — only a static SSR Router for its wouter <Link>. Runs in CI's plain `bun test`.
 import { describe, expect, it } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { StaticRouter } from "../apps/console/test/router";
 
 // Mirrors ContactsResponse["contacts"][number] AFTER AC1 lands: the console Zod schema in
 // apps/console/src/features/screens/api.ts gains `latest_conversation_id: uuid | null`.
@@ -80,7 +81,11 @@ describe("AC2: ContactTimeline deep-links a contact to its latest conversation t
     const ContactsTable = await loadContactsTable();
     expect(typeof ContactsTable).toBe("function"); // RED today: leaf unbuilt
     const Comp = ContactsTable as ContactsTableFn;
-    const html = renderToStaticMarkup(<Comp orgId={ORG} contacts={[linked]} />);
+    const html = renderToStaticMarkup(
+      <StaticRouter>
+        <Comp orgId={ORG} contacts={[linked]} />
+      </StaticRouter>,
+    );
     expect(html).toContain(`href="/o/${ORG}/conversations/${CONV}"`);
     expect(html).toMatch(linkRe);
   });
@@ -90,7 +95,9 @@ describe("AC2: ContactTimeline deep-links a contact to its latest conversation t
     expect(typeof ContactsTable).toBe("function");
     const Comp = ContactsTable as ContactsTableFn;
     const html = renderToStaticMarkup(
-      <Comp orgId={ORG} contacts={[unlinked]} />,
+      <StaticRouter>
+        <Comp orgId={ORG} contacts={[unlinked]} />
+      </StaticRouter>,
     );
     expect(html).toContain("Grace Hopper");
     expect(html).not.toMatch(/<a[\s>]/);
@@ -101,7 +108,9 @@ describe("AC2: ContactTimeline deep-links a contact to its latest conversation t
     expect(typeof ContactsTable).toBe("function");
     const Comp = ContactsTable as ContactsTableFn;
     const html = renderToStaticMarkup(
-      <Comp orgId={ORG} contacts={[linked, unlinked]} />,
+      <StaticRouter>
+        <Comp orgId={ORG} contacts={[linked, unlinked]} />
+      </StaticRouter>,
     );
     expect(html.match(/<a[\s>]/g)?.length ?? 0).toBe(1);
     expect(html).toMatch(linkRe);

@@ -231,8 +231,11 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   doc-change "only his merge is law") while live reality was zero-approval ruleset + named grant +
   agents squash-merging #30–#33. Rules written at different times, none reconciled. → D36: one
   explicit PHASE switch (STATE.md), phase-conditional process rules, phase-independent hard rails.
-- 2026-07-17 · task-17 transcript links · wouter's `<Link>` throws `ReferenceError: location is
-  not defined` under `renderToStaticMarkup` with no `<Router>` (bun test has no DOM/`location`
-  global), so an env-free presentational leaf tested providerless (the TranscriptView pattern)
-  must deep-link with a plain `<a>`, not `<Link>`. LiveMonitor/TaskQueue get away with `<Link>`
-  only because they render inside the app's Router at runtime, never in a providerless unit test.
+- 2026-07-17 · task-17 transcript links · Rendering a wouter `<Link>` under `renderToStaticMarkup`
+  in bun test (no DOM) needs a specific incantation: providerless throws `location is not defined`;
+  `<Router hook={memoryLocation({ static: true }).hook}>` throws `Missing getServerSnapshot` (the
+  hook uses useSyncExternalStore); the one that works in wouter 3.10.0 is `<Router ssrPath="/">`.
+  Extra quirk: `wouter` is a console-workspace dep (not hoisted to repo root), so a `tests/*` file
+  can't `import "wouter"` — the static Router must come from a helper under `apps/console/`, where
+  wouter resolves. (Round 1 wrongly concluded "use a plain `<a>`"; the Link/ssrPath path is better —
+  it's SPA soft-nav, matching TaskQueue/LiveMonitor.)
