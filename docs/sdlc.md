@@ -53,7 +53,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
-| Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + runtime run CI-owned (VITE_ env + browsers) |
+| Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + local run needs only `bunx playwright install`; CI arming follow-up |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
@@ -84,9 +84,9 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 
 ### Playwright smoke scaffold (e2e harness skeleton) 🚧
 - **Goal:** §12b e2e obligation (T12 layer 6) — Playwright smoke harness for the four console screens.
-- **Shape:** root `playwright.config.ts` + `apps/console/e2e/smoke.spec.ts`; `@playwright/test` exact-pinned (G2).
-- **Verified:** `bunx playwright test --list` (browser/env-free) — 1 test collected.
-- **Residual:** tech-stack T24 BOM row (Devesh) + CI arming (VITE_ env + browser install, runtime run CI-owned).
+- **Shape:** `apps/console/playwright.config.ts` + `apps/console/e2e/smoke.spec.ts`; `@playwright/test` exact-pinned (G2).
+- **Verified:** `bun run e2e -- --list` (+ typecheck, lint — all green).
+- **Residual:** tech-stack T24 BOM row (Devesh); (a) browser install is the sole runtime prereq — `bun run e2e` needs no `.env`; (b) e2e specs sit outside `tsc` scope by design (`--list` is their gate), a dedicated e2e tsconfig rides the CI-arming follow-up.
 - **Docs:** [tech-stack T12/T22/T24](tech-stack.md).
 
 ---

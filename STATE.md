@@ -33,9 +33,9 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
   outcomes. Verified in a live browser against the seeded real_estate org. 80/80 tests.
 - **§12b Playwright-smoke obligation (2026-07-17):** harness skeleton scaffolded — config
-  (`playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.spec.ts`), wiring proven by
-  `playwright test --list`; full four-screen runtime smoke + CI arming still deferred (env +
-  browsers).
+  (`apps/console/playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.spec.ts`),
+  wiring proven by `bun run e2e -- --list`; full four-screen runtime smoke still deferred to P3;
+  runtime run needs only `bunx playwright install` locally, CI arming is the follow-up.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -106,7 +106,7 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; runtime run CI-owned) (this PR) — 2026-07-17
+- chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) (this PR) — 2026-07-17
 - #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
