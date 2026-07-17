@@ -29,3 +29,8 @@ lessons.md entries you appended, and anything that smelled wrong. End with a **D
 what the PR body must say (what/why/evidence), which STATE.md lines change (NOW/NEXT/RECENT/DECISIONS),
 and the docs/sdlc.md ledger-row update if the task has one — the scribe writes the prose from this,
 you never write it yourself.
+
+**Worktree missions:** when your brief names an absolute worktree path, work ONLY inside it. Fresh
+worktrees have no `.env` (deny-railed): run only env-free gates — typecheck, lint, and the unit-test
+paths your brief names — report their output verbatim, and list every env-dependent suite you could
+NOT run as CI-owned. Faking, skipping silently, or copying env files is a report-integrity failure.

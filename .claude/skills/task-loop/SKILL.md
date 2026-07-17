@@ -13,7 +13,7 @@ description: Use when running the per-task build loop — a /goal Mode B cycle o
 
 ## The loop (D32-amended; every step blocking)
 1. **WIP cap before anything:** ≥3 open unmerged task PRs ⇒ stop, emit `NEED_HUMAN: stack full — review bottom-up`.
-2. Branch off the stack tip: `feat/task-NN-slug`.
+2. Branch `feat/task-NN-slug` off up-to-date `origin/main` — **independent, never stacked** (the 2026-07-10 merge race is why); one PR at a time through merge.
 3. **RED before GREEN** — failing tests from the acceptance criteria. **Dispatch, don't do (routing
    v2, 2026-07-13):** ALL RED goes to `tester` (opus 4.8, max effort) — for security/RLS/migration/
    guard-critical RED the orchestrator reviews the returned tests line-by-line BEFORE any GREEN
@@ -34,7 +34,18 @@ description: Use when running the per-task build loop — a /goal Mode B cycle o
 Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a T24 BOM row · mutate an active agent/workflow version · approve a PR (in any phase) · edit `docs/**`/`CLAUDE.md` outside a commissioned or §13 ADR PR · merge anything while `STATE.md` says `PHASE: LIVE` (D36 — LIVE merges are ruleset-enforced human acts).
 
 ## Merge discipline (phase-aware — D36; check STATE.md line 1 first)
-SETUP phase: agents merge — observed-green required `checks` + tested evidence + base==main confirmed (`gh pr view N --json baseRefName`) + ONE PR at a time, from the repo root. Independent branches squash; stacked branches keep merge commits (squash rewrites the patches above — D32). Never loop `gh pr merge` (lessons.md, 2026-07-10). LIVE phase: no agent merges, period.
+SETUP phase: agents merge — observed-green required `checks` + tested evidence + base==main confirmed (`gh pr view N --json baseRefName`) + ONE PR at a time, from the repo root. Branches are **independent off `origin/main`** and squash-merge — never stacked (D32; stacking caused the 2026-07-10 race). Never loop `gh pr merge` (lessons.md, 2026-07-10). LIVE phase: no agent merges, period.
+
+## Waves (Step-2 parallel — optional, when tasks are file-disjoint)
+Builds, tests, and reviews may run in PARALLEL, one git worktree per task under `.claude/worktrees/`
+(gitignored + biome-excluded — a worktree must never enter lint scope). Worktree branches verify
+**env-free** locally (typecheck · lint · the unit-test paths the brief names — fresh worktrees have no
+`.env`, by rail); CI `checks` is their verdict (S13.7). Landing stays serial: one PR at a time,
+base==main re-confirmed each, WIP cap 3 (D32) — parallel builds, serial merges. **≤1 migration-minting
+task per wave** (migrations are an append-only global sequence). `STATE.md` · `docs/sdlc.md` ·
+`lessons.md` are exempt-shared (every PR touches them) — give each task a distinct insertion target;
+their drain conflicts are expected and resolved "keep both, chronological", never grounds to serialize
+builds. Product file surfaces MUST be disjoint. Full protocol: `orchestrator/.claude/commands/goal.md`.
 
 ## Learned since this router was written (dynamic — run it, don't skip)
 `grep -inE 'gates|CI|pipe|worktree|queue|exit code' lessons.md` and read `STATE.md → DECISIONS`.

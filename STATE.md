@@ -73,6 +73,13 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
 - **SDLC ledger (2026-07-13, Devesh):** docs/sdlc.md is the per-task ledger (registry + ≤8-line
   detail blocks + doc map), updated in the same PR as the work. Division: STATE = "now",
   spec §12/§12b = original P0 contract + obligations, sdlc.md = task history and specced backlog.
+- **Waves (Step-2 parallel, 2026-07-17):** independent file-disjoint tasks may build/test/review in
+  PARALLEL, one worktree each under `.claude/worktrees/`, verifying env-free locally with CI as the
+  verdict; landing stays serial (one PR at a time, base==main re-confirmed, WIP cap 3), ≤1 migration
+  minter per wave, `STATE.md`/`docs/sdlc.md`/`lessons.md` exempt-shared. This supersedes
+  dev-workflow §3's stacked-branch mechanics; the §3 doc amendment itself is a pending §13 item
+  (docs/** is agent-denied). Mirrored into `.claude/skills/task-loop` + `.claude/agents/{worker,tester}`
+  (this PR); full protocol in `orchestrator/.claude/commands/goal.md`.
 - **D36 phased posture (2026-07-12, Devesh):** PHASE line above is the one truth. SETUP = agents
   merge independent PRs (squash) on observed-green + tested evidence; LIVE = ruleset-enforced
   human merges, full S13, monitoring on. Flip via docs/runbooks/go-live.md, Devesh-only. All
@@ -102,9 +109,8 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) Contacts rows deep-link to latest conversation transcript (screens API
-  latest_conversation_id) — 2026-07-17
+- (this PR) main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
+- #50 Contacts rows deep-link to latest conversation transcript (screens API latest_conversation_id) — 2026-07-17
 - #49 console boot honesty: env gate + ConfigErrorScreen + error≠empty — 2026-07-17
 - #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
-- #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
