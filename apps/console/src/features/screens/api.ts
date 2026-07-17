@@ -46,6 +46,9 @@ const ContactsResponse = z.object({
       score: z.number().nullable(),
       last_interaction_at: z.string().nullable(),
       created_at: z.string(),
+      // task 17: id of the contact's newest conversation (by started_at), for the transcript
+      // deep-link; null when the contact has no conversations yet.
+      latest_conversation_id: z.string().uuid().nullable(),
     }),
   ),
 });

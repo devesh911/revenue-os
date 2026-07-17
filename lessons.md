@@ -231,3 +231,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   doc-change "only his merge is law") while live reality was zero-approval ruleset + named grant +
   agents squash-merging #30–#33. Rules written at different times, none reconciled. → D36: one
   explicit PHASE switch (STATE.md), phase-conditional process rules, phase-independent hard rails.
+- 2026-07-17 · task-17 transcript links · wouter's `<Link>` throws `ReferenceError: location is
+  not defined` under `renderToStaticMarkup` with no `<Router>` (bun test has no DOM/`location`
+  global), so an env-free presentational leaf tested providerless (the TranscriptView pattern)
+  must deep-link with a plain `<a>`, not `<Link>`. LiveMonitor/TaskQueue get away with `<Link>`
+  only because they render inside the app's Router at runtime, never in a providerless unit test.
