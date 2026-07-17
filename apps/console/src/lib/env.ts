@@ -1,12 +1,14 @@
-// Console env validated at the boundary (R6/Zod): both Supabase vars must be present AND
-// non-empty before boot. Pure and side-effect-free — the caller passes `raw` (import.meta.env),
-// this never reads it — so it stays importable in tests with no env present. Returns a
-// discriminated result: ok with the parsed env, or the NAMES of the missing/empty vars for the
-// configuration-error screen. Empty string counts as missing (min(1)).
+// Console env validated at the boundary (R6/Zod) before boot. Pure and side-effect-free — the
+// caller passes `raw` (import.meta.env), this never reads it — so it stays importable in tests
+// with no env present. Returns a discriminated result: ok with the parsed env, or the NAMES of
+// the invalid vars for the configuration-error screen. VITE_SUPABASE_URL must be a valid URL, so
+// a present-but-garbage URL is caught here rather than thrown inside createClient (mirrors
+// services/worker/src/env.ts); VITE_SUPABASE_ANON_KEY must be non-empty. Absent/empty/garbage all
+// count as missing.
 import { z } from "zod";
 
 const ConsoleEnv = z.object({
-  VITE_SUPABASE_URL: z.string().min(1),
+  VITE_SUPABASE_URL: z.string().url(),
   VITE_SUPABASE_ANON_KEY: z.string().min(1),
 });
 

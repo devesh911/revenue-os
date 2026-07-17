@@ -239,3 +239,7 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   static import of it (or anything that pulls it) back onto the boot path reintroduces the
   white-screen, and the createRoot path is CI/e2e-owned, invisible to in-process bun tests. →
   Suggested: a browser/e2e boot check (empty .env → error screen, not blank) before console GA.
+- 2026-07-17 · task-16 revise · deeper fix deferred: making lib/supabase.ts a lazy getSupabase()
+  singleton would delete the static-import boot invariant outright (module load can no longer
+  throw) and drop the extra boot chunk; the dynamic-import gate + .catch BootErrorScreen is the
+  interim guard. → Suggested fast-follow before console GA.

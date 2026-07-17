@@ -21,7 +21,7 @@ export function OrgHomeView({
     return <div className="p-8 text-sm text-gray-500">Loading orgs…</div>;
   if (isError)
     return (
-      <div className="p-8 text-sm text-gray-500">
+      <div className="p-8 text-sm text-red-600">
         Can't reach the API at {apiBase}. Check that the server is running, then
         reload.
       </div>

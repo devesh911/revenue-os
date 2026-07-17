@@ -56,24 +56,24 @@ describe("task-16 console boot honesty", () => {
     expect(html).toContain("apps/console/.env.example");
   });
 
-  // AC1 — the validator + screen must actually sit on the boot path, else the white screen
-  // persists. Static proxy for the runtime mount; the createRoot wiring itself is CI/e2e-owned.
-  it("AC1: parseConsoleEnv and ConfigErrorScreen are wired into console src (not dead code)", async () => {
-    const glob = new Bun.Glob("apps/console/src/**/*.{ts,tsx}");
-    let usesParse = false;
-    let usesScreen = false;
-    for await (const path of glob.scan(".")) {
-      if (
-        path.endsWith("lib/env.ts") ||
-        path.endsWith("app/ConfigErrorScreen.tsx")
-      )
-        continue;
-      const src = await Bun.file(path).text();
-      if (src.includes("parseConsoleEnv")) usesParse = true;
-      if (src.includes("ConfigErrorScreen")) usesScreen = true;
-    }
-    expect(usesParse).toBe(true);
-    expect(usesScreen).toBe(true);
+  // AC1 — the validator + screen must sit on the boot path ITSELF (main.tsx, the entry), else the
+  // white screen persists. Pinned to main.tsx specifically; the createRoot mount is CI/e2e-owned.
+  it("AC1: parseConsoleEnv and ConfigErrorScreen are wired into main.tsx (not dead code)", async () => {
+    const src = await Bun.file("apps/console/src/main.tsx").text();
+    expect(src).toContain("parseConsoleEnv");
+    expect(src).toContain("ConfigErrorScreen");
+  });
+
+  // AC1 — a chunk-load failure of the dynamic app import must not white-screen #root: main.tsx
+  // catches it and renders a boot-error screen with a reload affordance (pure, importable here).
+  it("AC1: BootErrorScreen renders an honest load-failure message with a reload affordance", async () => {
+    const { BootErrorScreen } = await import(
+      "../apps/console/src/app/BootErrorScreen"
+    );
+    const html = renderToStaticMarkup(<BootErrorScreen />);
+    expect(html.length).toBeGreaterThan(0); // never a blank #root
+    expect(visible(html)).toMatch(/load the app/i);
+    expect(visible(html)).toMatch(/reload/i);
   });
 
   // AC2 — "With both vars present, parsing succeeds and boot proceeds (the pure unit returns
