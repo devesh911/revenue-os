@@ -5,6 +5,7 @@
 // index.css stays a static import so styles cover the error screen too.
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
+import { AppErrorBoundary } from "./app/AppErrorBoundary";
 import { ConfigErrorScreen } from "./app/ConfigErrorScreen";
 import { parseConsoleEnv } from "./lib/env";
 import "./index.css";
@@ -13,7 +14,15 @@ const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("missing #root");
 const root = createRoot(rootEl);
 
+// ConfigErrorScreen stays OUTSIDE the boundary — it is already crash-safe; the boundary wraps only
+// the App tree, the part that can throw at render time (task-22).
 const parsed = parseConsoleEnv(import.meta.env);
 root.render(
-  parsed.ok ? <App /> : <ConfigErrorScreen missing={parsed.missing} />,
+  parsed.ok ? (
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
+  ) : (
+    <ConfigErrorScreen missing={parsed.missing} />
+  ),
 );
