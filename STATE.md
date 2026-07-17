@@ -109,8 +109,8 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
+- (this PR) biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
+- #51 main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
 - #50 Contacts rows deep-link to latest conversation transcript (screens API latest_conversation_id) — 2026-07-17
 - #49 console boot honesty: env gate + ConfigErrorScreen + error≠empty — 2026-07-17
 - #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
-- #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12

@@ -251,3 +251,9 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   can't `import "wouter"` — the static Router must come from a helper under `apps/console/`, where
   wouter resolves. (Round 1 wrongly concluded "use a plain `<a>`"; the Link/ssrPath path is better —
   it's SPA soft-nav, matching TaskQueue/LiveMonitor.)
+- 2026-07-17 · biome preset migration · `bunx biome migrate --write` MIS-migrates
+  `linter.rules.recommended: true` → `preset: "none"`, which DISABLES the whole recommended ruleset
+  (verified: a `==` no longer trips `noDoubleEquals`) while `biome check` still prints green — a silent
+  lint-gate gutting. The correct hand-fix is `preset: "recommended"` (verified: `noDoubleEquals` fires,
+  deprecation cleared, identical file scope). → Never trust `biome migrate` output for the
+  `recommended` field without a rule-still-fires probe.
