@@ -4,7 +4,13 @@
 // the invalid vars for the configuration-error screen. VITE_SUPABASE_URL must be a valid URL, so
 // a present-but-garbage URL is caught here rather than thrown inside createClient (mirrors
 // services/worker/src/env.ts); VITE_SUPABASE_ANON_KEY must be non-empty. Absent/empty/garbage all
-// count as missing.
+// count as missing. Both VITE_SUPABASE_* rules are identical in dev and prod.
+//
+// VITE_API_URL is PROD-conditional (task-24): vite injects raw.PROD=true in production builds and
+// false/undefined in dev. In PROD it must be a valid URL — otherwise lib/api.ts silently bakes its
+// "http://localhost:8080" fallback and points a deployed console at nowhere, so a misconfigured
+// prod build fails loudly on the ConfigErrorScreen instead. In DEV it stays OPTIONAL because that
+// localhost fallback is exactly what local dev wants.
 import { z } from "zod";
 
 const ConsoleEnv = z.object({
@@ -21,7 +27,11 @@ export type ParseConsoleEnvResult =
 export function parseConsoleEnv(
   raw: Record<string, unknown>,
 ): ParseConsoleEnvResult {
-  const parsed = ConsoleEnv.safeParse(raw);
+  const apiUrl = z.string().url();
+  const schema = ConsoleEnv.extend({
+    VITE_API_URL: raw.PROD === true ? apiUrl : apiUrl.optional(),
+  });
+  const parsed = schema.safeParse(raw);
   if (parsed.success) return { ok: true, env: parsed.data };
   const missing = [
     ...new Set(
