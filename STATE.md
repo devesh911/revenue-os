@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable assigns/reviews)
+Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversation_id in screens API)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -29,8 +29,8 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   **CI `staging-migrations` GREEN** (token + DB password secrets fixed by Devesh; run 29191891317
   attempt 3): staging is at migration 015. Worker boot now waits ONLY on the domain.
 - **Console screens are REAL (task 15, 2026-07-13):** dashboard (six funnel tiles), task queue,
-  live monitor, contacts all render org-scoped data via new screens API; task/conversation rows
-  deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
+  live monitor, contacts all render org-scoped data via new screens API; task/conversation/contact
+  rows deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
   outcomes. Verified in a live browser against the seeded real_estate org. 80/80 tests.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
@@ -100,9 +100,9 @@ Updated: 2026-07-13 (model routing v2 — opus builds, sonnet scribes, fable ass
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) Contacts rows deep-link to latest conversation transcript (screens API
+  latest_conversation_id) — 2026-07-17
 - #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
 - #38+#39 task 14a: staging migrations ride CI (deploy.yml armed, CLI pinned 2.109.1) — 2026-07-12
-- #37 worker/tester/scout agents in main repo — sonnet/sonnet/haiku, dispatch-don't-do — 2026-07-12
-- #35+#36 VPS+Cloudflare runbook · STATE: VPS hardened, console live on Pages — 2026-07-12
