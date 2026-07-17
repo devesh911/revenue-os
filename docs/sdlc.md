@@ -33,7 +33,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | 12 | Org-scope the importContacts merge-update (audit F1) | P0+ | ✅ | #17 | — |
 | 13 | Pipeline hardening (dockerignore, SHA pins, honest deploy status) | P0+ | ✅ | #23 | — |
 | 14 | Staging deploy pipeline (a: migrations · b: image ship) | P2 | 🔨 | #38, #39 | 14b gated: domain + STAGING_SSH_KEY |
-| 15 | Console screens live data (screens API, six funnel metrics) | P3 | 🔨 | — (RED on branch) | GREEN in progress |
+| 15 | Console screens live data (screens API, six funnel metrics) | P3 | ✅ | #43 | — |
+| 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | (this PR) | — |
 
 ### Non-numbered engineering work
 
@@ -67,13 +68,6 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 ---
 
 ## 2. In flight
-
-### task 15 — console screens live data 🔨
-- **Goal:** the four console screens (task 10 shells) render real per-org data; dashboard shows the six funnel metrics (spec §5 M3).
-- **Shape:** worker `routes/screens.ts` (Hono, auth-gated) + `packages/db/screens.ts` queries + `apps/console/features/screens/` (TanStack Query).
-- **RED (committed, cb55953):** auth gate · M0 cross-org denial · six funnel metrics — `services/worker/test/screens-api.test.ts`.
-- **Branch:** `feat/task-15-console-screens-live-data`; GREEN uncommitted in the main working tree.
-- **Docs:** [security S1/S5/S7](security.md) · [patterns/tanstack-query](patterns/tanstack-query.md) · [patterns/hono-route](patterns/hono-route.md) · console-feature skill.
 
 ### task 14b — image ship to VPS 🚧
 - **Goal:** deploy.yml builds the worker image, ships to the VPS, `docker compose up`, Playwright smoke (T22, dev-workflow §10).
@@ -175,6 +169,22 @@ Born from audit-cicd-pipeline.
 deploy.yml `staging-migrations` on every main push (supabase CLI pinned 2.109.1); manual db push
 retired. Staging verified at migration 015 via on-box psql as app_service. Cloud pushes remain
 outside agent sessions (hard rail #2) — CI is the mechanism.
+
+### task 15 — console screens live data (#43)
+- **Goal:** the four console screens (task 10 shells) render real per-org data; dashboard shows the six funnel metrics (spec §5 M3).
+- **Shape:** worker `routes/screens.ts` (Hono, auth-gated) + `packages/db/screens.ts` queries + `apps/console/features/screens/` (TanStack Query).
+- **RED (committed, cb55953):** auth gate · M0 cross-org denial · six funnel metrics — `services/worker/test/screens-api.test.ts`.
+- **Branch:** `feat/task-15-console-screens-live-data`; GREEN landed as #43, 2026-07-15.
+- **Docs:** [security S1/S5/S7](security.md) · [patterns/tanstack-query](patterns/tanstack-query.md) · [patterns/hono-route](patterns/hono-route.md) · console-feature skill.
+
+### task 16 — console boot honesty (this PR)
+Env validated at the boundary (`lib/env.ts` `parseConsoleEnv`, Zod, empty==missing); `main.tsx`
+gates then dynamically imports `app/App` so `lib/supabase`'s module-scope `createClient` can't
+white-screen; `ConfigErrorScreen` names each missing var + `apps/console/.env.example`. New pure
+views `OrgHomeView`/`OrgSwitcherView` separate ERROR from EMPTY. RED: `tests/console-boot-honesty.test.tsx`
+(9). Invariant recorded in lessons.md: keep `lib/supabase` off `main.tsx`'s static import graph.
+Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md) ·
+[patterns/zod-boundary](patterns/zod-boundary.md).
 
 ### Non-numbered blocks
 - **P0 recovery (#15):** stacked bulk-merge race stranded tasks 3–10; re-landed in one PR. Lesson:
