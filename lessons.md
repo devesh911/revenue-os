@@ -264,3 +264,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   builds nothing and cannot throw. env-missing → ConfigErrorScreen preserved (12/12). Residual
   unchanged: the createRoot boot path is still CI/e2e-owned; a browser empty-.env boot check
   before console GA remains the suggested guard.
+- 2026-07-17 · task-22 (app error boundary) · React 19 SSR (renderToStaticMarkup/renderToString)
+  RETHROWS child render errors — error boundaries are a client-render feature
+  (getDerivedStateFromError/componentDidCatch fire on the client, not in synchronous SSR).
+  Env-free tests must compose getDerivedStateFromError + the fallback render; the live
+  client-DOM catch + onClick reload are e2e-owned.

@@ -54,7 +54,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
 | P3 polish — transcript links (Contacts deep-links) | ✅ | #50 | §5 |
-| Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | (this PR) | §5 |
+| Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
+| App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -217,6 +218,14 @@ existing `withOrg` scope (same RLS path, no new query); `ContactsTable.tsx` is a
 static import graph" invariant no longer exists (module load builds nothing, can't throw).
 env-missing → ConfigErrorScreen preserved. RED: `tests/console-boot-honesty.test.tsx` (12/12).
 Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md).
+
+### App-level error boundary — render-throw honesty (this PR)
+Completes the boot-honesty arc: #49 missing-env (`ConfigErrorScreen`) → #53 import-throw safety (lazy `getSupabase()`) → this render-throw — the #53 review's recommended follow-up.
+`AppErrorBoundary` (class — `getDerivedStateFromError`/`componentDidCatch` have no hooks equivalent) wraps `<App/>` in `main.tsx`; a render throw shows a "Something went wrong / Reload the page" card mirroring `ConfigErrorScreen` chrome.
+`ConfigErrorScreen` stays OUTSIDE the boundary (already crash-safe); `parseConsoleEnv` gate intact. RED: `tests/app-error-boundary.test.tsx` (5/5).
+Honest limit: React 19 SSR (`renderToStaticMarkup`/`renderToString`) rethrows child render errors rather than catching them — env-free tests compose `getDerivedStateFromError` + the fallback render.
+Live client-DOM catch + `onClick` reload are e2e-owned.
+Docs: [patterns/react-component](patterns/react-component.md) · [security S7](security.md).
 
 ---
 
