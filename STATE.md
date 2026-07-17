@@ -32,6 +32,10 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
   live monitor, contacts all render org-scoped data via new screens API; task/conversation/contact
   rows deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
   outcomes. Verified in a live browser against the seeded real_estate org. 80/80 tests.
+- **Console boot is honest (task 16, this PR):** missing/empty VITE_SUPABASE_* renders a
+  ConfigErrorScreen (names each var + apps/console/.env.example) instead of white-screening;
+  OrgHome/OrgSwitcher show a distinct unreachable-API error state, separate from empty. +9
+  env-free tests.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -42,9 +46,7 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
-- feat/task-15-console-screens-live-data (this PR): the four console screens on real data —
-  screens API (tasks/contacts/conversations/metrics), six funnel tiles, seed-pack demo data;
-  task/conversation rows link to transcripts (closes the old NEXT-3 polish item).
+(nothing in flight — task-14b is gated, see WAITING)
 
 ## WAITING ON DEVESH
 - **Domain purchase** — the ONLY blocker left for worker first-boot: Cloudflare zone (api DNS,
@@ -102,7 +104,7 @@ Updated: 2026-07-17 (task 17 — contacts transcript deep-links; latest_conversa
 ## RECENT (last 5 landings, newest first)
 - (this PR) Contacts rows deep-link to latest conversation transcript (screens API
   latest_conversation_id) — 2026-07-17
+- #49 console boot honesty: env gate + ConfigErrorScreen + error≠empty — 2026-07-17
 - #44 docs/sdlc.md — SDLC task ledger (registry, mini-specs, doc map) — 2026-07-13
 - #42 STATE: staging pipeline green, worker boot waits only on domain — 2026-07-12
 - #40+#41 provision-staging.sh (zero hand-typed secrets; pooler host fix) — 2026-07-12
-- #38+#39 task 14a: staging migrations ride CI (deploy.yml armed, CLI pinned 2.109.1) — 2026-07-12
