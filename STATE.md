@@ -113,8 +113,8 @@ Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws 
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
+- (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
+- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
 - #53 console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
 - #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
 - #51 main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
-- #50 Contacts rows deep-link to latest conversation transcript (screens API latest_conversation_id) — 2026-07-17
