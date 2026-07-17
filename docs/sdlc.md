@@ -53,6 +53,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | worker/tester/scout agents in main repo (dispatch economy) | ✅ | #37 | §5 |
 | provision-staging.sh (zero hand-typed secrets) | ✅ | #40, #41 | §5 |
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
+| P3 polish — transcript links (Contacts deep-links) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -89,10 +90,6 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 - Cloudflare zone (api DNS, Transform Rule w/ EDGE_SHARED_SECRET, origin lockdown) · Pages custom
   domain · Caddy cert · `docker compose up` · smoke. All steps scripted in
   [runbooks/vps-cloudflare-setup](runbooks/vps-cloudflare-setup.md); .env already installed on-box (0600).
-
-### P3 polish — transcript links ⏳
-- LiveMonitor/Contacts lists link to `/o/:orgId/conversations/:id` transcripts once those screens
-  carry data (natural successor to task 15).
 
 ### Deferred-by-phase obligations (spec §12b is the authority)
 - Playwright smoke over the four screens (T12 layer 6) — with P3 screen work.
@@ -202,6 +199,14 @@ Docs: [security S7](security.md) · [patterns/react-component](patterns/react-co
   soft-delete list, messages bigint PK, seed path, migration 011 app functions, migration 014
   extensions schema, T26.4 `webhook.process.vapi` job, MODEL ROUTING v2 test-authorship); added
   [runbooks/hygiene.md](runbooks/hygiene.md); paid the three dated STATE.md debt clauses.
+
+### P3 polish — transcript links (this PR)
+Split in two: **LiveMonitor half** = task 15 (#43). **Contacts half** = this PR —
+`latest_conversation_id` (newest by `started_at`) via a lateral left-join inside `listContacts`'
+existing `withOrg` scope (same RLS path, no new query); `ContactsTable.tsx` is a pure leaf
+(TranscriptView precedent). RED: `console-contact-links.test.tsx` (4) + 3 CI-owned
+`screens-api.test.ts` cases. Lesson: plain `<a>` not wouter `<Link>` — throws under
+`renderToStaticMarkup` with no Router — recorded in lessons.md.
 
 ---
 

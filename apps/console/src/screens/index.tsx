@@ -9,6 +9,7 @@ import {
   useMetricsQuery,
   useTasksQuery,
 } from "../features/screens/api";
+import { ContactsTable } from "./ContactsTable";
 
 function ScreenShell({
   title,
@@ -162,32 +163,7 @@ export function ContactTimeline() {
       ) : data.contacts.length === 0 ? (
         <EmptyRow label="No contacts." />
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-xs text-gray-500">
-              <th className="py-2 pr-4">Name</th>
-              <th className="py-2 pr-4">Lifecycle stage</th>
-              <th className="py-2 pr-4">Score</th>
-              <th className="py-2 pr-4">Last interaction</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.contacts.map((contact) => (
-              <tr key={contact.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">
-                  {[contact.first_name, contact.last_name]
-                    .filter(Boolean)
-                    .join(" ") || "—"}
-                </td>
-                <td className="py-2 pr-4">{contact.lifecycle_stage}</td>
-                <td className="py-2 pr-4">{contact.score ?? "—"}</td>
-                <td className="py-2 pr-4">
-                  {contact.last_interaction_at ?? "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ContactsTable orgId={orgId} contacts={data.contacts} />
       )}
     </ScreenShell>
   );

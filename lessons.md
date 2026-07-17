@@ -243,3 +243,11 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   singleton would delete the static-import boot invariant outright (module load can no longer
   throw) and drop the extra boot chunk; the dynamic-import gate + .catch BootErrorScreen is the
   interim guard. → Suggested fast-follow before console GA.
+- 2026-07-17 · task-17 transcript links · Rendering a wouter `<Link>` under `renderToStaticMarkup`
+  in bun test (no DOM) needs a specific incantation: providerless throws `location is not defined`;
+  `<Router hook={memoryLocation({ static: true }).hook}>` throws `Missing getServerSnapshot` (the
+  hook uses useSyncExternalStore); the one that works in wouter 3.10.0 is `<Router ssrPath="/">`.
+  Extra quirk: `wouter` is a console-workspace dep (not hoisted to repo root), so a `tests/*` file
+  can't `import "wouter"` — the static Router must come from a helper under `apps/console/`, where
+  wouter resolves. (Round 1 wrongly concluded "use a plain `<a>`"; the Link/ssrPath path is better —
+  it's SPA soft-nav, matching TaskQueue/LiveMonitor.)
