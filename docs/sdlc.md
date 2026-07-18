@@ -58,6 +58,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
 | App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
 | ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
+| Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -243,6 +244,18 @@ Promoted the wouter `/o/<org>/conversations/<id>` anchor (`text-blue-600 hover:u
 exactly one file (de-duplication, not a line-count cut — raw diff +52/−31). Nullable `conversationId`
 → link-or-plain-text preserved; anchors byte-identical (`console-contact-links` regression, 4/4).
 RED: `tests/conversation-link.test.tsx` (6/6), env-free. No DB/schema change.
+
+### Console design-system foundation (this PR)
+Tailwind v4 `@theme` tokens (warm-neutral palette + gold accent, radii, shadows, type scale) +
+`ui/primitives/` (Button/IconButton/Input/Textarea/Card/Badge/Chip/Avatar) + a 12-icon hand-authored
+inline-SVG set (no icon package) + `ui/layout/` AppShell + PageHeader/Section, styled after the
+Bland.ai console. Route MANIFEST `src/routes.tsx` feeds both Sidebar and router; `Home` (hero, ask
+bar, suggestion chips, recent-conversation cards on live data) is the new `/` landing. Transcript
+moved into `pages/`; legacy screens/auth/error token-re-skinned (copy byte-preserved); nested
+`apps/console/biome.json` enables Tailwind `@theme` linting.
+Evidence: typecheck/lint/`vite build` green, 39/39 env-free tests (6 suites, incl. new smoke);
+`services/worker/**` failures are CI-owned (env-only DATABASE_URL — diff is `apps/console/**` only).
+Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
 
 ---
 

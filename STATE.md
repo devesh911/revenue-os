@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; quiet-hours guardrail hook implemented + wired into `defaultPipeline` (inert in production until `packages/channels` wires the send site))
+Updated: 2026-07-18 (console design-system foundation, this PR — `@theme` tokens + `ui/` primitives + AppShell + `routes.tsx` manifest land; Home is the new console `/` landing)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -45,20 +45,37 @@ Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; quiet-hours guardra
   (`runTurn` in `packages/harness/src/loop.ts`) does not yet populate `action.channel`, so the gate
   is **inert in production** until `packages/channels` (P2) constructs channel-bearing actions. The
   hook is correct and tested (harness 29/29), not yet triggered end-to-end.
+- **Console design system foundation (this PR, 2026-07-18):** Tailwind v4 `@theme` tokens
+  (warm-neutral palette + one gold accent, radii, shadows, type scale), `ui/primitives/` (pill
+  Button/IconButton, Input, Textarea, Card, Badge, Chip, Avatar), a 12-icon hand-authored inline-SVG
+  set (no icon package), and `ui/layout/` AppShell (240px sidebar + grouped nav + user chip, topbar
+  pill actions) + PageHeader/Section — styled after the Bland.ai console. Route MANIFEST
+  `src/routes.tsx` feeds both Sidebar and router; Home (hero + ask bar + suggestion chips +
+  recent-conversation cards on live data) is the new `/` landing. Transcript moved into `pages/`;
+  remaining screens route through AppShell as `pages/` surfaces; legacy screens/auth/error got a
+  token re-skin (copy byte-preserved). `ui/README.md` is the fleet contract for the page-fleet
+  fan-out (NEXT). Gates: typecheck/lint/vite build green; 39/39 env-free tests (6 files).
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+1. Console page fleet — fan out the 7-page Fable fleet on the design-system foundation (this PR):
+   one page per agent, each composing `ui/` per `ui/README.md` and appending exactly one
+   `src/routes.tsx` entry (conflict-free parallel merges, no per-page style invention). The 3
+   data-less pages (Agents/Workflows, richer Analytics, Settings guardrail-config) build as
+   **styled shells** first; a queued **backend wave** adds their worker routes. Restyling any
+   `screens/*` surface implies a coordinated edit to `tests/conversation-link.test.tsx` /
+   `tests/console-contact-links.test.tsx` (path/source-pinned).
+2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-2. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-3. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
@@ -78,6 +95,10 @@ Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; quiet-hours guardra
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
+  tokens, `ui/` primitives, `routes.tsx` manifest as the single nav/router source; `screens/*` stay
+  path-pinned with `pages/*` as route surfaces until tests move; nested `apps/console/biome.json`
+  enables `tailwindDirectives`; `/` lands on Home.
 - **Quiet-hours guardrail posture (task 25, 2026-07-18):** the quiet-hours hook is deliberately
   fail-open (courtesy gate) — a missing/malformed policy row or a DB read error passes the send
   rather than blocking all outbound traffic on one bad read. The future DNC hook is hard-safety and
@@ -129,8 +150,8 @@ Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; quiet-hours guardra
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
 - (this PR) task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
 - (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
 - #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
 - #53 console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
-- #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17

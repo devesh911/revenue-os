@@ -4,21 +4,19 @@
 // effects at module scope — so main.tsx can render it before the app tree ever loads.
 export function ConfigErrorScreen({ missing }: { missing: string[] }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">
-      <div className="w-full max-w-lg rounded-xl bg-white p-8 shadow">
-        <h1 className="text-lg font-semibold text-red-600">
-          Console configuration incomplete
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-8">
+      <div className="w-full max-w-lg rounded-card border border-line bg-surface p-7 shadow-card">
+        <h1 className="text-h2 text-ink">Console configuration incomplete</h1>
+        <p className="mt-2 text-sm text-muted">
           The console can't start because these required environment variables
           are missing or empty:
         </p>
-        <ul className="mt-3 list-disc space-y-1 pl-5 font-mono text-sm text-gray-900">
+        <ul className="mt-3 list-disc space-y-1 pl-5 font-mono text-sm text-ink">
           {missing.map((name) => (
             <li key={name}>{name}</li>
           ))}
         </ul>
-        <p className="mt-4 text-sm text-gray-600">
+        <p className="mt-4 text-sm text-muted">
           Set them (see <code>apps/console/.env.example</code>), then reload.
         </p>
       </div>
