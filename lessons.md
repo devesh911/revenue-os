@@ -269,3 +269,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   (getDerivedStateFromError/componentDidCatch fire on the client, not in synchronous SSR).
   Env-free tests must compose getDerivedStateFromError + the fallback render; the live
   client-DOM catch + onClick reload are e2e-owned.
+- 2026-07-18 · task-25: a guard hook can pass every unit test yet be inert in production if no
+  caller constructs the action shape it gates on — `quietHoursHook` keys on `action.channel`, but
+  `runTurn` (loop.ts) never sets it and `packages/channels` is still an `export {}` stub, so the
+  hook short-circuits on every real send while its 25 hand-built tests stay green. Land a guard
+  hook WITH its call-site wiring, or a red-to-green suite can certify a no-op.
