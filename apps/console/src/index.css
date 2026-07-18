@@ -1,1 +1,72 @@
 @import "tailwindcss";
+
+/*
+  Design tokens — the console's single visual vocabulary (contract: src/ui/README.md).
+  Calm, warm-neutral, monochrome + ONE gold accent used sparingly. Light theme only for
+  now; dark is a later token swap — so components reference THESE tokens (bg-canvas,
+  text-ink, border-line, rounded-card…) and never raw hex or gray-*.
+*/
+@theme {
+  /* palette — warm neutrals + one muted-gold accent */
+  --color-canvas: #f4f1ea;
+  --color-surface: #ffffff;
+  --color-ink: #171717;
+  --color-ink-soft: #3d3d3d;
+  --color-muted: #8b8781;
+  --color-line: #e7e3dc;
+  --color-nav-active: #ece8e1;
+  --color-accent: #b87a2b;
+  --color-accent-soft: #f2e7d5;
+  --color-danger: #b3402a;
+
+  /* radii — pills for actions, soft corners for surfaces */
+  --radius-pill: 9999px;
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --radius-nav: 8px;
+
+  /* elevation — very soft, never harsh */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.06);
+
+  /* type — grotesk system stack; heavy weights + tight tracking approximate the look
+     without shipping a font package (no-new-deps rail) */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "SF Pro Display",
+    "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+
+  --text-hero: 3.25rem;
+  --text-hero--line-height: 1.04;
+  --text-hero--font-weight: 800;
+  --text-hero--letter-spacing: -0.035em;
+  --text-h1: 2rem;
+  --text-h1--line-height: 1.15;
+  --text-h1--font-weight: 700;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h2: 1.375rem;
+  --text-h2--line-height: 1.25;
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: -0.015em;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.6;
+  --text-body--font-weight: 450;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.2;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0.06em;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: 450;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+  }
+}
