@@ -57,11 +57,24 @@ export function Router() {
   return (
     <Switch>
       <Route path="/" component={OrgHome} />
-      {routes.map((r) => (
-        <Route key={r.path} path={`/o/:orgId/${r.path}`}>
-          <Chrome>{r.element}</Chrome>
-        </Route>
-      ))}
+      {/* ONE org-scoped route hosts the shell, so AppShell (sidebar/topbar/user chip)
+          mounts once and persists across page navigations — only the inner Switch swaps
+          the content pane. Per-page <Route> wrappers here would remount the whole shell
+          (and re-fire UserChip's session fetch) on every click (review #58, defect 1). */}
+      <Route path="/o/:orgId/*?">
+        <Chrome>
+          <Switch>
+            {routes.map((r) => (
+              <Route key={r.path} path={`/o/:orgId/${r.path}`}>
+                {r.element}
+              </Route>
+            ))}
+            <Route>
+              <Redirect to="/" />
+            </Route>
+          </Switch>
+        </Chrome>
+      </Route>
       <Route>
         <Redirect to="/" />
       </Route>

@@ -13,14 +13,24 @@ export type SidebarNavEntry = {
   section: string;
 };
 
-function groupBySection(
+// Groups nav entries by section NAME globally (routes.tsx contract: new section name →
+// new group, order of first appearance) — NOT by adjacency. The manifest only ever
+// appends at its anchor, so a same-section route landing after another section must
+// merge into the existing group, never render a duplicate header / duplicate React key
+// (review #58, defect 2). Exported for the unit test.
+export function groupBySection(
   nav: SidebarNavEntry[],
 ): Array<{ section: string; items: SidebarNavEntry[] }> {
   const groups: Array<{ section: string; items: SidebarNavEntry[] }> = [];
+  const bySection = new Map<string, (typeof groups)[number]>();
   for (const item of nav) {
-    const last = groups[groups.length - 1];
-    if (last && last.section === item.section) last.items.push(item);
-    else groups.push({ section: item.section, items: [item] });
+    let group = bySection.get(item.section);
+    if (!group) {
+      group = { section: item.section, items: [] };
+      bySection.set(item.section, group);
+      groups.push(group);
+    }
+    group.items.push(item);
   }
   return groups;
 }
