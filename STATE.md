@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-18 (console design-system foundation, this PR — `@theme` tokens + `ui/` primitives + AppShell + `routes.tsx` manifest land; Home is the new console `/` landing)
+Updated: 2026-07-18 (console design-system fan-out complete on main — foundation #58 + page PRs #59–#64 merged; all 8 console pages styled; this is the wave-end docs PR, code already landed)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
