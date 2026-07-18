@@ -57,6 +57,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
 | App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
 | ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
+| Static zero-dep landing page ported into apps/www (task-26) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -235,6 +236,15 @@ Promoted the wouter `/o/<org>/conversations/<id>` anchor (`text-blue-600 hover:u
 exactly one file (de-duplication, not a line-count cut — raw diff +52/−31). Nullable `conversationId`
 → link-or-plain-text preserved; anchors byte-identical (`console-contact-links` regression, 4/4).
 RED: `tests/conversation-link.test.tsx` (6/6), env-free. No DB/schema change.
+
+### Static zero-dep landing page — apps/www (task-26, this PR)
+Source: Devesh's design export, a self-extracting artifact bundle whose payload the orchestrator
+extracted. Ported as one hand-authored `index.html` — all copy/data baked (3 plans, 4 stages, 3
+moats, 5 FAQs, 5 logos) — plus 32 self-hosted woff2 fonts (Playfair Display/Lora/IBM Plex Mono), an
+SVG-noise texture, and one inline script (plan-select + FAQ accordion); default state renders
+statically. Zero new deps — no `package.json`, no build step. README rewritten; supersedes the
+week-3 Astro reservation (agent-blocked by the BOM rail — new deps need a tech-stack.md row).
+RED: 35 file-based tests, `apps/www/test/landing.test.ts`.
 
 ---
 

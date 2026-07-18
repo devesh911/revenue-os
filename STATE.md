@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws now show a reload card, not a blank page)
+Updated: 2026-07-18 (task 26 — static zero-dep landing page in apps/www)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -111,10 +111,13 @@ Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws 
   skip, and would challenge Vapi webhooks (lost call events). Revisit when apps/www exists.
 - Vapi `server.secret` is write-only at the API (GET never echoes it): .env/password-manager holds
   the only copy; rotation = overwrite assistant config + VPS env together.
+- **apps/www is zero-dep static HTML (task 26, 2026-07-18):** supersedes the README week-3 Astro
+  reservation — Astro is agent-blocked by the BOM rail (new deps need docs/tech-stack.md rows,
+  agent-denied); a one-page landing needs no framework. Revisit only if the site grows multi-page.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion), default state statically rendered; 35/35 landing tests — 2026-07-18
 - (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
 - #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
 - #53 console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
 - #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
-- #51 main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
