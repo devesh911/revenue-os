@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws now show a reload card, not a blank page)
+Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; quiet-hours guardrail hook implemented + wired into `defaultPipeline` (inert in production until `packages/channels` wires the send site))
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -40,13 +40,25 @@ Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws 
   env-missing gate is preserved. **Task 22:** a top-level `AppErrorBoundary` now catches
   render-time throws anywhere in the App subtree — an honest reload card, not a blank page;
   the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged.
+- **Quiet-hours guardrail hook (task 25, this PR):** The quiet-hours hook is implemented and wired
+  into `defaultPipeline`; it gates any send that carries a `channel`. BUT the current send path
+  (`runTurn` in `packages/harness/src/loop.ts`) does not yet populate `action.channel`, so the gate
+  is **inert in production** until `packages/channels` (P2) constructs channel-bearing actions. The
+  hook is correct and tested (harness 29/29), not yet triggered end-to-end.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+1. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+   wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
+   must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
+2. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+   (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
+   latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
+   handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
+3. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-2. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
@@ -66,6 +78,10 @@ Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws 
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Quiet-hours guardrail posture (task 25, 2026-07-18):** the quiet-hours hook is deliberately
+  fail-open (courtesy gate) — a missing/malformed policy row or a DB read error passes the send
+  rather than blocking all outbound traffic on one bad read. The future DNC hook is hard-safety and
+  will be fail-**closed** — opposite posture, do not copy this one.
 - **Model routing v2 (2026-07-13, Devesh):** code and tests are authored by Opus 4.8 at effort max
   (worker + tester agent defs repinned from sonnet); security/RLS/migration/guard-critical RED moves
   to tester(opus) with mandatory orchestrator line-by-line test review before GREEN, superseding
@@ -113,8 +129,8 @@ Updated: 2026-07-17 (task 22 — top-level AppErrorBoundary; render-time throws 
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
 - (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
 - #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
 - #53 console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
 - #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
-- #51 main-repo mirror: Step-2 wave protocol into task-loop skill + worker/tester defs — 2026-07-17
