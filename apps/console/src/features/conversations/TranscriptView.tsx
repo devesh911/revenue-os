@@ -15,11 +15,14 @@ export function TranscriptView({
   messages: TranscriptMessage[];
 }) {
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2.5">
       {messages.map((m) => (
-        <li key={m.seq} className="rounded border border-gray-200 p-3">
-          <span className="text-xs font-medium text-gray-500">{m.role}</span>
-          <p className="mt-1 text-sm text-gray-900">{m.content ?? "—"}</p>
+        <li
+          key={m.seq}
+          className="rounded-control border border-line bg-surface p-4"
+        >
+          <span className="text-label text-muted uppercase">{m.role}</span>
+          <p className="mt-1.5 text-sm text-ink-soft">{m.content ?? "—"}</p>
         </li>
       ))}
     </ul>
