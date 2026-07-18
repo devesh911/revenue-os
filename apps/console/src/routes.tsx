@@ -11,6 +11,7 @@
 // Page-fleet: append ONE entry at the anchor comment below; never reorder or edit
 // existing lines (keeps parallel-branch merges conflict-free).
 import type { ReactNode } from "react";
+import { AgentsPage } from "./pages/Agents";
 import { ContactsPage } from "./pages/Contacts";
 import { ConversationsPage } from "./pages/Conversations";
 import { DashboardPage } from "./pages/Dashboard";
@@ -71,6 +72,13 @@ export const routes: ConsoleRoute[] = [
     element: <TranscriptPage />,
     section: "Workspace",
     hidden: true,
+  },
+  {
+    path: "agents",
+    label: "Agents",
+    icon: "agents",
+    element: <AgentsPage />,
+    section: "Workspace",
   },
   // add your page here — append one entry above this line, nothing else.
 ];
