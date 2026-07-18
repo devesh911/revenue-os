@@ -58,7 +58,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
 | App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
 | ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
-| Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | (this PR) | §5 |
+| Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | #58 | §5 |
+| Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
 ### Read-only goals (no PR — findings in lessons.md)
@@ -245,7 +246,7 @@ exactly one file (de-duplication, not a line-count cut — raw diff +52/−31). 
 → link-or-plain-text preserved; anchors byte-identical (`console-contact-links` regression, 4/4).
 RED: `tests/conversation-link.test.tsx` (6/6), env-free. No DB/schema change.
 
-### Console design-system foundation (this PR)
+### Console design-system foundation (#58)
 Tailwind v4 `@theme` tokens (warm-neutral palette + gold accent, radii, shadows, type scale) +
 `ui/primitives/` (Button/IconButton/Input/Textarea/Card/Badge/Chip/Avatar) + a 12-icon hand-authored
 inline-SVG set (no icon package) + `ui/layout/` AppShell + PageHeader/Section, styled after the
@@ -256,6 +257,15 @@ moved into `pages/`; legacy screens/auth/error token-re-skinned (copy byte-prese
 Evidence: typecheck/lint/`vite build` green, 39/39 env-free tests (6 suites, incl. new smoke);
 `services/worker/**` failures are CI-owned (env-only DATABASE_URL — diff is `apps/console/**` only).
 Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
+
+### Console page-fleet fan-out (#59–#64)
+Six pages composed on the design-system foundation (#58, above), each its own PR, serial-merged:
+Conversations/live-monitor #59 · Contacts #60 · Analytics #61 (metrics cards; label
+Dashboard→Analytics, path kept `dashboard` — preserves Home's "Check performance" chip deep-link) ·
+Tasks #62 · Agents #63 · Settings #64. Test-pinned `screens/*` files stay byte-identical (`pages/`
+own the styled surface); Agents + Settings render honest empty-state shells — no `/agents` or
+guardrail-config worker route exists yet (NEXT: backend wave). All 8 console pages now styled.
+Evidence: foundation #58 + pages #59–#64, all env-free gates green, CI verdict per PR (S13.7).
 
 ---
 
