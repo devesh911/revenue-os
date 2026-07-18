@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; harness pipeline now gates outbound sends in the org's quiet window)
+Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; quiet-hours guardrail hook implemented + wired into `defaultPipeline` (inert in production until `packages/channels` wires the send site))
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -40,12 +40,11 @@ Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; harness pipeline no
   env-missing gate is preserved. **Task 22:** a top-level `AppErrorBoundary` now catches
   render-time throws anywhere in the App subtree — an honest reload card, not a blank page;
   the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged.
-- **Guardrail pipeline gates sends (task 25, this PR):** `packages/harness` `defaultPipeline` =
-  `[autonomyHook, quietHoursHook]` — pure `isWithinQuietHours` (Intl wall-clock in the target tz,
-  START inclusive/END exclusive, midnight-wrapping) blocks outbound sends inside an org's configured
-  quiet window (`guardrail_policies` key `quiet_hours`); tz `'contact'` resolves per-contact
-  (`Asia/Kolkata` fallback), else a literal IANA zone. Deliberately fail-open (courtesy gate) — see
-  DECISIONS. Harness 29/29 green; typecheck + biome clean; rls/integration CI-owned (no schema touched).
+- **Quiet-hours guardrail hook (task 25, this PR):** The quiet-hours hook is implemented and wired
+  into `defaultPipeline`; it gates any send that carries a `channel`. BUT the current send path
+  (`runTurn` in `packages/harness/src/loop.ts`) does not yet populate `action.channel`, so the gate
+  is **inert in production** until `packages/channels` (P2) constructs channel-bearing actions. The
+  hook is correct and tested (harness 29/29), not yet triggered end-to-end.
 - Operating contract: AGENTS.md (one page). Docs are reference; spec §12 + patterns/ load-bearing.
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
@@ -53,9 +52,13 @@ Updated: 2026-07-18 (task 25 — quiet-hours guardrail hook; harness pipeline no
 1. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-2. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+2. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+   (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
+   latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
+   handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
+3. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-3. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
