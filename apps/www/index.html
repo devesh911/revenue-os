@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revenue OS — voice AI for Indian real estate</title>
+<meta name="description" content="The revenue operating system for Indian real estate. Voice and WhatsApp agents run the funnel end to end, priced on outcomes.">
+<style>
+/* biome-ignore-all lint/complexity/noImportantStyles: ported responsive overrides must beat the export's inline desktop styles */
+/* __FONTFACE__ */
+html,body{margin:0;padding:0;background:#0B1712}
+::selection{background:#EDE3CF;color:#0B1712}
+/* hover states — ported from the export's style-hover attributes */
+.ro-nav-link:hover{color:#EDE3CF;background:rgba(237,227,207,.04)}
+.ro-cta-accent:hover{opacity:.88}
+.ro-btn-ghost:hover{background:rgba(237,227,207,.07)}
+.ro-stage:hover{background:rgba(237,227,207,.03)}
+.ro-choose:hover{background:rgba(237,227,207,.06)}
+.ro-faq-btn:hover{background:rgba(237,227,207,.03)}
+/* plan selection — default selected plan is "funnel" */
+.ro-plan-cta{display:block;width:100%;text-align:left}
+.ro-plan[data-selected="true"] .ro-plancard{border-color:#E8C87A}
+.ro-plan[data-selected="false"] .ro-plancard{border-color:rgba(237,227,207,.25)}
+.ro-plan[data-selected="true"] .ro-radio{background:#E8C87A;border-color:#E8C87A}
+.ro-plan[data-selected="false"] .ro-radio{background:transparent;border-color:rgba(237,227,207,.7)}
+.ro-plan[data-selected="true"] .ro-cta-choose{display:none}
+.ro-plan[data-selected="false"] .ro-cta-subscribe{display:none}
+/* faq accordion — default open item is index 0 */
+.ro-faq-item[data-open="false"] .ro-faq-a{display:none}
+/* responsive overrides — desktop styles are inline */
+@media (max-width:1100px){
+  .ro-grid4{grid-template-columns:repeat(2,1fr)!important}
+  .ro-grid4>div:not(:last-child){border-bottom:1px solid rgba(237,227,207,.12)}
+}
+@media (max-width:980px){
+  .ro-nav{display:flex!important;flex-wrap:wrap!important}
+  .ro-nav-logo{flex:1 1 100%!important;border-right:none!important;border-bottom:1px solid rgba(237,227,207,.18)!important;padding:20px 24px!important}
+  .ro-nav-link{flex:1 1 0!important;justify-content:center!important;padding:16px 6px!important;font-size:11px!important;letter-spacing:.14em!important;white-space:nowrap}
+  .ro-nav-cta{flex:1 1 100%!important;border-top:1px solid rgba(237,227,207,.18)!important;padding:14px 24px!important}
+  .ro-nav-cta a{display:block;width:100%;text-align:center}
+  .ro-grid3{grid-template-columns:1fr!important}
+  .ro-grid3>div{border-right:none!important}
+  .ro-grid3>div:not(:last-child){border-bottom:1px solid rgba(237,227,207,.12)}
+  .ro-pricegrid{grid-template-columns:1fr!important;max-width:560px;margin:0 auto}
+  .ro-logos{grid-template-columns:1fr!important}
+  .ro-logos-label{max-width:none!important;border-right:none!important;border-bottom:1px solid rgba(237,227,207,.18)!important}
+  .ro-faq{grid-template-columns:1fr!important}
+  .ro-faq-side{border-right:none!important;border-bottom:1px solid rgba(237,227,207,.18)!important;padding:44px 28px!important}
+}
+@media (max-width:680px){
+  .ro-wrap{padding:12px 12px 0!important}
+  .ro-hero{padding:56px 22px 52px!important}
+  .ro-hero h1{font-size:38px!important}
+  .ro-pad{padding:48px 22px 38px!important}
+  .ro-pad2{padding:48px 22px 12px!important}
+  .ro-grid4{grid-template-columns:1fr!important}
+  .ro-grid4>div{border-right:none!important;padding:30px 24px 34px!important}
+  .ro-grid2{grid-template-columns:1fr!important}
+  .ro-grid2>div{border-right:none!important;padding:22px 24px!important}
+  .ro-grid2>div:first-child{border-bottom:1px solid rgba(237,227,207,.12)}
+  .ro-btns{flex-wrap:wrap;justify-content:center}
+  .ro-logos-grid{grid-template-columns:repeat(2,1fr)!important}
+  .ro-logos-grid>div{border-bottom:1px solid rgba(237,227,207,.09)}
+  .ro-pricegrid{padding:28px 16px 32px!important}
+  .ro-plancard{min-height:480px!important}
+  .ro-faq-btn{padding:20px 22px!important}
+  .ro-faq-btn span:first-child{font-size:18px!important}
+  .ro-faq-a{padding:0 22px 24px!important}
+  .ro-footcta{padding:60px 22px!important}
+}
+</style>
+</head>
+<body>
+<div style="min-height:100vh;background:#0B1712;color:#EDE3CF;font-family:'Lora',Georgia,serif;position:relative">
+  <div style="position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.35;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22/%3E%3CfeColorMatrix values=%220 0 0 0 0.93 0 0 0 0 0.89 0 0 0 0 0.81 0 0 0 0.05 0%22/%3E%3C/filter%3E%3Crect width=%22180%22 height=%22180%22 filter=%22url(%23n)%22/%3E%3C/svg%3E')"></div>
+  <div class="ro-wrap" style="max-width:1360px;margin:0 auto;padding:28px 28px 0;position:relative">
+
+    <!-- ============ NAV ============ -->
+    <nav class="ro-nav" style="display:grid;grid-template-columns:280px 1fr 1fr 1fr auto;border:1px solid rgba(237,227,207,.22);background:rgba(237,227,207,.02)">
+      <div class="ro-nav-logo" style="padding:26px 30px;border-right:1px solid rgba(237,227,207,.18)">
+        <div style="font-family:'Playfair Display',serif;font-weight:500;font-size:30px;line-height:.95;letter-spacing:.02em">REVENUE<br>OS</div>
+      </div>
+      <a class="ro-nav-link" href="#how" style="display:flex;align-items:center;padding:0 34px;border-right:1px solid rgba(237,227,207,.18);font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.28em;color:rgba(237,227,207,.75);text-decoration:none">HOW IT WORKS</a>
+      <a class="ro-nav-link" href="#moats" style="display:flex;align-items:center;padding:0 34px;border-right:1px solid rgba(237,227,207,.18);font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.28em;color:rgba(237,227,207,.75);text-decoration:none">WHY US</a>
+      <a class="ro-nav-link" href="#pricing" style="display:flex;align-items:center;padding:0 34px;border-right:1px solid rgba(237,227,207,.18);font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.28em;color:rgba(237,227,207,.75);text-decoration:none">PRICING</a>
+      <div class="ro-nav-cta" style="display:flex;align-items:center;padding:0 26px">
+        <a class="ro-cta-accent" href="#cta" style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.22em;color:#0B1712;background:#E8C87A;padding:12px 22px;text-decoration:none;font-weight:500">BOOK A PILOT</a>
+      </div>
+    </nav>
+
+    <!-- ============ HERO ============ -->
+    <header class="ro-hero" style="border:1px solid rgba(237,227,207,.22);border-top:none;padding:96px 60px 84px;text-align:center;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse 70% 90% at 50% -20%, rgba(46,110,98,.28), transparent 65%);pointer-events:none"></div>
+      <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:28px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.34em;color:rgba(237,227,207,.6)">VOICE AI · INDIAN REAL ESTATE · PRICED ON OUTCOMES</div>
+        <h1 style="font-family:'Playfair Display',serif;font-weight:500;font-size:clamp(44px,5.6vw,84px);line-height:1.04;letter-spacing:.005em;max-width:19ch;margin:0">The revenue operating system for Indian real&nbsp;estate.</h1>
+        <p style="font-size:19px;line-height:1.7;color:rgba(237,227,207,.72);max-width:56ch;margin:0;font-style:italic">Voice agents are the front door. The product is the funnel — every conversation feeds the machine that decides who gets called next, and a human is inserted only when a human changes the outcome.</p>
+        <div class="ro-btns" style="display:flex;gap:16px;margin-top:14px">
+          <a class="ro-cta-accent" href="#cta" style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.2em;color:#0B1712;background:#E8C87A;padding:17px 34px;text-decoration:none;font-weight:500">RUN OUR PILOT</a>
+          <a class="ro-btn-ghost" href="#how" style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.2em;color:#EDE3CF;border:1px solid rgba(237,227,207,.45);padding:16px 34px;text-decoration:none">SEE THE ENGINE</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ LOGOS ============ -->
+    <section class="ro-logos" style="border:1px solid rgba(237,227,207,.22);border-top:none;display:grid;grid-template-columns:auto 1fr;align-items:stretch">
+      <div class="ro-logos-label" style="padding:26px 30px;border-right:1px solid rgba(237,227,207,.18);display:flex;align-items:center;max-width:240px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.26em;color:rgba(237,227,207,.55);line-height:1.8">TRUSTED BY TEAMS SELLING 12,000+ UNITS / YR</span>
+      </div>
+      <div class="ro-logos-grid" style="display:grid;grid-template-columns:repeat(5,1fr)">
+        <div style="display:flex;align-items:center;justify-content:center;padding:30px 10px;border-right:1px solid rgba(237,227,207,.09);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.3em;color:rgba(237,227,207,.35)">MERIDIAN</div>
+        <div style="display:flex;align-items:center;justify-content:center;padding:30px 10px;border-right:1px solid rgba(237,227,207,.09);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.3em;color:rgba(237,227,207,.35)">VASTU ONE</div>
+        <div style="display:flex;align-items:center;justify-content:center;padding:30px 10px;border-right:1px solid rgba(237,227,207,.09);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.3em;color:rgba(237,227,207,.35)">GRIHA CO.</div>
+        <div style="display:flex;align-items:center;justify-content:center;padding:30px 10px;border-right:1px solid rgba(237,227,207,.09);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.3em;color:rgba(237,227,207,.35)">NORTHGATE</div>
+        <div style="display:flex;align-items:center;justify-content:center;padding:30px 10px;border-right:1px solid rgba(237,227,207,.09);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.3em;color:rgba(237,227,207,.35)">ANVAYA</div>
+      </div>
+    </section>
+
+    <!-- ============ HOW IT WORKS ============ -->
+    <section id="how" style="border:1px solid rgba(237,227,207,.22);border-top:none">
+      <div class="ro-pad" style="padding:72px 60px 56px;text-align:center">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.34em;color:rgba(237,227,207,.55);margin-bottom:20px">PLOT 01 — THE FUNNEL ENGINE</div>
+        <h2 style="font-family:'Playfair Display',serif;font-weight:500;font-size:clamp(30px,3.4vw,48px);letter-spacing:.02em;margin:0 0 18px">FOUR STAGES RUN ON MACHINE TIME</h2>
+        <p style="font-size:17px;line-height:1.7;color:rgba(237,227,207,.68);max-width:62ch;margin:0 auto">A lead enters, the AI works it end to end. High intent routes to a human closer; low intent enters the nurture loop. Every outcome retrains the scoring model.</p>
+      </div>
+      <div class="ro-grid4" style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(237,227,207,.18)">
+        <div class="ro-stage" style="padding:38px 34px 44px;border-right:1px solid rgba(237,227,207,.12);display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.26em;color:rgba(237,227,207,.45)">01</div>
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500;letter-spacing:.01em">Answer fast</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;color:rgba(237,227,207,.5);line-height:1.9">CALL IN MINUTES</div>
+          <p style="margin:0;font-size:15px;line-height:1.65;color:rgba(237,227,207,.68)">Every portal, ad, and referral lead gets a call in minutes, in Hinglish or eleven Indian languages — not tomorrow morning.</p>
+        </div>
+        <div class="ro-stage" style="padding:38px 34px 44px;border-right:1px solid rgba(237,227,207,.12);display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.26em;color:rgba(237,227,207,.45)">02</div>
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500;letter-spacing:.01em">Score intent</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;color:rgba(237,227,207,.5);line-height:1.9">PROPENSITY MODEL</div>
+          <p style="margin:0;font-size:15px;line-height:1.65;color:rgba(237,227,207,.68)">Each caller is ranked against the profile that historically converts for this project, so human hours go where they pay.</p>
+        </div>
+        <div class="ro-stage" style="padding:38px 34px 44px;border-right:1px solid rgba(237,227,207,.12);display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.26em;color:rgba(237,227,207,.45)">03</div>
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500;letter-spacing:.01em">Qualify</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;color:rgba(237,227,207,.5);line-height:1.9">BUDGET · TIMELINE</div>
+          <p style="margin:0;font-size:15px;line-height:1.65;color:rgba(237,227,207,.68)">Budget, timeline, financing, configuration — captured conversationally and written straight into your CRM.</p>
+        </div>
+        <div class="ro-stage" style="padding:38px 34px 44px;border-right:1px solid rgba(237,227,207,.12);display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.26em;color:rgba(237,227,207,.45)">04</div>
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500;letter-spacing:.01em">Book visit</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;color:rgba(237,227,207,.5);line-height:1.9">CALL + WHATSAPP</div>
+          <p style="margin:0;font-size:15px;line-height:1.65;color:rgba(237,227,207,.68)">High-intent buyers get a confirmed site-visit slot, reminders, and directions — before a human ever touches the lead.</p>
+        </div>
+      </div>
+      <div class="ro-grid2" style="border-top:1px solid rgba(237,227,207,.18);display:grid;grid-template-columns:1fr 1fr">
+        <div style="padding:30px 34px;border-right:1px solid rgba(237,227,207,.12);display:flex;gap:16px;align-items:baseline">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.24em;color:#8FB8A8">↻ LOW INTENT</span>
+          <span style="font-size:15px;color:rgba(237,227,207,.65)">Nurture loop — WhatsApp follow-ups and scheduled re-calls until intent changes.</span>
+        </div>
+        <div style="padding:30px 34px;display:flex;gap:16px;align-items:baseline">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.24em;color:#E8C87A">→ HIGH INTENT</span>
+          <span style="font-size:15px;color:rgba(237,227,207,.65)">Human closer, briefed by the machine. Site visit → sale. Priced on outcomes.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MOATS / FEATURES ============ -->
+    <section id="moats" style="border:1px solid rgba(237,227,207,.22);border-top:none">
+      <div class="ro-pad" style="padding:72px 60px 56px;text-align:center">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.34em;color:rgba(237,227,207,.55);margin-bottom:20px">PLOT 02 — WHY THIS SURVIVES</div>
+        <h2 style="font-family:'Playfair Display',serif;font-weight:500;font-size:clamp(30px,3.4vw,48px);letter-spacing:.02em;margin:0">THREE COMPETITORS, THREE MOATS</h2>
+      </div>
+      <div class="ro-grid3" style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(237,227,207,.18)">
+        <div style="border-right:1px solid rgba(237,227,207,.12);display:flex;flex-direction:column">
+          <div style="position:relative;height:220px;overflow:hidden;border-bottom:1px solid rgba(237,227,207,.12)">
+            <div style="position:absolute;inset:0;background:linear-gradient(160deg, rgba(20,58,44,.8), rgba(31,84,64,.9))"></div>
+          </div>
+          <div style="padding:34px 34px 44px;display:flex;flex-direction:column;gap:14px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.26em;color:rgba(237,227,207,.5)">VS HORIZONTAL PLAYERS</div>
+            <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500">Vertical depth beats breadth</div>
+            <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(237,227,207,.68)">Generalists span ten industries. We live inside one vertical’s workflow — inventory, site visits, RERA paperwork — deeper than a horizontal player can justify going.</p>
+          </div>
+        </div>
+        <div style="border-right:1px solid rgba(237,227,207,.12);display:flex;flex-direction:column">
+          <div style="position:relative;height:220px;overflow:hidden;border-bottom:1px solid rgba(237,227,207,.12)">
+            <div style="position:absolute;inset:0;background:linear-gradient(160deg, rgba(16,38,74,.8), rgba(24,52,102,.9))"></div>
+          </div>
+          <div style="padding:34px 34px 44px;display:flex;flex-direction:column;gap:14px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.26em;color:rgba(237,227,207,.5)">VS US PLATFORMS</div>
+            <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500">Built for India, not ported</div>
+            <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(237,227,207,.68)">RERA, TRAI/DND compliance, Hinglish, Indian CRM stacks. The localization work is our barrier to entry — not something a ported product bolts on.</p>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <div style="position:relative;height:220px;overflow:hidden;border-bottom:1px solid rgba(237,227,207,.12)">
+            <div style="position:absolute;inset:0;background:linear-gradient(160deg, rgba(74,16,12,.8), rgba(112,24,18,.9))"></div>
+          </div>
+          <div style="padding:34px 34px 44px;display:flex;flex-direction:column;gap:14px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.26em;color:rgba(237,227,207,.5)">VS VOICE INFRA</div>
+            <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:500">The data loop, not the calling</div>
+            <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(237,227,207,.68)">Infra platforms sell minutes. Our value is the conversion data loop — every closed sale sharpens who gets called next. That compounds; per-minute pricing doesn’t.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+<!--END-->
