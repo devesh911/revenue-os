@@ -35,6 +35,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | 14 | Staging deploy pipeline (a: migrations · b: image ship) | P2 | 🔨 | #38, #39 | 14b gated: domain + STAGING_SSH_KEY |
 | 15 | Console screens live data (screens API, six funnel metrics) | P3 | ✅ | #43 | — |
 | 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | #49 | — |
+| 25 | Quiet-hours guardrail hook — predicate + pipeline wiring | P2 | ✅ | (this PR) | — |
 
 ### Non-numbered engineering work
 
@@ -186,6 +187,13 @@ views `OrgHomeView`/`OrgSwitcherView` separate ERROR from EMPTY. RED: `tests/con
 (superseded by the lazy-getSupabase refactor, this PR — invariant deleted).
 Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md) ·
 [patterns/zod-boundary](patterns/zod-boundary.md).
+
+### task 25 — quiet-hours guardrail hook (this PR)
+- **Goal:** gate outbound sends against an org's configured quiet-hours window — moat invariant #4, no code path around the pipeline ([project-spec §9](project-spec.md)).
+- **Shape:** pure `isWithinQuietHours(now,start,end,tz)` (`packages/harness/src/quiet-hours.ts`, Intl wall-clock, START inclusive/END exclusive, midnight-wrapping) + `quietHoursHook` in `packages/harness/src/policies.ts`; `defaultPipeline = [autonomyHook, quietHoursHook]`. tz `'contact'` resolves per-contact (`Asia/Kolkata` fallback), else a literal IANA zone skips the lookup.
+- **Decision:** deliberately fail-open (courtesy gate) — a missing/malformed policy row or any DB read error returns `null` (send proceeds); the future DNC hook is hard-safety and must fail CLOSED — opposite posture, not to be copied.
+- **Evidence:** RED `3d18f5e` / GREEN `64421d4`; harness 29/29 (`quiet-hours.test.ts` 25/25, `loop.test.ts` 4/4 — no autonomy regression); typecheck + biome clean; rls/integration CI-owned (no DB schema touched).
+- **Docs:** [security S8.2](security.md) · [tech-stack T26.1](tech-stack.md) · `guardrail_policies` table in [db-design](db-design.md).
 
 ### Non-numbered blocks
 - **P0 recovery (#15):** stacked bulk-merge race stranded tasks 3–10; re-landed in one PR. Lesson:
