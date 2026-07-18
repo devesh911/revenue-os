@@ -31,8 +31,9 @@
 
   /* type — grotesk system stack; heavy weights + tight tracking approximate the look
      without shipping a font package (no-new-deps rail) */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "SF Pro Display",
-    "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue",
+    "Segoe UI", Arial, sans-serif;
 
   --text-hero: 3.25rem;
   --text-hero--line-height: 1.04;
