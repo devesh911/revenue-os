@@ -15,6 +15,7 @@ import { ContactsPage } from "./pages/Contacts";
 import { ConversationsPage } from "./pages/Conversations";
 import { DashboardPage } from "./pages/Dashboard";
 import { HomePage } from "./pages/Home";
+import { SettingsPage } from "./pages/Settings";
 import { TasksPage } from "./pages/Tasks";
 import { TranscriptPage } from "./pages/Transcript";
 import type { IconName } from "./ui/icons";
@@ -71,6 +72,13 @@ export const routes: ConsoleRoute[] = [
     element: <TranscriptPage />,
     section: "Workspace",
     hidden: true,
+  },
+  {
+    path: "settings",
+    label: "Settings",
+    icon: "settings",
+    element: <SettingsPage />,
+    section: "Account",
   },
   // add your page here — append one entry above this line, nothing else.
 ];
