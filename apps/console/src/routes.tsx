@@ -59,7 +59,7 @@ export const routes: ConsoleRoute[] = [
   },
   {
     path: "dashboard",
-    label: "Dashboard",
+    label: "Analytics",
     icon: "analytics",
     element: <DashboardPage />,
     section: "Insights",
