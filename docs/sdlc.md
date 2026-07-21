@@ -35,6 +35,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | 14 | Staging deploy pipeline (a: migrations · b: image ship) | P2 | 🔨 | #38, #39 | 14b gated: domain + STAGING_SSH_KEY |
 | 15 | Console screens live data (screens API, six funnel metrics) | P3 | ✅ | #43 | — |
 | 16 | Console boot honesty (env gate + error-vs-empty states) | P3 | ✅ | #49 | — |
+| 25 | Quiet-hours guardrail hook — predicate + pipeline wiring | P2 | ✅ | (this PR) | — |
 
 ### Non-numbered engineering work
 
@@ -57,6 +58,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
 | App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
 | ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
+| Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | #58 | §5 |
+| Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -196,6 +199,13 @@ views `OrgHomeView`/`OrgSwitcherView` separate ERROR from EMPTY. RED: `tests/con
 Docs: [security S7](security.md) · [patterns/react-component](patterns/react-component.md) ·
 [patterns/zod-boundary](patterns/zod-boundary.md).
 
+### task 25 — quiet-hours guardrail hook (this PR)
+- **Goal:** gate outbound sends against an org's configured quiet-hours window — moat invariant #4, no code path around the pipeline ([project-spec §9](project-spec.md)).
+- **Shape:** pure `isWithinQuietHours(now,start,end,tz)` (`packages/harness/src/quiet-hours.ts`, Intl wall-clock, START inclusive/END exclusive, midnight-wrapping) + `quietHoursHook` in `packages/harness/src/policies.ts`; `defaultPipeline = [autonomyHook, quietHoursHook]`. tz `'contact'` resolves per-contact (`Asia/Kolkata` fallback), else a literal IANA zone skips the lookup.
+- **Decision:** deliberately fail-open (courtesy gate) — a missing/malformed policy row or any DB read error returns `null` (send proceeds); the future DNC hook is hard-safety and must fail CLOSED — opposite posture, not to be copied.
+- **Evidence:** RED `3d18f5e` / GREEN `64421d4`; harness 29/29 (`quiet-hours.test.ts` 25/25, `loop.test.ts` 4/4 — no autonomy regression); typecheck + biome clean; rls/integration CI-owned (no DB schema touched).
+- **Docs:** [security S8.2](security.md) · [tech-stack T26.1](tech-stack.md) · `guardrail_policies` table in [db-design](db-design.md).
+
 ### Non-numbered blocks
 - **P0 recovery (#15):** stacked bulk-merge race stranded tasks 3–10; re-landed in one PR. Lesson:
   merge one at a time, base==main first — now contract law (AGENTS.md loop §5).
@@ -244,6 +254,27 @@ Promoted the wouter `/o/<org>/conversations/<id>` anchor (`text-blue-600 hover:u
 exactly one file (de-duplication, not a line-count cut — raw diff +52/−31). Nullable `conversationId`
 → link-or-plain-text preserved; anchors byte-identical (`console-contact-links` regression, 4/4).
 RED: `tests/conversation-link.test.tsx` (6/6), env-free. No DB/schema change.
+
+### Console design-system foundation (#58)
+Tailwind v4 `@theme` tokens (warm-neutral palette + gold accent, radii, shadows, type scale) +
+`ui/primitives/` (Button/IconButton/Input/Textarea/Card/Badge/Chip/Avatar) + a 12-icon hand-authored
+inline-SVG set (no icon package) + `ui/layout/` AppShell + PageHeader/Section, styled after the
+Bland.ai console. Route MANIFEST `src/routes.tsx` feeds both Sidebar and router; `Home` (hero, ask
+bar, suggestion chips, recent-conversation cards on live data) is the new `/` landing. Transcript
+moved into `pages/`; legacy screens/auth/error token-re-skinned (copy byte-preserved); nested
+`apps/console/biome.json` enables Tailwind `@theme` linting.
+Evidence: typecheck/lint/`vite build` green, 39/39 env-free tests (6 suites, incl. new smoke);
+`services/worker/**` failures are CI-owned (env-only DATABASE_URL — diff is `apps/console/**` only).
+Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
+
+### Console page-fleet fan-out (#59–#64)
+Six pages composed on the design-system foundation (#58, above), each its own PR, serial-merged:
+Conversations/live-monitor #59 · Contacts #60 · Analytics #61 (metrics cards; label
+Dashboard→Analytics, path kept `dashboard` — preserves Home's "Check performance" chip deep-link) ·
+Tasks #62 · Agents #63 · Settings #64. Test-pinned `screens/*` files stay byte-identical (`pages/`
+own the styled surface); Agents + Settings render honest empty-state shells — no `/agents` or
+guardrail-config worker route exists yet (NEXT: backend wave). All 8 console pages now styled.
+Evidence: foundation #58 + pages #59–#64, all env-free gates green, CI verdict per PR (S13.7).
 
 ---
 

@@ -18,17 +18,17 @@ export function OrgHomeView({
   apiBase: string;
 }) {
   if (isLoading)
-    return <div className="p-8 text-sm text-gray-500">Loading orgs…</div>;
+    return <div className="p-8 text-sm text-muted">Loading orgs…</div>;
   if (isError)
     return (
-      <div className="p-8 text-sm text-red-600">
+      <div className="p-8 text-sm text-danger">
         Can't reach the API at {apiBase}. Check that the server is running, then
         reload.
       </div>
     );
   if (!orgs || orgs.length === 0)
     return (
-      <div className="p-8 text-sm text-gray-500">
+      <div className="p-8 text-sm text-muted">
         No orgs yet — create one via the API (console org-create UI lands in
         P3).
       </div>

@@ -1,24 +1,25 @@
 // wouter routes behind the auth guard (S7.5). Org context lives in the URL (R7).
-import { Link, Redirect, Route, Switch, useParams } from "wouter";
+// The route table is src/routes.tsx — the Switch below AND the AppShell sidebar both
+// read it, so pages register once. Sign-out stays HERE (not in ui/) so router.tsx
+// remains a getSupabase() consumer (boot-honesty AC-R4) and ui/ stays supabase-free.
+import type { ReactNode } from "react";
+import { Redirect, Route, Switch } from "wouter";
 import { useOrgsQuery } from "../features/orgs/api";
 import { API_URL } from "../lib/api";
 import { getSupabase } from "../lib/supabase";
-import { ContactTimeline, Dashboard, LiveMonitor, TaskQueue } from "../screens";
-import { ConversationTranscript } from "../screens/transcript";
+import { routes } from "../routes";
+import { AppShell } from "../ui/layout/AppShell";
+import { Button } from "../ui/primitives";
 import { OrgHomeView } from "./OrgHomeView";
 import { OrgSwitcher } from "./OrgSwitcher";
+import { UserChip } from "./UserChip";
 
-const SCREENS = [
-  { path: "tasks", label: "Tasks", el: <TaskQueue /> },
-  { path: "live", label: "Live", el: <LiveMonitor /> },
-  { path: "contacts", label: "Contacts", el: <ContactTimeline /> },
-  { path: "dashboard", label: "Dashboard", el: <Dashboard /> },
-];
+const NAV = routes.filter((r) => !r.hidden);
 
 function OrgHome() {
   const { data: orgs, isLoading, isError } = useOrgsQuery();
   const first = orgs?.[0];
-  if (first) return <Redirect to={`/o/${first.id}/tasks`} />;
+  if (first) return <Redirect to={`/o/${first.id}/home`} />;
   return (
     <OrgHomeView
       isLoading={isLoading}
@@ -29,53 +30,51 @@ function OrgHome() {
   );
 }
 
-function OrgLayout() {
-  const params = useParams<{ orgId: string; screen: string }>();
-  const active = SCREENS.find((s) => s.path === params.screen) ?? SCREENS[0];
+function Chrome({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="flex items-center gap-6 border-b bg-white px-6 py-3">
-        <span className="font-semibold">Revenue OS</span>
-        <nav className="flex gap-4">
-          {SCREENS.map((s) => (
-            <Link
-              key={s.path}
-              href={`/o/${params.orgId}/${s.path}`}
-              className={
-                s.path === active?.path
-                  ? "text-sm font-medium"
-                  : "text-sm text-gray-500"
-              }
-            >
-              {s.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="ml-auto flex items-center gap-3">
+    <AppShell
+      nav={NAV}
+      actions={
+        <>
           <OrgSwitcher />
-          <button
-            type="button"
-            className="text-xs text-gray-500"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => getSupabase().auth.signOut()}
           >
             Sign out
-          </button>
-        </div>
-      </header>
-      {active?.el}
-    </div>
+          </Button>
+        </>
+      }
+      user={<UserChip />}
+    >
+      {children}
+    </AppShell>
   );
 }
 
 export function Router() {
   return (
     <Switch>
-      <Route
-        path="/o/:orgId/conversations/:conversationId"
-        component={ConversationTranscript}
-      />
-      <Route path="/o/:orgId/:screen" component={OrgLayout} />
       <Route path="/" component={OrgHome} />
+      {/* ONE org-scoped route hosts the shell, so AppShell (sidebar/topbar/user chip)
+          mounts once and persists across page navigations — only the inner Switch swaps
+          the content pane. Per-page <Route> wrappers here would remount the whole shell
+          (and re-fire UserChip's session fetch) on every click (review #58, defect 1). */}
+      <Route path="/o/:orgId/*?">
+        <Chrome>
+          <Switch>
+            {routes.map((r) => (
+              <Route key={r.path} path={`/o/:orgId/${r.path}`}>
+                {r.element}
+              </Route>
+            ))}
+            <Route>
+              <Redirect to="/" />
+            </Route>
+          </Switch>
+        </Chrome>
+      </Route>
       <Route>
         <Redirect to="/" />
       </Route>

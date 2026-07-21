@@ -24,19 +24,17 @@ export class AppErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (!this.state.hasError) return this.props.children;
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">
-        <div className="w-full max-w-lg rounded-xl bg-white p-8 shadow">
-          <h1 className="text-lg font-semibold text-red-600">
-            Something went wrong
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
+      <div className="flex min-h-screen items-center justify-center bg-canvas p-8">
+        <div className="w-full max-w-lg rounded-card border border-line bg-surface p-7 shadow-card">
+          <h1 className="text-h2 text-ink">Something went wrong</h1>
+          <p className="mt-2 text-sm text-muted">
             The console hit an unexpected error and couldn't finish rendering.
             Reloading the page usually clears it.
           </p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-4 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            className="mt-5 inline-flex h-10 items-center justify-center rounded-pill bg-ink px-5 text-sm font-medium text-surface transition-colors hover:bg-ink-soft"
           >
             Reload the page
           </button>
