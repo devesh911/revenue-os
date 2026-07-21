@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-18 (console design-system fan-out complete on main — foundation #58 + page PRs #59–#64 merged; all 8 console pages styled; this is the wave-end docs PR, code already landed)
+Updated: 2026-07-21 (comprehension docs: architecture explainer + secrets map + Claude Code operating guide; stale .agents/skills duplicate deleted)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -99,6 +99,13 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Docs for the human (2026-07-21, Devesh):** three reference docs added so the owner can
+  understand what agents build — `docs/architecture.md` (topology, request flows, failure table,
+  tech-debt register), `docs/secrets-map.md` (every env var name × store; rule: a PR adding an
+  env reference adds a row), `docs/working-with-claude-code.md` (Mode A single-session is the
+  recommended default; orchestrator reserved for file-disjoint fan-outs; post-merge diff
+  walkthroughs as the comprehension habit). Stale `.agents/skills/` duplicate of
+  `.claude/skills/` deleted — `.claude/` is the only skill tree.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
   tokens, `ui/` primitives, `routes.tsx` manifest as the single nav/router source; `screens/*` stay
   path-pinned with `pages/*` as route surfaces until tests move; nested `apps/console/biome.json`
@@ -159,8 +166,8 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) comprehension docs — architecture.md (flows + "when X is down" + debt register) + secrets-map.md (env var registry, 5 stores, drift findings) + working-with-claude-code.md (light operating guide); deleted stale `.agents/skills/` duplicate tree — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
 - #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
 - (this PR) task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
 - (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
-- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17

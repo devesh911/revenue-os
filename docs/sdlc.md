@@ -59,6 +59,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
 | ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
 | Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | #58 | §5 |
+| Comprehension docs — architecture.md + secrets-map.md + working-with-claude-code.md; `.agents/skills/` duplicate deleted | ✅ | (this PR) | §5 |
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 
