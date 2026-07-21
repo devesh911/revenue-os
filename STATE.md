@@ -39,8 +39,10 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   `App` import; the off-static-graph invariant and the separate boot chunk are gone; the
   env-missing gate is preserved. **Task 22:** a top-level `AppErrorBoundary` now catches
   render-time throws anywhere in the App subtree — an honest reload card, not a blank page;
-  the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged.
-- **Quiet-hours guardrail hook (task 25, this PR):** The quiet-hours hook is implemented and wired
+  the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged. **Task 24:**
+  `VITE_API_URL` — the one still-unvalidated var #53's review flagged — is now required as a
+  valid URL in PROD (optional in dev) via `parseConsoleEnv`; VITE_SUPABASE_* rules unchanged.
+- **Quiet-hours guardrail hook (task 25, #57):** The quiet-hours hook is implemented and wired
   into `defaultPipeline`; it gates any send that carries a `channel`. BUT the current send path
   (`runTurn` in `packages/harness/src/loop.ts`) does not yet populate `action.channel`, so the gate
   is **inert in production** until `packages/channels` (P2) constructs channel-bearing actions. The
@@ -159,8 +161,8 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
 - #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
-- (this PR) task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
-- (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
-- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
+- #57 task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
+- #55 ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
