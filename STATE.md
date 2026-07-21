@@ -32,7 +32,7 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   live monitor, contacts all render org-scoped data via new screens API; task/conversation/contact
   rows deep-link to transcripts; seed packs now include demo contacts/conversations/messages/tasks/
   outcomes. Verified in a live browser against the seeded real_estate org. 80/80 tests.
-- **Console boot is honest (task 16, this PR):** missing/empty VITE_SUPABASE_* renders a
+- **Console boot is honest (task 16, #49):** missing/empty VITE_SUPABASE_* renders a
   ConfigErrorScreen (names each var + apps/console/.env.example) instead of white-screening;
   OrgHome/OrgSwitcher show a distinct unreachable-API error state, separate from empty. +9
   env-free tests. **Task 21:** the mechanism is now a lazy memoized `getSupabase()` + a static
@@ -42,6 +42,10 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged. **Task 24:**
   `VITE_API_URL` — the one still-unvalidated var #53's review flagged — is now required as a
   valid URL in PROD (optional in dev) via `parseConsoleEnv`; VITE_SUPABASE_* rules unchanged.
+- **§12b Playwright-smoke obligation (2026-07-17):** harness skeleton scaffolded — config
+  (`apps/console/playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.e2e.ts`),
+  wiring proven by `bun run e2e -- --list`; full four-screen runtime smoke still deferred to P3;
+  runtime run needs only `bunx playwright install` locally, CI arming is the follow-up.
 - **Quiet-hours guardrail hook (task 25, #57):** The quiet-hours hook is implemented and wired
   into `defaultPipeline`; it gates any send that carries a `channel`. BUT the current send path
   (`runTurn` in `packages/harness/src/loop.ts`) does not yet populate `action.channel`, so the gate
@@ -161,8 +165,8 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
+- (this PR) chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21
+- #56 VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
 - #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
 - #57 task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
-- #55 ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17

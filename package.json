@@ -22,10 +22,12 @@
     "gates": "bun run typecheck && bun run lint && bun test && bun run rls:check",
     "evals": "bun scripts/evals.ts",
     "guards": "bash scripts/guards.sh",
-    "dev:console": "bun run --filter console dev"
+    "dev:console": "bun run --filter console dev",
+    "e2e": "playwright test -c apps/console/playwright.config.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.3",
+    "@playwright/test": "1.61.1",
     "@types/pg": "8.20.0",
     "bun-types": "1.3.11",
     "pg": "8.22.0",
