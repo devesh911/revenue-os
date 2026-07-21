@@ -161,16 +161,8 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-<<<<<<< HEAD
-- (this PR) VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-17
-- #55 ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
-- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
-- #53 console boot: lib/supabase → lazy memoized getSupabase(); main.tsx static App import; BootErrorScreen + dynamic-import invariant deleted (env gate preserved) — 2026-07-17
-- #52 biome.json: recommended→preset:recommended (clear deprecation; ruleset verified intact) — 2026-07-17
-=======
+- (this PR) VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
 - #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
-- (this PR) task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
-- (this PR) ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
-- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
->>>>>>> origin/main
+- #57 task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
+- #55 ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
