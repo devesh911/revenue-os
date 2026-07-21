@@ -287,3 +287,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
 - 2026-07-18 · console-ds: biome 2.5 rejects Tailwind v4 `@theme` unless
   `css.parser.tailwindDirectives` is on — enabled via a NESTED `apps/console/biome.json`
   (`"root": false`, extends `"//"`) so the root config stayed untouched.
+- 2026-07-21 · resolving conflicts inside a wave worktree: a session-end auto-checkpoint hook fired
+  between `git add` and `git commit`, concluding the in-progress merge under its canned message
+  (528775c on #48). Content survived only because the index was already fully resolved — a
+  half-staged merge would have been committed blind. Expect/disarm checkpoint hooks before merging
+  inside .claude/worktrees; verify HEAD parents + reflog after any surprise commit.
