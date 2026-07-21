@@ -18,16 +18,16 @@ export function OrgSwitcherView({
   current?: string;
   onSelect?: (orgId: string) => void;
 }) {
-  if (isLoading) return <span className="text-xs text-gray-400">orgs…</span>;
-  if (isError)
-    return <span className="text-xs text-red-500">orgs offline</span>;
+  if (isLoading) return <span className="text-xs text-muted">orgs…</span>;
+  if (isError) return <span className="text-xs text-danger">orgs offline</span>;
   if (!orgs || orgs.length === 0)
-    return <span className="text-xs text-gray-400">no orgs</span>;
+    return <span className="text-xs text-muted">no orgs</span>;
 
   const selected = current ?? orgs[0]?.id;
   return (
     <select
-      className="rounded border px-2 py-1 text-sm"
+      aria-label="Organization"
+      className="h-8 rounded-pill border border-line bg-surface px-3 text-[13px] font-medium text-ink-soft outline-none transition-colors hover:bg-nav-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       value={selected}
       onChange={(e) => onSelect?.(e.target.value)}
     >
