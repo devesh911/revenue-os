@@ -56,10 +56,11 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | docs-reconciliation (9 contradictions settled + hygiene runbook) | ✅ | #46 | §4 |
 | P3 polish — transcript links (Contacts deep-links) | ✅ | #50 | §5 |
 | Lazy getSupabase() singleton — deletes task-16 boot static-import invariant | ✅ | #53 | §5 |
-| App-level error boundary — render-throw honesty | ✅ | (this PR) | §5 |
-| ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | (this PR) | §5 |
+| App-level error boundary — render-throw honesty | ✅ | #54 | §5 |
+| ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | #55 | §5 |
 | Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | #58 | §5 |
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
+| VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -275,6 +276,14 @@ Tasks #62 · Agents #63 · Settings #64. Test-pinned `screens/*` files stay byte
 own the styled surface); Agents + Settings render honest empty-state shells — no `/agents` or
 guardrail-config worker route exists yet (NEXT: backend wave). All 8 console pages now styled.
 Evidence: foundation #58 + pages #59–#64, all env-free gates green, CI verdict per PR (S13.7).
+
+### VITE_API_URL prod-validation — console boot-honesty arc closed (this PR)
+Closes the boot-honesty arc: #49 missing-env (`ConfigErrorScreen`) → #53 import-throw safety (lazy `getSupabase()`) → #54 render-throw safety (`AppErrorBoundary`) → this PR, the one still-unvalidated var #53's review flagged.
+`parseConsoleEnv` (`apps/console/src/lib/env.ts`) is now PROD-aware via Vite's `raw.PROD`; `VITE_API_URL` becomes a required valid URL in PROD, stays optional in dev; `VITE_SUPABASE_*` rules unchanged in both modes.
+RED @029b2452 (5 AC) → GREEN @0c28949: vite-api-url-honesty 5/5; regressions console-boot-honesty 12/12, transcript-xss 3/3.
+DEPLOY-ORDER caveat: self-announcing, not self-healing — set Pages' `VITE_API_URL` BEFORE merge (merging redeploys Pages; a still-missing var shows `ConfigErrorScreen` until it's set).
+Honest limit: `main.tsx` live `createRoot`→`ConfigErrorScreen` render is CI/e2e-owned.
+Docs: [security S7](security.md) · [patterns/zod-boundary](patterns/zod-boundary.md).
 
 ---
 

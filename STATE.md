@@ -39,7 +39,9 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   `App` import; the off-static-graph invariant and the separate boot chunk are gone; the
   env-missing gate is preserved. **Task 22:** a top-level `AppErrorBoundary` now catches
   render-time throws anywhere in the App subtree — an honest reload card, not a blank page;
-  the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged.
+  the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged. **Task 24:**
+  `VITE_API_URL` — the one still-unvalidated var #53's review flagged — is now required as a
+  valid URL in PROD (optional in dev) via `parseConsoleEnv`; VITE_SUPABASE_* rules unchanged.
 - **§12b Playwright-smoke obligation (2026-07-17):** harness skeleton scaffolded — config
   (`apps/console/playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.e2e.ts`),
   wiring proven by `bun run e2e -- --list`; full four-screen runtime smoke still deferred to P3;
@@ -97,8 +99,6 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   for migrations): generate + wire the staging SSH key,
   either by naming the action to an agent session or yourself:
   `ssh deploy@168.144.147.90 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
-- **tech-stack T24 BOM row for `@playwright/test@1.61.1`** — the playwright-smoke PR is
-  merge-blocked until it exists (dep policy).
 - Vapi India telephony decision inputs: Exotel vs Plivo SIP trunk account (spec risk #4).
 - Stale merged branches: agents are classifier-blocked from `git push origin --delete`; run flip-kit
   item 5 (orchestrator/state/FLIP-KIT-2026-07-11.md) or leave them.
@@ -165,9 +165,8 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   the only copy; rotation = overwrite assistant config + VPS env together.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-17
+- (this PR) chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21
+- #56 VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
 - #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
 - #57 task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18
-- #55 ConversationLink shared leaf — TaskQueue/LiveMonitor/ContactsTable deep-links de-duplicated (idiom 3→1 file) — 2026-07-17
-- #54 console boot: top-level AppErrorBoundary wraps `<App/>` — render-time throws show an honest reload card (not a blank page); ConfigErrorScreen stays outside, parseConsoleEnv gate intact — 2026-07-17
