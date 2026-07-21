@@ -4,7 +4,7 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-18 (console design-system fan-out complete on main — foundation #58 + page PRs #59–#64 merged; all 8 console pages styled; this is the wave-end docs PR, code already landed)
+Updated: 2026-07-21 (task 26 — static zero-dep landing page in apps/www + visual-review fixes; lands on console-complete main)
 
 ## NOW (verified facts, not hopes)
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
@@ -163,10 +163,13 @@ Updated: 2026-07-18 (console design-system fan-out complete on main — foundati
   skip, and would challenge Vapi webhooks (lost call events). Revisit when apps/www exists.
 - Vapi `server.secret` is write-only at the API (GET never echoes it): .env/password-manager holds
   the only copy; rotation = overwrite assistant config + VPS env together.
+- **apps/www is zero-dep static HTML (task 26, 2026-07-18):** supersedes the README week-3 Astro
+  reservation — Astro is agent-blocked by the BOM rail (new deps need docs/tech-stack.md rows,
+  agent-denied); a one-page landing needs no framework. Revisit only if the site grows multi-page.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21
+- (this PR) apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
+- #48 chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21
 - #56 VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
 - #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
-- #57 task-25 quiet-hours guardrail hook — `defaultPipeline` gates outbound sends in the org's configured quiet window; fail-open courtesy gate — 2026-07-18

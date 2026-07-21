@@ -60,7 +60,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | ConversationLink shared leaf — console deep-link de-dup (idiom 3→1) | ✅ | #55 | §5 |
 | Console design-system foundation — `@theme` tokens + `ui/` primitives + AppShell + routes manifest | ✅ | #58 | §5 |
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
-| VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | (this PR) | §5 |
+| VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | #56 | §5 |
+| Static zero-dep landing page ported into apps/www (task-26) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -277,13 +278,23 @@ own the styled surface); Agents + Settings render honest empty-state shells — 
 guardrail-config worker route exists yet (NEXT: backend wave). All 8 console pages now styled.
 Evidence: foundation #58 + pages #59–#64, all env-free gates green, CI verdict per PR (S13.7).
 
-### VITE_API_URL prod-validation — console boot-honesty arc closed (this PR)
+### VITE_API_URL prod-validation — console boot-honesty arc closed (#56)
 Closes the boot-honesty arc: #49 missing-env (`ConfigErrorScreen`) → #53 import-throw safety (lazy `getSupabase()`) → #54 render-throw safety (`AppErrorBoundary`) → this PR, the one still-unvalidated var #53's review flagged.
 `parseConsoleEnv` (`apps/console/src/lib/env.ts`) is now PROD-aware via Vite's `raw.PROD`; `VITE_API_URL` becomes a required valid URL in PROD, stays optional in dev; `VITE_SUPABASE_*` rules unchanged in both modes.
 RED @029b2452 (5 AC) → GREEN @0c28949: vite-api-url-honesty 5/5; regressions console-boot-honesty 12/12, transcript-xss 3/3.
 DEPLOY-ORDER caveat: self-announcing, not self-healing — set Pages' `VITE_API_URL` BEFORE merge (merging redeploys Pages; a still-missing var shows `ConfigErrorScreen` until it's set).
 Honest limit: `main.tsx` live `createRoot`→`ConfigErrorScreen` render is CI/e2e-owned.
 Docs: [security S7](security.md) · [patterns/zod-boundary](patterns/zod-boundary.md).
+
+### Static zero-dep landing page — apps/www (task-26, this PR)
+Source: Devesh's design export, a self-extracting artifact bundle whose payload the orchestrator
+extracted. Ported as one hand-authored `index.html` — all copy/data baked (3 plans, 4 stages, 3
+moats, 5 FAQs, 5 logos) — plus 32 self-hosted woff2 fonts (Playfair Display/Lora/IBM Plex Mono), an
+SVG-noise texture, and one inline script (plan-select + FAQ accordion); default state renders
+statically. Zero new deps — no `package.json`, no build step. README rewritten; supersedes the
+week-3 Astro reservation (agent-blocked by the BOM rail — new deps need a tech-stack.md row).
+RED: 35 file-based tests, `apps/www/test/landing.test.ts`.
+Review round 1 (this PR): selected-plan CTA `box-sizing:border-box` (the `<a>` was content-box → overflowed its column ~48px, overlapping the neighbor); near-black `#0B1712` underlay restored behind the 6 tint panels (the port had dropped the original's opaque underlay → over-saturated). Code-reviewed; pixel-level render sign-off pending a browser (tooling disconnected this session); `apps/www` is not deployed, so trivially adjustable.
 
 ---
 
