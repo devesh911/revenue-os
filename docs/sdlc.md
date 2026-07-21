@@ -62,7 +62,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
-| Playwright smoke scaffold (e2e harness skeleton) | 🚧 | (this PR) | BOM row (Devesh) + local run needs only `bunx playwright install`; CI arming follow-up |
+| Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
@@ -84,11 +84,11 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 - **Gates:** domain purchase (Devesh) + `STAGING_SSH_KEY` env secret (command ready in STATE WAITING).
 - **Docs:** [runbooks/vps-cloudflare-setup §4–§6](runbooks/vps-cloudflare-setup.md) · [tech-stack T14/T22](tech-stack.md).
 
-### Playwright smoke scaffold (e2e harness skeleton) 🚧
+### Playwright smoke scaffold (e2e harness skeleton)
 - **Goal:** §12b e2e obligation (T12 layer 6) — Playwright smoke harness for the four console screens.
 - **Shape:** `apps/console/playwright.config.ts` + `apps/console/e2e/smoke.e2e.ts` (Playwright `testMatch: "**/*.e2e.ts"` — specs live outside bun's `.test`/`.spec` glob); `@playwright/test` exact-pinned (G2).
 - **Verified:** `bun run e2e -- --list` (+ typecheck, lint — all green).
-- **Residual:** tech-stack T24 BOM row (Devesh); (a) browser install is the sole runtime prereq — `bun run e2e` needs no `.env`; (b) e2e specs sit outside `tsc` scope by design (`--list` is their gate), a dedicated e2e tsconfig rides the CI-arming follow-up.
+- **Residual:** (a) browser install is the sole runtime prereq — `bun run e2e` needs no `.env`; (b) e2e specs sit outside `tsc` scope by design (`--list` is their gate), a dedicated e2e tsconfig rides the CI-arming follow-up.
 - **Docs:** [tech-stack T12/T22/T24](tech-stack.md).
 
 ---
