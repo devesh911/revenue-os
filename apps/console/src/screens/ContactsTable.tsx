@@ -24,20 +24,22 @@ export function ContactsTable({
   orgId: string;
   contacts: ContactRow[];
 }) {
+  const th = "py-2.5 pr-4 text-label text-muted uppercase font-medium";
+  const td = "py-3 pr-4 text-sm text-ink-soft";
   return (
-    <table className="w-full text-left text-sm">
+    <table className="w-full text-left">
       <thead>
-        <tr className="border-b text-xs text-gray-500">
-          <th className="py-2 pr-4">Name</th>
-          <th className="py-2 pr-4">Lifecycle stage</th>
-          <th className="py-2 pr-4">Score</th>
-          <th className="py-2 pr-4">Last interaction</th>
+        <tr className="border-b border-line">
+          <th className={th}>Name</th>
+          <th className={th}>Lifecycle stage</th>
+          <th className={th}>Score</th>
+          <th className={th}>Last interaction</th>
         </tr>
       </thead>
       <tbody>
         {contacts.map((contact) => (
-          <tr key={contact.id} className="border-b last:border-0">
-            <td className="py-2 pr-4">
+          <tr key={contact.id} className="border-b border-line last:border-0">
+            <td className={`${td} font-medium text-ink`}>
               <ConversationLink
                 orgId={orgId}
                 conversationId={contact.latest_conversation_id}
@@ -45,9 +47,9 @@ export function ContactsTable({
                 {contactName(contact)}
               </ConversationLink>
             </td>
-            <td className="py-2 pr-4">{contact.lifecycle_stage}</td>
-            <td className="py-2 pr-4">{contact.score ?? "—"}</td>
-            <td className="py-2 pr-4">{contact.last_interaction_at ?? "—"}</td>
+            <td className={td}>{contact.lifecycle_stage}</td>
+            <td className={td}>{contact.score ?? "—"}</td>
+            <td className={td}>{contact.last_interaction_at ?? "—"}</td>
           </tr>
         ))}
       </tbody>

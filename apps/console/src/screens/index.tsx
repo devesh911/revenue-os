@@ -1,6 +1,12 @@
 // The four V1 screens (D4/architecture E) — server state via TanStack Query hooks
 // (features/screens/api.ts, R2); org context from the URL (R7). Text renders as plain
 // text nodes only — no raw-HTML injection anywhere (S7.1).
+//
+// NOTE (design-system foundation): this file's PATH and SOURCE are pinned by
+// tests/conversation-link.test.tsx (ConversationLink import + usage, no inline
+// deep-link), so these components stay here; src/pages/* re-export them as route
+// surfaces. Skin below is LIGHT (tokens + Card/Badge/PageHeader) — the full per-page
+// restyle is the page-fleet's job, done by rebuilding pages/* with ui/ primitives.
 import type { ReactNode } from "react";
 import { useParams } from "wouter";
 import {
@@ -9,6 +15,8 @@ import {
   useMetricsQuery,
   useTasksQuery,
 } from "../features/screens/api";
+import { PageHeader } from "../ui/layout";
+import { Badge, Card } from "../ui/primitives";
 import { ContactsTable } from "./ContactsTable";
 import { ConversationLink } from "./ConversationLink";
 
@@ -20,24 +28,27 @@ function ScreenShell({
   children: ReactNode;
 }) {
   return (
-    <section className="p-8">
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <div className="mt-4">{children}</div>
+    <section className="mx-auto w-full max-w-5xl">
+      <PageHeader title={title} />
+      {children}
     </section>
   );
 }
 
 function LoadingRow() {
-  return <p className="text-sm text-gray-500">Loading…</p>;
+  return <p className="text-sm text-muted">Loading…</p>;
 }
 
 function ErrorRow() {
-  return <p className="text-sm text-gray-500">Unable to load data.</p>;
+  return <p className="text-sm text-muted">Unable to load data.</p>;
 }
 
 function EmptyRow({ label }: { label: string }) {
-  return <p className="text-sm text-gray-500">{label}</p>;
+  return <p className="text-sm text-muted">{label}</p>;
 }
+
+const TH = "py-2.5 pr-4 text-label text-muted uppercase font-medium";
+const TD = "py-3 pr-4 text-sm text-ink-soft";
 
 export function TaskQueue() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -51,35 +62,40 @@ export function TaskQueue() {
       ) : data.tasks.length === 0 ? (
         <EmptyRow label="No tasks." />
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-xs text-gray-500">
-              <th className="py-2 pr-4">Title</th>
-              <th className="py-2 pr-4">Kind</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Priority</th>
-              <th className="py-2 pr-4">Due</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.tasks.map((task) => (
-              <tr key={task.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">
-                  <ConversationLink
-                    orgId={orgId}
-                    conversationId={task.conversation_id}
-                  >
-                    {task.title}
-                  </ConversationLink>
-                </td>
-                <td className="py-2 pr-4">{task.kind}</td>
-                <td className="py-2 pr-4">{task.status}</td>
-                <td className="py-2 pr-4">{task.priority ?? "—"}</td>
-                <td className="py-2 pr-4">{task.due_at ?? "—"}</td>
+        <Card padding="lg">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-line">
+                <th className={TH}>Title</th>
+                <th className={TH}>Kind</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Priority</th>
+                <th className={TH}>Due</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.tasks.map((task) => (
+                <tr
+                  key={task.id}
+                  className="border-b border-line last:border-0"
+                >
+                  <td className={`${TD} font-medium text-ink`}>
+                    <ConversationLink
+                      orgId={orgId}
+                      conversationId={task.conversation_id}
+                    >
+                      {task.title}
+                    </ConversationLink>
+                  </td>
+                  <td className={TD}>{task.kind}</td>
+                  <td className={TD}>{task.status}</td>
+                  <td className={TD}>{task.priority ?? "—"}</td>
+                  <td className={TD}>{task.due_at ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
     </ScreenShell>
   );
@@ -88,17 +104,10 @@ export function TaskQueue() {
 const ACTIVE_STATUSES = new Set(["queued", "ringing", "active"]);
 
 function StatusBadge({ status }: { status: string }) {
-  const active = ACTIVE_STATUSES.has(status);
   return (
-    <span
-      className={
-        active
-          ? "rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"
-          : "rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
-      }
-    >
+    <Badge tone={ACTIVE_STATUSES.has(status) ? "accent" : "neutral"}>
       {status}
-    </span>
+    </Badge>
   );
 }
 
@@ -106,7 +115,7 @@ export function LiveMonitor() {
   const { orgId } = useParams<{ orgId: string }>();
   const { data, isLoading, isError } = useConversationsQuery(orgId);
   return (
-    <ScreenShell title="Live monitor">
+    <ScreenShell title="Conversations">
       {isLoading ? (
         <LoadingRow />
       ) : isError || !data ? (
@@ -114,32 +123,37 @@ export function LiveMonitor() {
       ) : data.conversations.length === 0 ? (
         <EmptyRow label="No conversations." />
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-xs text-gray-500">
-              <th className="py-2 pr-4">Contact</th>
-              <th className="py-2 pr-4">Channel</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Started</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.conversations.map((convo) => (
-              <tr key={convo.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">
-                  <ConversationLink orgId={orgId} conversationId={convo.id}>
-                    {convo.contact_name ?? "Unknown"}
-                  </ConversationLink>
-                </td>
-                <td className="py-2 pr-4">{convo.channel}</td>
-                <td className="py-2 pr-4">
-                  <StatusBadge status={convo.status} />
-                </td>
-                <td className="py-2 pr-4">{convo.started_at ?? "—"}</td>
+        <Card padding="lg">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-line">
+                <th className={TH}>Contact</th>
+                <th className={TH}>Channel</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Started</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.conversations.map((convo) => (
+                <tr
+                  key={convo.id}
+                  className="border-b border-line last:border-0"
+                >
+                  <td className={`${TD} font-medium text-ink`}>
+                    <ConversationLink orgId={orgId} conversationId={convo.id}>
+                      {convo.contact_name ?? "Unknown"}
+                    </ConversationLink>
+                  </td>
+                  <td className={TD}>{convo.channel}</td>
+                  <td className={TD}>
+                    <StatusBadge status={convo.status} />
+                  </td>
+                  <td className={TD}>{convo.started_at ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
     </ScreenShell>
   );
@@ -157,7 +171,9 @@ export function ContactTimeline() {
       ) : data.contacts.length === 0 ? (
         <EmptyRow label="No contacts." />
       ) : (
-        <ContactsTable orgId={orgId} contacts={data.contacts} />
+        <Card padding="lg">
+          <ContactsTable orgId={orgId} contacts={data.contacts} />
+        </Card>
       )}
     </ScreenShell>
   );
@@ -173,11 +189,13 @@ function StatTile({
   caption?: string;
 }) {
   return (
-    <div className="rounded border border-gray-200 bg-white p-4">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      {caption ? <p className="mt-1 text-xs text-gray-400">{caption}</p> : null}
-    </div>
+    <Card>
+      <p className="text-label text-muted uppercase">{label}</p>
+      <p className="mt-2 text-[28px] font-bold tracking-tight text-ink">
+        {value}
+      </p>
+      {caption ? <p className="mt-1 text-xs text-muted">{caption}</p> : null}
+    </Card>
   );
 }
 
@@ -192,7 +210,7 @@ export function Dashboard() {
       ) : isError || !data ? (
         <ErrorRow />
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <StatTile
             label="New leads"
             value={data.metrics.new_leads}
