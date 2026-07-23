@@ -4,9 +4,19 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-21 (task 26 — static zero-dep landing page in apps/www + visual-review fixes; lands on console-complete main)
+Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed console functional)
 
 ## NOW (verified facts, not hopes)
+- **Staging worker first boot (2026-07-23, tunnel stopgap — no PR pipeline, ops only):** worker
+  container runs on the VPS (168.144.147.90), source rsync'd to `~/app` (provisioning skipped the
+  clone), via `docker compose` + a tunnel override (8080→box localhost only, Caddy not started).
+  HTTPS = Cloudflare QUICK TUNNEL in tmux (https://expense-reveal-founder-vip.trycloudflare.com) —
+  EPHEMERAL (dies on cloudflared restart, needs Pages VITE_API_URL re-set + console rebuild after)
+  and bypasses edge lockdown (X-Edge-Auth), demo-only. Pages VITE_API_URL is now SET + console
+  rebuilt: deployed console functional end-to-end for the first time (login, org switcher work).
+  First API writes hit staging (validate→authorize→write, RLS): org 67e8c293 + 5 contacts via CSV
+  import (`{created:5,merged:0,invalid:0}`), verified live in browser. Tasks/Conversations/Analytics
+  stay empty by design, pending the console backend wave.
 - main@3839ee4 green end-to-end: 15 migrations (000–014) reset-clean · **62/62 tests** (incl.
   cross-tenant denial + gitleaks-config suites) · rls_coverage 0 offenders (gate RAISES on
   offenders) · typecheck ✓ · lint ✓ · CI ✓. Deploy stubs SKIP on main pushes (task 14 arms them).
@@ -92,9 +102,10 @@ Updated: 2026-07-21 (task 26 — static zero-dep landing page in apps/www + visu
 (nothing in flight — task-14b is gated, see WAITING)
 
 ## WAITING ON DEVESH
-- **Domain purchase** — the ONLY blocker left for worker first-boot: Cloudflare zone (api DNS,
+- **Domain purchase** — the ONLY blocker left for the PERMANENT worker deploy: Cloudflare zone (api DNS,
   Transform Rule, origin lockdown), Pages custom domain, Caddy cert, `docker compose up`, and the
-  Vapi remote spike all execute the day it exists (runbook §4–§6).
+  Vapi remote spike all execute the day it exists (runbook §4–§6). Tunnel stopgap is live meanwhile
+  (ephemeral URL; Pages re-pairing needed on every cloudflared restart).
 - **CI deploy credentials** (classifier-blocked for agents; needed for task 14b image ship, not
   for migrations): generate + wire the staging SSH key,
   either by naming the action to an agent session or yourself:
@@ -168,8 +179,8 @@ Updated: 2026-07-21 (task 26 — static zero-dep landing page in apps/www + visu
   agent-denied); a one-page landing needs no framework. Revisit only if the site grows multi-page.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
+- (this PR) staging worker FIRST BOOT via Cloudflare quick tunnel — deployed console functional end-to-end; first API writes to staging (org 67e8c293 + 5 contacts via CSV import) — 2026-07-23
+- #66 apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
 - #48 chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21
 - #56 VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
 - console page-fleet fan-out — 6 pages styled on the design-system foundation: Conversations/live-monitor #59, Contacts #60, Analytics #61 (label Dashboard→Analytics, path kept `dashboard`), Tasks #62, Agents #63, Settings #64; Agents/Settings are honest empty-state shells (no backend API yet); all 8 console pages now styled — 2026-07-18
-- #58 console design-system foundation — Tailwind v4 `@theme` tokens + `ui/primitives` (Button/Input/Textarea/Card/Badge/Chip/Avatar) + `ui/layout` AppShell + `routes.tsx` manifest; Home is the new `/` landing; Transcript moved into `pages/`, legacy screens/auth/error token-re-skinned (copy byte-preserved) — 2026-07-18
