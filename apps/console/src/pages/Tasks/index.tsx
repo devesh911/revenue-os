@@ -1,6 +1,8 @@
 // /o/:orgId/tasks — rebuilt with ui/ primitives (page-fleet restyle; this file used to
 // re-export screens/index.tsx TaskQueue). Server state via useTasksQuery
-// (features/screens/api.ts, R2); org context from the URL (R7). Title cells deep-link
+// (features/screens/api.ts, R2); org context from the URL (R7). Loading / error / empty
+// go through <DataShell>; tabular data through the <Table> suite (ui/README skeleton) —
+// no hand-rolled ternary or <table>, no local TH/TD class consts. Title cells deep-link
 // through the shared, test-pinned ConversationLink (plain text when conversation_id is
 // null) — never inline the /o/<org>/conversations/<id> literal. All text renders as
 // inert text nodes only (S7.1).
@@ -8,11 +10,16 @@ import { useParams } from "wouter";
 import { useTasksQuery } from "../../features/screens/api";
 import { ConversationLink } from "../../screens/ConversationLink";
 import { PageHeader } from "../../ui/layout";
-import { Badge, Card } from "../../ui/primitives";
-
-const TH = "py-2.5 pr-4 text-label text-muted uppercase font-medium";
-const TD = "py-3 pr-4 text-sm text-ink-soft";
-const TD_TITLE = "py-3 pr-4 text-sm font-medium text-ink";
+import {
+  Badge,
+  Card,
+  DataShell,
+  Row,
+  Table,
+  TD,
+  TH,
+  THead,
+} from "../../ui/primitives";
 
 export function TasksPage() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -20,52 +27,46 @@ export function TasksPage() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader title="Tasks" />
-      {isLoading ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : isError || !data ? (
-        <p className="text-sm text-muted">Unable to load data.</p>
-      ) : data.tasks.length === 0 ? (
-        <p className="text-sm text-muted">No tasks.</p>
-      ) : (
+      <DataShell
+        isLoading={isLoading}
+        isError={isError || !data}
+        isEmpty={data?.tasks.length === 0}
+        emptyText="No tasks."
+      >
         <Card padding="lg">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-line">
-                <th className={TH}>Title</th>
-                <th className={TH}>Kind</th>
-                <th className={TH}>Status</th>
-                <th className={TH}>Priority</th>
-                <th className={TH}>Due</th>
-              </tr>
-            </thead>
+          <Table>
+            <THead>
+              <TH>Title</TH>
+              <TH>Kind</TH>
+              <TH>Status</TH>
+              <TH>Priority</TH>
+              <TH>Due</TH>
+            </THead>
             <tbody>
-              {data.tasks.map((task) => (
-                <tr
-                  key={task.id}
-                  className="border-b border-line last:border-0"
-                >
-                  <td className={TD_TITLE}>
+              {data?.tasks.map((task) => (
+                <Row key={task.id}>
+                  <TD tone="ink" className="font-medium">
                     <ConversationLink
                       orgId={orgId}
                       conversationId={task.conversation_id}
                     >
                       {task.title}
                     </ConversationLink>
-                  </td>
-                  <td className={TD}>{task.kind}</td>
-                  <td className={TD}>
+                  </TD>
+                  <TD>{task.kind}</TD>
+                  <TD>
                     <Badge tone={task.status === "open" ? "accent" : "neutral"}>
                       {task.status}
                     </Badge>
-                  </td>
-                  <td className={TD}>{task.priority ?? "—"}</td>
-                  <td className={TD}>{task.due_at ?? "—"}</td>
-                </tr>
+                  </TD>
+                  <TD>{task.priority ?? "—"}</TD>
+                  <TD>{task.due_at ?? "—"}</TD>
+                </Row>
               ))}
             </tbody>
-          </table>
+          </Table>
         </Card>
-      )}
+      </DataShell>
     </div>
   );
 }

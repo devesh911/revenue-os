@@ -43,11 +43,14 @@ export function Row({ className, ...rest }: RowProps) {
   );
 }
 
-export type TDProps = ComponentProps<"td">;
-export function TD({ className, ...rest }: TDProps) {
+// tone picks TD's ONE text color (default soft): cx has no tailwind-merge, so a color set via
+// className can't out-cascade a baked one — emit exactly one of text-ink-soft / text-ink, never both.
+const TD_TONES = { soft: "text-ink-soft", ink: "text-ink" } as const;
+export type TDProps = ComponentProps<"td"> & { tone?: keyof typeof TD_TONES };
+export function TD({ className, tone = "soft", ...rest }: TDProps) {
   return (
     <td
-      className={cx("py-3 pr-4 text-sm text-ink-soft", className)}
+      className={cx("py-3 pr-4 text-sm", TD_TONES[tone], className)}
       {...rest}
     />
   );

@@ -7,6 +7,9 @@ Component and unit tests for this app, env-free by construction (`bun test` +
   the grouped nav.
 - `data-shell.test.tsx`, `table.test.tsx`, `ui-contract.test.tsx` — the DataShell + Table
   primitives, their barrel exports, and the `ui/README.md` contract.
+- `pages-adoption-tasks-agents-settings.test.tsx` — Tasks + Settings adopt the DataShell/Table
+  primitives (source pins) with their loading/error/empty/happy copy preserved; Agents stays an
+  honest static shell (no data source ⇒ no fabricated states).
 - `sidebar-grouping.test.tsx` — the routes manifest groups the sidebar correctly.
 - `readme-coverage.test.ts` — the self-explanatory-repo guard: every console folder that holds
   source or tests carries a README with real content (≥3 non-empty lines).

@@ -30,6 +30,11 @@ const TH_CLASSES = [
 ];
 const TD_CLASSES = ["py-3", "pr-4", "text-sm", "text-ink-soft"];
 
+// The class tokens of the first element, as an EXACT list — so `text-ink` never matches inside the
+// `text-ink-soft` substring (TD's regression is exactly a both-classes cascade collision).
+const classesOf = (html: string): string[] =>
+  html.match(/class="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
+
 // Undefined until the worker adds the suite; each test guards typeof === "function".
 const P = asPrimitivesMap(primitives);
 
@@ -82,6 +87,24 @@ describe("Table suite — semantic structure + token classes", () => {
     expect(html).toContain("<td");
     for (const cls of TD_CLASSES) expect(html).toContain(cls);
     expect(html).toContain("cell value");
+  });
+
+  it("TD default tone emits text-ink-soft and NOT text-ink (one color, cascade-safe)", () => {
+    const TD = P.TD;
+    expect(typeof TD).toBe("function");
+    const classes = classesOf(renderToStaticMarkup(<TD>cell value</TD>));
+    expect(classes).toContain("text-ink-soft");
+    expect(classes).not.toContain("text-ink");
+  });
+
+  it('TD tone="ink" emits text-ink and NOT text-ink-soft (title/emphasis cells)', () => {
+    const TD = P.TD;
+    expect(typeof TD).toBe("function");
+    const classes = classesOf(
+      renderToStaticMarkup(<TD tone="ink">cell value</TD>),
+    );
+    expect(classes).toContain("text-ink");
+    expect(classes).not.toContain("text-ink-soft");
   });
 
   it("Row is a <tr> with the hairline border (border-b border-line)", () => {
