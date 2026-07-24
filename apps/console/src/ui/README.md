@@ -72,7 +72,9 @@ In-between sizes: use `text-sm` (14) and `text-xs` (12) with token colors.
   classes baked in, replacing the hand-rolled `<table>` + the copy-pasted TH/TD class constants.
   `THead` OWNS the header row: nest `<TH>`s (each a `scope="col"` header cell) straight inside
   it; body `<Row>`s live in a plain `<tbody>`, each holding `<TD>` cells. All take native props.
-  See the table in the skeleton below.
+  `TD` also takes `tone: "soft" | "ink"` (default `soft`) — title/emphasis cells use `tone="ink"`;
+  never override a cell's color via `className` (cx can't tailwind-merge, so the cascade ignores
+  attribute order and TD's baked color wins). See the table in the skeleton below.
 
 ## Layout (`import { PageHeader, Section } from "../../ui/layout"`)
 

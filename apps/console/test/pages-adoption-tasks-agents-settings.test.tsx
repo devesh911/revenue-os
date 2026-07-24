@@ -19,6 +19,8 @@ import { afterAll, describe, expect, it, mock } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
+import * as realOrgsApi from "../src/features/orgs/api";
+import * as realScreensApi from "../src/features/screens/api";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
@@ -68,10 +70,16 @@ const ok = (data: unknown) => ({ isLoading: false, isError: false, data });
 let tasksResult: unknown = noDataState;
 let orgsResult: unknown = noDataState;
 
+// SPREAD the real module, override only the one hook (Bun's mock.module is process-global): a
+// bare `{ useTasksQuery }` factory drops the module's sibling exports (useContactsQuery,
+// useConversationsQuery, queryKeys, …) and kills any other test file that imports them — the
+// exact regression that broke PR #71's merged run.
 mock.module("../src/features/screens/api", () => ({
+  ...realScreensApi,
   useTasksQuery: () => tasksResult,
 }));
 mock.module("../src/features/orgs/api", () => ({
+  ...realOrgsApi,
   useOrgsQuery: () => orgsResult,
 }));
 
@@ -90,6 +98,15 @@ const text = (html: string): string =>
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");
+
+// The class tokens of the <td> whose markup contains `needle` — lets a test inspect ONE cell's
+// color when the page as a whole carries both text-ink (title cell) and text-ink-soft (the rest).
+const cellClasses = (html: string, needle: string): string[] => {
+  const cell = (html.match(/<td\b[^>]*>.*?<\/td>/gs) ?? []).find((c) =>
+    c.includes(needle),
+  );
+  return cell?.match(/class="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
+};
 
 // Render a page inside a static SSR Router at a route that carries :orgId, so useParams resolves.
 function renderInRouter(
@@ -239,6 +256,11 @@ describe("Tasks — state behavior preserved (mocked useTasksQuery)", () => {
     expect(html).toContain(`href="/o/${ORG}/conversations/${CONV}"`); // linked title
     expect(t).toContain("Send recap"); // null-conversation title stays plain text
     expect(t).toContain("—"); // null priority / due_at fallback
+    // the title cell restores TD_TITLE's ink: TD tone="ink" emits text-ink and NOT text-ink-soft
+    // (the both-classes cascade collision this round fixes). Isolate it — the page carries both.
+    const titleClasses = cellClasses(html, "Call Ada back");
+    expect(titleClasses).toContain("text-ink");
+    expect(titleClasses).not.toContain("text-ink-soft");
   });
 
   it('RED until the Table primitive lands: headers are semantic <th scope="col">', async () => {

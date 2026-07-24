@@ -45,7 +45,7 @@ export function TasksPage() {
             <tbody>
               {data?.tasks.map((task) => (
                 <Row key={task.id}>
-                  <TD className="font-medium text-ink">
+                  <TD tone="ink" className="font-medium">
                     <ConversationLink
                       orgId={orgId}
                       conversationId={task.conversation_id}
