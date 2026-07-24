@@ -305,7 +305,7 @@ baked in; `THead` owns the header `<tr>`, `TH` is `scope="col"`). Both barrel-ex
 extended (page skeleton now composes DataShell + Table); new README-coverage layer adds a
 self-explanatory README to every console folder (apps/console + src, src/{pages,features,lib,app,screens}, test/).
 Evidence: 27 RED → `bun test apps/console/test/` 39/39; pinned `conversation-link` + `console-contact-links` + `console-boot-honesty` 22/22; typecheck 0, lint 0 (2 pre-existing apps/www warnings, unrelated); no new deps, env-free by construction.
-Follow-up: wave-B adoption across the 6 data pages queued (STATE.md NEXT). Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
+Follow-up: wave-B adoption across the 7 data pages queued (STATE.md NEXT). Review round 1 applied @a86ab0f (5 findings: derived README coverage, DataShell empty default, test-util dedupe, README dedupe, narrowing-tradeoff doc), gates green. Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
 
 ---
 
