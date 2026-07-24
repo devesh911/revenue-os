@@ -10,7 +10,14 @@ import { useConversationsQuery } from "../../features/screens/api";
 import { ConversationLink } from "../../screens/ConversationLink";
 import { type IconName, icons, SendIcon } from "../../ui/icons";
 import { Section } from "../../ui/layout";
-import { Avatar, Badge, Card, Chip, IconButton } from "../../ui/primitives";
+import {
+  Avatar,
+  Badge,
+  Card,
+  Chip,
+  DataShell,
+  IconButton,
+} from "../../ui/primitives";
 
 const SUGGESTIONS: Array<{ label: string; icon: IconName; to: string }> = [
   { label: "Review open tasks", icon: "tasks", to: "tasks" },
@@ -62,46 +69,45 @@ function AskBar() {
 
 function RecentConversations({ orgId }: { orgId: string }) {
   const { data, isLoading, isError } = useConversationsQuery(orgId);
-  if (isLoading) return <p className="text-sm text-muted">Loading…</p>;
-  if (isError || !data)
-    return (
-      <p className="text-sm text-muted">Unable to load recent conversations.</p>
-    );
-  const recent = data.conversations.slice(0, 3);
-  if (recent.length === 0)
-    return (
-      <p className="text-sm text-muted">
-        No conversations yet — they'll appear here as your agents start talking.
-      </p>
-    );
+  const recent = data?.conversations.slice(0, 3) ?? [];
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      {recent.map((convo) => {
-        const name = convo.contact_name ?? "Unknown";
-        return (
-          <Card key={convo.id} className="flex flex-col gap-3">
-            <div className="flex items-center gap-2.5">
-              <Avatar name={name} size="sm" />
-              <span className="min-w-0 truncate text-sm font-semibold text-ink">
-                <ConversationLink orgId={orgId} conversationId={convo.id}>
-                  {name}
-                </ConversationLink>
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted">
-              <Badge
-                tone={ACTIVE_STATUSES.has(convo.status) ? "accent" : "neutral"}
-              >
-                {convo.status}
-              </Badge>
-              <span>
-                {convo.channel} · {startedLabel(convo.started_at)}
-              </span>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+    <DataShell
+      isLoading={isLoading}
+      isError={isError || !data}
+      isEmpty={recent.length === 0}
+      errorText="Unable to load recent conversations."
+      emptyText="No conversations yet — they'll appear here as your agents start talking."
+    >
+      <div className="grid gap-3 sm:grid-cols-3">
+        {recent.map((convo) => {
+          const name = convo.contact_name ?? "Unknown";
+          return (
+            <Card key={convo.id} className="flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <Avatar name={name} size="sm" />
+                <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                  <ConversationLink orgId={orgId} conversationId={convo.id}>
+                    {name}
+                  </ConversationLink>
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted">
+                <Badge
+                  tone={
+                    ACTIVE_STATUSES.has(convo.status) ? "accent" : "neutral"
+                  }
+                >
+                  {convo.status}
+                </Badge>
+                <span>
+                  {convo.channel} · {startedLabel(convo.started_at)}
+                </span>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </DataShell>
   );
 }
 

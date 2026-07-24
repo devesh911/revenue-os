@@ -297,3 +297,6 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   not just a real declaration — no comment says it today, but one that documented the convention
   would trip a false RED. → Suggested: phrase such comments as "priority flags" rather than the
   literal token, or tighten the regex to strip comment bodies before testing.
+- 2026-07-24 · task-31 B2-FIX (PR #71 post-merge CI) · bun `mock.module` replaces the whole module
+  for every later importer in the process — mock factories for shared modules must spread the real
+  module and override only what they stub, else sibling-branch test files break at merge (PR #71).
