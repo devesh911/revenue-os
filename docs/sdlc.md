@@ -62,6 +62,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | #56 | §5 |
 | Static zero-dep landing page ported into apps/www (task-26) | ✅ | (this PR) | §5 |
+| apps/www rebuild — token CSS layer + semantic landmarks + folder README, visuals identical (task-29) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -295,6 +296,16 @@ statically. Zero new deps — no `package.json`, no build step. README rewritten
 week-3 Astro reservation (agent-blocked by the BOM rail — new deps need a tech-stack.md row).
 RED: 35 file-based tests, `apps/www/test/landing.test.ts`.
 Review round 1 (this PR): selected-plan CTA `box-sizing:border-box` (the `<a>` was content-box → overflowed its column ~48px, overlapping the neighbor); near-black `#0B1712` underlay restored behind the 6 tint panels (the port had dropped the original's opaque underlay → over-saturated). Code-reviewed; pixel-level render sign-off pending a browser (tooling disconnected this session); `apps/www` is not deployed, so trivially adjustable.
+
+### apps/www rebuild — token CSS layer (task-29, this PR)
+Restructures the task-26 export: the 745-line `index.html` (184 inline `style=` attrs + one giant
+`<style>` block) becomes 3 linked stylesheets in cascade order — `tokens.css` (palette, cream-alpha
+channel, hairline scale, fonts, 40 `@font-face`), `components.css` (reusable look + `data-*` state
+rules), `page.css` (composition + all responsive rules) — plus semantic HTML (`header>nav`,
+`main>sections`, `footer`, one `h1`, zero inline styles) and a folder README. Copy, `data-*`
+attributes, and the single inline `<script>` are byte-preserved.
+RED 45 pass / 22 fail @c00f066 → GREEN 67/67 tests, `bunx biome check apps/www` clean, typecheck clean.
+Visuals identical (copy + token values pinned by the suite); true pixel parity pending human review.
 
 ---
 
