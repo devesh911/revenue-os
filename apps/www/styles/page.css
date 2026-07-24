@@ -1,0 +1,435 @@
+/* page.css — composition: the page shell, section frames, grids, decorative
+   glows, and EVERY responsive rule. Loaded LAST, so its rules win over
+   components.css at equal specificity by cascade order alone — which is why the
+   ported responsive overrides need no priority flags. No raw hex, no override
+   flags. The teal hero/footer glow stays a literal rgba (a one-off decorative wash,
+   not a reusable token). Breakpoints preserved verbatim: 1100 / 980 / 680. */
+
+/* ── page shell ───────────────────────────────────────────────────────── */
+.ro-page {
+  min-height: 100vh;
+  background: var(--ground);
+  color: var(--cream);
+  font-family: var(--font-body);
+  position: relative;
+}
+.ro-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22/%3E%3CfeColorMatrix values=%220 0 0 0 0.93 0 0 0 0 0.89 0 0 0 0 0.81 0 0 0 0.05 0%22/%3E%3C/filter%3E%3Crect width=%22180%22 height=%22180%22 filter=%22url(%23n)%22/%3E%3C/svg%3E");
+}
+.ro-wrap {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 28px 28px 0;
+  position: relative;
+}
+
+/* the absolute-inset overlay every glow / gradient / scrim layer builds on */
+.ro-fill {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── nav ──────────────────────────────────────────────────────────────── */
+.ro-nav {
+  display: grid;
+  grid-template-columns: 280px 1fr 1fr 1fr auto;
+  border: 1px solid var(--hairline-22);
+  background: rgba(var(--cream-rgb), 0.02);
+}
+.ro-nav-logo {
+  padding: 26px 30px;
+  border-right: 1px solid var(--hairline-18);
+}
+.ro-nav-cta {
+  display: flex;
+  align-items: center;
+  padding: 0 26px;
+}
+
+/* ── hero ─────────────────────────────────────────────────────────────── */
+.ro-hero {
+  border: 1px solid var(--hairline-22);
+  border-top: none;
+  padding: 96px 60px 84px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.ro-hero-glow {
+  background: radial-gradient(
+    ellipse 70% 90% at 50% -20%,
+    rgba(46, 110, 98, 0.28),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+.ro-hero-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+.ro-btns {
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+/* ── logos ────────────────────────────────────────────────────────────── */
+.ro-logos {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: stretch;
+}
+.ro-logos-label {
+  padding: 26px 30px;
+  border-right: 1px solid var(--hairline-18);
+  display: flex;
+  align-items: center;
+  max-width: 240px;
+}
+.ro-logos-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+/* ── section frame + centred header pads ──────────────────────────────── */
+.ro-section {
+  border: 1px solid var(--hairline-22);
+  border-top: none;
+}
+.ro-pad {
+  padding: 72px 60px 56px;
+  text-align: center;
+}
+.ro-pad2 {
+  padding: 72px 60px 24px;
+  text-align: center;
+}
+
+/* ── how-it-works grids ───────────────────────────────────────────────── */
+.ro-grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--hairline-18);
+}
+.ro-stage {
+  padding: 38px 34px 44px;
+  border-right: 1px solid var(--hairline-12);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ro-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--hairline-18);
+}
+.ro-intent-cell {
+  padding: 30px 34px;
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+}
+.ro-intent-cell-div {
+  border-right: 1px solid var(--hairline-12);
+}
+
+/* ── moats grid ───────────────────────────────────────────────────────── */
+.ro-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--hairline-18);
+}
+.ro-moat-card {
+  display: flex;
+  flex-direction: column;
+}
+.ro-moat-card:not(:last-child) {
+  border-right: 1px solid var(--hairline-12);
+}
+.ro-moat-media {
+  position: relative;
+  height: 220px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--hairline-12);
+  background: var(--ground);
+}
+.ro-moat-grad-a {
+  background: linear-gradient(
+    160deg,
+    rgba(20, 58, 44, 0.8),
+    rgba(31, 84, 64, 0.9)
+  );
+}
+.ro-moat-grad-b {
+  background: linear-gradient(
+    160deg,
+    rgba(16, 38, 74, 0.8),
+    rgba(24, 52, 102, 0.9)
+  );
+}
+.ro-moat-grad-c {
+  background: linear-gradient(
+    160deg,
+    rgba(74, 16, 12, 0.8),
+    rgba(112, 24, 18, 0.9)
+  );
+}
+.ro-moat-body {
+  padding: 34px 34px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── pricing grid + plan cards ────────────────────────────────────────── */
+.ro-pricegrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 26px;
+  padding: 36px 28px 40px;
+}
+.ro-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ro-plancard-base {
+  background: var(--ground);
+}
+.ro-plan-grad-a {
+  background: linear-gradient(
+    160deg,
+    rgba(20, 58, 44, 0.78),
+    rgba(31, 84, 64, 0.9)
+  );
+}
+.ro-plan-grad-b {
+  background: linear-gradient(
+    160deg,
+    rgba(16, 38, 74, 0.78),
+    rgba(24, 52, 102, 0.9)
+  );
+}
+.ro-plan-grad-c {
+  background: linear-gradient(
+    160deg,
+    rgba(74, 16, 12, 0.78),
+    rgba(112, 24, 18, 0.9)
+  );
+}
+.ro-plancard-scrim {
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 23, 18, 0.55) 0%,
+    rgba(11, 23, 18, 0.15) 30%,
+    rgba(11, 23, 18, 0.2) 55%,
+    rgba(11, 23, 18, 0.82) 100%
+  );
+}
+.ro-plancard-head {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 24px 24px 0;
+  pointer-events: none;
+}
+.ro-plancard-feats {
+  position: relative;
+  margin-top: auto;
+  padding: 0 24px 22px;
+  pointer-events: none;
+}
+.ro-price-note {
+  border-top: 1px solid var(--hairline-18);
+  padding: 26px 32px;
+  font-size: 15px;
+  color: rgba(var(--cream-rgb), 0.6);
+  line-height: 1.8;
+}
+
+/* ── faq ──────────────────────────────────────────────────────────────── */
+.ro-faq {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+}
+.ro-faq-side {
+  padding: 64px 40px;
+  border-right: 1px solid var(--hairline-18);
+}
+
+/* ── footer CTA + footer ──────────────────────────────────────────────── */
+.ro-footcta {
+  padding: 96px 60px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.ro-footcta-glow {
+  background: radial-gradient(
+    ellipse 60% 100% at 50% 120%,
+    rgba(46, 110, 98, 0.3),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+.ro-footcta-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+.ro-footer {
+  border: 1px solid var(--hairline-22);
+  border-top: none;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 24px 32px;
+  margin-bottom: 28px;
+}
+
+/* ── responsive — page.css is last in the cascade, so these win by source
+      order. The grid-child dividers now target the child's own class
+      (:not(:last-child) / :first-child) instead of a `> div` type selector. ── */
+@media (max-width: 1100px) {
+  .ro-grid4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ro-stage:not(:last-child) {
+    border-bottom: 1px solid var(--hairline-12);
+  }
+}
+
+@media (max-width: 980px) {
+  .ro-nav {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .ro-nav-logo {
+    flex: 1 1 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline-18);
+    padding: 20px 24px;
+  }
+  .ro-nav-link {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 16px 6px;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+  }
+  .ro-nav-cta {
+    flex: 1 1 100%;
+    border-top: 1px solid var(--hairline-18);
+    padding: 14px 24px;
+  }
+  .ro-nav-cta .ro-cta-accent {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+  .ro-grid3 {
+    grid-template-columns: 1fr;
+  }
+  .ro-moat-card:not(:last-child) {
+    border-right: none;
+    border-bottom: 1px solid var(--hairline-12);
+  }
+  .ro-pricegrid {
+    grid-template-columns: 1fr;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .ro-logos {
+    grid-template-columns: 1fr;
+  }
+  .ro-logos-label {
+    max-width: none;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline-18);
+  }
+  .ro-faq {
+    grid-template-columns: 1fr;
+  }
+  .ro-faq-side {
+    border-right: none;
+    border-bottom: 1px solid var(--hairline-18);
+    padding: 44px 28px;
+  }
+}
+
+@media (max-width: 680px) {
+  .ro-wrap {
+    padding: 12px 12px 0;
+  }
+  .ro-hero {
+    padding: 56px 22px 52px;
+  }
+  .ro-h1 {
+    font-size: 38px;
+  }
+  .ro-pad {
+    padding: 48px 22px 38px;
+  }
+  .ro-pad2 {
+    padding: 48px 22px 12px;
+  }
+  .ro-grid4 {
+    grid-template-columns: 1fr;
+  }
+  .ro-stage {
+    border-right: none;
+    padding: 30px 24px 34px;
+  }
+  .ro-grid2 {
+    grid-template-columns: 1fr;
+  }
+  .ro-intent-cell {
+    border-right: none;
+    padding: 22px 24px;
+  }
+  .ro-intent-cell:first-child {
+    border-bottom: 1px solid var(--hairline-12);
+  }
+  .ro-btns {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ro-logos-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ro-logo {
+    border-bottom: 1px solid var(--hairline-09);
+  }
+  .ro-pricegrid {
+    padding: 28px 16px 32px;
+  }
+  .ro-plancard {
+    min-height: 480px;
+  }
+  .ro-faq-btn {
+    padding: 20px 22px;
+  }
+  .ro-faq-q {
+    font-size: 18px;
+  }
+  .ro-faq-a {
+    padding: 0 22px 24px;
+  }
+  .ro-footcta {
+    padding: 60px 22px;
+  }
+}

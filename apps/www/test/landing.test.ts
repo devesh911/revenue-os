@@ -9,6 +9,13 @@ import { resolve } from "node:path";
 
 const WWW_DIR = resolve(import.meta.dir, "..");
 const INDEX_PATH = resolve(WWW_DIR, "index.html");
+// REBUILT-SPEC (task-29 www rebuild): the CSS layer moved out of index.html's
+// inline <style> block into styles/*.css. AC-3 (self-hosted fonts) below now
+// reads the @font-face rules from styles/tokens.css — the token file that owns
+// the three font families — instead of index.html. Font url()s in tokens.css
+// resolve relative to the styles/ directory (i.e. ../fonts/<file>.woff2).
+const STYLES_DIR = resolve(WWW_DIR, "styles");
+const TOKENS_PATH = resolve(STYLES_DIR, "tokens.css");
 
 // − is U+2212 MINUS SIGN (the "open" FAQ marker in the source); the "closed"
 // marker is an ASCII "+". Spelled as an escape so it can never be confused with
@@ -23,6 +30,18 @@ function readIndex(): string {
     `apps/www/index.html must exist (built landing page): ${INDEX_PATH}`,
   ).toBe(true);
   return readFileSync(INDEX_PATH, "utf8");
+}
+
+// REBUILT-SPEC (task-29): read the extracted token stylesheet. Existence is
+// asserted first so the pre-rebuild state fails as a clear assertion (tokens.css
+// not yet built) rather than an opaque filesystem throw — same pattern as
+// readIndex above.
+function readTokens(): string {
+  expect(
+    existsSync(TOKENS_PATH),
+    `apps/www/styles/tokens.css must exist (extracted token layer): ${TOKENS_PATH}`,
+  ).toBe(true);
+  return readFileSync(TOKENS_PATH, "utf8");
 }
 
 function escapeRe(s: string): string {
@@ -225,43 +244,47 @@ describe("AC-2 self-containment", () => {
     }
   });
 });
-// ── AC-3 · self-hosted fonts ───────────────────────────────────────────────
-// @font-face rules for both display families, covering the weights the page
-// uses, each pointing at a fonts/ file that exists on disk.
+// ── AC-3 · self-hosted fonts (REBUILT-SPEC, task-29) ───────────────────────
+// Same invariant as the original export (both display families, the weights the
+// page actually uses, every src url() resolving to a real fonts/ file) — but the
+// @font-face rules now live in styles/tokens.css, not in an inline <style> block
+// in index.html. Only the file under test changed: readIndex() → readTokens().
+// This is a type-(b) rewrite (it pinned the single-file export's implementation)
+// and is RED until the rebuild extracts the token layer.
 describe("AC-3 self-hosted fonts", () => {
-  function faceBlocks(doc: string): string[] {
-    return [...doc.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(
+  function faceBlocks(css: string): string[] {
+    return [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(
       (m) => m[1] ?? "",
     );
   }
   const normColon = (s: string): string => s.replace(/\s*:\s*/g, ":");
-  function hasFace(doc: string, family: string, weight: number): boolean {
-    return faceBlocks(doc).some(
+  function hasFace(css: string, family: string, weight: number): boolean {
+    return faceBlocks(css).some(
       (b) =>
         b.includes(family) && normColon(b).includes(`font-weight:${weight}`),
     );
   }
 
   test("@font-face rules present for both display families", () => {
-    const doc = readIndex();
-    expect(doc).toContain("@font-face");
-    expect(faceBlocks(doc).some((b) => b.includes("Playfair Display"))).toBe(
+    const css = readTokens();
+    expect(css).toContain("@font-face");
+    expect(faceBlocks(css).some((b) => b.includes("Playfair Display"))).toBe(
       true,
     );
-    expect(faceBlocks(doc).some((b) => b.includes("IBM Plex Mono"))).toBe(true);
+    expect(faceBlocks(css).some((b) => b.includes("IBM Plex Mono"))).toBe(true);
   });
 
   test("covers the weights the page actually uses", () => {
-    const doc = readIndex();
+    const css = readTokens();
     // Playfair Display renders at 500 (all headings); IBM Plex Mono at 400 + 500.
-    expect(hasFace(doc, "Playfair Display", 500)).toBe(true);
-    expect(hasFace(doc, "IBM Plex Mono", 400)).toBe(true);
-    expect(hasFace(doc, "IBM Plex Mono", 500)).toBe(true);
+    expect(hasFace(css, "Playfair Display", 500)).toBe(true);
+    expect(hasFace(css, "IBM Plex Mono", 400)).toBe(true);
+    expect(hasFace(css, "IBM Plex Mono", 500)).toBe(true);
   });
 
   test("@font-face src url()s point at fonts/ files that exist", () => {
-    const doc = readIndex();
-    const urls = faceBlocks(doc)
+    const css = readTokens();
+    const urls = faceBlocks(css)
       .flatMap((b) => [...b.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)])
       .map((m) => (m[1] ?? "").trim())
       .filter((v) => v.length > 0 && !v.startsWith("data:"));
@@ -269,7 +292,9 @@ describe("AC-3 self-hosted fonts", () => {
     for (const u of urls) {
       expect(u).toContain("fonts/");
       const clean = (u.split("?")[0] ?? u).split("#")[0] ?? u;
-      expect(existsSync(resolve(WWW_DIR, clean))).toBe(true);
+      // url()s in tokens.css are relative to its own dir (styles/), per CSS
+      // semantics — so ../fonts/<file> must resolve into apps/www/fonts/.
+      expect(existsSync(resolve(STYLES_DIR, clean))).toBe(true);
     }
   });
 });

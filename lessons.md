@@ -292,3 +292,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   (528775c on #48). Content survived only because the index was already fully resolved — a
   half-staged merge would have been committed blind. Expect/disarm checkpoint hooks before merging
   inside .claude/worktrees; verify HEAD parents + reflog after any surprise commit.
+- 2026-07-24 · task-29 (apps/www rebuild) · `apps/www/test/structure.test.ts`'s no-`!important`
+  guard (`/!important/i` over the whole file) also fires on the literal string inside a CSS comment,
+  not just a real declaration — no comment says it today, but one that documented the convention
+  would trip a false RED. → Suggested: phrase such comments as "priority flags" rather than the
+  literal token, or tighten the regex to strip comment bodies before testing.

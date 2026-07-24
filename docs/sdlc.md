@@ -62,6 +62,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | #56 | §5 |
 | Static zero-dep landing page ported into apps/www (task-26) | ✅ | (this PR) | §5 |
+| apps/www rebuild — token CSS layer + semantic landmarks + folder README, visuals identical (task-29) | ✅ | (this PR) | §5 |
 | Console ui-foundation-v2 — DataShell + Table primitives, README-coverage layer (task-28) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
@@ -297,6 +298,15 @@ week-3 Astro reservation (agent-blocked by the BOM rail — new deps need a tech
 RED: 35 file-based tests, `apps/www/test/landing.test.ts`.
 Review round 1 (this PR): selected-plan CTA `box-sizing:border-box` (the `<a>` was content-box → overflowed its column ~48px, overlapping the neighbor); near-black `#0B1712` underlay restored behind the 6 tint panels (the port had dropped the original's opaque underlay → over-saturated). Code-reviewed; pixel-level render sign-off pending a browser (tooling disconnected this session); `apps/www` is not deployed, so trivially adjustable.
 
+### apps/www rebuild — token CSS layer (task-29, this PR)
+Restructures the task-26 export: the 745-line `index.html` (184 inline `style=` attrs + one giant
+`<style>` block) becomes 3 linked stylesheets — `tokens.css` (palette, hairlines, fonts),
+`components.css` (reusable look + `data-*` states), `page.css` (composition + responsive) — plus
+semantic HTML (zero inline styles) and a folder README; copy/`data-*`/inline `<script>` byte-preserved.
+Review round 1 @eea363e: `.ro-stage` base rule restored (dropped in extraction — the one visual
+regression, caught by 3 review angles) + AC-11 dropped-base-rule guard; hairline-DRY finding
+dropped by ruling (AC-7 literal pins win). 68/68 green.
+RED 45 pass / 22 fail @c00f066; biome + typecheck clean; visual parity re-check (vs export) pending.
 ### Console ui-foundation-v2 — DataShell + Table primitives (task-28, this PR)
 Two new `ui/primitives/` exports: `DataShell` (loading/error/empty/content branch, precedence
 loading > error > empty > children; non-happy states render a muted `<p>`, defaulting to "Loading…"
