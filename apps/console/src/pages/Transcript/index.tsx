@@ -6,7 +6,7 @@ import { useParams } from "wouter";
 import { useTranscriptQuery } from "../../features/conversations/api";
 import { TranscriptView } from "../../features/conversations/TranscriptView";
 import { PageHeader } from "../../ui/layout";
-import { Card } from "../../ui/primitives";
+import { Card, DataShell } from "../../ui/primitives";
 
 export function TranscriptPage() {
   const { orgId, conversationId } = useParams<{
@@ -23,15 +23,16 @@ export function TranscriptPage() {
         title="Transcript"
         description="Every message in this conversation, verbatim."
       />
-      {isLoading ? (
-        <p className="text-sm text-muted">Loading transcript…</p>
-      ) : isError || !data ? (
-        <p className="text-sm text-muted">Transcript unavailable.</p>
-      ) : (
+      <DataShell
+        isLoading={isLoading}
+        isError={isError || !data}
+        loadingText="Loading transcript…"
+        errorText="Transcript unavailable."
+      >
         <Card padding="lg">
-          <TranscriptView messages={data.messages} />
+          <TranscriptView messages={data?.messages ?? []} />
         </Card>
-      )}
+      </DataShell>
     </div>
   );
 }

@@ -12,7 +12,16 @@ import {
 } from "../../features/screens/api";
 import { ConversationLink } from "../../screens/ConversationLink";
 import { PageHeader } from "../../ui/layout";
-import { Badge, Card } from "../../ui/primitives";
+import {
+  Badge,
+  Card,
+  DataShell,
+  Row,
+  Table,
+  TD,
+  TH,
+  THead,
+} from "../../ui/primitives";
 
 type ContactRow = ContactsResponse["contacts"][number];
 
@@ -22,57 +31,48 @@ function contactName(contact: ContactRow): string {
   );
 }
 
-const TH = "py-2.5 pr-4 text-label text-muted uppercase";
-const TD = "py-3 pr-4 text-sm text-ink-soft";
-
 export function ContactsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const { data, isLoading, isError } = useContactsQuery(orgId);
   return (
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader title="Contacts" />
-      {isLoading ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : isError || !data ? (
-        <p className="text-sm text-muted">Unable to load data.</p>
-      ) : data.contacts.length === 0 ? (
-        <p className="text-sm text-muted">No contacts.</p>
-      ) : (
+      <DataShell
+        isLoading={isLoading}
+        isError={isError || !data}
+        isEmpty={data?.contacts.length === 0}
+        emptyText="No contacts."
+      >
         <Card padding="lg">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-line">
-                <th className={TH}>Name</th>
-                <th className={TH}>Lifecycle stage</th>
-                <th className={TH}>Score</th>
-                <th className={TH}>Last interaction</th>
-              </tr>
-            </thead>
+          <Table>
+            <THead>
+              <TH>Name</TH>
+              <TH>Lifecycle stage</TH>
+              <TH>Score</TH>
+              <TH>Last interaction</TH>
+            </THead>
             <tbody>
-              {data.contacts.map((contact) => (
-                <tr
-                  key={contact.id}
-                  className="border-b border-line last:border-0"
-                >
-                  <td className={`${TD} font-medium text-ink`}>
+              {data?.contacts.map((contact) => (
+                <Row key={contact.id}>
+                  <TD className="font-medium text-ink">
                     <ConversationLink
                       orgId={orgId}
                       conversationId={contact.latest_conversation_id}
                     >
                       {contactName(contact)}
                     </ConversationLink>
-                  </td>
-                  <td className={TD}>
+                  </TD>
+                  <TD>
                     <Badge tone="neutral">{contact.lifecycle_stage}</Badge>
-                  </td>
-                  <td className={TD}>{contact.score ?? "—"}</td>
-                  <td className={TD}>{contact.last_interaction_at ?? "—"}</td>
-                </tr>
+                  </TD>
+                  <TD>{contact.score ?? "—"}</TD>
+                  <TD>{contact.last_interaction_at ?? "—"}</TD>
+                </Row>
               ))}
             </tbody>
-          </table>
+          </Table>
         </Card>
-      )}
+      </DataShell>
     </div>
   );
 }

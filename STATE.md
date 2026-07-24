@@ -98,6 +98,10 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 6. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
+7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages. Conversations/Transcript/
+   Contacts (✅ this PR): local TH/TD consts + raw table markup deleted; Contacts header gains
+   standardized `font-medium` (intended, not a regression); Transcript keeps bespoke copy via
+   loadingText/errorText. Home/Dashboard: task-30 (sibling PR). Tasks/Settings: remain (task-32).
 7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages (Tasks/Contacts/Conversations/
    Dashboard/Home/Settings/Transcript — same isLoading/isError ternary at
    `pages/Transcript/index.tsx:26-28`, omitted from the original count; Home ✅ Dashboard ✅ this PR),
@@ -189,8 +193,8 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
   2026-07-24).
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) task-31 wave-B2 — Conversations/Transcript/Contacts adopt DataShell+Table; local TH/TD consts + raw table markup deleted; Contacts header gains standardized font-medium (intended); Transcript keeps bespoke copy via loadingText/errorText. RED @3507a67 13→GREEN @0ba2574; console 69/69 + pinned 10/10, typecheck+lint clean — 2026-07-24
 - (this PR) task-30 wave-B1 — Home+Dashboard adopt DataShell (pure composition; copy byte-identical, 7 guards; Home overrides errorText/emptyText, Dashboard uses defaults; no Table — pages have no tables). RED @7a5914d 6→GREEN @d60f352; console 54/54 + pinned 22/22, typecheck+lint clean — 2026-07-24
 - (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
 - (this PR) task-28 ui-foundation-v2 — DataShell (loading/error/empty/content, precedence loading > error > empty > children) + semantic Table suite (Table/THead/TH/Row/TD) primitives, barrel-exported; ui/README.md contract extended; README-coverage layer added across apps/console. 39/39 console + 22/22 pinned, typecheck+lint clean — 2026-07-24; + review round 1 @a86ab0f (derived README coverage now incl. src/ui, DataShell empty default 'Nothing here yet.', test-util dedupe, README de-duplication)
 - (this PR) staging worker FIRST BOOT via Cloudflare quick tunnel — deployed console functional end-to-end; first API writes to staging (org 67e8c293 + 5 contacts via CSV import) — 2026-07-23
-- #66 apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
