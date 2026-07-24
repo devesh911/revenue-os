@@ -60,6 +60,19 @@ In-between sizes: use `text-sm` (14) and `text-xs` (12) with token colors.
   `<Chip icon={<TasksIcon size={15} />} onClick={…}>Review open tasks</Chip>`
 - **Avatar** — initials circle; `name: string`, `size: "sm" | "md"`.
   `<Avatar name={contactName} size="sm" />`
+- **DataShell** — the loading / error / empty / content branch every data page repeats, as
+  one primitive. `isLoading`, `isError`, `isEmpty?`; copy overrides `loadingText?` (default
+  "Loading…"), `errorText?` (default "Unable to load data."), `emptyText?` (default "Nothing here
+  yet."). `children` render ONLY on the happy path; precedence is loading > error > empty >
+  children. Each state is a calm muted `<p>` — never a spinner. Narrowing tradeoff: `children`
+  evaluate eagerly (the JSX is built before DataShell runs), so keep optional access (`data?.`)
+  inside them — DataShell guards *rendering*, not *types*. It replaces the page ternary (see the
+  skeleton below).
+- **Table** + **THead** / **TH** / **Row** / **TD** — the semantic table with today's token
+  classes baked in, replacing the hand-rolled `<table>` + the copy-pasted TH/TD class constants.
+  `THead` OWNS the header row: nest `<TH>`s (each a `scope="col"` header cell) straight inside
+  it; body `<Row>`s live in a plain `<tbody>`, each holding `<TD>` cells. All take native props.
+  See the table in the skeleton below.
 
 ## Layout (`import { PageHeader, Section } from "../../ui/layout"`)
 
@@ -71,7 +84,8 @@ In-between sizes: use `text-sm` (14) and `text-xs` (12) with token colors.
 - **Section** — `label` (renders uppercase-muted), `actions?`, `children`. For content
   clusters like "Recent conversations".
 
-Page skeleton:
+Page skeleton — every data page is this shape (`DataShell` owns the state branch, `Table`
+owns the markup; a page never hand-rolls the loading/error/empty ternary or `<table>` again):
 
 ```tsx
 export function ThingsPage() {
@@ -83,13 +97,29 @@ export function ThingsPage() {
         title="Things"
         actions={<Button icon={<PlusIcon size={15} />}>New thing</Button>}
       />
-      {isLoading ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : isError || !data ? (
-        <p className="text-sm text-muted">Unable to load data.</p>
-      ) : (
-        <Card padding="lg">…</Card>
-      )}
+      <DataShell
+        isLoading={isLoading}
+        isError={isError || !data}
+        isEmpty={data?.things.length === 0}
+        emptyText="No things."
+      >
+        <Card padding="lg">
+          <Table>
+            <THead>
+              <TH>Name</TH>
+              <TH>Status</TH>
+            </THead>
+            <tbody>
+              {data?.things.map((t) => (
+                <Row key={t.id}>
+                  <TD>{t.name}</TD>
+                  <TD>{t.status}</TD>
+                </Row>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      </DataShell>
     </div>
   );
 }
@@ -121,7 +151,8 @@ plus svg props; `aria-hidden` by default, so pair with text or a labelled parent
 `screens/index.tsx`, `screens/ContactsTable.tsx` and `screens/ConversationLink.tsx` are
 PATH- and SOURCE-pinned by `tests/conversation-link.test.tsx` /
 `tests/console-contact-links.test.tsx` (ConversationLink import + usage, no inline
-deep-link literal, and ConversationLink's exact anchor markup — including its
-`text-blue-600 hover:underline` class). Restyle those pages by REBUILDING their
+deep-link literal, and ConversationLink's exact anchor markup — including its pinned link
+class, spelled out in `screens/README.md` so the literal lives in exactly one doc).
+Restyle those pages by REBUILDING their
 `pages/*` wrapper with primitives; retiring or re-skinning the pinned files (e.g.
 turning the blue link gold) requires updating those tests in the same PR.

@@ -98,6 +98,11 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 6. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
+7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages (Tasks/Contacts/Conversations/
+   Dashboard/Home/Settings/Transcript — same isLoading/isError ternary at
+   `pages/Transcript/index.tsx:26-28`, omitted from the original count), replacing the loading/error/
+   empty ternary + hand-rolled `<table>`/TH-TD class constants. Heads-up: Contacts' header gains
+   `font-medium` on adoption (the `TH` primitive standardizes it) — intended, not a regression.
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
 
@@ -184,7 +189,7 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 
 ## RECENT (last 5 landings, newest first)
 - (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
+- (this PR) task-28 ui-foundation-v2 — DataShell (loading/error/empty/content, precedence loading > error > empty > children) + semantic Table suite (Table/THead/TH/Row/TD) primitives, barrel-exported; ui/README.md contract extended; README-coverage layer added across apps/console. 39/39 console + 22/22 pinned, typecheck+lint clean — 2026-07-24; + review round 1 @a86ab0f (derived README coverage now incl. src/ui, DataShell empty default 'Nothing here yet.', test-util dedupe, README de-duplication)
 - (this PR) staging worker FIRST BOOT via Cloudflare quick tunnel — deployed console functional end-to-end; first API writes to staging (org 67e8c293 + 5 contacts via CSV import) — 2026-07-23
 - #66 apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
 - #48 chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21
-- #56 VITE_API_URL now validated in prod by parseConsoleEnv (required valid URL in PROD, optional in dev) — boot-honesty arc closed — 2026-07-21
