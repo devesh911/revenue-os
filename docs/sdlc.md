@@ -63,6 +63,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | #56 | §5 |
 | Static zero-dep landing page ported into apps/www (task-26) | ✅ | (this PR) | §5 |
 | apps/www rebuild — token CSS layer + semantic landmarks + folder README, visuals identical (task-29) | ✅ | (this PR) | §5 |
+| Wave-B1 Home+Dashboard DataShell adoption (task-30) | ✅ | (this PR) | §5 |
 | Console ui-foundation-v2 — DataShell + Table primitives, README-coverage layer (task-28) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
