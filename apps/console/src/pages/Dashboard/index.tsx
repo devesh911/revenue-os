@@ -10,7 +10,7 @@ import {
   useMetricsQuery,
 } from "../../features/screens/api";
 import { PageHeader, Section } from "../../ui/layout";
-import { Card } from "../../ui/primitives";
+import { Card, DataShell } from "../../ui/primitives";
 
 const STATS: Array<{
   key: keyof MetricsResponse["metrics"];
@@ -39,23 +39,19 @@ export function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader title="Analytics" />
-      {isLoading ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : isError || !data ? (
-        <p className="text-sm text-muted">Unable to load data.</p>
-      ) : (
+      <DataShell isLoading={isLoading} isError={isError || !data}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {STATS.map((stat) => (
             <Card key={stat.key} padding="lg" className="flex flex-col gap-1.5">
               <p className="text-label text-muted uppercase">{stat.label}</p>
               <p className="text-h1 text-ink tabular-nums">
-                {data.metrics[stat.key].toLocaleString()}
+                {data?.metrics[stat.key].toLocaleString()}
               </p>
               <p className="text-xs text-muted">{stat.note}</p>
             </Card>
           ))}
         </div>
-      )}
+      </DataShell>
       <Section label="Trends" className="mt-10">
         <Card padding="lg" className="text-center">
           <p className="text-sm text-muted">
