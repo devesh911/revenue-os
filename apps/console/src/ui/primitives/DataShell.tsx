@@ -22,7 +22,7 @@ export function DataShell({
   isEmpty,
   loadingText = "Loading…",
   errorText = "Unable to load data.",
-  emptyText,
+  emptyText = "Nothing here yet.",
   children,
 }: DataShellProps) {
   if (isLoading) return <p className={STATE}>{loadingText}</p>;

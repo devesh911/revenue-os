@@ -13,21 +13,16 @@
 // "undefined" to be "function" — an assertion, NOT an import/typo error). Once the worker lands
 // the component the guard passes and the assertions below it run as the real behavioral spec.
 import { describe, expect, it } from "bun:test";
-import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as primitives from "../src/ui/primitives";
+import { asPrimitivesMap, visible } from "./test-utils";
 
-// tags stripped → visible text only, so text assertions never match class names / attributes.
-const visible = (html: string) => html.replace(/<[^>]*>/g, "");
 // unique marker for the happy-path children — must be ABSENT in every non-happy state.
 const ROWS = "data-shell-children-marker";
 const children = <div>{ROWS}</div>;
 
 // Undefined until the worker adds the primitive; each test guards typeof === "function".
-const P = primitives as unknown as Record<
-  string,
-  ComponentType<Record<string, unknown>> | undefined
->;
+const P = asPrimitivesMap(primitives);
 
 describe("DataShell — loading / error / empty / content branches", () => {
   it("loading: default 'Loading…' in a muted <p>, children hidden", () => {
@@ -77,6 +72,21 @@ describe("DataShell — loading / error / empty / content branches", () => {
     expect(html).toContain("text-sm");
     expect(html).toContain("text-muted");
     expect(visible(html)).toContain("No tasks.");
+    expect(html).not.toContain(ROWS); // children hidden on empty
+  });
+
+  it("empty: emptyText omitted renders the default 'Nothing here yet.' (never a blank <p>)", () => {
+    const DataShell = P.DataShell;
+    expect(typeof DataShell).toBe("function");
+    const html = renderToStaticMarkup(
+      <DataShell isLoading={false} isError={false} isEmpty>
+        {children}
+      </DataShell>,
+    );
+    expect(html.startsWith("<p")).toBe(true);
+    expect(html).toContain("text-sm");
+    expect(html).toContain("text-muted");
+    expect(visible(html)).toBe("Nothing here yet."); // default emptyText, no blank <p>
     expect(html).not.toContain(ROWS); // children hidden on empty
   });
 

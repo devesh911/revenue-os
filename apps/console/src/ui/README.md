@@ -62,9 +62,12 @@ In-between sizes: use `text-sm` (14) and `text-xs` (12) with token colors.
   `<Avatar name={contactName} size="sm" />`
 - **DataShell** — the loading / error / empty / content branch every data page repeats, as
   one primitive. `isLoading`, `isError`, `isEmpty?`; copy overrides `loadingText?` (default
-  "Loading…"), `errorText?` (default "Unable to load data."), `emptyText?`. `children` render
-  ONLY on the happy path; precedence is loading > error > empty > children. Each state is a
-  calm muted `<p>` — never a spinner. It replaces the page ternary (see the skeleton below).
+  "Loading…"), `errorText?` (default "Unable to load data."), `emptyText?` (default "Nothing here
+  yet."). `children` render ONLY on the happy path; precedence is loading > error > empty >
+  children. Each state is a calm muted `<p>` — never a spinner. Narrowing tradeoff: `children`
+  evaluate eagerly (the JSX is built before DataShell runs), so keep optional access (`data?.`)
+  inside them — DataShell guards *rendering*, not *types*. It replaces the page ternary (see the
+  skeleton below).
 - **Table** + **THead** / **TH** / **Row** / **TD** — the semantic table with today's token
   classes baked in, replacing the hand-rolled `<table>` + the copy-pasted TH/TD class constants.
   `THead` OWNS the header row: nest `<TH>`s (each a `scope="col"` header cell) straight inside
@@ -148,7 +151,8 @@ plus svg props; `aria-hidden` by default, so pair with text or a labelled parent
 `screens/index.tsx`, `screens/ContactsTable.tsx` and `screens/ConversationLink.tsx` are
 PATH- and SOURCE-pinned by `tests/conversation-link.test.tsx` /
 `tests/console-contact-links.test.tsx` (ConversationLink import + usage, no inline
-deep-link literal, and ConversationLink's exact anchor markup — including its
-`text-blue-600 hover:underline` class). Restyle those pages by REBUILDING their
+deep-link literal, and ConversationLink's exact anchor markup — including its pinned link
+class, spelled out in `screens/README.md` so the literal lives in exactly one doc).
+Restyle those pages by REBUILDING their
 `pages/*` wrapper with primitives; retiring or re-skinning the pinned files (e.g.
 turning the blue link gold) requires updating those tests in the same PR.

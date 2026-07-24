@@ -16,12 +16,9 @@
 // RED shape: the suite is not yet exported from ui/primitives, so each case GUARDS on
 // `typeof … === "function"` first — a clean assertion failure today (not an import/typo error).
 import { describe, expect, it } from "bun:test";
-import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as primitives from "../src/ui/primitives";
-
-// tags stripped → visible text only, so text assertions never match class names / attributes.
-const visible = (html: string) => html.replace(/<[^>]*>/g, "");
+import { asPrimitivesMap, visible } from "./test-utils";
 
 const TH_CLASSES = [
   "py-2.5",
@@ -34,10 +31,7 @@ const TH_CLASSES = [
 const TD_CLASSES = ["py-3", "pr-4", "text-sm", "text-ink-soft"];
 
 // Undefined until the worker adds the suite; each test guards typeof === "function".
-const P = primitives as unknown as Record<
-  string,
-  ComponentType<Record<string, unknown>> | undefined
->;
+const P = asPrimitivesMap(primitives);
 
 describe("Table suite — semantic structure + token classes", () => {
   it("Table renders a semantic <table> (full-width, left-aligned like today's pages)", () => {

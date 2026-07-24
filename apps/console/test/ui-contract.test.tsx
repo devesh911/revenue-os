@@ -6,8 +6,9 @@
 // Env-free by construction (bun test; a namespace import + Bun.file text read, no DB/network).
 import { describe, expect, it } from "bun:test";
 import * as primitives from "../src/ui/primitives";
+import { asPrimitivesMap } from "./test-utils";
 
-const P = primitives as unknown as Record<string, unknown>;
+const P = asPrimitivesMap(primitives);
 
 describe("ui/primitives barrel exports the new suite", () => {
   it("exports DataShell and the full Table suite (Table, THead, TH, Row, TD)", () => {

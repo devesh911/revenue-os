@@ -8,15 +8,9 @@ Stack: a Vite + React single-page app (React 19, wouter for routing, TanStack Qu
 state, supabase-js for auth, Zod at every boundary, Tailwind tokens). No SSR — it boots against
 the app API and Supabase, and org context lives in the URL (`/o/:orgId/…`).
 
-Folder map (`src/`):
-
-- `app/` — shell and wiring: boot gate, providers, auth guard, the router that mounts the chrome.
-- `pages/` — one folder per routed page; composition only (primitives + feature hooks).
-- `features/` — the data layer: Zod-parsed TanStack Query hooks, one module per domain.
-- `ui/` — the presentation layer: tokens, primitives, layout, icons.
-- `lib/` — utilities: env parsing, the lazy Supabase getter, the API client.
-- `screens/` — legacy V1 screens, kept only because tests pin them (see `src/screens/README.md`).
-- `test/` — this app's env-free component/unit suites (see `test/README.md`).
+Folder map: **[`src/README.md`](src/README.md)** is the authoritative layer map for `src/` — each
+folder plus the `routes.tsx` manifest. The sibling `test/` holds this app's env-free unit suites
+(see [`test/README.md`](test/README.md)). Kept in one place so the map never drifts against a copy.
 
 Run and test (from the repo root):
 
