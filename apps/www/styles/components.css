@@ -1,0 +1,378 @@
+/* components.css — the reusable look: colour, typography, interactive chrome,
+   and the data-attribute state rules. Loaded SECOND. Every colour resolves
+   through a token from tokens.css — no raw hex, no priority flags live here. Two
+   base classes carry the font families (.ro-mono, .ro-display); each semantic
+   class layers size/tracking/colour on top, so a label is `class="ro-mono
+   ro-eyebrow"`. Body copy inherits Lora from .ro-page and needs no class. */
+
+/* ── base ─────────────────────────────────────────────────────────────── */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--ground);
+}
+::selection {
+  background: var(--cream);
+  color: var(--ground);
+}
+
+/* ── font-family bases (the two display/mono families; body inherits Lora) ─ */
+.ro-mono {
+  font-family: var(--font-mono);
+}
+.ro-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+/* ── hover (instant, matching the export — no transition, no drift) ─────── */
+.ro-nav-link:hover {
+  color: var(--cream);
+  background: rgba(var(--cream-rgb), 0.04);
+}
+.ro-cta-accent:hover {
+  opacity: 0.88;
+}
+.ro-btn-ghost:hover {
+  background: rgba(var(--cream-rgb), 0.07);
+}
+.ro-stage:hover {
+  background: rgba(var(--cream-rgb), 0.03);
+}
+.ro-choose:hover {
+  background: rgba(var(--cream-rgb), 0.06);
+}
+.ro-faq-btn:hover {
+  background: rgba(var(--cream-rgb), 0.03);
+}
+
+/* ── keyboard focus: a gold ring on the night ground (quality floor) ────── */
+.ro-nav-link:focus-visible,
+.ro-cta-accent:focus-visible,
+.ro-btn-ghost:focus-visible,
+.ro-choose:focus-visible,
+.ro-faq-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* ── nav atoms ────────────────────────────────────────────────────────── */
+.ro-nav-wordmark {
+  font-size: 30px;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+}
+.ro-nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0 34px;
+  border-right: 1px solid var(--hairline-18);
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  color: rgba(var(--cream-rgb), 0.75);
+  text-decoration: none;
+}
+
+/* ── buttons ──────────────────────────────────────────────────────────── */
+/* the gold accent button: shared skin, size comes from the context modifier */
+.ro-cta-accent {
+  font-weight: 500;
+  color: var(--ground);
+  background: var(--gold);
+  text-decoration: none;
+}
+.ro-cta-nav {
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  padding: 12px 22px;
+}
+.ro-cta-hero {
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  padding: 17px 34px;
+}
+.ro-cta-foot {
+  font-size: 14px;
+  letter-spacing: 0.22em;
+  padding: 18px 40px;
+  margin-top: 8px;
+}
+/* the ghost button (hero: SEE THE ENGINE) */
+.ro-btn-ghost {
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--cream);
+  border: 1px solid rgba(var(--cream-rgb), 0.45);
+  padding: 16px 34px;
+  text-decoration: none;
+}
+/* the plan CTA fills its card column; subscribe/choose share this sizing */
+.ro-plan-cta {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  font-size: 13.5px;
+  letter-spacing: 0.24em;
+  padding: 16px 24px;
+}
+.ro-choose {
+  color: var(--cream);
+  background: transparent;
+  border: 1px solid rgba(var(--cream-rgb), 0.35);
+  cursor: pointer;
+}
+
+/* ── section eyebrows (mono kicker above each section heading) ──────────── */
+.ro-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  color: rgba(var(--cream-rgb), 0.55);
+}
+.ro-eyebrow-gap {
+  margin-bottom: 20px;
+}
+.ro-hero-eyebrow {
+  font-size: 12.5px;
+  letter-spacing: 0.34em;
+  color: rgba(var(--cream-rgb), 0.6);
+}
+
+/* ── display headings ─────────────────────────────────────────────────── */
+.ro-h1 {
+  font-size: clamp(44px, 5.6vw, 84px);
+  line-height: 1.04;
+  letter-spacing: 0.005em;
+  max-width: 19ch;
+  margin: 0;
+}
+.ro-h2 {
+  font-size: clamp(30px, 3.4vw, 48px);
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+.ro-h2-how {
+  margin: 0 0 18px;
+}
+.ro-h2-price {
+  letter-spacing: 0.06em;
+  margin: 0 0 20px;
+}
+.ro-h2-faq {
+  font-size: 40px;
+  letter-spacing: 0.02em;
+  margin: 0;
+  line-height: 1.15;
+}
+.ro-h2-foot {
+  font-size: clamp(34px, 4vw, 60px);
+  letter-spacing: 0.01em;
+  margin: 0;
+  max-width: 22ch;
+  line-height: 1.12;
+}
+
+/* ── body ledes (Lora, inherited) ─────────────────────────────────────── */
+.ro-hero-sub {
+  font-size: 19px;
+  line-height: 1.7;
+  color: rgba(var(--cream-rgb), 0.72);
+  max-width: 56ch;
+  margin: 0;
+  font-style: italic;
+}
+.ro-how-lede {
+  font-size: 17px;
+  line-height: 1.7;
+  color: rgba(var(--cream-rgb), 0.68);
+  max-width: 62ch;
+  margin: 0 auto;
+}
+.ro-price-lede {
+  font-size: 17px;
+  line-height: 1.75;
+  color: rgba(var(--cream-rgb), 0.68);
+  max-width: 56ch;
+  margin: 0 auto;
+}
+
+/* ── funnel stage card text ───────────────────────────────────────────── */
+.ro-stage-num {
+  font-size: 12px;
+  letter-spacing: 0.26em;
+  color: rgba(var(--cream-rgb), 0.45);
+}
+.ro-stage-title {
+  font-size: 26px;
+  letter-spacing: 0.01em;
+}
+.ro-stage-kicker {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(var(--cream-rgb), 0.5);
+  line-height: 1.9;
+}
+.ro-stage-copy {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+  color: rgba(var(--cream-rgb), 0.68);
+}
+
+/* ── intent split (low = teal, high = gold) ───────────────────────────── */
+.ro-intent-label {
+  font-size: 11.5px;
+  letter-spacing: 0.24em;
+}
+.ro-intent-low {
+  color: var(--intent-teal);
+}
+.ro-intent-high {
+  color: var(--gold);
+}
+.ro-intent-copy {
+  font-size: 15px;
+  color: rgba(var(--cream-rgb), 0.65);
+}
+
+/* ── moat card text ───────────────────────────────────────────────────── */
+.ro-moat-kicker {
+  font-size: 11.5px;
+  letter-spacing: 0.26em;
+  color: rgba(var(--cream-rgb), 0.5);
+}
+.ro-moat-title {
+  font-size: 26px;
+}
+.ro-moat-copy {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(var(--cream-rgb), 0.68);
+}
+
+/* ── plan card text ───────────────────────────────────────────────────── */
+.ro-plan-name {
+  font-size: 26px;
+  letter-spacing: 0.02em;
+}
+.ro-plan-price {
+  font-size: 26px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+.ro-plan-price-sub {
+  font-size: 15px;
+  color: rgba(var(--cream-rgb), 0.65);
+}
+.ro-plan-feat {
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  color: rgba(var(--cream-rgb), 0.85);
+  line-height: 2.15;
+}
+
+/* ── logos row ────────────────────────────────────────────────────────── */
+.ro-logos-caption {
+  font-size: 11.5px;
+  letter-spacing: 0.26em;
+  color: rgba(var(--cream-rgb), 0.55);
+  line-height: 1.8;
+}
+.ro-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 10px;
+  border-right: 1px solid var(--hairline-09);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: rgba(var(--cream-rgb), 0.35);
+}
+
+/* ── faq accordion chrome ─────────────────────────────────────────────── */
+.ro-faq-item {
+  border-bottom: 1px solid var(--hairline-12);
+}
+.ro-faq-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: transparent;
+  border: none;
+  color: var(--cream);
+  padding: 26px 36px;
+  cursor: pointer;
+  text-align: left;
+}
+.ro-faq-q {
+  font-size: 21px;
+}
+.ro-faq-mark {
+  font-size: 16px;
+  color: rgba(var(--cream-rgb), 0.5);
+}
+.ro-faq-a {
+  margin: 0;
+  padding: 0 36px 28px;
+  font-size: 15.5px;
+  line-height: 1.75;
+  color: rgba(var(--cream-rgb), 0.68);
+  max-width: 68ch;
+}
+
+/* ── footer meta ──────────────────────────────────────────────────────── */
+.ro-foot-meta {
+  font-size: 11.5px;
+  letter-spacing: 0.24em;
+  color: rgba(var(--cream-rgb), 0.45);
+}
+
+/* ── radio + plancard base (border-colour set by the state rules below) ── */
+.ro-radio {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border-width: 2px;
+  border-style: solid;
+}
+.ro-plancard {
+  position: relative;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+  overflow: hidden;
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── data-attribute state (baked default: funnel selected, faq 0 open) ─── */
+/* Higher-specificity rules come after the flat bases above, so specificity
+   only ever ascends — no priority flags, no descending-specificity churn. */
+.ro-plan[data-selected="true"] .ro-plancard {
+  border-color: var(--gold);
+}
+.ro-plan[data-selected="false"] .ro-plancard {
+  border-color: rgba(var(--cream-rgb), 0.25);
+}
+.ro-plan[data-selected="true"] .ro-radio {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.ro-plan[data-selected="false"] .ro-radio {
+  background: transparent;
+  border-color: rgba(var(--cream-rgb), 0.7);
+}
+.ro-plan[data-selected="true"] .ro-cta-choose {
+  display: none;
+}
+.ro-plan[data-selected="false"] .ro-cta-subscribe {
+  display: none;
+}
+.ro-faq-item[data-open="false"] .ro-faq-a {
+  display: none;
+}
