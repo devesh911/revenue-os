@@ -12,6 +12,8 @@ import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
+import * as realConversationsApi from "../src/features/conversations/api";
+import * as realScreensApi from "../src/features/screens/api";
 import { visible } from "./test-utils";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -61,11 +63,17 @@ let ContactsPage: () => ReactElement;
 let TranscriptPage: () => ReactElement;
 
 beforeAll(async () => {
+  // mock.module is process-global and REPLACES the whole module for every LATER importer in the
+  // process — so spread the real module first and override only the hooks this file stubs. Else a
+  // sibling test file that imports an export we'd otherwise drop (e.g. useMetricsQuery, read by the
+  // Dashboard page) fails to link with "Export named '…' not found" once the suites run merged (#71).
   mock.module("../src/features/screens/api", () => ({
+    ...realScreensApi,
     useConversationsQuery: () => convState,
     useContactsQuery: () => contactsState,
   }));
   mock.module("../src/features/conversations/api", () => ({
+    ...realConversationsApi,
     useTranscriptQuery: () => transcriptState,
   }));
   ConversationsPage = (await import("../src/pages/Conversations"))
