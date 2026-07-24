@@ -119,6 +119,13 @@
   grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--hairline-18);
 }
+.ro-stage {
+  padding: 38px 34px 44px;
+  border-right: 1px solid var(--hairline-12);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 .ro-grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

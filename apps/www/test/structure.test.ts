@@ -195,3 +195,41 @@ describe("AC-10 copy parity across sections", () => {
     });
   }
 });
+
+// ── AC-11 · restored .ro-stage base rule (PR #69 review round 1 guard) ─────
+// Regression guard. The single-file export styled every funnel stage card with
+// an inline style — padding:38px 34px 44px; border-right:1px solid
+// rgba(237,227,207,.12); display:flex; flex-direction:column; gap:14px. The
+// task-29 extraction lifted .ro-stage:hover into components.css but DROPPED this
+// base rule, so above 680px the four cards rendered unpadded, undivided and
+// unstacked (caught in PR #69 review). The @1100 / @680 media rules only OVERRIDE
+// on top of this base, so the fix — and this guard — is a NON-media .ro-stage
+// rule in page.css carrying the flex-column + gap + padding + border-right set.
+describe("AC-11 restored .ro-stage base rule (PR #69 review round 1)", () => {
+  const DECLS: Array<[string, RegExp]> = [
+    ["display:flex", /display\s*:\s*flex\b/],
+    ["flex-direction:column", /flex-direction\s*:\s*column\b/],
+    ["gap:14px", /gap\s*:\s*14px\b/],
+    ["padding:38px 34px 44px", /padding\s*:\s*38px\s+34px\s+44px\b/],
+    [
+      "border-right via --hairline-12",
+      /border-right\s*:\s*1px\s+solid\s+var\(--hairline-12\)/,
+    ],
+  ];
+  test("a non-media .ro-stage base rule exists in page.css", () => {
+    // Slice off everything from the first @media onward, leaving only the base
+    // (non-responsive) cascade layer — so a match here is provably non-media.
+    const base = readPage().split("@media")[0] ?? "";
+    const rule = /\.ro-stage\s*\{([^}]*)\}/.exec(base);
+    expect(
+      rule,
+      "a non-media .ro-stage base rule must exist in page.css",
+    ).not.toBeNull();
+    const body = rule?.[1] ?? "";
+    for (const [label, re] of DECLS) {
+      expect(re.test(body), `.ro-stage base rule must declare ${label}`).toBe(
+        true,
+      );
+    }
+  });
+});
