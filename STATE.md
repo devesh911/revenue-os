@@ -178,9 +178,12 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
   reservation — Astro is agent-blocked by the BOM rail (new deps need docs/tech-stack.md rows,
   agent-denied); a one-page landing needs no framework. Revisit only if the site grows multi-page.
   Now a token-based multi-file static layer as of task-29 — still zero-dep, no framework.
+- PR #69 review finding 'hairline tokens via --cream-rgb' DROPPED — AC-7's literal-rgba pins are the
+  stronger visual-parity guard; the literal duplication is faithful to the export (Fable ruling,
+  2026-07-24).
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests — 2026-07-24
+- (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
 - (this PR) staging worker FIRST BOOT via Cloudflare quick tunnel — deployed console functional end-to-end; first API writes to staging (org 67e8c293 + 5 contacts via CSV import) — 2026-07-23
 - #66 apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
 - #48 chore/playwright-smoke — Playwright e2e smoke scaffold (harness skeleton; locally runnable after browser install) — 2026-07-21

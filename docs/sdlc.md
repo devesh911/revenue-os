@@ -299,13 +299,13 @@ Review round 1 (this PR): selected-plan CTA `box-sizing:border-box` (the `<a>` w
 
 ### apps/www rebuild — token CSS layer (task-29, this PR)
 Restructures the task-26 export: the 745-line `index.html` (184 inline `style=` attrs + one giant
-`<style>` block) becomes 3 linked stylesheets in cascade order — `tokens.css` (palette, cream-alpha
-channel, hairline scale, fonts, 40 `@font-face`), `components.css` (reusable look + `data-*` state
-rules), `page.css` (composition + all responsive rules) — plus semantic HTML (`header>nav`,
-`main>sections`, `footer`, one `h1`, zero inline styles) and a folder README. Copy, `data-*`
-attributes, and the single inline `<script>` are byte-preserved.
-RED 45 pass / 22 fail @c00f066 → GREEN 67/67 tests, `bunx biome check apps/www` clean, typecheck clean.
-Visuals identical (copy + token values pinned by the suite); true pixel parity pending human review.
+`<style>` block) becomes 3 linked stylesheets — `tokens.css` (palette, hairlines, fonts),
+`components.css` (reusable look + `data-*` states), `page.css` (composition + responsive) — plus
+semantic HTML (zero inline styles) and a folder README; copy/`data-*`/inline `<script>` byte-preserved.
+Review round 1 @eea363e: `.ro-stage` base rule restored (dropped in extraction — the one visual
+regression, caught by 3 review angles) + AC-11 dropped-base-rule guard; hairline-DRY finding
+dropped by ruling (AC-7 literal pins win). 68/68 green.
+RED 45 pass / 22 fail @c00f066; biome + typecheck clean; visual parity re-check (vs export) pending.
 
 ---
 
