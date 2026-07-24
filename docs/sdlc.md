@@ -62,6 +62,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Console page-fleet fan-out — Bland-style design system + 8 styled console pages | ✅ | #59–#64 | §5 |
 | VITE_API_URL prod-validation — console boot-honesty arc closed | ✅ | #56 | §5 |
 | Static zero-dep landing page ported into apps/www (task-26) | ✅ | (this PR) | §5 |
+| Console ui-foundation-v2 — DataShell + Table primitives, README-coverage layer (task-28) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -295,6 +296,16 @@ statically. Zero new deps — no `package.json`, no build step. README rewritten
 week-3 Astro reservation (agent-blocked by the BOM rail — new deps need a tech-stack.md row).
 RED: 35 file-based tests, `apps/www/test/landing.test.ts`.
 Review round 1 (this PR): selected-plan CTA `box-sizing:border-box` (the `<a>` was content-box → overflowed its column ~48px, overlapping the neighbor); near-black `#0B1712` underlay restored behind the 6 tint panels (the port had dropped the original's opaque underlay → over-saturated). Code-reviewed; pixel-level render sign-off pending a browser (tooling disconnected this session); `apps/www` is not deployed, so trivially adjustable.
+
+### Console ui-foundation-v2 — DataShell + Table primitives (task-28, this PR)
+Two new `ui/primitives/` exports: `DataShell` (loading/error/empty/content branch, precedence
+loading > error > empty > children; non-happy states render a muted `<p>`, defaulting to "Loading…"
+/ "Unable to load data.") and a semantic Table suite (`Table`/`THead`/`TH`/`Row`/`TD`, token classes
+baked in; `THead` owns the header `<tr>`, `TH` is `scope="col"`). Both barrel-exported; `ui/README.md`
+extended (page skeleton now composes DataShell + Table); new README-coverage layer adds a
+self-explanatory README to every console folder (apps/console + src, src/{pages,features,lib,app,screens}, test/).
+Evidence: 27 RED → `bun test apps/console/test/` 39/39; pinned `conversation-link` + `console-contact-links` + `console-boot-honesty` 22/22; typecheck 0, lint 0 (2 pre-existing apps/www warnings, unrelated); no new deps, env-free by construction.
+Follow-up: wave-B adoption across the 7 data pages queued (STATE.md NEXT). Review round 1 applied @a86ab0f (5 findings: derived README coverage, DataShell empty default, test-util dedupe, README dedupe, narrowing-tradeoff doc), gates green. Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
 
 ---
 
