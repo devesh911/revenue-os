@@ -8,13 +8,19 @@ import { useParams } from "wouter";
 import { useConversationsQuery } from "../../features/screens/api";
 import { ConversationLink } from "../../screens/ConversationLink";
 import { PageHeader } from "../../ui/layout";
-import { Badge, Card } from "../../ui/primitives";
+import {
+  Badge,
+  Card,
+  DataShell,
+  Row,
+  Table,
+  TD,
+  TH,
+  THead,
+} from "../../ui/primitives";
 
 // Statuses that mean the conversation is live right now — the one gold accent per row.
 const ACTIVE_STATUSES = new Set(["queued", "ringing", "active"]);
-
-const TH = "py-2.5 pr-4 text-label text-muted uppercase font-medium";
-const TD = "py-3 pr-4 text-sm text-ink-soft";
 
 export function ConversationsPage() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -22,33 +28,30 @@ export function ConversationsPage() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       <PageHeader title="Conversations" />
-      {isLoading ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : isError || !data ? (
-        <p className="text-sm text-muted">Unable to load data.</p>
-      ) : data.conversations.length === 0 ? (
-        <p className="text-sm text-muted">No conversations.</p>
-      ) : (
+      <DataShell
+        isLoading={isLoading}
+        isError={isError || !data}
+        isEmpty={data?.conversations.length === 0}
+        emptyText="No conversations."
+      >
         <Card padding="lg">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-line">
-                <th className={TH}>Contact</th>
-                <th className={TH}>Channel</th>
-                <th className={TH}>Status</th>
-                <th className={TH}>Started</th>
-              </tr>
-            </thead>
+          <Table>
+            <THead>
+              <TH>Contact</TH>
+              <TH>Channel</TH>
+              <TH>Status</TH>
+              <TH>Started</TH>
+            </THead>
             <tbody>
-              {data.conversations.map((c) => (
-                <tr key={c.id} className="border-b border-line last:border-0">
-                  <td className={`${TD} font-medium text-ink`}>
+              {data?.conversations.map((c) => (
+                <Row key={c.id}>
+                  <TD className="font-medium text-ink">
                     <ConversationLink orgId={orgId} conversationId={c.id}>
                       {c.contact_name ?? "Unknown"}
                     </ConversationLink>
-                  </td>
-                  <td className={TD}>{c.channel}</td>
-                  <td className={TD}>
+                  </TD>
+                  <TD>{c.channel}</TD>
+                  <TD>
                     <Badge
                       tone={
                         ACTIVE_STATUSES.has(c.status) ? "accent" : "neutral"
@@ -56,14 +59,14 @@ export function ConversationsPage() {
                     >
                       {c.status}
                     </Badge>
-                  </td>
-                  <td className={TD}>{c.started_at ?? "—"}</td>
-                </tr>
+                  </TD>
+                  <TD>{c.started_at ?? "—"}</TD>
+                </Row>
               ))}
             </tbody>
-          </table>
+          </Table>
         </Card>
-      )}
+      </DataShell>
     </div>
   );
 }
