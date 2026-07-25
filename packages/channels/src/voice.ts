@@ -1,8 +1,24 @@
-// T5 — voice(Vapi) guarded doorway. WORKER (GREEN) fills this:
-//   export async function place(ports: VoicePorts, ctx: OrgCtx, req: VoiceReq): Promise<DoorwayResult>
-//   MUST: build action {kind:'tool', toolName, autonomy, contactId, channel:'voice'} → await
-//   ports.guard(ctx, action) FIRST → if !verdict.ok return verdict (NO send) → only then
-//   await ports.sender.place(req.payload) and return {ok:true, result}.
-// RED: `place` is intentionally NOT exported yet — test namespace-imports it and REDs on
-// "voice.place is not a function". G1: runtime-agnostic.
-export {};
+// T5 — voice(Vapi) guarded doorway. MOAT #4: guard() runs BEFORE the sender on every path; a
+// blocking verdict returns the reason and NO send happens. Senders + guard are injected via ports.
+// Harness types are type-only (tsconfig @harness/* alias, erased at runtime — no runtime harness dep).
+// G1: runtime-agnostic — no bun:* imports, no Bun globals.
+import type { GuardedAction, OrgCtx } from "@harness/types";
+import type { DoorwayResult, VoicePorts, VoiceReq } from "./types";
+
+export async function place(
+  ports: VoicePorts,
+  ctx: OrgCtx,
+  req: VoiceReq,
+): Promise<DoorwayResult> {
+  const action: GuardedAction = {
+    kind: "tool",
+    toolName: req.toolName,
+    autonomy: req.autonomy,
+    contactId: req.contactId,
+    channel: "voice",
+  };
+  const verdict = await ports.guard(ctx, action); // 1. guard FIRST, always
+  if (!verdict.ok) return verdict; // 2. block → return the reason, NO send
+  const result = await ports.sender.place(req.payload); // 3. only-then send
+  return { ok: true, result };
+}

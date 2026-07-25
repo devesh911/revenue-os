@@ -1,9 +1,25 @@
-// T5 — whatsapp(Meta) guarded doorway. WORKER (GREEN) fills this:
-//   export async function send(ports: WaPorts, ctx: OrgCtx, req: WaReq): Promise<DoorwayResult>
-//   MUST: build action {kind:'tool', toolName, autonomy, contactId, channel:'whatsapp'} → await
-//   ports.guard(ctx, action) FIRST → if !verdict.ok return verdict (NO send) → only then
-//   await ports.sender.send(req.payload) and return {ok:true, result}. Forward req.payload.vars
-//   verbatim (T7 owns the contact/run-var MERGE, not this doorway).
-// RED: `send` is intentionally NOT exported yet — test namespace-imports it and REDs on
-// "wa.send is not a function". G1: runtime-agnostic.
-export {};
+// T5 — whatsapp(Meta) guarded doorway. MOAT #4: guard() runs BEFORE the sender on every path; a
+// blocking verdict returns the reason and NO send happens. Senders + guard are injected via ports.
+// req.payload.vars are FORWARDED verbatim — the contact/run-var MERGE is T7's send_wa handler.
+// Harness types are type-only (tsconfig @harness/* alias, erased at runtime — no runtime harness dep).
+// G1: runtime-agnostic — no bun:* imports, no Bun globals.
+import type { GuardedAction, OrgCtx } from "@harness/types";
+import type { DoorwayResult, WaPorts, WaReq } from "./types";
+
+export async function send(
+  ports: WaPorts,
+  ctx: OrgCtx,
+  req: WaReq,
+): Promise<DoorwayResult> {
+  const action: GuardedAction = {
+    kind: "tool",
+    toolName: req.toolName,
+    autonomy: req.autonomy,
+    contactId: req.contactId,
+    channel: "whatsapp",
+  };
+  const verdict = await ports.guard(ctx, action); // 1. guard FIRST, always
+  if (!verdict.ok) return verdict; // 2. block → return the reason, NO send
+  const result = await ports.sender.send(req.payload); // 3. only-then send
+  return { ok: true, result };
+}
