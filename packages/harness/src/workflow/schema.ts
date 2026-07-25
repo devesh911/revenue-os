@@ -1,10 +1,12 @@
+// biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow step field (data,
+// not a thenable) in the T26.2 definition JSON, e.g. { kind:"wait", for:"PT2H", then:"..." }.
 // T1 (T26.2) — workflow-definition JSON schema + the workflow type contract.
 //
-// RED STUB authored by the tester. The runtime validator is intentionally UNIMPLEMENTED
-// (its safeParse throws) so the schema tests fail against a missing implementation. The
-// TYPE contract below is the spec the worker (GREEN), the scheduler (T6), and the handlers
-// (T7) must satisfy. Types live HERE in src/workflow/ — never in the shared src/types.ts —
-// per the T1 brief. G1: runtime-agnostic (no bun:* imports, no Bun.* globals).
+// WorkflowDefinitionSchema validates workflows.definition: a CLOSED discriminated union on
+// `kind` (an out-of-set kind fails safeParse). The TYPE contract below is the spec the
+// interpreter, the scheduler (T6), and the handlers (T7) satisfy; types live HERE in
+// src/workflow/ — never in the shared src/types.ts. G1: runtime-agnostic (no bun:* imports).
+import { z } from "zod";
 
 /** Closed set of step kinds. Adding one is a code change + ADR, never ad-hoc JSON. */
 export type StepKind =
@@ -85,11 +87,41 @@ export type SafeParseResult =
   | { success: true; data: WorkflowDefinition }
   | { success: false; error: unknown };
 
-/** RED STUB — the worker replaces this with a real closed `z.object({...})` schema whose
- *  `safeParse` rejects unknown step kinds and accepts a valid M2 definition. Throwing here
- *  keeps BOTH schema tests RED against a missing implementation. */
-export const WorkflowDefinitionSchema = {
-  safeParse(_input: unknown): SafeParseResult {
-    throw new Error("WorkflowDefinitionSchema not implemented — T1 RED");
-  },
-};
+/** Per-kind step schemas — a CLOSED discriminated union on `kind`; an out-of-set kind fails
+ *  safeParse. Fields mirror the `Step` type; unknown keys are stripped, not an error. */
+const StepSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("call"),
+    agent: z.string(),
+    on: z.record(z.string(), z.string()),
+  }),
+  z.object({ kind: z.literal("wait"), for: z.string(), then: z.string() }),
+  z.object({
+    kind: z.literal("wait_until"),
+    localTime: z.string(),
+    then: z.string(),
+  }),
+  z.object({
+    kind: z.literal("whatsapp"),
+    template: z.string(),
+    then: z.string(),
+    vars: z.record(z.string(), z.string()).optional(),
+  }),
+  z.object({
+    kind: z.literal("branch"),
+    onDisposition: z.record(z.string(), z.string()),
+  }),
+  z.object({
+    kind: z.literal("tool"),
+    tool: z.string(),
+    args: z.record(z.string(), z.unknown()).optional(),
+    then: z.string(),
+  }),
+  z.object({ kind: z.literal("end") }),
+]);
+
+/** The runtime validator for workflows.definition (the JSON in tech-stack T26.2). */
+export const WorkflowDefinitionSchema = z.object({
+  entry: z.string(),
+  steps: z.record(z.string(), StepSchema),
+});

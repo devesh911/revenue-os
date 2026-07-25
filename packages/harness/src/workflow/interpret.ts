@@ -1,27 +1,192 @@
-// T1 (T26.2) — the pure workflow interpreter.
+// T1 (T26.2) — the pure workflow interpreter (the show-runner's brain).
 //
 //   interpret(definition, runState, event, now) → Transition
 //
 // PURE by contract (test 9): deterministic in its four inputs, performs ZERO I/O, and never
 // reads the clock — callers pass `now` explicitly. No db/ctx handle is in the signature, so
-// durability lives entirely in the tables, never in the interpreter.
-//
-// RED STUB authored by the tester: returns a fixed placeholder so the interpret tests fail on
-// assertion diffs against a missing implementation. The worker replaces the body (only) with
-// the real interpreter; the encoded contract is test/interpret.test.ts. G1: runtime-agnostic.
+// durability lives entirely in the tables, never here. Guardrail checks are NOT here (they run
+// per-action in the executor). G1: runtime-agnostic (Intl only — no date libs, no Bun globals).
 import type {
+  Action,
   Transition,
   WorkflowDefinition,
   WorkflowEvent,
   WorkflowState,
 } from "./schema";
 
+// --- pure helpers -----------------------------------------------------------
+
+// ISO-8601 duration → milliseconds, for `wait` steps. Supports weeks/days and the T-part
+// hours/minutes/seconds (the fixed-length fields a wait expresses); calendar-ambiguous
+// years/months are rejected.
+const DURATION =
+  /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
+function durationMs(iso: string): number {
+  const m = DURATION.exec(iso);
+  if (!m || iso === "P" || iso === "PT") {
+    throw new Error(`unsupported ISO-8601 duration: ${iso}`);
+  }
+  const [, w, d, h, min, s] = m;
+  const secs =
+    Number(w ?? 0) * 604800 +
+    Number(d ?? 0) * 86400 +
+    Number(h ?? 0) * 3600 +
+    Number(min ?? 0) * 60 +
+    Number(s ?? 0);
+  return secs * 1000;
+}
+
+// Wall-clock parts of an instant read IN `tz` (via Intl — host-tz independent, like quiet-hours).
+function zonedParts(now: Date, tz: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(now);
+  const at = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return {
+    year: at("year"),
+    month: at("month"),
+    day: at("day"),
+    hour: at("hour"),
+    minute: at("minute"),
+    second: at("second"),
+  };
+}
+
+// The next instant whose wall-clock in `tz` is exactly hh:mm:00, STRICTLY after `now`.
+// ponytail: single-pass offset — exact for fixed-offset zones (Asia/Kolkata); inside a DST
+// spring-forward gap it can be off by the DST delta. Two-pass converge if that ever matters.
+function nextLocalTime(now: Date, hhmm: string, tz: string): Date {
+  const [h = 0, min = 0] = hhmm.split(":").map(Number);
+  const { year, month, day } = zonedParts(now, tz);
+  const utcAt = (d: number): Date => {
+    const naive = Date.UTC(year, month - 1, d, h, min, 0);
+    const z = zonedParts(new Date(naive), tz);
+    const offset =
+      Date.UTC(z.year, z.month - 1, z.day, z.hour, z.minute, z.second) - naive;
+    return new Date(naive - offset);
+  };
+  const today = utcAt(day);
+  return today.getTime() > now.getTime() ? today : utcAt(day + 1);
+}
+
+// --- interpreter ------------------------------------------------------------
+
 export function interpret(
-  _def: WorkflowDefinition,
-  _state: WorkflowState,
+  def: WorkflowDefinition,
+  state: WorkflowState,
   _event: WorkflowEvent,
-  _now: Date,
+  now: Date,
 ): Transition {
-  // RED placeholder — deliberately inert so every interpret assertion below fails.
-  return { actions: [], nextStep: null, wakeAt: null, runStatus: "pending" };
+  function run(id: string): Transition {
+    const step = def.steps[id];
+    if (!step) throw new Error(`unknown step: ${id}`);
+    switch (step.kind) {
+      case "call": {
+        // RE-ENTRY: the handler folded in the call outcome → route, no side effect, chain on.
+        const disposition = state.lastDisposition;
+        if (disposition) {
+          const on = step.on as Record<string, string>;
+          return {
+            actions: [],
+            nextStep: on[disposition] ?? null,
+            wakeAt: null,
+            runStatus: "running",
+          };
+        }
+        // FRESH entry: place the call and park on this step, waiting for the provider callback.
+        // ponytail: unit tests cover RE-ENTRY only; this arm is exercised by T9/M2 replay.
+        const action: Action = {
+          kind: "place_call",
+          contactId: state.contactId ?? "",
+          agentKey: step.agent as string,
+        };
+        return {
+          actions: [action],
+          nextStep: id,
+          wakeAt: null,
+          runStatus: "waiting",
+        };
+      }
+      case "wait":
+        return {
+          actions: [],
+          nextStep: step.then as string,
+          wakeAt: new Date(now.getTime() + durationMs(step.for as string)),
+          runStatus: "waiting",
+        };
+      case "wait_until":
+        return {
+          actions: [],
+          nextStep: step.then as string,
+          wakeAt: nextLocalTime(
+            now,
+            step.localTime as string,
+            state.timezone ?? "UTC",
+          ),
+          runStatus: "waiting",
+        };
+      case "whatsapp": {
+        // Emit the send AND arm the following step in the same tick (single transition).
+        const action: Action = {
+          kind: "send_wa",
+          contactId: state.contactId ?? "",
+          template: step.template as string,
+          vars: (step.vars as Record<string, string> | undefined) ?? {},
+        };
+        const next = run(step.then as string);
+        return { ...next, actions: [action, ...next.actions] };
+      }
+      case "branch": {
+        // Pure routing on the folded-in disposition; unmatched falls through to the '*' arm.
+        const arms = step.onDisposition as Record<string, string>;
+        const disposition = state.lastDisposition;
+        return {
+          actions: [],
+          nextStep:
+            (disposition ? arms[disposition] : undefined) ?? arms["*"] ?? null,
+          wakeAt: null,
+          runStatus: "running",
+        };
+      }
+      case "tool": {
+        // Closed side-effect set: create_task drafts a task; book_appointment records an outcome.
+        const target = step.then as string;
+        const args = (step.args as Record<string, unknown> | undefined) ?? {};
+        const action: Action =
+          step.tool === "book_appointment"
+            ? {
+                kind: "write_outcome",
+                outcome: {
+                  kind: "site_visit_booked",
+                  contactId: state.contactId,
+                  ...args,
+                },
+              }
+            : { kind: "create_task", task: { ...args } };
+        return {
+          actions: [action],
+          nextStep: target,
+          wakeAt: null,
+          runStatus: target === "end" ? "completed" : "running",
+        };
+      }
+      case "end":
+        return {
+          actions: [],
+          nextStep: null,
+          wakeAt: null,
+          runStatus: "completed",
+        };
+    }
+  }
+
+  return run(state.currentStep ?? def.entry);
 }
