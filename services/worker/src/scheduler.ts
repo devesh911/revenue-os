@@ -226,11 +226,16 @@ async function applyTransitions(
 }
 
 /**
- * Enqueue an external action as a pgboss.job row on the queue named after the action kind.
- * Idempotent by singleton_key `<runId>:<step>:<idx>` + policy 'short' (pg-boss's job_i1 partial
- * unique index dedupes while state='created'), so a re-tick of a still-parked run no-ops instead
- * of double-dispatching. The payload carries ids + the action only; T7 re-scopes via withOrg.
- * Returns true iff a new job row was inserted (false when the singleton_key conflicted).
+ * Enqueue an external action as a pgboss job on the queue named after the action kind. Writes the
+ * DEFAULT partition `pgboss.job_common` directly: pg-boss v12 partitions `job` BY LIST(name) and
+ * every writer — pg-boss's own `send` included — targets the leaf partition, never the parent
+ * routing shell. Non-partitioned queues (policy 'short', the T6→T8 default) land in job_common,
+ * which is where the `job_i1` dedup index lives and which app_service owns (migration 015). This
+ * also sidesteps a privilege split: app_service is not the parent `job`'s effective DML owner in
+ * some stacks, but always owns the partition it works through (proven by the pg-boss send path).
+ * Idempotent by singleton_key `<runId>:<step>:<idx>` + policy 'short' (job_i1 dedupes while
+ * state='created'), so a re-tick of a still-parked run no-ops. Payload = ids + action only; T7
+ * re-scopes via withOrg. Returns true iff a row was inserted (false on singleton_key conflict).
  */
 async function enqueueJob(
   tx: PoolClient,
@@ -242,7 +247,7 @@ async function enqueueJob(
 ): Promise<boolean> {
   const singletonKey = `${runId}:${step}:${idx}`;
   const r = await tx.query(
-    `insert into pgboss.job (name, data, singleton_key, policy)
+    `insert into pgboss.job_common (name, data, singleton_key, policy)
      values ($1, $2::jsonb, $3, 'short')
      on conflict do nothing`,
     [action.kind, JSON.stringify({ orgId, runId, action }), singletonKey],

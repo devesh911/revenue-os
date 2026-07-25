@@ -123,6 +123,13 @@ beforeAll(async () => {
       // idempotent across reruns: the queue partition already exists
     }
   }
+  // boss.start() (as app_service) installs + OWNS pg-boss's tables (migration 015: the migration
+  // role can't own them). The admin pool is `postgres` — BYPASSRLS but NOT a superuser here — so
+  // it can't SELECT/DELETE pgboss.job (jobsFor()/cleanup()) without a grant from the owner. Grant
+  // it here AS app_service (appPool), the owner. Idempotent; must precede the first cleanup().
+  await appPool.query(
+    "grant select, delete on pgboss.job, pgboss.job_common to postgres",
+  );
   await cleanup();
   const org = await admin.query(
     `insert into orgs (name, slug) values ('Scheduler Org', $1) returning id`,
