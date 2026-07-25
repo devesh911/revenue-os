@@ -22,12 +22,16 @@
 // "do-not-contact THIS person" signal is the contact's own flag (not the org-level 'dnc' policy
 // list). WORKER MUST read this source for the GREEN to match these canned rows.
 //
-// ATTEMPT-CAP SHAPES (tester-defined — NO code pins them yet; WORKER MUST MATCH, flagged in report):
-//   workflow_runs.attempts (006_harness.sql:62, read via runs_contact index :71):
-//       { "<channel>": ["<iso8601>", ...] }   — timestamps of prior send attempts, per channel
-//   guardrail_policies['attempt_caps'].config:
-//       { "voice": {"max":3,"window_hours":72}, "whatsapp": {"max":2,"window_hours":24} }
-//   count-in-window(ch) = |{ t in attempts[ch] : t >= now - window_hours }|; block when >= max.
+// ATTEMPT-CAP SHAPES:
+//   workflow_runs.attempts (006_harness.sql:62, read via runs_contact index :71) — TESTER-DEFINED,
+//   no code pins it yet (WORKER MUST MATCH, flagged in report). Per-channel ARRAY of ISO timestamps
+//   (timestamps, not a bare counter — a rolling window needs them):
+//       { "<channel>": ["<iso8601>", ...] }
+//   guardrail_policies['attempt_caps'].config — key GROUNDED in the real seed (real_estate.sql:46 &
+//   b2b_wholesale.sql:41): `per_hours`, NOT `window_hours`. A cap that reads a missing key ⇒ no cap
+//   ⇒ over-contacting, so the canned config MUST match the seed to force the worker to read it:
+//       { "voice": {"max":3,"per_hours":72}, "whatsapp": {"max":2,"per_hours":24} }
+//   count-in-window(ch) = |{ t in attempts[ch] : t >= now - per_hours }|; block when >= max.
 import { afterEach, describe, expect, it, setSystemTime } from "bun:test";
 import * as policies from "../src/policies";
 import type { GuardedAction, OrgCtx, OrgScopedDb } from "../src/types";
@@ -77,8 +81,8 @@ const QUIET_NOW = "2026-07-16T16:30:00Z"; // 22:00 IST — inside quiet hours
 
 // Attempt-cap fixtures. Three prior VOICE attempts clustered Jul-16 10:00–12:00Z.
 const ATTEMPT_CAPS = {
-  voice: { max: 3, window_hours: 72 },
-  whatsapp: { max: 2, window_hours: 24 },
+  voice: { max: 3, per_hours: 72 },
+  whatsapp: { max: 2, per_hours: 24 },
 };
 const VOICE_ATTEMPTS_2 = ["2026-07-16T10:00:00Z", "2026-07-16T11:00:00Z"];
 const VOICE_ATTEMPTS_3 = [
