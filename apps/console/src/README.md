@@ -13,4 +13,3 @@ folder's own README before working in it.
 - `ui/` — presentation: tokens, primitives, layout, icons. The design-system contract is
   `ui/README.md`; pages compose it and never redefine colors, spacing, or components.
 - `lib/` — framework-free utilities: env parsing, the lazy Supabase getter, the API client.
-- `screens/` — legacy V1 screens, kept only because tests pin them (see `screens/README.md`).

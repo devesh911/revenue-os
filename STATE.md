@@ -82,37 +82,18 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
    the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
    AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section; `GET`/`PUT
    /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire Settings "Guardrails".
-2. Console cleanup — retire the now-unrouted but test-pinned `screens/*` (LiveMonitor/TaskQueue/
-   ContactTimeline/ContactsTable) and re-skin `ConversationLink`'s pinned `text-blue-600` link to
-   the gold accent — both need coordinated edits to `tests/conversation-link.test.tsx` /
-   `tests/console-contact-links.test.tsx` in the same PR.
-3. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-4. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-5. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-6. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
-7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages. Conversations/Transcript/
-   Contacts (✅ this PR): local TH/TD consts + raw table markup deleted; Contacts header gains
-   standardized `font-medium` (intended, not a regression); Transcript keeps bespoke copy via
-   loadingText/errorText. Home/Dashboard: task-30 (sibling PR). Tasks/Settings: remain (task-32).
-7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages (Tasks/Contacts/Conversations/
-   Dashboard/Home/Settings/Transcript — same isLoading/isError ternary at
-   `pages/Transcript/index.tsx:26-28`, omitted from the original count), replacing the loading/error/
-   empty ternary + hand-rolled `<table>`/TH-TD class constants. Heads-up: Contacts' header gains
-   `font-medium` on adoption (the `TH` primitive standardizes it) — intended, not a regression.
-   Tasks ✅ Settings ✅ (this PR).
-   Wave-C follow-up: flip the Contacts + Conversations name cells to `<TD tone="ink" className="font-medium">` once this PR's tone prop lands (their both-classes collision was preserved bug-for-bug in #71).
-   `pages/Transcript/index.tsx:26-28`, omitted from the original count; Home ✅ Dashboard ✅ this PR),
-   replacing the loading/error/empty ternary + hand-rolled `<table>`/TH-TD class constants. Heads-up:
-   Contacts' header gains `font-medium` on adoption (the `TH` primitive standardizes it) — intended,
-   not a regression.
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
 
@@ -201,10 +182,12 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
   over the primitive's baked `text-ink-soft`), matching the Contacts title-cell idiom — design-system
   detail, not test-pinned.
 - **Workflow `tool` step → Action mapping (2026-07-25, T1):** `book_appointment` maps to a `write_outcome` action (kind `site_visit_booked`, a db-design outcome kind); `create_task` maps to `create_task`. Boring closed-set mapping; the M2 replay keys on the booked OUTCOME row (the appointments-table row comes from the real in-call book tool, out of the pure-spine scope).
+- T4: all three production tools autonomy:"auto" — M2 requires autonomous site-visit booking; send-safety is enforced at the guarded channels doorway (moat #4), not a per-tool approval gate; the writes are reversible/low-stakes. An "approval" tier would route every booking/send to a human task (loop.ts) and break autonomous operation.
+- T4: contactId validated with z.guid() (UUID shape) not z.string().uuid() — Zod 4.4.3 enforces RFC-9562 version/variant nibbles that non-real fixtures fail; RLS + the contacts FK are the real identity guarantee.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) T1 — pure workflow interpreter + closed-set definition schema (show-runner brain); harness barrel exports interpret + WorkflowDefinitionSchema; 9/9 — 2026-07-25
-- #75 T2 — dnc(fail-closed) + per-channel windowed attempt-cap hooks + clock-aware quiet-hours (fail-open); defaultPipeline autonomy→dnc→quiet→cap (moat #4); 13/13 — 2026-07-25
-- #73 T3 — raw-fetch Anthropic (Claude) adapter behind LlmProvider (harness talker layer); 11/11, no SDK/dep (T19), fake stays CI default, API-key wiring deferred — 2026-07-25
-- task-32 wave-B3 — Tasks+Settings adopt DataShell/Table (local TH/TD/TD_TITLE consts deleted; semantic th scope=col via TH; Settings keeps custom error copy + not-in-list branch); Agents verified honest static shell, untouched. RED @fe4b41e 7→GREEN @8a830ae; adoption suite 24/24, console 65/65 + tests/ 39/39, typecheck+lint clean — 2026-07-24
-- apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
+- (this PR) T4 tool catalog GREEN @6106660 — book_appointment/update_contact/send_confirmation + buildCatalog wired; 12/12 env-free unit pass, 4 integration CI-owned — 2026-07-25
+- #78 T5 channels guarded doorway (`packages/channels`) — `voice.place` (Vapi) + `wa.send` (Meta) build a `GuardedAction` (channel/contactId/tool identity), `await guard()` before any sender call, block with the `Verdict` on `!ok` (no send), only-then call the injected sender. Type-only harness dep (no BOM/package.json change); `channels.test.ts` 7/7 (31 expect), env-free; wa.send vars-merge deferred to T7 — 2026-07-25
+- (this PR) task-33 wave-C: legacy src/screens/ retired — ConversationLink relocated to features/conversations/ + re-skinned blue→gold (text-accent), 4 pages repointed, Contacts/Conversations name cells tone="ink"; screens/ doc mentions removed. tests/ 49/49 · console 109/109 (readme-coverage readdirSync auto-adjust 110→109) · typecheck+lint ✓ — 2026-07-25
+- (this PR) task-32 wave-B3 — Tasks+Settings adopt DataShell/Table (local TH/TD/TD_TITLE consts deleted; semantic th scope=col via TH; Settings keeps custom error copy + not-in-list branch); Agents verified honest static shell, untouched. RED @fe4b41e 7→GREEN @8a830ae; adoption suite 24/24, console 65/65 + tests/ 39/39, typecheck+lint clean — 2026-07-24
+- (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24

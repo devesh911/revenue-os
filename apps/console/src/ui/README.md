@@ -147,14 +147,3 @@ plus svg props; `aria-hidden` by default, so pair with text or a labelled parent
    everyone appends). `hidden: true` for detail routes; params allowed in `path`.
 3. That's it — the Sidebar and the router both read the manifest. Never touch
    `app/router.tsx` or the AppShell wiring for a new page.
-
-## Restyling the legacy screens (read before touching `src/screens/`)
-
-`screens/index.tsx`, `screens/ContactsTable.tsx` and `screens/ConversationLink.tsx` are
-PATH- and SOURCE-pinned by `tests/conversation-link.test.tsx` /
-`tests/console-contact-links.test.tsx` (ConversationLink import + usage, no inline
-deep-link literal, and ConversationLink's exact anchor markup — including its pinned link
-class, spelled out in `screens/README.md` so the literal lives in exactly one doc).
-Restyle those pages by REBUILDING their
-`pages/*` wrapper with primitives; retiring or re-skinning the pinned files (e.g.
-turning the blue link gold) requires updating those tests in the same PR.

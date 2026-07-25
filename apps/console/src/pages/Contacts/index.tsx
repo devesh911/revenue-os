@@ -1,16 +1,15 @@
-// Contacts — page-fleet rebuild of the /o/:orgId/contacts route surface with ui/
-// primitives (ui/README "Restyling the legacy screens": restyle by rebuilding THIS
-// wrapper; the path+source test-pinned screens/ContactsTable.tsx stays untouched and
-// simply drops out of the route). Data via the existing useContactsQuery hook (R2);
-// loading / error / empty handled where the data lands. Names deep-link to the
-// contact's latest conversation through the shared <ConversationLink> (Task 23 idiom —
-// null renders plain text, no anchor); all cells render inert text nodes only (S7.1).
+// Contacts — the /o/:orgId/contacts route surface, composed from ui/ primitives (the
+// legacy src/screens/ContactsTable leaf it replaced is now retired — task-33). Data via
+// the existing useContactsQuery hook (R2); loading / error / empty handled where the data
+// lands. Names deep-link to the contact's latest conversation through the shared
+// <ConversationLink> (features/conversations — null renders plain text, no anchor); all
+// cells render inert text nodes only (S7.1).
 import { useParams } from "wouter";
+import { ConversationLink } from "../../features/conversations/ConversationLink";
 import {
   type ContactsResponse,
   useContactsQuery,
 } from "../../features/screens/api";
-import { ConversationLink } from "../../screens/ConversationLink";
 import { PageHeader } from "../../ui/layout";
 import {
   Badge,
@@ -54,7 +53,7 @@ export function ContactsPage() {
             <tbody>
               {data?.contacts.map((contact) => (
                 <Row key={contact.id}>
-                  <TD className="font-medium text-ink">
+                  <TD tone="ink" className="font-medium">
                     <ConversationLink
                       orgId={orgId}
                       conversationId={contact.latest_conversation_id}
