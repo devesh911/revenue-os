@@ -1,120 +1,56 @@
-// Task 17 (transcript links — docs/sdlc.md §3 P3 polish): Contacts rows deep-link to the
-// contact's latest conversation transcript. RED / test-is-spec. Env-free: renders over an
-// isolated presentational leaf (the TranscriptView precedent), so it needs no QueryClient, DB, or
-// supabase module load — only a static SSR Router for its wouter <Link>. Runs in CI's plain `bun test`.
+// task-33 (wave 5 C) · C-RED — screens/ retirement: ContactsTable leaf repointed to pages/Contacts.
+// This SUPERSEDES the task-17 spec that rendered the src/screens/ContactsTable leaf directly: that
+// leaf is DELETED with the rest of the legacy src/screens/ layer, and the Contacts PAGE
+// (pages/Contacts, the routed surface) now owns the contact→transcript deep-link inline via the
+// relocated shared <ConversationLink> (apps/console/src/features/conversations/ConversationLink —
+// its render, incl. the anchor and null-plain-text branches, is unit-pinned by
+// tests/conversation-link.test.tsx, and the page-level happy render by
+// apps/console/test/pages-adoption-behavior.test.tsx). Here we KEEP the ContactsResponse schema pin
+// and REPOINT the deep-link expectations to pages/Contacts at the SOURCE level, plus pin the
+// ContactsTable leaf's deletion. Env-free: Bun.file text reads + node:fs existence (no module load
+// — a full ContactsPage render lives in apps/console/test/ where wouter resolves, not the repo-root
+// tests/ suite; see apps/console/test/router.tsx).
 import { describe, expect, it } from "bun:test";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { StaticRouter } from "../apps/console/test/router";
+import { existsSync } from "node:fs";
 
-// Mirrors ContactsResponse["contacts"][number] AFTER AC1 lands: the console Zod schema in
-// apps/console/src/features/screens/api.ts gains `latest_conversation_id: uuid | null`.
-type ContactFixture = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  lifecycle_stage: string;
-  score: number | null;
-  last_interaction_at: string | null;
-  created_at: string;
-  latest_conversation_id: string | null;
-};
+const CONTACTS_PAGE = "apps/console/src/pages/Contacts/index.tsx";
+// A ConversationLink import from the relocated features/conversations path vs the retired screens.
+const IMPORTS_NEW =
+  /from\s+["'][^"']*features\/conversations\/ConversationLink["']/;
+const IMPORTS_OLD = /from\s+["'][^"']*screens\/ConversationLink["']/;
+const INLINE_DEEPLINK = /\/o\/\$\{[^}]*\}\/conversations\//;
 
-// The surface this test DEFINES (brief's design-freedom note): a pure, prop-driven leaf
-// `ContactsTable({ orgId, contacts })` at apps/console/src/screens/ContactsTable.tsx that
-// ContactTimeline renders in its success branch. Kept isolated from the query hooks so it
-// renders under renderToStaticMarkup with no providers — exactly like TranscriptView.
-type ContactsTableFn = (props: {
-  orgId: string;
-  contacts: ContactFixture[];
-}) => ReactElement;
-
-const SURFACE = "../apps/console/src/screens/ContactsTable";
-
-async function loadContactsTable(): Promise<ContactsTableFn | undefined> {
-  try {
-    const mod = await import(SURFACE);
-    return (mod as { ContactsTable?: ContactsTableFn }).ContactsTable;
-  } catch {
-    return undefined; // leaf not built yet → the typeof assertion below is the RED
-  }
-}
-
-const ORG = "11111111-1111-4111-8111-111111111111";
-const CONV = "22222222-2222-4222-8222-222222222222";
-const base = {
-  lifecycle_stage: "lead",
-  score: null,
-  last_interaction_at: null,
-  created_at: "2026-07-01T00:00:00Z",
-} as const;
-const linked: ContactFixture = {
-  ...base,
-  id: "33333333-3333-4333-8333-333333333333",
-  first_name: "Ada",
-  last_name: "Lovelace",
-  latest_conversation_id: CONV,
-};
-const unlinked: ContactFixture = {
-  ...base,
-  id: "44444444-4444-4444-8444-444444444444",
-  first_name: "Grace",
-  last_name: "Hopper",
-  latest_conversation_id: null,
-};
-const linkRe = new RegExp(
-  `<a[^>]*href="/o/${ORG}/conversations/${CONV}"[^>]*>\\s*Ada Lovelace\\s*</a>`,
-);
-
-describe("AC1: console ContactsResponse Zod schema gains latest_conversation_id", () => {
+describe("AC1 (KEEP): console ContactsResponse Zod schema declares latest_conversation_id", () => {
   it("declares latest_conversation_id as a contacts-schema field (uuid | null)", async () => {
     const src = await Bun.file(
       "apps/console/src/features/screens/api.ts",
     ).text();
-    // RED today: the field is absent from the ContactsResponse contact object.
+    // Regression pin: the contact→transcript deep-link depends on this field surviving the refactor.
     expect(src).toMatch(/latest_conversation_id\s*:/);
   });
 });
 
-describe("AC2: ContactTimeline deep-links a contact to its latest conversation transcript", () => {
-  it("a contact WITH a latest_conversation_id renders an anchor to /o/<orgId>/conversations/<id>, name as the anchor text", async () => {
-    const ContactsTable = await loadContactsTable();
-    expect(typeof ContactsTable).toBe("function"); // RED today: leaf unbuilt
-    const Comp = ContactsTable as ContactsTableFn;
-    const html = renderToStaticMarkup(
-      <StaticRouter>
-        <Comp orgId={ORG} contacts={[linked]} />
-      </StaticRouter>,
-    );
-    expect(html).toContain(`href="/o/${ORG}/conversations/${CONV}"`);
-    expect(html).toMatch(linkRe);
+describe("AC2 (repoint): pages/Contacts owns the contact→transcript deep-link via the relocated leaf", () => {
+  it("imports ConversationLink from features/conversations, not from the retired src/screens path", async () => {
+    const src = await Bun.file(CONTACTS_PAGE).text();
+    expect(src).toMatch(IMPORTS_NEW); // RED today: imports ../../screens/ConversationLink instead
+    expect(src).not.toMatch(IMPORTS_OLD); // RED today: the retired src/screens path is still imported
   });
 
-  it("a contact with latest_conversation_id = null renders exactly as today: plain text, no anchor", async () => {
-    const ContactsTable = await loadContactsTable();
-    expect(typeof ContactsTable).toBe("function");
-    const Comp = ContactsTable as ContactsTableFn;
-    const html = renderToStaticMarkup(
-      <StaticRouter>
-        <Comp orgId={ORG} contacts={[unlinked]} />
-      </StaticRouter>,
-    );
-    expect(html).toContain("Grace Hopper");
-    expect(html).not.toMatch(/<a[\s>]/);
+  it("deep-links each contact by passing latest_conversation_id to ConversationLink (no inline href)", async () => {
+    const src = await Bun.file(CONTACTS_PAGE).text();
+    // The anchor-vs-plain-text wiring lives in the leaf; the page must feed it the id and never
+    // hand-roll the /o/<org>/conversations/ literal itself.
+    expect(src).toMatch(/<ConversationLink\b/);
+    expect(src).toMatch(/conversationId=\{[^}]*latest_conversation_id[^}]*\}/); // regression
+    expect(src).not.toMatch(INLINE_DEEPLINK); // regression: the href shape stays inside the leaf
   });
+});
 
-  it("with both contacts, only the linked one is an anchor; the null contact stays plain text", async () => {
-    const ContactsTable = await loadContactsTable();
-    expect(typeof ContactsTable).toBe("function");
-    const Comp = ContactsTable as ContactsTableFn;
-    const html = renderToStaticMarkup(
-      <StaticRouter>
-        <Comp orgId={ORG} contacts={[linked, unlinked]} />
-      </StaticRouter>,
-    );
-    expect(html.match(/<a[\s>]/g)?.length ?? 0).toBe(1);
-    expect(html).toMatch(linkRe);
-    expect(html).not.toMatch(/<a[^>]*>[^<]*Grace Hopper/);
-    expect(html).toContain("Grace Hopper");
+describe("AC3 (retire): the src/screens/ContactsTable leaf is deleted", () => {
+  it("apps/console/src/screens/ContactsTable.tsx no longer exists", () => {
+    expect(existsSync("apps/console/src/screens/ContactsTable.tsx")).toBe(
+      false,
+    ); // RED today: present
   });
 });

@@ -286,3 +286,53 @@ describe("task-31 behavior: Transcript page keeps its exact custom copy + render
     expect(text).toContain("Every message in this conversation, verbatim.");
   });
 });
+
+// task-33 (wave 5 C): the Contacts + Conversations name cells flip tone soft→ink. Today each is
+// <TD className="font-medium text-ink"> — but TD bakes its default tone="soft" (text-ink-soft) and
+// cx has no tailwind-merge, so the cell emits BOTH text-ink-soft AND text-ink (ambiguous cascade).
+// The fix is <TD tone="ink" className="font-medium">, emitting text-ink ALONE. These render the real
+// page (same mocked hooks) and read the name cell's class list — the ONE body <td> carrying
+// font-medium (the header's font-medium sits on <th>, excluded). RED today: text-ink-soft is still
+// present beside text-ink.
+describe("task-33 tone flip: Conversations + Contacts name cells adopt tone=ink (text-ink, not text-ink-soft)", () => {
+  // The name cell is the sole body <td> with font-medium; capture its class token list.
+  const nameCellTokens = (html: string): string[] => {
+    const cls =
+      html.match(/<td class="([^"]*\bfont-medium\b[^"]*)"/)?.[1] ?? "";
+    return cls.split(/\s+/).filter(Boolean);
+  };
+
+  it("Conversations name cell carries text-ink and NOT text-ink-soft", () => {
+    convState = {
+      data: {
+        conversations: [
+          {
+            id: CONV,
+            channel: "sms",
+            status: "active",
+            direction: "outbound",
+            contact_name: "Ada Lovelace",
+            started_at: "2026-07-01T00:00:00Z",
+            ended_at: null,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    };
+    const tokens = nameCellTokens(renderConversations());
+    expect(tokens).toContain("text-ink"); // full-ink emphasis for the linked name
+    expect(tokens).not.toContain("text-ink-soft"); // RED today: soft default still baked in beside it
+  });
+
+  it("Contacts name cell carries text-ink and NOT text-ink-soft", () => {
+    contactsState = {
+      data: { contacts: [CONTACT_ROW] },
+      isLoading: false,
+      isError: false,
+    };
+    const tokens = nameCellTokens(renderContacts());
+    expect(tokens).toContain("text-ink");
+    expect(tokens).not.toContain("text-ink-soft"); // RED today: same soft/ink ambiguity as Conversations
+  });
+});
