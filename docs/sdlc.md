@@ -73,6 +73,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Workflow interpreter + closed-set definition schema (T1, harness) | ✅ | (this PR) | RED 49e92a1 → GREEN c0c2651; pure, I/O-free; unblocks T6/T7 |
 | Guardrail hooks — DNC (fail-closed) + attempt-caps + clock-aware quiet-hours (T2, harness) | ✅ | #75 | RED 0b22c45 → GREEN 7771e9e; moat invariant #4 |
 | Anthropic raw-fetch provider adapter (T3, harness) — RED ceb7cb3 → GREEN 334613b; no new dependency (T19) | ✅ | #73 | §5 |
+| Production tool catalog — book_appointment/update_contact/send_confirmation + buildCatalog (T4, harness) | ✅ | (this PR) | GREEN @6106660 (feat/task-44-tool-catalog); 12/12 env-free unit pass, 4 integration CI-owned; typecheck+lint clean |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
