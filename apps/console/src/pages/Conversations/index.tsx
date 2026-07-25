@@ -1,12 +1,11 @@
-// Conversations / live monitor — page-fleet rebuild of the /o/:orgId/live route surface
-// with ui/ primitives (see ui/README.md). Previously a bare re-export of screens/index.tsx
-// LiveMonitor; that screen stays untouched (path+source pinned by tests/conversation-link
-// .test.tsx) — this page owns the styled surface now. Server state via the existing
-// useConversationsQuery hook (R2), org context from the URL (R7), all text rendered as
-// inert nodes (S7.1). Transcript deep-links go through the shared ConversationLink leaf.
+// Conversations / live monitor — the /o/:orgId/live route surface, composed from ui/
+// primitives (see ui/README.md); the legacy screens/index.tsx LiveMonitor it replaced is
+// now retired (task-33). Server state via the existing useConversationsQuery hook (R2),
+// org context from the URL (R7), all text rendered as inert nodes (S7.1). Transcript
+// deep-links go through the shared ConversationLink leaf (features/conversations).
 import { useParams } from "wouter";
+import { ConversationLink } from "../../features/conversations/ConversationLink";
 import { useConversationsQuery } from "../../features/screens/api";
-import { ConversationLink } from "../../screens/ConversationLink";
 import { PageHeader } from "../../ui/layout";
 import {
   Badge,
@@ -45,7 +44,7 @@ export function ConversationsPage() {
             <tbody>
               {data?.conversations.map((c) => (
                 <Row key={c.id}>
-                  <TD className="font-medium text-ink">
+                  <TD tone="ink" className="font-medium">
                     <ConversationLink orgId={orgId} conversationId={c.id}>
                       {c.contact_name ?? "Unknown"}
                     </ConversationLink>
