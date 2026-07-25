@@ -69,6 +69,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Wave-B2 Conversations/Transcript/Contacts DataShell+Table adoption, Contacts font-medium standardized (task-31) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
+| Anthropic raw-fetch provider adapter (T3, harness) — RED ceb7cb3 → GREEN 334613b; no new dependency (T19) | ✅ | (this PR) | §5 |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
