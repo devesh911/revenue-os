@@ -5,6 +5,7 @@
   },
   "dependencies": {
     "@revenue-os/db": "workspace:*",
+    "@revenue-os/harness": "workspace:*",
     "@revenue-os/shared": "workspace:*",
     "hono": "4.12.29",
     "jose": "6.2.3",

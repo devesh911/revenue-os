@@ -1,26 +1,334 @@
-// T6 (task-46) — the scheduler tick. STUB ONLY (RED phase): tick is intentionally
-// unimplemented so the integration suite fails on REAL behaviour, not on a missing module.
-// GREEN replaces the body — this throw is NOT the contract. See the RED report's
-// worker-contract for the real signature, the one-tx ordering, and the park-vs-advance rule.
-import type { Pool } from "pg";
+// T6 (task-46) — the scheduler tick. Selects an org's due runs, drives each through the pure
+// interpreter (packages/harness), and applies the resulting transitions in ONE per-run tx:
+// external actions become pgboss.job rows, inline actions are written in the same tx, then the
+// run row advances. The clock is a seam: ctx.now decides dueness (the M2 SimClock drives it).
+//
+// Isolation (load-bearing): every run runs in its OWN withOrg tx. A run selected FOR UPDATE
+// SKIP LOCKED that another tick holds is skipped, not blocked (criterion 5). A run whose apply
+// hits a DB error rolls its whole tx back — enqueue included — and is left 'waiting', never
+// advanced (criterion 2 atomicity). A run whose definition dangles (interpret throws) is
+// dead-lettered: status 'failed', last_error captured, and the tick keeps going (criterion 6).
+import { withOrg } from "@revenue-os/db";
+import {
+  type Action,
+  interpret,
+  type Transition,
+  WorkflowDefinitionSchema,
+  type WorkflowState,
+} from "@revenue-os/harness";
+import type { Pool, PoolClient } from "pg";
+import { logger } from "./logger";
 
 /** The clock seam (criterion 7): the M2 SimClock injects `now`; production passes new Date(). */
 export type TickCtx = { now: Date };
 
-/** One tick's summary — how many due runs were advanced this tick. */
+/** One tick's summary — how many due runs were advanced (or dead-lettered) this tick. */
 export type TickResult = { processed: number };
 
 /**
- * Select due runs (wake_at <= ctx.now, status waiting/pending) FOR UPDATE SKIP LOCKED, run the
- * pure interpreter, and apply each Transition in ONE withOrg tx: enqueue external actions as
- * pgboss.job rows (singleton_key `<runId>:<step>:<idx>`), apply inline actions in the SAME tx,
- * then advance the run (status/current_step/state/wake_at/attempts). A dangling-ref interpret
- * throw fails-the-run; it never crashes the tick.
+ * External-action queues, one per action kind. T6→T8 contract: the worker MUST createQueue()
+ * each of these (policy 'short') at startup — pgboss.job is partitioned BY LIST(name) with an
+ * FK to pgboss.queue, so the raw insert below FK-fails against a queue that does not exist yet.
+ */
+export const ACTION_QUEUES = [
+  "place_call",
+  "send_wa",
+  "run_agent_turn",
+] as const;
+
+const EXTERNAL = new Set<string>(ACTION_QUEUES);
+
+// ponytail: routing-cycle guard. A definition that loops through 'running' steps (branch→branch)
+// would spin forever and hang the tick; cap the in-tick walk and dead-letter past it.
+const MAX_STEPS = 64;
+
+type RunRow = {
+  id: string;
+  workflow_id: string;
+  contact_id: string;
+  current_step: string;
+  state: Record<string, unknown> | null;
+  attempts: unknown;
+};
+
+/** Per-channel attempt log: ISO-timestamp arrays (NOT a counter) — guardrails read this. */
+type Attempts = Record<string, string[]>;
+
+/**
+ * Select this org's due runs (status waiting/pending, wake_at <= ctx.now) and process each in
+ * its own withOrg tx. Returns how many runs were advanced or dead-lettered.
  */
 export async function tick(
-  _pool: Pool,
-  _orgId: string,
-  _ctx: TickCtx,
+  pool: Pool,
+  orgId: string,
+  ctx: TickCtx,
 ): Promise<TickResult> {
-  throw new Error("not implemented: tick (task-46 RED)");
+  const { now } = ctx;
+
+  // Enumerate candidate ids (RLS-scoped by withOrg). A plain read is enough: the per-run tx
+  // below re-locks each id FOR UPDATE SKIP LOCKED, which is the authoritative concurrency guard.
+  const ids = await withOrg(pool, orgId, async (tx) => {
+    const r = await tx.query<{ id: string }>(
+      `select id from workflow_runs
+        where status in ('pending', 'waiting') and wake_at <= $1
+        order by wake_at`,
+      [now],
+    );
+    return r.rows.map((row) => row.id);
+  });
+
+  let processed = 0;
+  for (const id of ids) {
+    try {
+      const did = await withOrg(pool, orgId, (tx) =>
+        processRun(tx, orgId, id, now),
+      );
+      if (did) processed += 1;
+    } catch (err) {
+      // A DB / inline-apply error: withOrg has already ROLLED BACK this run's tx (enqueue and
+      // advance undone; the run stays 'waiting', never marked failed). One poisoned run must
+      // not abort the tick or starve the other due runs — log and continue. Interpret throws
+      // never reach here; processRun dead-letters those in-tx.
+      logger.error(
+        { err, org_id: orgId, run_id: id },
+        "tick: run apply rolled back",
+      );
+    }
+  }
+  return { processed };
+}
+
+/**
+ * Lock one due run, drive it through the interpreter, and apply the transitions in `tx`.
+ * Returns true if the run was advanced or dead-lettered, false if it was skipped (locked by a
+ * concurrent tick, or no longer due). A DB error thrown here propagates so withOrg rolls back.
+ */
+async function processRun(
+  tx: PoolClient,
+  orgId: string,
+  id: string,
+  now: Date,
+): Promise<boolean> {
+  const locked = await tx.query<RunRow>(
+    `select id, workflow_id, contact_id, current_step, state, attempts
+       from workflow_runs
+      where id = $1 and status in ('pending', 'waiting') and wake_at <= $2
+      for update skip locked`,
+    [id, now],
+  );
+  const run = locked.rows[0];
+  if (!run) return false; // held by another tick (SKIP LOCKED), or no longer due
+
+  // Phase 1 — PURE. Load + validate the definition and walk the interpreter with NO DB writes.
+  // Any throw here (unknown step / dangling ref / bad definition) is permanent: dead-letter the
+  // run in THIS tx (nothing else is written yet, so the failed status commits cleanly).
+  let steps: { step: string; transition: Transition }[];
+  try {
+    const defRow = await tx.query<{ definition: unknown }>(
+      `select definition from workflows where id = $1`,
+      [run.workflow_id],
+    );
+    const wf = defRow.rows[0];
+    if (!wf) {
+      throw new Error(`workflow not found: ${run.workflow_id}`);
+    }
+    const def = WorkflowDefinitionSchema.parse(wf.definition);
+    steps = drive(def, run, now);
+  } catch (err) {
+    await tx.query(
+      `update workflow_runs
+          set status = 'failed', last_error = $2, updated_at = now()
+        where id = $1`,
+      [id, errorMessage(err)],
+    );
+    return true;
+  }
+
+  // Phase 2 — APPLY. Enqueue external actions and write inline actions, then advance the run.
+  // A DB error (e.g. a CHECK violation on an inline write) propagates → withOrg rolls the whole
+  // tx back, so the enqueue never commits and the run is not advanced (atomicity).
+  await applyTransitions(tx, orgId, run, steps, now);
+  return true;
+}
+
+/**
+ * Walk the interpreter from the run's current step, in memory, until it PARKS ('waiting') or
+ * ENDS ('completed'). 'running' means "keep interpreting this tick" (routing steps chain), so
+ * we re-interpret from the next step. Pure: interpret does no I/O and never reads the clock.
+ */
+function drive(
+  def: Parameters<typeof interpret>[0],
+  run: RunRow,
+  now: Date,
+): { step: string; transition: Transition }[] {
+  const out: { step: string; transition: Transition }[] = [];
+  let state: WorkflowState = {
+    ...(run.state ?? {}),
+    currentStep: run.current_step,
+  };
+  for (let i = 0; i < MAX_STEPS; i++) {
+    const step = state.currentStep ?? def.entry;
+    const transition = interpret(def, state, { type: "wake" }, now);
+    out.push({ step, transition });
+    if (transition.runStatus !== "running") return out;
+    state = { ...state, currentStep: transition.nextStep ?? step };
+  }
+  throw new Error(`workflow step limit exceeded (${MAX_STEPS})`);
+}
+
+/** Apply every transition's actions in `tx`, then advance the run row exactly once. */
+async function applyTransitions(
+  tx: PoolClient,
+  orgId: string,
+  run: RunRow,
+  steps: { step: string; transition: Transition }[],
+  now: Date,
+): Promise<void> {
+  const iso = now.toISOString();
+  const attempts = normalizeAttempts(run.attempts);
+
+  let final: Transition | undefined;
+  for (const { step, transition } of steps) {
+    final = transition;
+    for (const [idx, action] of transition.actions.entries()) {
+      if (EXTERNAL.has(action.kind)) {
+        // Record the channel attempt only when the job is actually enqueued (singleton_key may
+        // dedupe a re-tick of a still-parked run — no new job means no new attempt).
+        const enqueued = await enqueueJob(tx, orgId, run.id, step, idx, action);
+        if (enqueued && action.kind === "place_call") {
+          pushAttempt(attempts, "voice", iso);
+        } else if (enqueued && action.kind === "send_wa") {
+          pushAttempt(attempts, "whatsapp", iso);
+        }
+      } else {
+        await applyInlineAction(tx, orgId, run.id, run, action);
+      }
+    }
+  }
+  if (!final) return; // drive never yields an empty walk; this guards the type-checker
+
+  const nextStep = final.nextStep ?? run.current_step;
+  await tx.query(
+    `update workflow_runs
+        set status = $2, current_step = $3, state = $4::jsonb, wake_at = $5,
+            attempts = $6::jsonb, completed_at = $7, updated_at = now()
+      where id = $1`,
+    [
+      run.id,
+      final.runStatus,
+      nextStep,
+      JSON.stringify(run.state ?? {}),
+      final.wakeAt,
+      JSON.stringify(attempts),
+      final.runStatus === "completed" ? iso : null,
+    ],
+  );
+}
+
+/**
+ * Enqueue an external action as a pgboss.job row on the queue named after the action kind.
+ * Idempotent by singleton_key `<runId>:<step>:<idx>` + policy 'short' (pg-boss's job_i1 partial
+ * unique index dedupes while state='created'), so a re-tick of a still-parked run no-ops instead
+ * of double-dispatching. The payload carries ids + the action only; T7 re-scopes via withOrg.
+ * Returns true iff a new job row was inserted (false when the singleton_key conflicted).
+ */
+async function enqueueJob(
+  tx: PoolClient,
+  orgId: string,
+  runId: string,
+  step: string,
+  idx: number,
+  action: Action,
+): Promise<boolean> {
+  const singletonKey = `${runId}:${step}:${idx}`;
+  const r = await tx.query(
+    `insert into pgboss.job (name, data, singleton_key, policy)
+     values ($1, $2::jsonb, $3, 'short')
+     on conflict do nothing`,
+    [action.kind, JSON.stringify({ orgId, runId, action }), singletonKey],
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+/** Apply an inline (no job hop) action in the same tx: outcomes / tasks writes. */
+async function applyInlineAction(
+  tx: PoolClient,
+  orgId: string,
+  runId: string,
+  run: RunRow,
+  action: Action,
+): Promise<void> {
+  if (action.kind === "write_outcome") {
+    const { kind, contactId, ...attributes } = action.outcome as {
+      kind: string;
+      contactId?: string;
+    } & Record<string, unknown>;
+    await tx.query(
+      `insert into outcomes
+         (org_id, workflow_run_id, contact_id, kind, source, attributes)
+       values ($1, $2, $3, $4, 'agent', $5::jsonb)`,
+      [
+        orgId,
+        runId,
+        contactId ?? run.contact_id,
+        kind,
+        JSON.stringify(attributes),
+      ],
+    );
+    return;
+  }
+  if (action.kind === "create_task") {
+    const { kind, title, ...payload } = action.task as {
+      kind?: string;
+      title?: string;
+    } & Record<string, unknown>;
+    await tx.query(
+      `insert into tasks
+         (org_id, workflow_run_id, contact_id, kind, title, payload)
+       values ($1, $2, $3, $4, $5, $6::jsonb)`,
+      [orgId, runId, run.contact_id, kind, title, JSON.stringify(payload)],
+    );
+    return;
+  }
+  if (action.kind === "handoff") {
+    // conversationId rides the payload (not the FK column) — the run's conversation may not exist.
+    await tx.query(
+      `insert into tasks
+         (org_id, workflow_run_id, contact_id, kind, title, payload)
+       values ($1, $2, $3, 'handoff', 'Human handoff', $4::jsonb)`,
+      [
+        orgId,
+        runId,
+        run.contact_id,
+        JSON.stringify({
+          conversationId: action.conversationId,
+          context: action.context,
+        }),
+      ],
+    );
+    return;
+  }
+  throw new Error(`unhandled inline action: ${action.kind}`);
+}
+
+function normalizeAttempts(raw: unknown): Attempts {
+  const out: Attempts = {};
+  if (raw && typeof raw === "object") {
+    for (const [channel, value] of Object.entries(
+      raw as Record<string, unknown>,
+    )) {
+      if (Array.isArray(value)) out[channel] = value.map(String);
+    }
+  }
+  return out;
+}
+
+function pushAttempt(attempts: Attempts, channel: string, iso: string): void {
+  const arr = attempts[channel] ?? [];
+  arr.push(iso);
+  attempts[channel] = arr;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }

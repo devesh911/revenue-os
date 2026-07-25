@@ -1,10 +1,12 @@
-// T6 (task-46) — the run writer. STUB ONLY (RED phase): startRun is intentionally
-// unimplemented so the integration suite (services/worker/test/scheduler.test.ts) fails on
-// REAL behaviour, not on a missing module. GREEN replaces the body — this throw is NOT the
-// contract. See the worker-contract in the RED report for the real signature + semantics.
+// T6 (task-46) — the run writer. Creates a workflow_run at the definition's entry step,
+// schedulable at once (wake_at = now, status 'pending'). The scheduler tick (scheduler.ts)
+// drives it from there. The only DB door is withOrg (db-design §1, S1.3): one org-scoped tx.
+import { withOrg } from "@revenue-os/db";
+import { WorkflowDefinitionSchema } from "@revenue-os/harness";
 import type { Pool } from "pg";
 
-/** Input to startRun. `state` seeds the run's WorkflowState jsonb (contactId, timezone, vars). */
+/** Input to startRun. `state` seeds the run's WorkflowState jsonb (contactId is always set
+ *  from `contactId`; callers may add timezone / vars). */
 export type StartRunInput = {
   workflowId: string;
   contactId: string;
@@ -13,14 +15,45 @@ export type StartRunInput = {
 };
 
 /**
- * Create a workflow_run at the definition's entry step: status waiting/pending, current_step =
- * definition.entry, state seeded, attempts = {} (the per-channel timestamp arrays fill in later).
- * Returns the new run id. Runs inside one withOrg(orgId) tx (the only DB door).
+ * Create a workflow_run at the definition's entry step: status 'pending', current_step =
+ * definition.entry, state seeded { …caller state, contactId }, attempts = {} (the per-channel
+ * timestamp arrays fill in on the first tick), wake_at = now() so the tick's due-selection can
+ * pick it up. Returns the new run id. Runs inside one withOrg(orgId) tx.
  */
 export async function startRun(
-  _pool: Pool,
-  _orgId: string,
-  _input: StartRunInput,
+  pool: Pool,
+  orgId: string,
+  input: StartRunInput,
 ): Promise<string> {
-  throw new Error("not implemented: startRun (task-46 RED)");
+  return withOrg(pool, orgId, async (tx) => {
+    const wf = await tx.query<{ definition: unknown }>(
+      `select definition from workflows where id = $1`,
+      [input.workflowId],
+    );
+    const wfRow = wf.rows[0];
+    if (!wfRow) {
+      throw new Error(`workflow not found: ${input.workflowId}`);
+    }
+    // The definition jsonb is a boundary — validate it before we trust definition.entry.
+    const def = WorkflowDefinitionSchema.parse(wfRow.definition);
+    const state = { ...input.state, contactId: input.contactId };
+
+    const r = await tx.query<{ id: string }>(
+      `insert into workflow_runs
+         (org_id, workflow_id, campaign_id, contact_id, status, current_step, state, wake_at, attempts)
+       values ($1, $2, $3, $4, 'pending', $5, $6::jsonb, now(), '{}'::jsonb)
+       returning id`,
+      [
+        orgId,
+        input.workflowId,
+        input.campaignId ?? null,
+        input.contactId,
+        def.entry,
+        JSON.stringify(state),
+      ],
+    );
+    const runRow = r.rows[0];
+    if (!runRow) throw new Error("startRun: insert returned no row");
+    return runRow.id;
+  });
 }
