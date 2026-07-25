@@ -75,6 +75,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Anthropic raw-fetch provider adapter (T3, harness) — RED ceb7cb3 → GREEN 334613b; no new dependency (T19) | ✅ | #73 | §5 |
 | Production tool catalog — book_appointment/update_contact/send_confirmation + buildCatalog (T4, harness) | ✅ | (this PR) | GREEN @6106660 (feat/task-44-tool-catalog); 12/12 env-free unit pass, 4 integration CI-owned; typecheck+lint clean |
 | Channels guarded doorway — `voice.place`/`wa.send` guard-before-send, ports-injected (T5, packages/channels) | ✅ | #78 | GREEN 2aaf0bb; 7/7 (31 expect), env-free; moat invariant #4 (S8.2); type-only harness dep, no BOM change; wa.send vars-merge → T7 |
+| Scheduler tick + run writer (T6, worker) | ✅ | (this PR) | RED 13d0185 → GREEN 6d250ee; per-run withOrg tx + FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned; unblocks T7/T8 |
 
 ### Read-only goals (no PR — findings in lessons.md)
 

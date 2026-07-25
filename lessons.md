@@ -303,3 +303,12 @@ transcript screen (P1) — needs an explicit deferral note or the test.
 - 2026-07-25 · task-44 (T4 tool catalog) · Zod 4.x z.string().uuid()/z.uuid() enforce RFC-9562
   version+variant nibbles — repeating-digit test fixtures (2222…) fail validation. Use z.guid()
   for UUID-shape validation when fixtures aren't real v4 ids.
+- 2026-07-25 · task-46 (T6 scheduler) · pg-boss v12 dedup lives on the default partition: queues
+  created without partition:true route to pgboss.job_common, which carries the job_i1
+  partial-unique index (name, coalesce(singleton_key,'')) WHERE state='created' AND
+  policy='short'. A raw insert into pgboss.job dedupes ONLY when policy='short' is set (state
+  defaults to 'created'). Any future raw pgboss.job writer needs this.
+- 2026-07-25 · task-46 (T6 scheduler) · Scheduler DB-error runs retry forever: a run that
+  deterministically fails an inline write stays 'waiting'/due and is re-attempted-and-rolled-back
+  every tick — no backoff or dead-letter (only interpret-throws dead-letter). A DB-error retry
+  cap / dead-letter is a T8-or-later follow-up.
