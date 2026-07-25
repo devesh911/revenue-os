@@ -8,3 +8,6 @@ export { emitUsage } from "./meter";
 export { autonomyHook, defaultPipeline, guard } from "./policies";
 export { ToolRegistry } from "./registry";
 export type * from "./types";
+export { interpret } from "./workflow/interpret";
+export type * from "./workflow/schema";
+export { WorkflowDefinitionSchema } from "./workflow/schema";

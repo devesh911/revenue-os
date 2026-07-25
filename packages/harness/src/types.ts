@@ -10,7 +10,10 @@ export interface OrgScopedDb {
   ): Promise<{ rows: Record<string, unknown>[]; rowCount: number | null }>;
 }
 
-export type OrgCtx = { orgId: string; db: OrgScopedDb };
+// Clock seam (T2): hooks that reason about time (quiet-hours, attempt-cap windows) read
+// `ctx.now?.() ?? new Date()` so tests can inject a fixed instant. Optional — absent in prod
+// (falls back to wall-clock), supplied by tests and any deterministic caller.
+export type OrgCtx = { orgId: string; db: OrgScopedDb; now?: () => Date };
 
 export type ToolResult =
   | { ok: true; data: unknown }

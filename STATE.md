@@ -112,6 +112,7 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
   tokens, `ui/` primitives, `routes.tsx` manifest as the single nav/router source; `screens/*` stay
   path-pinned with `pages/*` as route surfaces until tests move; nested `apps/console/biome.json`
@@ -180,6 +181,7 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - DataShell/Table adoption keeps the title cell as `<TD className="font-medium text-ink">` (cx-concat
   over the primitive's baked `text-ink-soft`), matching the Contacts title-cell idiom — design-system
   detail, not test-pinned.
+- **Workflow `tool` step → Action mapping (2026-07-25, T1):** `book_appointment` maps to a `write_outcome` action (kind `site_visit_booked`, a db-design outcome kind); `create_task` maps to `create_task`. Boring closed-set mapping; the M2 replay keys on the booked OUTCOME row (the appointments-table row comes from the real in-call book tool, out of the pure-spine scope).
 
 ## RECENT (last 5 landings, newest first)
 - (this PR) task-33 wave-C: legacy src/screens/ retired — ConversationLink relocated to features/conversations/ + re-skinned blue→gold (text-accent), 4 pages repointed, Contacts/Conversations name cells tone="ink"; screens/ doc mentions removed. tests/ 49/49 · console 109/109 (readme-coverage readdirSync auto-adjust 110→109) · typecheck+lint ✓ — 2026-07-25
