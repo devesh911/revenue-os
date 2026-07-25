@@ -300,3 +300,6 @@ transcript screen (P1) — needs an explicit deferral note or the test.
 - 2026-07-24 · task-31 B2-FIX (PR #71 post-merge CI) · bun `mock.module` replaces the whole module
   for every later importer in the process — mock factories for shared modules must spread the real
   module and override only what they stub, else sibling-branch test files break at merge (PR #71).
+- 2026-07-25 · task-44 (T4 tool catalog) · Zod 4.x z.string().uuid()/z.uuid() enforce RFC-9562
+  version+variant nibbles — repeating-digit test fixtures (2222…) fail validation. Use z.guid()
+  for UUID-shape validation when fixtures aren't real v4 ids.
