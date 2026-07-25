@@ -131,6 +131,7 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
   tokens, `ui/` primitives, `routes.tsx` manifest as the single nav/router source; `screens/*` stay
   path-pinned with `pages/*` as route surfaces until tests move; nested `apps/console/biome.json`
@@ -203,7 +204,7 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 
 ## RECENT (last 5 landings, newest first)
 - (this PR) T1 — pure workflow interpreter + closed-set definition schema (show-runner brain); harness barrel exports interpret + WorkflowDefinitionSchema; 9/9 — 2026-07-25
-- (this PR) task-32 wave-B3 — Tasks+Settings adopt DataShell/Table (local TH/TD/TD_TITLE consts deleted; semantic th scope=col via TH; Settings keeps custom error copy + not-in-list branch); Agents verified honest static shell, untouched. RED @fe4b41e 7→GREEN @8a830ae; adoption suite 24/24, console 65/65 + tests/ 39/39, typecheck+lint clean — 2026-07-24
-- (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
-- (this PR) task-28 ui-foundation-v2 — DataShell (loading/error/empty/content, precedence loading > error > empty > children) + semantic Table suite (Table/THead/TH/Row/TD) primitives, barrel-exported; ui/README.md contract extended; README-coverage layer added across apps/console. 39/39 console + 22/22 pinned, typecheck+lint clean — 2026-07-24; + review round 1 @a86ab0f (derived README coverage now incl. src/ui, DataShell empty default 'Nothing here yet.', test-util dedupe, README de-duplication)
-- (this PR) staging worker FIRST BOOT via Cloudflare quick tunnel — deployed console functional end-to-end; first API writes to staging (org 67e8c293 + 5 contacts via CSV import) — 2026-07-23
+- #75 T2 — dnc(fail-closed) + per-channel windowed attempt-cap hooks + clock-aware quiet-hours (fail-open); defaultPipeline autonomy→dnc→quiet→cap (moat #4); 13/13 — 2026-07-25
+- #73 T3 — raw-fetch Anthropic (Claude) adapter behind LlmProvider (harness talker layer); 11/11, no SDK/dep (T19), fake stays CI default, API-key wiring deferred — 2026-07-25
+- task-32 wave-B3 — Tasks+Settings adopt DataShell/Table (local TH/TD/TD_TITLE consts deleted; semantic th scope=col via TH; Settings keeps custom error copy + not-in-list branch); Agents verified honest static shell, untouched. RED @fe4b41e 7→GREEN @8a830ae; adoption suite 24/24, console 65/65 + tests/ 39/39, typecheck+lint clean — 2026-07-24
+- apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24

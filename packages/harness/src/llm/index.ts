@@ -18,3 +18,6 @@ export function selectProvider(key: string): LlmProvider {
     );
   return p;
 }
+
+// Real adapters (raw fetch per T19) — the sub-barrel's public surface.
+export { createAnthropicProvider } from "./anthropic";
