@@ -7,8 +7,8 @@
 // null) — never inline the /o/<org>/conversations/<id> literal. All text renders as
 // inert text nodes only (S7.1).
 import { useParams } from "wouter";
+import { ConversationLink } from "../../features/conversations/ConversationLink";
 import { useTasksQuery } from "../../features/screens/api";
-import { ConversationLink } from "../../screens/ConversationLink";
 import { PageHeader } from "../../ui/layout";
 import {
   Badge,

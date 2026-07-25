@@ -6,8 +6,8 @@
 // "not wired yet" notice instead of faking a response.
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
+import { ConversationLink } from "../../features/conversations/ConversationLink";
 import { useConversationsQuery } from "../../features/screens/api";
-import { ConversationLink } from "../../screens/ConversationLink";
 import { type IconName, icons, SendIcon } from "../../ui/icons";
 import { Section } from "../../ui/layout";
 import {
