@@ -67,6 +67,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Console ui-foundation-v2 — DataShell + Table primitives, README-coverage layer (task-28) | ✅ | (this PR) | §5 |
 | Wave-B3 Tasks+Settings DataShell/Table adoption; Agents stays honest shell (task-32) | ✅ | (this PR) | §5 |
 | Wave-B2 Conversations/Transcript/Contacts DataShell+Table adoption, Contacts font-medium standardized (task-31) | ✅ | (this PR) | §5 |
+| Wave-C screens/ retirement — ConversationLink relocated + gold re-skin, tone flips (task-33) | ✅ | (this PR) | §5 |
 | ADRs D31–D36 | ✅ | #12–#14, #16, #34 | [docs/decisions/](decisions/) |
 | Playwright smoke scaffold (e2e harness skeleton) | ✅ | (this PR) | local run needs only `bunx playwright install`; CI arming follow-up |
 
@@ -319,6 +320,17 @@ extended (page skeleton now composes DataShell + Table); new README-coverage lay
 self-explanatory README to every console folder (apps/console + src, src/{pages,features,lib,app,screens}, test/).
 Evidence: 27 RED → `bun test apps/console/test/` 39/39; pinned `conversation-link` + `console-contact-links` + `console-boot-honesty` 22/22; typecheck 0, lint 0 (2 pre-existing apps/www warnings, unrelated); no new deps, env-free by construction.
 Follow-up: wave-B adoption across the 7 data pages queued (STATE.md NEXT). Review round 1 applied @a86ab0f (5 findings: derived README coverage, DataShell empty default, test-util dedupe, README dedupe, narrowing-tradeoff doc), gates green. Docs: `apps/console/src/ui/README.md` (fleet contract) · [patterns/react-component](patterns/react-component.md).
+
+### Console screens/ retirement — ConversationLink relocated + gold re-skin, tone flips (task-33, wave 5 C)
+Retires the legacy `apps/console/src/screens/` layer, unrouted since the #58–#64 page-fleet fan-out
+and kept only for test pins. `ConversationLink` relocates to `features/conversations/` (colocated
+with `TranscriptView`/`api.ts`), re-skinning its pinned `text-blue-600` anchor → `text-accent`; the
+four call-site pages repoint. Contacts + Conversations name cells flip to `<TD tone="ink"
+className="font-medium">`, closing the `text-ink-soft`/`text-ink` cx collision that #71 preserved
+bug-for-bug; `screens/{ConversationLink,ContactsTable,index}.tsx` + README deleted.
+Sanctioned coordinated rewrite: `conversation-link.test.tsx` + `console-contact-links.test.tsx`
+repointed first, Fable line-reviewed pre-GREEN — RED @f5b9572 (16) → GREEN @3e466d6: `tests/` 49/49 · `apps/console/test/` 109/109 (110→109, readdirSync-derived readme-coverage auto-drops the screens/README case); typecheck 0, lint 0; 11 files changed, +50/−377.
+Doc mentions removed: the screens/ bullet + "Restyling the legacy screens" section, from apps/console/src/{README,ui/README}.md.
 
 ---
 

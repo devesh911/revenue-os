@@ -82,37 +82,18 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
    the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
    AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section; `GET`/`PUT
    /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire Settings "Guardrails".
-2. Console cleanup — retire the now-unrouted but test-pinned `screens/*` (LiveMonitor/TaskQueue/
-   ContactTimeline/ContactsTable) and re-skin `ConversationLink`'s pinned `text-blue-600` link to
-   the gold accent — both need coordinated edits to `tests/conversation-link.test.tsx` /
-   `tests/console-contact-links.test.tsx` in the same PR.
-3. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-4. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-5. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-6. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
-7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages. Conversations/Transcript/
-   Contacts (✅ this PR): local TH/TD consts + raw table markup deleted; Contacts header gains
-   standardized `font-medium` (intended, not a regression); Transcript keeps bespoke copy via
-   loadingText/errorText. Home/Dashboard: task-30 (sibling PR). Tasks/Settings: remain (task-32).
-7. Adopt DataShell + Table (task-28 follow-on) across the 7 data pages (Tasks/Contacts/Conversations/
-   Dashboard/Home/Settings/Transcript — same isLoading/isError ternary at
-   `pages/Transcript/index.tsx:26-28`, omitted from the original count), replacing the loading/error/
-   empty ternary + hand-rolled `<table>`/TH-TD class constants. Heads-up: Contacts' header gains
-   `font-medium` on adoption (the `TH` primitive standardizes it) — intended, not a regression.
-   Tasks ✅ Settings ✅ (this PR).
-   Wave-C follow-up: flip the Contacts + Conversations name cells to `<TD tone="ink" className="font-medium">` once this PR's tone prop lands (their both-classes collision was preserved bug-for-bug in #71).
-   `pages/Transcript/index.tsx:26-28`, omitted from the original count; Home ✅ Dashboard ✅ this PR),
-   replacing the loading/error/empty ternary + hand-rolled `<table>`/TH-TD class constants. Heads-up:
-   Contacts' header gains `font-medium` on adoption (the `TH` primitive standardizes it) — intended,
-   not a regression.
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
 
@@ -201,8 +182,8 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
   detail, not test-pinned.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) task-33 wave-C: legacy src/screens/ retired — ConversationLink relocated to features/conversations/ + re-skinned blue→gold (text-accent), 4 pages repointed, Contacts/Conversations name cells tone="ink"; screens/ doc mentions removed. tests/ 49/49 · console 109/109 (readme-coverage readdirSync auto-adjust 110→109) · typecheck+lint ✓ — 2026-07-25
 - (this PR) task-32 wave-B3 — Tasks+Settings adopt DataShell/Table (local TH/TD/TD_TITLE consts deleted; semantic th scope=col via TH; Settings keeps custom error copy + not-in-list branch); Agents verified honest static shell, untouched. RED @fe4b41e 7→GREEN @8a830ae; adoption suite 24/24, console 65/65 + tests/ 39/39, typecheck+lint clean — 2026-07-24
 - (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
 - (this PR) task-28 ui-foundation-v2 — DataShell (loading/error/empty/content, precedence loading > error > empty > children) + semantic Table suite (Table/THead/TH/Row/TD) primitives, barrel-exported; ui/README.md contract extended; README-coverage layer added across apps/console. 39/39 console + 22/22 pinned, typecheck+lint clean — 2026-07-24; + review round 1 @a86ab0f (derived README coverage now incl. src/ui, DataShell empty default 'Nothing here yet.', test-util dedupe, README de-duplication)
 - (this PR) staging worker FIRST BOOT via Cloudflare quick tunnel — deployed console functional end-to-end; first API writes to staging (org 67e8c293 + 5 contacts via CSV import) — 2026-07-23
-- #66 apps/www static zero-dep landing page — single index.html (copy/data baked: 3 plans/4 stages/3 moats/5 FAQs), 32 self-hosted fonts (Playfair/Lora/IBM Plex Mono), SVG-noise texture, one inline script (plan-select + FAQ accordion); + review round 1 (selected-plan CTA box-sizing so it's flush to its column; near-black underlay behind the tint panels); 35/35 landing tests — 2026-07-21
