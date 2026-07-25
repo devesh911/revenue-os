@@ -1,9 +1,10 @@
-// T4 — production tool catalog barrel + registration site.
-// buildCatalog wires the three production tools into a ToolRegistry, injecting the send seam
-// into send_confirmation. RED-phase STUB registers NOTHING (registration tests fail); GREEN
-// registers book_appointment, update_contact, send_confirmation. G1: runtime-agnostic.
+// T4 — production tool catalog barrel + registration site. buildCatalog wires the three
+// production tools into a ToolRegistry, injecting the send seam into send_confirmation.
+// runTurn consumes them via registry.specs(allowed) / get(name, allowed). G1: runtime-agnostic.
 import { ToolRegistry } from "../registry";
-import type { SendPort } from "./send-confirmation";
+import { bookAppointment } from "./book-appointment";
+import { makeSendConfirmation, type SendPort } from "./send-confirmation";
+import { updateContact } from "./update-contact";
 
 export { bookAppointment } from "./book-appointment";
 export type {
@@ -14,7 +15,10 @@ export type {
 export { makeSendConfirmation } from "./send-confirmation";
 export { updateContact } from "./update-contact";
 
-export function buildCatalog(_deps: { send: SendPort }): ToolRegistry {
-  // STUB (RED): GREEN registers book_appointment, update_contact, send_confirmation here.
-  return new ToolRegistry();
+export function buildCatalog(deps: { send: SendPort }): ToolRegistry {
+  const registry = new ToolRegistry();
+  registry.register(bookAppointment);
+  registry.register(updateContact);
+  registry.register(makeSendConfirmation({ send: deps.send }));
+  return registry;
 }
