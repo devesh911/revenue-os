@@ -116,7 +116,12 @@ export async function runTurn(
 
       let result: ToolResult;
       if (verdict.ok) {
-        result = await tool.execute(ctx, parsed.data as never);
+        // Thread the turn's conversationId so a tool write attributes to the run (book_appointment's
+        // outcome → conversations.workflow_run_id). Additive: tools that ignore it are unaffected.
+        result = await tool.execute(
+          { ...ctx, conversationId },
+          parsed.data as never,
+        );
         await emitAudit(ctx, {
           actorType: "agent",
           action: `tool.${tool.name}`,

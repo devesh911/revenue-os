@@ -216,7 +216,11 @@ async function applyTransitions(
   }
   if (!final) return; // drive never yields an empty walk; this guards the type-checker
 
-  const nextStep = final.nextStep ?? run.current_step;
+  // Where the run now rests. A PARKED run resumes at final.nextStep (a wait's `then`, a fresh
+  // call's own step). A run that COMPLETED by WALKING onto a terminal `end` has final.nextStep=null,
+  // so land on the walked step (finalState.currentStep reached 'end') — never the pre-terminal step.
+  // run.current_step is a last-ditch type guard (finalState.currentStep is always a set string).
+  const nextStep = final.nextStep ?? finalState.currentStep ?? run.current_step;
   // Persist the WALKED state (lastDisposition cleared on routing advance), dropping the transient
   // currentStep field — the run's step lives in its own column. undefined values are omitted by
   // JSON.stringify, so no stale currentStep leaks into the state jsonb.

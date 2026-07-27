@@ -13,7 +13,17 @@ export interface OrgScopedDb {
 // Clock seam (T2): hooks that reason about time (quiet-hours, attempt-cap windows) read
 // `ctx.now?.() ?? new Date()` so tests can inject a fixed instant. Optional — absent in prod
 // (falls back to wall-clock), supplied by tests and any deterministic caller.
-export type OrgCtx = { orgId: string; db: OrgScopedDb; now?: () => Date };
+//
+// conversationId (T9/M2): the turn's conversation, threaded in by runTurn so a tool's write can
+// attribute to the run — book_appointment stamps outcomes.conversation_id, which traces to the run
+// via conversations.workflow_run_id (moat #4, spec §9). Optional: absent outside a turn (unit tests,
+// inline callers) where the tool writes a null link.
+export type OrgCtx = {
+  orgId: string;
+  db: OrgScopedDb;
+  now?: () => Date;
+  conversationId?: string;
+};
 
 export type ToolResult =
   | { ok: true; data: unknown }

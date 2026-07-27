@@ -4,9 +4,13 @@
 // by construction: processVapiEvents drains ALL 'received' events for the org, so any
 // later job for that org catches strays. pgboss.* has no RLS (CLAUDE.md gotcha) —
 // job payloads carry ids only, never PII.
-import { guard, type LlmProvider } from "@revenue-os/harness";
-import { createAnthropicProvider } from "@revenue-os/harness/src/llm";
-import { buildCatalog, type SendPort } from "@revenue-os/harness/src/tools";
+import {
+  buildCatalog,
+  createAnthropicProvider,
+  guard,
+  type LlmProvider,
+  type SendPort,
+} from "@revenue-os/harness";
 import { OrgIdSchema } from "@revenue-os/shared";
 import { PgBoss } from "pg-boss";
 import { z } from "zod";
