@@ -1,15 +1,17 @@
-// T7 (task-47) — send_wa job handler. RED-phase THROWING STUB (no implementation).
-// GREEN wires, in ONE withOrg(orgId) tx:
-//   1. reload the run; NO-OP if this send was already delivered (the scheduler ALREADY advanced
-//      the run past the whatsapp step, so staleness is a DURABLE send marker keyed by a
-//      deterministic fn of the job payload — e.g. a wa_message usage row / a whatsapp
-//      conversation upsert — NOT the run step). Exactly-once against a re-delivery.
-//   2. guard() BEFORE the send (moat #4) via the channels wa doorway (wa.send, injected sender
-//      + guard). A blocking verdict => NO send.
-//   3. MERGE the run/contact vars into the template vars (the T5->T7 contract: send_wa must not
-//      go out empty) and send; record the outbound message + usage.
+// T7 (task-47) — send_wa job handler. In ONE withOrg(orgId) tx:
+//   1. reload the run FOR UPDATE (serializes re-deliveries + reads run/contact vars); NO-OP if
+//      this send was ALREADY delivered. The scheduler already advanced the run past the whatsapp
+//      step, so staleness is a DURABLE marker (a wa_message usage row keyed by a deterministic fn
+//      of the job) — NOT the run step. Exactly-once against a re-delivery.
+//   2. guard() BEFORE the send (moat #4) via the channels wa doorway (wa.send).
+//   3. MERGE run/contact vars into the step's template vars (T5->T7 contract: send_wa must not go
+//      out empty) — run/contact vars OVERRIDE step vars on key collision — then send; record the
+//      outbound message + usage (the usage row is the durable exactly-once marker).
 import type { GuardedAction, OrgCtx, Verdict } from "@harness/types";
-import type { Pool } from "pg";
+import { wa } from "@revenue-os/channels";
+import { withOrg } from "@revenue-os/db";
+import { emitUsage } from "@revenue-os/harness";
+import type { Pool, PoolClient } from "pg";
 
 /** WhatsApp sender port — structural superset of channels' WaSender (local, no channels dep). */
 export type WaSenderPort = {
@@ -44,8 +46,77 @@ export type SendWaJob = {
 };
 
 export async function handleSendWa(
-  _deps: SendWaDeps,
-  _job: SendWaJob,
+  deps: SendWaDeps,
+  job: SendWaJob,
 ): Promise<void> {
-  throw new Error("T7 not implemented: send_wa handler");
+  const { orgId, runId, action } = job;
+
+  await withOrg(deps.pool, orgId, async (tx) => {
+    const ctx: OrgCtx = { orgId, db: tx };
+
+    // 1. lock the run (serializes re-deliveries) + read run/contact vars; NO-OP if delivered.
+    const reload = await tx.query(
+      `select state from workflow_runs where id = $1 for update`,
+      [runId],
+    );
+    const run = reload.rows[0];
+    if (!run) return; // RLS-hidden (cross-tenant) or gone
+    const state = (run.state ?? {}) as { vars?: Record<string, string> };
+
+    const dedupeKey = `send_wa:${runId}:${action.template}`;
+    const seen = await tx.query(
+      `select 1 from usage_events
+        where org_id = $1 and kind = 'wa_message' and meta ->> 'dedupeKey' = $2 limit 1`,
+      [orgId, dedupeKey],
+    );
+    if ((seen.rowCount ?? 0) > 0) return; // already delivered — exactly-once
+
+    // 2 + 3. MERGE (run/contact vars WIN) then guard BEFORE the send.
+    const vars = { ...action.vars, ...(state.vars ?? {}) };
+    const to = await resolveTo(tx, action.contactId);
+    const doorway = await wa.send(
+      { sender: deps.sender, guard: deps.guard },
+      ctx,
+      {
+        contactId: action.contactId,
+        autonomy: "auto",
+        toolName: "send_wa",
+        payload: { to, template: action.template, vars },
+      },
+    );
+    if (!doorway.ok) return; // blocked → no send
+
+    // record the outbound message + usage (usage = the durable exactly-once marker).
+    const convo = await tx.query(
+      `insert into conversations
+         (org_id, contact_id, workflow_run_id, channel, direction, status, provider, provider_ref)
+       values ($1, $2, $3, 'whatsapp', 'outbound', 'active', 'meta_wa', $4) returning id`,
+      [orgId, action.contactId, runId, doorway.result.providerRef],
+    );
+    const conversationId = convo.rows[0]?.id as string;
+    await tx.query(
+      `insert into messages (org_id, conversation_id, seq, role, content)
+       values ($1, $2, 1, 'agent', $3)`,
+      [orgId, conversationId, `template:${action.template}`],
+    );
+    await emitUsage(ctx, {
+      conversationId,
+      kind: "wa_message",
+      provider: "meta_wa",
+      quantity: 1,
+      unit: "messages",
+      meta: { dedupeKey, template: action.template },
+    });
+  });
+}
+
+/** Resolve the contact's WhatsApp destination (E.164), primary first. */
+async function resolveTo(tx: PoolClient, contactId: string): Promise<string> {
+  const r = await tx.query(
+    `select value from contact_identities
+      where contact_id = $1 and kind = 'whatsapp'
+      order by is_primary desc, created_at asc limit 1`,
+    [contactId],
+  );
+  return (r.rows[0]?.value as string) ?? "";
 }
