@@ -4,9 +4,19 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed console functional)
+Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end)
 
 ## NOW (verified facts, not hopes)
+- **M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end (2026-07-27,
+  T9/task-49):** `m2-replay.test.ts` drives the real `scheduler.tick` + T7 job handlers through a
+  deterministic multi-day replay — call_1→no_answer→wait 2h→WhatsApp→wait_until 11:00→call_2→booked
+  — over a SimClock with FakeVoice/FakeWa/fake-LLM providers (CI-owned real-DB; CI `checks` is the
+  M2 verdict). Landing closed two integration gaps: `site_visit_booked` outcomes now attribute to
+  the run (conversationId threaded OrgCtx→runTurn→book_appointment, `outcomes.conversation_id →
+  conversations.workflow_run_id`, moat #4); completed runs now rest at `current_step='end'`
+  (`scheduler.applyTransitions`). T8-H2 closed (jobs.ts now imports the `@revenue-os/harness`
+  barrel). Env-free gates green (typecheck/lint/tools/full-harness/wiring-unit); m2-replay/
+  scheduler/wiring-jobs suites are CI-owned. @b00d0f2 + @bae1f37.
 - **Staging worker first boot (2026-07-23, tunnel stopgap — no PR pipeline, ops only):** worker
   container runs on the VPS (168.144.147.90), source rsync'd to `~/app` (provisioning skipped the
   clone), via `docker compose` + a tunnel override (8080→box localhost only, Caddy not started).
@@ -78,27 +88,20 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. T7 — job handlers + agent.turn bridge (harness/worker, unblocked by T6): pg-boss handlers for
-   the T6-enqueued `place_call`/`send_wa`/`run_agent_turn` jobs (payload `{orgId, runId, action}`),
-   driving real sends through the T5 `packages/channels` guarded doorway and agent turns through
-   the harness loop.
-2. T8 — worker wiring + createQueue (harness/worker): register `ACTION_QUEUES`
-   (`place_call`/`send_wa`/`run_agent_turn`, `policy:'short'`) via `createQueue` at worker
-   startup — T6's raw `pgboss.job` insert FK-fails without it — plus the scheduler tick loop wiring.
-3. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
+1. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
    the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
    AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section; `GET`/`PUT
    /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire Settings "Guardrails".
-4. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-5. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-6. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-7. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
@@ -203,8 +206,8 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) T9/task-49 — M2 REPLAY (the acceptance gate): deterministic multi-day lifecycle GREEN on a SimClock + synthetic providers; two integration gaps fixed (booking outcome run-attributed via conversation_id; completed runs rest at current_step='end'); T8-H2 barrel closed. @b00d0f2 + @bae1f37. — 2026-07-27
 - (this PR) T8 (task-48) GREEN @c8b2b9f — worker production boot wired: action queues (policy 'short') + call.post dead-letter, 4 T7 handlers via boss.work, durable pg-boss scheduler.tick; ANTHROPIC_API_KEY optional, makeProvider gates the Claude provider (null ⇒ boot still green). wiring-unit 3/3, wiring-jobs CI-owned. — 2026-07-27
 - (this PR) T7 (task-47) GREEN @1adf15b — job handlers + agent.turn bridge + Feed-1 + M2 lastDisposition-clear; env-free gates green (typecheck/lint/context 2·2), handler+scheduler suites CI-owned. — 2026-07-27
 - (this PR) T6 scheduler tick + run writer GREEN @6d250ee — startRun + tick over the T1 interpreter: per-run withOrg tx, FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned. T6→T7 payload {orgId,runId,action}; T6→T8 createQueue(ACTION_QUEUES). — 2026-07-25
 - (this PR) T4 tool catalog GREEN @6106660 — book_appointment/update_contact/send_confirmation + buildCatalog wired; 12/12 env-free unit pass, 4 integration CI-owned — 2026-07-25
-- #78 T5 channels guarded doorway (`packages/channels`) — `voice.place` (Vapi) + `wa.send` (Meta) build a `GuardedAction` (channel/contactId/tool identity), `await guard()` before any sender call, block with the `Verdict` on `!ok` (no send), only-then call the injected sender. Type-only harness dep (no BOM/package.json change); `channels.test.ts` 7/7 (31 expect), env-free; wa.send vars-merge deferred to T7 — 2026-07-25

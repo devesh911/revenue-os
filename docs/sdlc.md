@@ -78,6 +78,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Scheduler tick + run writer (T6, worker) | ✅ | (this PR) | RED 13d0185 → GREEN 6d250ee; per-run withOrg tx + FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned; unblocks T7/T8 |
 | Job handlers + agent.turn bridge + Feed-1 + M2 lastDisposition-clear (T7, worker) | ✅ | (this PR) | GREEN 1adf15b; 4 handlers (exactly-once reload-no-op, guard-before-send moat#4), agent.turn→runTurn bridge, assembleContext Feed-1, scheduler lastDisposition-clear (drive+persist); @revenue-os/channels internal dep no-BOM; env-free gates green, handler/scheduler suites CI-owned |
 | Worker wiring — action queues + handlers + durable scheduler.tick + provider gating (T8, worker) | ✅ | (this PR) | GREEN @c8b2b9f; startJobs wires ACTION_QUEUES (policy 'short') + call.post sink + 4 boss.work handlers + pgboss.schedule tick; env ANTHROPIC_API_KEY optional, makeProvider null⇒boot-green; wiring-unit 3/3 env-free, wiring-jobs CI-owned |
+| M2 REPLAY acceptance gate + integration fixes (T9, task-49) | ✅ | (this PR) | m2-replay.test.ts drives the real spine (scheduler.tick + T7 handlers) over SimClock/FakeVoice/FakeWa/fake-LLM: call→no_answer→wa→re-call→booked; fixed outcome run-attribution (conversation_id) + completed current_step + T8-H2 barrel; env-free gates green, m2-replay/scheduler/wiring-jobs CI-owned = M2 verdict |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
