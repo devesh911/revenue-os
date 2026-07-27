@@ -78,20 +78,27 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
+1. T7 — job handlers + agent.turn bridge (harness/worker, unblocked by T6): pg-boss handlers for
+   the T6-enqueued `place_call`/`send_wa`/`run_agent_turn` jobs (payload `{orgId, runId, action}`),
+   driving real sends through the T5 `packages/channels` guarded doorway and agent turns through
+   the harness loop.
+2. T8 — worker wiring + createQueue (harness/worker): register `ACTION_QUEUES`
+   (`place_call`/`send_wa`/`run_agent_turn`, `policy:'short'`) via `createQueue` at worker
+   startup — T6's raw `pgboss.job` insert FK-fails without it — plus the scheduler tick loop wiring.
+3. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
    the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
    AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section; `GET`/`PUT
    /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire Settings "Guardrails".
-2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+4. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+5. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+6. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+7. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
@@ -112,6 +119,7 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **T6 scheduler DB-error policy (2026-07-25):** a failed inline write rolls the per-run tx back and leaves the run 'waiting' (retried); only interpret-throws dead-letter to 'failed'. tick() catches per-run and continues so one bad run never aborts the tick — required because the RED suite ticks without .catch and a rolled-back poison run stays due.
 - **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
   tokens, `ui/` primitives, `routes.tsx` manifest as the single nav/router source; `screens/*` stay
@@ -186,8 +194,8 @@ Updated: 2026-07-23 (staging worker first-boot via tunnel stopgap — deployed c
 - T4: contactId validated with z.guid() (UUID shape) not z.string().uuid() — Zod 4.4.3 enforces RFC-9562 version/variant nibbles that non-real fixtures fail; RLS + the contacts FK are the real identity guarantee.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) T6 scheduler tick + run writer GREEN @6d250ee — startRun + tick over the T1 interpreter: per-run withOrg tx, FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned. T6→T7 payload {orgId,runId,action}; T6→T8 createQueue(ACTION_QUEUES). — 2026-07-25
 - (this PR) T4 tool catalog GREEN @6106660 — book_appointment/update_contact/send_confirmation + buildCatalog wired; 12/12 env-free unit pass, 4 integration CI-owned — 2026-07-25
 - #78 T5 channels guarded doorway (`packages/channels`) — `voice.place` (Vapi) + `wa.send` (Meta) build a `GuardedAction` (channel/contactId/tool identity), `await guard()` before any sender call, block with the `Verdict` on `!ok` (no send), only-then call the injected sender. Type-only harness dep (no BOM/package.json change); `channels.test.ts` 7/7 (31 expect), env-free; wa.send vars-merge deferred to T7 — 2026-07-25
 - (this PR) task-33 wave-C: legacy src/screens/ retired — ConversationLink relocated to features/conversations/ + re-skinned blue→gold (text-accent), 4 pages repointed, Contacts/Conversations name cells tone="ink"; screens/ doc mentions removed. tests/ 49/49 · console 109/109 (readme-coverage readdirSync auto-adjust 110→109) · typecheck+lint ✓ — 2026-07-25
 - (this PR) task-32 wave-B3 — Tasks+Settings adopt DataShell/Table (local TH/TD/TD_TITLE consts deleted; semantic th scope=col via TH; Settings keeps custom error copy + not-in-list branch); Agents verified honest static shell, untouched. RED @fe4b41e 7→GREEN @8a830ae; adoption suite 24/24, console 65/65 + tests/ 39/39, typecheck+lint clean — 2026-07-24
-- (this PR) apps/www rebuild (task-29) — single-file export split into a token CSS layer (tokens.css: palette + cream-alpha channel + hairline scale + fonts + 40 @font-face; components.css: reusable look + data-* state rules; page.css: composition + all responsive), semantic landmarks, zero inline styles, folder README; visuals identical (pixel parity pending human review); 67/67 tests; + review round 1 @eea363e (restored dropped .ro-stage base rule + AC-11 regression guard, 68/68) — 2026-07-24
