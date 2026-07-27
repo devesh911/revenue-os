@@ -116,6 +116,9 @@ async function cleanup(): Promise<void> {
   await admin.query(
     `delete from usage_events where org_id in (select id from orgs where slug like 'm2-replay-%')`,
   );
+  await admin.query(
+    `delete from audit_log where org_id in (select id from orgs where slug like 'm2-replay-%')`,
+  );
   // org delete cascades runs/workflows/conversations/messages/outcomes/appointments/tasks/policies
   await admin.query(`delete from orgs where slug like 'm2-replay-%'`);
 }

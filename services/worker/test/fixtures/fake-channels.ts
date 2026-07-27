@@ -19,6 +19,11 @@ import type {
 import type { WaSenderPort } from "../../src/handlers/send-wa";
 import type { SimClock } from "./sim-clock";
 
+// Module-level counters for globally-unique provider refs (prevents test-isolation collisions
+// where each test fixture instance would restart counting at 1, causing provider_ref duplicates).
+let voiceSeq = 0;
+let waSeq = 0;
+
 /**
  * A scripted LlmProvider: returns turns[i] then advances, holding the LAST turn once exhausted
  * (the loop.test / handlers.test idiom). runTurn stops the moment a turn has no toolCalls, so a
@@ -39,7 +44,9 @@ export function makeScriptedLlm(turns: LlmTurn[]): LlmProvider {
 /** FakeVoice — the Vapi VoiceSender + the call-outcome port behind ONE object. place() mints a
  *  UNIQUE providerRef (so two calls never collide on convo_provider_ref_uq) and is paired 1:1 with
  *  outcome(), which replays the scripted disposition for that call (no_answer #1, completed #2). The
- *  pairing is exact because a place_call handler calls place() then outcome() once each, serially. */
+ *  pairing is exact because a place_call handler calls place() then outcome() once each, serially.
+ *  Provider refs use a global counter to avoid collisions across test instances; outcome pairing
+ *  stays per-instance (each instance tracks its own placement count for disposition indexing). */
 export function makeFakeVoice(dispositions: string[]): {
   refs: string[];
   readonly placeCount: number;
@@ -49,8 +56,9 @@ export function makeFakeVoice(dispositions: string[]): {
   const refs: string[] = [];
   let placed = 0;
   const place: VoiceSenderPort["place"] = async () => {
+    voiceSeq += 1;
     placed += 1;
-    const providerRef = `vapi-call-${placed}`;
+    const providerRef = `vapi-call-${voiceSeq}`;
     refs.push(providerRef);
     return { providerRef };
   };
@@ -70,7 +78,8 @@ export function makeFakeVoice(dispositions: string[]): {
   };
 }
 
-/** FakeWa — the Meta WaSender. send() mints a unique wamid (delivered) and counts. */
+/** FakeWa — the Meta WaSender. send() mints a unique wamid (delivered) and counts.
+ *  Like FakeVoice, wamids use a global counter to avoid cross-test collisions. */
 export function makeFakeWa(): {
   refs: string[];
   readonly sendCount: number;
@@ -79,8 +88,9 @@ export function makeFakeWa(): {
   const refs: string[] = [];
   let sent = 0;
   const send: WaSenderPort["send"] = async () => {
+    waSeq += 1;
     sent += 1;
-    const providerRef = `wamid-${sent}`;
+    const providerRef = `wamid-${waSeq}`;
     refs.push(providerRef);
     return { providerRef };
   };
