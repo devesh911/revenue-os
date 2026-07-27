@@ -153,7 +153,7 @@ export async function handlePlaceCall(
 async function resolveTo(tx: PoolClient, contactId: string): Promise<string> {
   const r = await tx.query(
     `select value from contact_identities
-      where contact_id = $1 and kind in ('phone','voice','whatsapp')
+      where contact_id = $1 and kind in ('phone','whatsapp')
       order by is_primary desc, created_at asc limit 1`,
     [contactId],
   );

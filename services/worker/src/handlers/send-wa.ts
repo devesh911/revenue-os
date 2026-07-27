@@ -86,18 +86,25 @@ export async function handleSendWa(
     );
     if (!doorway.ok) return; // blocked → no send
 
-    // record the outbound message + usage (usage = the durable exactly-once marker).
+    // record the outbound message + usage (usage = the durable exactly-once marker). The wamid is
+    // the outbound MESSAGE id, not a wa THREAD id — provider_ref (unique per thread) stays NULL and
+    // the wamid rides the message's tool_call, so distinct sends never collide on convo_provider_ref_uq.
     const convo = await tx.query(
       `insert into conversations
-         (org_id, contact_id, workflow_run_id, channel, direction, status, provider, provider_ref)
-       values ($1, $2, $3, 'whatsapp', 'outbound', 'active', 'meta_wa', $4) returning id`,
-      [orgId, action.contactId, runId, doorway.result.providerRef],
+         (org_id, contact_id, workflow_run_id, channel, direction, status, provider)
+       values ($1, $2, $3, 'whatsapp', 'outbound', 'active', 'meta_wa') returning id`,
+      [orgId, action.contactId, runId],
     );
     const conversationId = convo.rows[0]?.id as string;
     await tx.query(
-      `insert into messages (org_id, conversation_id, seq, role, content)
-       values ($1, $2, 1, 'agent', $3)`,
-      [orgId, conversationId, `template:${action.template}`],
+      `insert into messages (org_id, conversation_id, seq, role, content, tool_call)
+       values ($1, $2, 1, 'agent', $3, $4::jsonb)`,
+      [
+        orgId,
+        conversationId,
+        `template:${action.template}`,
+        JSON.stringify({ providerRef: doorway.result.providerRef }),
+      ],
     );
     await emitUsage(ctx, {
       conversationId,
