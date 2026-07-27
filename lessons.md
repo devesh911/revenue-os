@@ -312,3 +312,9 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   deterministically fails an inline write stays 'waiting'/due and is re-attempted-and-rolled-back
   every tick — no backoff or dead-letter (only interpret-throws dead-letter). A DB-error retry
   cap / dead-letter is a T8-or-later follow-up.
+- 2026-07-27 · task-48 (T8 worker wiring) · Two harness VALUES the worker needs — createAnthropicProvider
+  and buildCatalog — are NOT on the @revenue-os/harness root barrel (only guard/runTurn/emitUsage/etc.
+  are). Reached them via @revenue-os/harness/src/llm + /src/tools subpaths (leaks the package's src/
+  layout). Promote both to packages/harness/src/index.ts when convenient; T9 (FakeVoice/FakeWa) will
+  hit the same gap. NOTE: the @harness/* tsconfig alias is TYPE-ONLY (erased) — no root tsconfig.json,
+  so a runtime VALUE import via @harness/* would not resolve under bun.

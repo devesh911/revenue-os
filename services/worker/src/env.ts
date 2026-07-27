@@ -1,7 +1,7 @@
 // Zod-parsed process env (T11) — the worker refuses to boot half-configured.
 import { z } from "zod";
 
-const EnvSchema = z.object({
+export const EnvSchema = z.object({
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL missing — app_service connection string"),
@@ -17,10 +17,16 @@ const EnvSchema = z.object({
         .map((o) => o.trim())
         .filter(Boolean),
     ),
+  // OPTIONAL: the worker boots WITHOUT it — a missing key just means no LLM turns until one
+  // is set (makeProvider gates on it). Env-provisioned in prod, absent in tests/local. Never logged.
+  ANTHROPIC_API_KEY: z.string().optional(),
 });
+
+export type Env = z.infer<typeof EnvSchema>;
 
 export const env = EnvSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
   SUPABASE_URL: process.env.SUPABASE_URL,
   CORS_ORIGINS: process.env.CORS_ORIGINS,
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
 });
