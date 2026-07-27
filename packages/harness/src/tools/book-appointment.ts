@@ -1,7 +1,8 @@
 // T4 — book_appointment tool. Two writes on the caller's withOrg tx (ctx.db): insert the
 // appointment RETURNING id, then an attributed outcomes row (kind 'site_visit_booked',
-// source 'agent', appointment_id = that id) on the SAME handle. Errors PROPAGATE so the
-// enclosing withOrg rolls back both — atomicity (a swallowed error orphans the appointment).
+// source 'agent', appointment_id = that id, conversation_id = ctx.conversationId → the run via
+// conversations.workflow_run_id) on the SAME handle. Errors PROPAGATE so the enclosing withOrg
+// rolls back both — atomicity (a swallowed error orphans the appointment).
 // Spec: packages/harness/test/tools.test.ts. G1: runtime-agnostic.
 import { z } from "zod";
 import type { Tool } from "../types";
@@ -32,9 +33,16 @@ export const bookAppointment: Tool<z.infer<typeof schema>> = {
     );
     const appointmentId = appt.rows[0]?.id;
     await ctx.db.query(
-      `insert into outcomes (org_id, contact_id, appointment_id, kind, source)
-       values ($1, $2, $3, $4, $5)`,
-      [ctx.orgId, args.contactId, appointmentId, "site_visit_booked", "agent"],
+      `insert into outcomes (org_id, contact_id, appointment_id, conversation_id, kind, source)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [
+        ctx.orgId,
+        args.contactId,
+        appointmentId,
+        ctx.conversationId ?? null,
+        "site_visit_booked",
+        "agent",
+      ],
     );
     return { ok: true, data: { appointmentId } };
   },
