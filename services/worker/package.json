@@ -4,6 +4,7 @@
     "dev": "bun --watch src/index.ts"
   },
   "dependencies": {
+    "@revenue-os/channels": "workspace:*",
     "@revenue-os/db": "workspace:*",
     "@revenue-os/harness": "workspace:*",
     "@revenue-os/shared": "workspace:*",

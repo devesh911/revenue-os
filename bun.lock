@@ -67,6 +67,7 @@
     "services/worker": {
       "name": "worker",
       "dependencies": {
+        "@revenue-os/channels": "workspace:*",
         "@revenue-os/db": "workspace:*",
         "@revenue-os/harness": "workspace:*",
         "@revenue-os/shared": "workspace:*",

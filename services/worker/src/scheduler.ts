@@ -122,7 +122,10 @@ async function processRun(
   // Phase 1 — PURE. Load + validate the definition and walk the interpreter with NO DB writes.
   // Any throw here (unknown step / dangling ref / bad definition) is permanent: dead-letter the
   // run in THIS tx (nothing else is written yet, so the failed status commits cleanly).
-  let steps: { step: string; transition: Transition }[];
+  let walk: {
+    steps: { step: string; transition: Transition }[];
+    state: WorkflowState;
+  };
   try {
     const defRow = await tx.query<{ definition: unknown }>(
       `select definition from workflows where id = $1`,
@@ -133,7 +136,7 @@ async function processRun(
       throw new Error(`workflow not found: ${run.workflow_id}`);
     }
     const def = WorkflowDefinitionSchema.parse(wf.definition);
-    steps = drive(def, run, now);
+    walk = drive(def, run, now);
   } catch (err) {
     await tx.query(
       `update workflow_runs
@@ -147,7 +150,7 @@ async function processRun(
   // Phase 2 — APPLY. Enqueue external actions and write inline actions, then advance the run.
   // A DB error (e.g. a CHECK violation on an inline write) propagates → withOrg rolls the whole
   // tx back, so the enqueue never commits and the run is not advanced (atomicity).
-  await applyTransitions(tx, orgId, run, steps, now);
+  await applyTransitions(tx, orgId, run, walk.steps, walk.state, now);
   return true;
 }
 
@@ -160,7 +163,7 @@ function drive(
   def: Parameters<typeof interpret>[0],
   run: RunRow,
   now: Date,
-): { step: string; transition: Transition }[] {
+): { steps: { step: string; transition: Transition }[]; state: WorkflowState } {
   const out: { step: string; transition: Transition }[] = [];
   let state: WorkflowState = {
     ...(run.state ?? {}),
@@ -170,8 +173,13 @@ function drive(
     const step = state.currentStep ?? def.entry;
     const transition = interpret(def, state, { type: "wake" }, now);
     out.push({ step, transition });
-    if (transition.runStatus !== "running") return out;
+    if (transition.runStatus !== "running") return { steps: out, state };
+    // Advancing OUT of a routing step (a `call` re-entry or a `branch`) CONSUMES lastDisposition
+    // (M2 P0): clear it so a same-tick chain (call->call) sees the next routing step FRESH, and so
+    // applyTransitions persists a cleared state — never a stale disposition for the next tick.
+    const kind = def.steps[step]?.kind;
     state = { ...state, currentStep: transition.nextStep ?? step };
+    if (kind === "call" || kind === "branch") delete state.lastDisposition;
   }
   throw new Error(`workflow step limit exceeded (${MAX_STEPS})`);
 }
@@ -182,6 +190,7 @@ async function applyTransitions(
   orgId: string,
   run: RunRow,
   steps: { step: string; transition: Transition }[],
+  finalState: WorkflowState,
   now: Date,
 ): Promise<void> {
   const iso = now.toISOString();
@@ -208,6 +217,9 @@ async function applyTransitions(
   if (!final) return; // drive never yields an empty walk; this guards the type-checker
 
   const nextStep = final.nextStep ?? run.current_step;
+  // Persist the WALKED state (lastDisposition cleared on routing advance), dropping the transient
+  // currentStep field — the run's step lives in its own column. undefined values are omitted by
+  // JSON.stringify, so no stale currentStep leaks into the state jsonb.
   await tx.query(
     `update workflow_runs
         set status = $2, current_step = $3, state = $4::jsonb, wake_at = $5,
@@ -217,7 +229,7 @@ async function applyTransitions(
       run.id,
       final.runStatus,
       nextStep,
-      JSON.stringify(run.state ?? {}),
+      JSON.stringify({ ...finalState, currentStep: undefined }),
       final.wakeAt,
       JSON.stringify(attempts),
       final.runStatus === "completed" ? iso : null,

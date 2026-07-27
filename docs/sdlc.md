@@ -76,6 +76,7 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Production tool catalog — book_appointment/update_contact/send_confirmation + buildCatalog (T4, harness) | ✅ | (this PR) | GREEN @6106660 (feat/task-44-tool-catalog); 12/12 env-free unit pass, 4 integration CI-owned; typecheck+lint clean |
 | Channels guarded doorway — `voice.place`/`wa.send` guard-before-send, ports-injected (T5, packages/channels) | ✅ | #78 | GREEN 2aaf0bb; 7/7 (31 expect), env-free; moat invariant #4 (S8.2); type-only harness dep, no BOM change; wa.send vars-merge → T7 |
 | Scheduler tick + run writer (T6, worker) | ✅ | (this PR) | RED 13d0185 → GREEN 6d250ee; per-run withOrg tx + FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned; unblocks T7/T8 |
+| Job handlers + agent.turn bridge + Feed-1 + M2 lastDisposition-clear (T7, worker) | ✅ | (this PR) | GREEN 1adf15b; 4 handlers (exactly-once reload-no-op, guard-before-send moat#4), agent.turn→runTurn bridge, assembleContext Feed-1, scheduler lastDisposition-clear (drive+persist); @revenue-os/channels internal dep no-BOM; env-free gates green, handler/scheduler suites CI-owned |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
