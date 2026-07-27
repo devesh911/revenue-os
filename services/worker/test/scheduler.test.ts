@@ -433,4 +433,46 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect(rb.current_step).toBe("c");
     expect(rb.attempts.voice ?? []).toEqual([]);
   });
+
+  it("advancing OUT of a `call` step CLEARS state.lastDisposition so the next call is FRESH (M2 P0) [T7 criterion 6: lastDisposition-clear]", async () => {
+    // call_1 got 'no_answer' (the handler folded it). This tick routes call_1 -> call_2. The
+    // scheduler MUST clear lastDisposition on advance; else call_2 RE-ENTERS on the STALE
+    // 'no_answer' (routing to giveup -> end -> completed) instead of placing a FRESH call.
+    const def = {
+      entry: "call_1",
+      steps: {
+        call_1: {
+          kind: "call",
+          agent: "closer",
+          on: { no_answer: "call_2", completed: "book" },
+        },
+        call_2: {
+          kind: "call",
+          agent: "closer",
+          on: { no_answer: "giveup", completed: "book" },
+        },
+        book: { kind: "tool", tool: "book_appointment", then: "end", args: {} },
+        giveup: { kind: "end" },
+        end: { kind: "end" },
+      },
+    };
+    const workflowId = await seedWorkflow(def);
+    const runId = await seedRun(workflowId, {
+      currentStep: "call_1",
+      state: { contactId, lastDisposition: "no_answer" }, // call_1 re-entry
+    });
+
+    await tick(appPool, orgId, { now: new Date() });
+
+    const run = await getRun(runId);
+    // call_1(no_answer) routed to call_2, and call_2 — being FRESH — placed a call and parked
+    expect(run.current_step).toBe("call_2");
+    expect(run.status).toBe("waiting");
+    // THE P0 ASSERTION: the stale disposition was CLEARED on advance (call_2 saw NO disposition)
+    expect(run.state.lastDisposition ?? null).toBeNull();
+    // proof call_2 saw a FRESH call — a place_call job for call_2, not a stale route to giveup
+    expect((await jobsFor(`${runId}:call_2:0`)).length).toBe(1);
+    expect(Array.isArray(run.attempts.voice)).toBe(true);
+    expect(run.attempts.voice.length).toBe(1); // one place_call attempt, for call_2
+  });
 });
