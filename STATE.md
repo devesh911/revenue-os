@@ -4,9 +4,16 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end)
+Updated: 2026-07-30 (task-50 — console AgentsPage live on real data)
 
 ## NOW (verified facts, not hopes)
+- **Console AgentsPage live on real data (task-50, 2026-07-30):** new `GET /orgs/:orgId/agents`
+  (validate→authorize→do; `memberRole`→403; lean `{agents, workflows}` payload, S5.8 — no
+  system_prompt/voice_config/language_config/tools_allowed/definition on the wire) backed by
+  `packages/db`'s `listAgentsAndWorkflows`; `AgentsPage` now renders both lists via `useAgentsQuery`
+  + the DataShell/Table suite, retiring the "endpoint isn't live" placeholder (honest empty state:
+  "No agents or workflows configured yet."). Real-DB suite (401/403/cross-tenant-denial/lean-shape/
+  ordering) is CI-owned.
 - **M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end (2026-07-27,
   T9/task-49):** `m2-replay.test.ts` drives the real `scheduler.tick` + T7 job handlers through a
   deterministic multi-day replay — call_1→no_answer→wait 2h→WhatsApp→wait_until 11:00→call_2→booked
@@ -89,9 +96,9 @@ Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle pr
 
 ## NEXT (top = take it; one task, one branch, one PR)
 1. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
-   the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
-   AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section; `GET`/`PUT
-   /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire Settings "Guardrails".
+   the page-fleet fan-out (#58–#64): an analytics-trends endpoint → wire the Analytics "Trends"
+   section; `GET`/`PUT /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire
+   Settings "Guardrails".
 2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
@@ -122,6 +129,10 @@ Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle pr
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Task-50 agents-list scope (2026-07-30):** the explicit `org_id = $1` filter in
+  `listAgentsAndWorkflows` is the drizzle-query.md belt-and-suspenders convention and deliberately
+  EXCLUDES global-template rows (`org_id IS NULL`, member-readable under RLS per migration 006);
+  templates stay unlisted until a product need exists.
 - **T6 scheduler DB-error policy (2026-07-25):** a failed inline write rolls the per-run tx back and leaves the run 'waiting' (retried); only interpret-throws dead-letter to 'failed'. tick() catches per-run and continues so one bad run never aborts the tick — required because the RED suite ticks without .catch and a rolled-back poison run stays due.
 - **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
