@@ -54,20 +54,17 @@ type Trend = {
   bookings: number;
 };
 
-// Bootstrap an org owned by `token`, seed one contact + one conversation on `daysAgo`, and attach
-// `bookings` booking outcomes on the same day. Returns the org id. `deleted` marks the contact
-// soft-deleted (must be excluded from new_leads, mirroring funnelMetrics' `deleted_at is null`).
+// Seed one LIVE contact + one conversation on `daysAgo`, and attach `bookings` booking outcomes on
+// the same day — the three funnelMetrics series, each bucketed to that one day.
 async function seedDay(
   orgId: string,
   daysAgo: number,
   bookings: number,
-  deleted = false,
 ): Promise<void> {
   const ago = `now() - interval '${daysAgo} days'`;
   const contact = await admin.query(
-    `insert into contacts (org_id, first_name, last_name, lifecycle_stage, created_at, deleted_at)
-     values ($1, 'Trend', 'Fixture', 'new', ${ago}, ${deleted ? "now()" : "null"})
-     returning id`,
+    `insert into contacts (org_id, first_name, last_name, lifecycle_stage, created_at)
+     values ($1, 'Trend', 'Fixture', 'new', ${ago}) returning id`,
     [orgId],
   );
   const contactId = contact.rows[0].id;
@@ -100,9 +97,9 @@ async function bootstrapOrg(token: string, tag: string): Promise<string> {
   return body.id;
 }
 
-// Expected org-A totals for the 30-day window (all seeded rows below are inside it):
-//   new_leads = 3 (today, -5d, -28d; the -5d DELETED contact excluded), conversations_started = 3,
-//   bookings  = 2 + 1 + 3 = 6. Today's bucket carries exactly 2 bookings.
+// Expected org-A tile totals (30-day window): new_leads = 3 live in-window contacts (today, -5d,
+// -28d) — the -5d soft-deleted contact is excluded by `deleted_at is null`; conversations_started
+// = 3; bookings = 2 + 1 + 3 = 6. Today's bucket carries exactly 2 bookings.
 const A_NEW_LEADS = 3;
 const A_CONVS = 3;
 const A_BOOKINGS = 6;
@@ -120,8 +117,16 @@ beforeAll(async () => {
   await seedDay(orgA, 0, A_TODAY_BOOKINGS); // today   → last bucket
   await seedDay(orgA, 5, 1); // -5 days
   await seedDay(orgA, 28, 3); // -28 days (still inside the 30-day window)
-  await seedDay(orgA, 5, 9, true); // -5 days, DELETED contact — excluded from new_leads
   await seedDay(orgA, 45, 4); // out of window — must appear in NEITHER trends nor the tile
+  // A soft-deleted contact created -5d: excluded from new_leads by funnelMetrics' `deleted_at is
+  // null`. It seeds CONTACT ONLY — no conversation/booking, since those two series have NO
+  // deleted-contact filter, so attaching any would (correctly) inflate the tile and break the
+  // absolute totals above. This fixture tests only the new_leads exclusion.
+  await admin.query(
+    `insert into contacts (org_id, first_name, last_name, lifecycle_stage, created_at, deleted_at)
+     values ($1, 'Soft', 'Deleted', 'new', now() - interval '5 days', now())`,
+    [orgA],
+  );
 
   // Cross-tenant noise: a SEPARATE org with heavy activity today. None of it may leak into orgA.
   const orgB = await bootstrapOrg(userB.token, "b");
