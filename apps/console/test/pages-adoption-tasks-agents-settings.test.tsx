@@ -82,6 +82,22 @@ mock.module("../src/features/orgs/api", () => ({
   ...realOrgsApi,
   useOrgsQuery: () => orgsResult,
 }));
+// task-52: SettingsPage grows a live Guardrails section that calls useGuardrailPoliciesQuery. Mock
+// it (virtual until features/guardrails/api.ts lands) so these OrganizationCard renders stay isolated
+// from the new section. Defaulted to loading — its only added copy ("Loading…") collides with none of
+// the org assertions below (the org-error test asserts NOT "Unable to load data.", which loading never
+// emits). Non-spreading is safe: this file's SettingsPage needs only the two hooks.
+mock.module("../src/features/guardrails/api", () => ({
+  useGuardrailPoliciesQuery: () => ({
+    isLoading: true,
+    isError: false,
+    data: undefined,
+  }),
+  useUpdateGuardrailPolicy: () => ({ mutate: () => {}, isPending: false }),
+  queryKeys: {
+    guardrailPolicies: (orgId: string) => ["guardrail-policies", orgId],
+  },
+}));
 
 afterAll(() => {
   mock.restore();
