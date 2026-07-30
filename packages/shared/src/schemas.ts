@@ -35,6 +35,60 @@ export const UpdateOrgSchema = z
   .strict();
 export type UpdateOrg = z.infer<typeof UpdateOrgSchema>;
 
+// Guardrail-policy config is the SAFETY BOUNDARY (task-52). The harness quiet_hours hook reads
+// guardrail_policies.config FAIL-OPEN (packages/harness/src/policies.ts): a malformed config
+// silently disables the gate for every send. This strict discriminated union is what stops a bad
+// config reaching the row — the PUT route parses it before any write. One union export is the whole
+// boundary (never re-declared in the route or the console). HH:MM regex is verbatim from the harness.
+const GUARDRAIL_HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const AttemptCap = z.strictObject({
+  max: z.number().int().positive(),
+  per_hours: z.number().positive(),
+});
+export const GuardrailPolicyInputSchema = z.discriminatedUnion("key", [
+  z
+    .object({
+      key: z.literal("quiet_hours"),
+      config: z.strictObject({
+        start: z.string().regex(GUARDRAIL_HHMM),
+        end: z.string().regex(GUARDRAIL_HHMM),
+        tz: z.string().min(1),
+      }),
+      active: z.boolean().default(true),
+    })
+    .strict(),
+  z
+    .object({
+      // Partial channel maps allowed: an org may cap voice only. strict rejects unknown channels;
+      // the harness treats a missing channel as no-cap by design.
+      key: z.literal("attempt_caps"),
+      config: z.strictObject({
+        voice: AttemptCap.optional(),
+        whatsapp: AttemptCap.optional(),
+      }),
+      active: z.boolean().default(true),
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal("dnc"),
+      config: z.strictObject({ hard_stop: z.boolean() }),
+      active: z.boolean().default(true),
+    })
+    .strict(),
+  z
+    .object({
+      key: z.literal("autonomy"),
+      config: z.record(
+        z.string().min(1),
+        z.enum(["auto", "approval", "forbidden"]),
+      ),
+      active: z.boolean().default(true),
+    })
+    .strict(),
+]);
+export type GuardrailPolicyInput = z.infer<typeof GuardrailPolicyInputSchema>;
+
 // Vapi webhook envelope — only the fields we consume; everything else passes through
 // untouched (S6.5: payloads stay untrusted even after the signature check).
 export const VapiWebhookSchema = z

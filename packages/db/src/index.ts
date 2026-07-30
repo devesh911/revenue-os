@@ -6,6 +6,11 @@ export { createPool, type PoolClient, withOrg } from "./client";
 export { type ImportSummary, importContacts } from "./contacts";
 export { conversationMessages, type TranscriptRow } from "./conversations";
 export {
+  type GuardrailPolicyRow,
+  listGuardrailPolicies,
+  upsertGuardrailPolicy,
+} from "./guardrails";
+export {
   addMember,
   createOrgWithAdmin,
   memberRole,
