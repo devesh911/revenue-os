@@ -3,6 +3,7 @@
 // live monitor, and dashboard.
 import {
   funnelMetrics,
+  funnelTrends,
   listContacts,
   listConversations,
   listTasks,
@@ -45,4 +46,12 @@ export const screens = new Hono<AuthEnv>()
     if (role === null) return c.json({ error: "forbidden" }, 403);
     const metrics = await funnelMetrics(pool, orgId);
     return c.json({ metrics });
+  })
+  .get("/orgs/:orgId/metrics/trends", async (c) => {
+    const orgId = OrgIdSchema.parse(c.req.param("orgId")); // S5.1 — before ANY logic
+    const actor = c.get("actor");
+    const role = await memberRole(pool, orgId, actor.userId);
+    if (role === null) return c.json({ error: "forbidden" }, 403);
+    const trends = await funnelTrends(pool, orgId);
+    return c.json({ trends }); // S5.8 — no internals
   });

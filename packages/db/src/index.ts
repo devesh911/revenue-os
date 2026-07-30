@@ -24,8 +24,10 @@ export {
   type ConversationRow,
   type FunnelMetrics,
   funnelMetrics,
+  funnelTrends,
   listContacts,
   listConversations,
   listTasks,
   type TaskRow,
+  type TrendRow,
 } from "./screens";
