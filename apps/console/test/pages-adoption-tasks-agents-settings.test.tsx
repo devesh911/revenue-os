@@ -21,6 +21,7 @@ import { afterAll, describe, expect, it, mock } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
+import * as realAgentsApi from "../src/features/agents/api";
 import * as realOrgsApi from "../src/features/orgs/api";
 import * as realScreensApi from "../src/features/screens/api";
 
@@ -104,9 +105,11 @@ mock.module("../src/features/orgs/api", () => ({
   ...realOrgsApi,
   useOrgsQuery: () => orgsResult,
 }));
-// Task 50: features/agents/api is a NEW module — nothing to spread yet, so a full fake (the pattern
-// pages-adoption-home-dashboard uses for screens/api). Unused until AgentsPage imports the hook.
+// SPREAD the real module (same reason as screens/orgs above): a bare `{ useAgentsQuery }` factory
+// drops the module's sibling exports (queryKeys, AgentsResponse) process-wide and breaks
+// agents-api-hook.test.ts in a combined run — the PR #71 regression class.
 mock.module("../src/features/agents/api", () => ({
+  ...realAgentsApi,
   useAgentsQuery: () => agentsResult,
 }));
 
