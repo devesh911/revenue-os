@@ -1,12 +1,14 @@
 // task-32 page-fleet adoption · B3-RED — Tasks + Settings adopt the DataShell/Table primitives
-// (ui/README.md "page skeleton"); Agents STAYS an honest static shell. Test-is-spec.
+// (ui/README.md "page skeleton"). task-50 then flips Agents from the honest static shell to a real
+// data page (the /agents endpoint is now live). Test-is-spec.
 //
 // This file mixes RED and GREEN on purpose (imitates tests/console-boot-honesty.test.tsx):
 //   • SOURCE pins (RED today) — Tasks imports DataShell + the Table suite from the barrel and drops
 //     its hand-rolled ternary + local TH/TD class consts (TS2451: those collide with the imports);
 //     Settings' OrganizationCard replaces its isLoading/isError guards with <DataShell>.
-//   • Agents HONESTY guard (GREEN today, MUST stay green) — the /agents endpoint isn't live, so the
-//     page has NO data source: it must never import DataShell or grow a loading/error/empty branch.
+//   • Agents DATA-PAGE pins (task-50 RED) — the /agents endpoint is live, so AgentsPage now reads
+//     useAgentsQuery and renders agents+workflows through DataShell (loading/error/data), with an
+//     honest zero-agents empty state; the retired "endpoint isn't live" copy is gone.
 //   • BEHAVIOR pins — today's loading/error/empty copy and happy-path strings per page, preserved
 //     across the refactor (copy is identical everywhere). One is RED-until-Table: Tasks headers
 //     become semantic <th scope="col"> only once the Table primitive lands.
@@ -19,6 +21,7 @@ import { afterAll, describe, expect, it, mock } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
+import * as realAgentsApi from "../src/features/agents/api";
 import * as realOrgsApi from "../src/features/orgs/api";
 import * as realScreensApi from "../src/features/screens/api";
 
@@ -59,6 +62,25 @@ const otherOrg = {
   role: "viewer",
 };
 
+// Task 50 — the lean agents/workflows wire rows for AgentsPage. Version digits (7 and 9) are chosen
+// collision-free vs the uuids ({4,8}), model ({4,6}) and dates ({0,1,2,6}) so a bare toContain on a
+// version can't match another field (the pattern pages-adoption-home-dashboard uses for "42"/"137").
+const agentFixture = {
+  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  key: "receptionist",
+  version: 7,
+  status: "active",
+  model: "claude-sonnet-4-6",
+  created_at: "2026-01-02T00:00:00Z",
+};
+const workflowFixture = {
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  key: "inbound-triage",
+  version: 9,
+  status: "draft",
+  created_at: "2026-01-02T00:00:00Z",
+};
+
 // Reusable query-hook return shapes. `ok(data)` = success; the three states below are the non-happy
 // branches every DataShell adoption must keep honest.
 const loadingState = { isLoading: true, isError: false, data: undefined };
@@ -69,6 +91,7 @@ const ok = (data: unknown) => ({ isLoading: false, isError: false, data });
 // The mocked hooks read these live, so each behavior test just assigns before it renders.
 let tasksResult: unknown = noDataState;
 let orgsResult: unknown = noDataState;
+let agentsResult: unknown = noDataState;
 
 // SPREAD the real module, override only the one hook (Bun's mock.module is process-global): a
 // bare `{ useTasksQuery }` factory drops the module's sibling exports (useContactsQuery,
@@ -81,6 +104,13 @@ mock.module("../src/features/screens/api", () => ({
 mock.module("../src/features/orgs/api", () => ({
   ...realOrgsApi,
   useOrgsQuery: () => orgsResult,
+}));
+// SPREAD the real module (same reason as screens/orgs above): a bare `{ useAgentsQuery }` factory
+// drops the module's sibling exports (queryKeys, AgentsResponse) process-wide and breaks
+// agents-api-hook.test.ts in a combined run — the PR #71 regression class.
+mock.module("../src/features/agents/api", () => ({
+  ...realAgentsApi,
+  useAgentsQuery: () => agentsResult,
 }));
 
 afterAll(() => {
@@ -185,24 +215,28 @@ describe("Settings — OrganizationCard adopts DataShell (source)", () => {
   });
 });
 
-describe("Agents — honest static shell: NO DataShell, NO data-state code (source)", () => {
-  it("does NOT import or reference DataShell (no data source ⇒ no fake loading/empty states)", async () => {
-    // GREEN today and MUST stay green: adopting DataShell here would fabricate states with no data.
-    expect(await readSrc(AGENTS_SRC)).not.toMatch(/\bDataShell\b/);
+// Task 50 flips this block: the /agents endpoint is live, so AgentsPage is now a real data page —
+// DataShell owns loading/error/empty, and it reads server state through useAgentsQuery. RED today
+// against the current honest static shell (imports only { Card }, no hook, no features import).
+describe("Agents — data page: DataShell + useAgentsQuery (source)", () => {
+  it("imports DataShell from the primitives barrel", async () => {
+    expect(barrelNames(await readSrc(AGENTS_SRC))).toContain("DataShell");
   });
 
-  it("carries no query hook and no isLoading/isError/isEmpty branch", async () => {
-    const src = await readSrc(AGENTS_SRC);
-    expect(src).not.toMatch(/use\w*Query/); // no server-state hook
-    expect(src).not.toContain("isLoading");
-    expect(src).not.toContain("isError");
-    expect(src).not.toContain("isEmpty");
+  it("reads server state through the useAgentsQuery hook", async () => {
+    expect(await readSrc(AGENTS_SRC)).toMatch(/useAgentsQuery/);
   });
 
-  it("imports nothing from features/* (it renders no server data)", async () => {
-    expect(await readSrc(AGENTS_SRC)).not.toMatch(
-      /from\s+["'][^"']*\/features\//,
+  it("imports the hook from features/agents/api", async () => {
+    expect(await readSrc(AGENTS_SRC)).toMatch(
+      /from\s+["'][^"']*\/features\/agents\/api["']/,
     );
+  });
+
+  it("drops the retired honesty copy ('endpoint isn't live')", async () => {
+    const src = await readSrc(AGENTS_SRC);
+    expect(src).not.toContain("isn't live");
+    expect(src).not.toContain("isn't in the console yet");
   });
 });
 
@@ -317,29 +351,58 @@ describe("Settings — OrganizationCard state behavior preserved (mocked useOrgs
   });
 });
 
-describe("Agents — honest static shell copy (no hooks, no mocks)", () => {
+describe("Agents — data-state behavior (mocked useAgentsQuery)", () => {
+  // Renders inside an SSR Router at a :orgId route so useParams resolves (mirrors Tasks above); the
+  // mocked useAgentsQuery reads `agentsResult`, so each test assigns before it renders.
   const render = async (): Promise<string> => {
     const { AgentsPage } = await import("../src/pages/Agents/index");
-    return renderToStaticMarkup(<AgentsPage />);
+    return renderInRouter(
+      `/o/${ORG}/agents`,
+      "/o/:orgId/agents",
+      <AgentsPage />,
+    );
   };
 
-  it("renders the page title and description", async () => {
-    const t = text(await render());
-    expect(t).toContain("Agents");
-    expect(t).toContain("Voice & messaging agents and their workflows");
+  it("loading → 'Loading…', no rows drawn", async () => {
+    agentsResult = loadingState;
+    const html = await render();
+    expect(text(html)).toContain("Loading…");
+    expect(html).not.toContain("receptionist");
   });
 
-  it("explains itself instead of faking data", async () => {
-    const t = text(await render());
-    expect(t).toContain("Agent management isn't in the console yet");
-    expect(t).toContain("/agents endpoint isn't live");
-    expect(t).toContain("list each agent and its workflow versions");
+  it("error → 'Unable to load data.'", async () => {
+    agentsResult = errorState;
+    expect(text(await render())).toContain("Unable to load data.");
   });
 
-  it("shows NO loading/error/empty state copy (honesty: there is no data source)", async () => {
+  it("no data (not error) reads as unavailable, never as empty", async () => {
+    agentsResult = noDataState;
     const t = text(await render());
+    expect(t).toContain("Unable to load data.");
+    expect(t).not.toContain("No agents");
+  });
+
+  it("zero agents → honest empty state; the retired 'endpoint isn't live' copy is gone", async () => {
+    agentsResult = ok({ agents: [], workflows: [] });
+    const t = text(await render());
+    expect(t).toContain("No agents"); // honest empty, not a fabricated list
+    expect(t).not.toContain("isn't live");
+    expect(t).not.toContain("isn't in the console yet");
+  });
+
+  it("happy path → the agent row and the workflow row, each with its lean fields", async () => {
+    agentsResult = ok({ agents: [agentFixture], workflows: [workflowFixture] });
+    const t = text(await render());
+    // agents list: key, status, model, version
+    expect(t).toContain("receptionist");
+    expect(t).toContain("active");
+    expect(t).toContain("claude-sonnet-4-6");
+    expect(t).toContain("7"); // agent version (collision-free digit)
+    // workflows list: key, status, version — proves the second list renders too
+    expect(t).toContain("inbound-triage");
+    expect(t).toContain("draft");
+    expect(t).toContain("9"); // workflow version (collision-free digit)
     expect(t).not.toContain("Loading…");
-    expect(t).not.toContain("Unable to load");
-    expect(t).not.toContain("Nothing here yet.");
+    expect(t).not.toContain("Unable to load data.");
   });
 });

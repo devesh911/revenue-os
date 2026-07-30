@@ -4,9 +4,16 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-30 (Analytics "Trends" live on real data — 30-day gap-filled daily series API + console wiring, task-51)
+Updated: 2026-07-30 (tasks 50+51 — console AgentsPage + Analytics "Trends" live on real data)
 
 ## NOW (verified facts, not hopes)
+- **Console AgentsPage live on real data (task-50, 2026-07-30):** new `GET /orgs/:orgId/agents`
+  (validate→authorize→do; `memberRole`→403; lean `{agents, workflows}` payload, S5.8 — no
+  system_prompt/voice_config/language_config/tools_allowed/definition on the wire) backed by
+  `packages/db`'s `listAgentsAndWorkflows`; `AgentsPage` now renders both lists via `useAgentsQuery`
+  + the DataShell/Table suite, retiring the "endpoint isn't live" placeholder (honest empty state:
+  "No agents or workflows configured yet."). Real-DB suite (401/403/cross-tenant-denial/lean-shape/
+  ordering) is CI-owned.
 - **Analytics "Trends" live on real data (2026-07-30, task-51):** `GET /orgs/:orgId/metrics/trends`
   returns a gap-filled 30-day daily series (new_leads/conversations_started/bookings) via new
   `funnelTrends` (`packages/db/src/screens.ts`, `withOrg`); console Analytics page's Trends section
@@ -95,10 +102,9 @@ Updated: 2026-07-30 (Analytics "Trends" live on real data — 30-day gap-filled 
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Console backend wave — 2 remaining worker routes + Zod console hooks to light up the styled
-   shells left by the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows
-   list) → wire AgentsPage; `GET`/`PUT /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy
-   config) → wire Settings "Guardrails".
+1. Console backend wave — 1 remaining worker route + Zod console hooks to light up the styled
+   shells left by the page-fleet fan-out (#58–#64): `GET`/`PUT /orgs/:orgId/guardrail-policies`
+   (quiet-hours + autonomy config) → wire Settings "Guardrails" (in flight as task-52).
 2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
@@ -129,6 +135,10 @@ Updated: 2026-07-30 (Analytics "Trends" live on real data — 30-day gap-filled 
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Task-50 agents-list scope (2026-07-30):** the explicit `org_id = $1` filter in
+  `listAgentsAndWorkflows` is the drizzle-query.md belt-and-suspenders convention and deliberately
+  EXCLUDES global-template rows (`org_id IS NULL`, member-readable under RLS per migration 006);
+  templates stay unlisted until a product need exists.
 - **Analytics trends query posture (2026-07-30, task-51):** `funnelTrends` adds an explicit
   `org_id = $1` predicate to every series (drizzle-query.md belt-and-suspenders) where
   `funnelMetrics` omits it — `withOrg` RLS stays the net, tile↔trend agreement unaffected; gap-fill

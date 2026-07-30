@@ -7,6 +7,7 @@ import { type AuthEnv, requireAuth } from "./auth";
 import { env } from "./env";
 import { startJobs } from "./jobs";
 import { logger } from "./logger";
+import { agents } from "./routes/agents";
 import { contacts } from "./routes/contacts";
 import { conversations } from "./routes/conversations";
 import { orgs } from "./routes/orgs";
@@ -34,6 +35,7 @@ app.get("/ready", (c) =>
 app.use("/orgs", requireAuth);
 app.use("/orgs/*", requireAuth);
 app.route("/", orgs);
+app.route("/", agents);
 app.route("/", contacts);
 app.route("/", conversations);
 app.route("/", screens);
