@@ -38,17 +38,22 @@ const HAND_ROLLED_LOADING = /isLoading\s*\?|if\s*\(\s*isLoading/;
 type QueryState = { data: unknown; isLoading: boolean; isError: boolean };
 let convoState: QueryState;
 let metricsState: QueryState;
+// task-51: the Dashboard now also drives a Trends section from useTrendsQuery. Held here so each
+// Dashboard case can put the Trends section in a state that keeps the stat-tile pins byte-identical.
+let trendsState: QueryState;
 
 beforeAll(() => {
   // Keyed by the path the PAGES import ("../../features/screens/api") — the same resolved module.
   mock.module("../src/features/screens/api", () => ({
     useConversationsQuery: () => convoState,
     useMetricsQuery: () => metricsState,
+    useTrendsQuery: () => trendsState,
     queryKeys: {
       tasks: () => [],
       contacts: () => [],
       conversations: () => [],
       metrics: () => [],
+      trends: () => [],
     },
   }));
 });
@@ -192,6 +197,7 @@ describe("Dashboard — visible copy is preserved across the refactor (character
   it("loading: shows 'Loading…' with the title + Trends still visible", async () => {
     const DashboardPage = await loadDashboard();
     metricsState = { data: undefined, isLoading: true, isError: false };
+    trendsState = { data: undefined, isLoading: true, isError: false };
     const text = visible(dashAt(<DashboardPage />));
     expect(text).toContain("Loading…");
     expect(text).toContain("Analytics"); // PageHeader title
@@ -201,6 +207,7 @@ describe("Dashboard — visible copy is preserved across the refactor (character
   it("error: shows the page's exact 'Unable to load data.' copy", async () => {
     const DashboardPage = await loadDashboard();
     metricsState = { data: undefined, isLoading: false, isError: true };
+    trendsState = { data: undefined, isLoading: false, isError: true };
     const text = visible(dashAt(<DashboardPage />));
     expect(text).toContain("Unable to load data.");
     expect(text).not.toContain("New leads"); // the metric grid is hidden on error
@@ -222,6 +229,9 @@ describe("Dashboard — visible copy is preserved across the refactor (character
       isLoading: false,
       isError: false,
     };
+    // trends empty (all-zero) → the section shows its honest note, never loading/error/placeholder,
+    // so every stat-tile pin below stays byte-identical.
+    trendsState = { data: { trends: [] }, isLoading: false, isError: false };
     const text = visible(dashAt(<DashboardPage />));
     for (const label of METRIC_LABELS) expect(text).toContain(label);
     expect(text).toContain("42"); // new_leads value proves the data path renders
@@ -230,7 +240,11 @@ describe("Dashboard — visible copy is preserved across the refactor (character
     expect(text).toContain("All time"); // open_tasks note
     expect(text).toContain("Analytics");
     expect(text).toContain("Trends");
-    expect(text).toContain("Time-series trends arrive with the analytics API.");
+    // task-51 RED: the placeholder copy is retired; the Trends section renders the series instead
+    // (its data/empty/loading/error states are covered in trends-analytics.test.tsx).
+    expect(text).not.toContain(
+      "Time-series trends arrive with the analytics API.",
+    );
     expect(text).not.toContain("Loading…");
     expect(text).not.toContain("Unable to load data.");
   });
