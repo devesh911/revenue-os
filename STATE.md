@@ -4,9 +4,17 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-30 (tasks 50+51 — console AgentsPage + Analytics "Trends" live on real data)
+Updated: 2026-07-30 (tasks 50+51+52 — console backend wave COMPLETE: AgentsPage,
+Analytics "Trends", and Settings Guardrails all live on real data)
 
 ## NOW (verified facts, not hopes)
+- **Settings Guardrails live on real data (task 52, 2026-07-30):** `GET`/`PUT
+  /orgs/:orgId/guardrail-policies` (GET any member, PUT admin-only S1.7) share one
+  `GuardrailPolicyInputSchema` — the strict-Zod boundary parsed by both the worker route and the
+  console mutation, protecting the harness quiet-hours hook's FAIL-OPEN `guardrail_policies.config`
+  read (a malformed config is a 400 with nothing written, not a silently-disabled gate). Settings
+  Guardrails section is live: quiet_hours + autonomy editable, attempt_caps + dnc read-only. Real-DB
+  route suite (401/403 lattice, round-trips, 400-nothing-written) is CI-owned.
 - **Console AgentsPage live on real data (task-50, 2026-07-30):** new `GET /orgs/:orgId/agents`
   (validate→authorize→do; `memberRole`→403; lean `{agents, workflows}` payload, S5.8 — no
   system_prompt/voice_config/language_config/tools_allowed/definition on the wire) backed by
@@ -102,19 +110,16 @@ Updated: 2026-07-30 (tasks 50+51 — console AgentsPage + Analytics "Trends" liv
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Console backend wave — 1 remaining worker route + Zod console hooks to light up the styled
-   shells left by the page-fleet fan-out (#58–#64): `GET`/`PUT /orgs/:orgId/guardrail-policies`
-   (quiet-hours + autonomy config) → wire Settings "Guardrails" (in flight as task-52).
-2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+1. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+2. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+3. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
@@ -135,6 +140,14 @@ Updated: 2026-07-30 (tasks 50+51 — console AgentsPage + Analytics "Trends" liv
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Guardrail-policies config decisions (task 52, 2026-07-30):** `attempt_caps` is a `strictObject`
+  with optional `voice`/`whatsapp` keys — strict rejects unknown channels, optional lets an org cap
+  just one channel; a missing channel means no cap, by design. One `GuardrailPolicyInputSchema`
+  union is the only config boundary — declared once in `packages/shared`, parsed by the worker route
+  AND the console mutation, never re-declared (boundary truth T11). GET envelope is a lean 4 columns
+  (`key, config, active, updated_at`) — no `id`/`org_id` on the wire (S5.8). Submit→PUT click-path
+  coverage is deferred to the P3 Playwright smoke — console suites are env-free SSR, so the path
+  stays source-pinned (`useMutation` + PUT + `invalidateQueries` + shared-schema parse) until then.
 - **Task-50 agents-list scope (2026-07-30):** the explicit `org_id = $1` filter in
   `listAgentsAndWorkflows` is the drizzle-query.md belt-and-suspenders convention and deliberately
   EXCLUDES global-template rows (`org_id IS NULL`, member-readable under RLS per migration 006);

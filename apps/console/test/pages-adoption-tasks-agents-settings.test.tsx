@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
 import * as realAgentsApi from "../src/features/agents/api";
+import * as realGuardrailsApi from "../src/features/guardrails/api";
 import * as realOrgsApi from "../src/features/orgs/api";
 import * as realScreensApi from "../src/features/screens/api";
 
@@ -104,6 +105,19 @@ mock.module("../src/features/screens/api", () => ({
 mock.module("../src/features/orgs/api", () => ({
   ...realOrgsApi,
   useOrgsQuery: () => orgsResult,
+}));
+// task-52: SettingsPage's live Guardrails section calls useGuardrailPoliciesQuery — hold it in
+// loading so these OrganizationCard renders stay isolated (loading's only copy, "Loading…",
+// collides with none of the org assertions below). SPREAD the real module (same rule as
+// screens/orgs/agents): a bare factory drops sibling exports process-wide — the PR #71 class.
+mock.module("../src/features/guardrails/api", () => ({
+  ...realGuardrailsApi,
+  useGuardrailPoliciesQuery: () => ({
+    isLoading: true,
+    isError: false,
+    data: undefined,
+  }),
+  useUpdateGuardrailPolicy: () => ({ mutate: () => {}, isPending: false }),
 }));
 // SPREAD the real module (same reason as screens/orgs above): a bare `{ useAgentsQuery }` factory
 // drops the module's sibling exports (queryKeys, AgentsResponse) process-wide and breaks

@@ -10,6 +10,7 @@ import { logger } from "./logger";
 import { agents } from "./routes/agents";
 import { contacts } from "./routes/contacts";
 import { conversations } from "./routes/conversations";
+import { guardrailPolicies } from "./routes/guardrail-policies";
 import { orgs } from "./routes/orgs";
 import { screens } from "./routes/screens";
 import { vapiWebhook } from "./vapi/receive";
@@ -39,6 +40,7 @@ app.route("/", agents);
 app.route("/", contacts);
 app.route("/", conversations);
 app.route("/", screens);
+app.route("/", guardrailPolicies);
 app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (S6.2)
 
 // S5.8: clients get clean statuses, never internals; detail goes to the log.
