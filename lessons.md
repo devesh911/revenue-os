@@ -318,3 +318,12 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   layout). Promote both to packages/harness/src/index.ts when convenient; T9 (FakeVoice/FakeWa) will
   hit the same gap. NOTE: the @harness/* tsconfig alias is TYPE-ONLY (erased) — no root tsconfig.json,
   so a runtime VALUE import via @harness/* would not resolve under bun.
+- 2026-07-30 · task-50 (agents API) · A pages-adoption test that FULL-FAKES a features/*/api module
+  (bare `mock.module(path, () => ({ oneHook }))`, no `...realApi` spread) drops that module's sibling
+  exports (queryKeys, the exported response schema). Bun's mock.module is process-global AND hoisted
+  (registered at file-collection, before any test body), so the fake leaks into a sibling file that
+  imports the REAL module by name (agents-api-hook.test.ts) and breaks it — even reversing file order
+  or afterAll(mock.restore()) doesn't undo it. Fix = spread the real module the moment it exists
+  (`...realAgentsApi, useAgentsQuery: …`), the pattern the same file already uses for screens/api +
+  orgs/api. Same regression class as PR #71. At RED the spread was impossible (module absent), so this
+  is a GREEN-phase test-mock update owed by the tester, not the implementer.

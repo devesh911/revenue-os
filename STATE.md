@@ -4,8 +4,8 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-30 (task-52 — Settings Guardrails live on real data; shared strict-Zod config
-boundary protects the fail-open quiet-hours read)
+Updated: 2026-07-30 (tasks 50+51+52 — console backend wave COMPLETE: AgentsPage,
+Analytics "Trends", and Settings Guardrails all live on real data)
 
 ## NOW (verified facts, not hopes)
 - **Settings Guardrails live on real data (task 52, 2026-07-30):** `GET`/`PUT
@@ -15,6 +15,20 @@ boundary protects the fail-open quiet-hours read)
   read (a malformed config is a 400 with nothing written, not a silently-disabled gate). Settings
   Guardrails section is live: quiet_hours + autonomy editable, attempt_caps + dnc read-only. Real-DB
   route suite (401/403 lattice, round-trips, 400-nothing-written) is CI-owned.
+- **Console AgentsPage live on real data (task-50, 2026-07-30):** new `GET /orgs/:orgId/agents`
+  (validate→authorize→do; `memberRole`→403; lean `{agents, workflows}` payload, S5.8 — no
+  system_prompt/voice_config/language_config/tools_allowed/definition on the wire) backed by
+  `packages/db`'s `listAgentsAndWorkflows`; `AgentsPage` now renders both lists via `useAgentsQuery`
+  + the DataShell/Table suite, retiring the "endpoint isn't live" placeholder (honest empty state:
+  "No agents or workflows configured yet."). Real-DB suite (401/403/cross-tenant-denial/lean-shape/
+  ordering) is CI-owned.
+- **Analytics "Trends" live on real data (2026-07-30, task-51):** `GET /orgs/:orgId/metrics/trends`
+  returns a gap-filled 30-day daily series (new_leads/conversations_started/bookings) via new
+  `funnelTrends` (`packages/db/src/screens.ts`, `withOrg`); console Analytics page's Trends section
+  now renders it (`useTrendsQuery` → per-series CSS bar tracks through `DataShell`), retiring the
+  "Time-series trends arrive with the analytics API." placeholder. Env-free gates green (typecheck/
+  lint/118 console tests); the real-DB tenancy suite `services/worker/test/metrics-trends-api.test.ts`
+  is CI-owned — CI `checks` is the verdict. @1bf1ccb.
 - **M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end (2026-07-27,
   T9/task-49):** `m2-replay.test.ts` drives the real `scheduler.tick` + T7 job handlers through a
   deterministic multi-day replay — call_1→no_answer→wait 2h→WhatsApp→wait_until 11:00→call_2→booked
@@ -96,19 +110,16 @@ boundary protects the fail-open quiet-hours read)
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
-   the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
-   AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section.
-2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+1. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+2. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+3. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 ## IN FLIGHT
@@ -137,6 +148,15 @@ boundary protects the fail-open quiet-hours read)
   (`key, config, active, updated_at`) — no `id`/`org_id` on the wire (S5.8). Submit→PUT click-path
   coverage is deferred to the P3 Playwright smoke — console suites are env-free SSR, so the path
   stays source-pinned (`useMutation` + PUT + `invalidateQueries` + shared-schema parse) until then.
+- **Task-50 agents-list scope (2026-07-30):** the explicit `org_id = $1` filter in
+  `listAgentsAndWorkflows` is the drizzle-query.md belt-and-suspenders convention and deliberately
+  EXCLUDES global-template rows (`org_id IS NULL`, member-readable under RLS per migration 006);
+  templates stay unlisted until a product need exists.
+- **Analytics trends query posture (2026-07-30, task-51):** `funnelTrends` adds an explicit
+  `org_id = $1` predicate to every series (drizzle-query.md belt-and-suspenders) where
+  `funnelMetrics` omits it — `withOrg` RLS stays the net, tile↔trend agreement unaffected; gap-fill
+  uses `generate_series(0, 29)` integer offsets, not a date/timestamp series, to sidestep Postgres
+  function-resolution ambiguity.
 - **T6 scheduler DB-error policy (2026-07-25):** a failed inline write rolls the per-run tx back and leaves the run 'waiting' (retried); only interpret-throws dead-letter to 'failed'. tick() catches per-run and continues so one bad run never aborts the tick — required because the RED suite ticks without .catch and a rolled-back poison run stays due.
 - **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
