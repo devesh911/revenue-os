@@ -152,3 +152,58 @@ export async function funnelMetrics(
     };
   });
 }
+
+export interface TrendRow {
+  day: string;
+  new_leads: number;
+  conversations_started: number;
+  bookings: number;
+}
+
+// Task 51 (spec §12 — Analytics "Trends"): the 30-day daily series behind funnelMetrics' tiles.
+// The three series predicates MIRROR funnelMetrics exactly — new_leads = live contacts by
+// created_at::date, conversations_started = conversations by started_at::date, bookings = 'booking'
+// outcomes by occurred_at::date — so each daily total sums to the matching tile. Gap-filled to
+// EXACTLY 30 rows via generate_series(0..29) → current_date-29 … current_date (ascending): a
+// no-activity day is a zero row, never omitted. Series are windowed by the same 30 calendar days
+// the tiles span, so out-of-window rows count in neither. Explicit `org_id = $1` in every series is
+// the drizzle-query.md belt-and-suspenders (withOrg RLS is the net; funnelMetrics omits it, this
+// doesn't — agreement is unaffected, both run inside the same org scope).
+export async function funnelTrends(
+  pool: pg.Pool,
+  orgId: string,
+): Promise<TrendRow[]> {
+  return withOrg(pool, orgId, async (tx) => {
+    const result = await tx.query(
+      `select to_char(current_date - gs.n, 'YYYY-MM-DD') as day,
+              coalesce(nl.c, 0)::int as new_leads,
+              coalesce(cs.c, 0)::int as conversations_started,
+              coalesce(bk.c, 0)::int as bookings
+         from generate_series(0, 29) as gs(n)
+         left join (
+                select created_at::date as d, count(*) as c
+                  from contacts
+                 where org_id = $1 and deleted_at is null
+                   and created_at::date between current_date - 29 and current_date
+                 group by created_at::date
+              ) nl on nl.d = current_date - gs.n
+         left join (
+                select started_at::date as d, count(*) as c
+                  from conversations
+                 where org_id = $1
+                   and started_at::date between current_date - 29 and current_date
+                 group by started_at::date
+              ) cs on cs.d = current_date - gs.n
+         left join (
+                select occurred_at::date as d, count(*) as c
+                  from outcomes
+                 where org_id = $1 and kind = 'booking'
+                   and occurred_at::date between current_date - 29 and current_date
+                 group by occurred_at::date
+              ) bk on bk.d = current_date - gs.n
+        order by gs.n desc`,
+      [orgId],
+    );
+    return result.rows;
+  });
+}

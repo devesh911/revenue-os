@@ -10,6 +10,7 @@ export const queryKeys = {
   contacts: (orgId: string) => ["contacts", orgId] as const,
   conversations: (orgId: string) => ["conversations", orgId] as const,
   metrics: (orgId: string) => ["metrics", orgId] as const,
+  trends: (orgId: string) => ["trends", orgId] as const,
 };
 
 const TasksResponse = z.object({
@@ -99,5 +100,26 @@ export function useMetricsQuery(orgId: string) {
   return useQuery({
     queryKey: queryKeys.metrics(orgId),
     queryFn: () => api(`/orgs/${orgId}/metrics`, MetricsResponse),
+  });
+}
+
+// task 51: the 30-day daily series behind the funnel tiles — one row per calendar day (gap-filled
+// with zeros server-side), the three series mirroring funnelMetrics.
+const TrendsResponse = z.object({
+  trends: z.array(
+    z.object({
+      day: z.string(),
+      new_leads: z.number(),
+      conversations_started: z.number(),
+      bookings: z.number(),
+    }),
+  ),
+});
+export type TrendsResponse = z.infer<typeof TrendsResponse>;
+
+export function useTrendsQuery(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.trends(orgId),
+    queryFn: () => api(`/orgs/${orgId}/metrics/trends`, TrendsResponse),
   });
 }
