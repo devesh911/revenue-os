@@ -4,9 +4,16 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end)
+Updated: 2026-07-30 (Analytics "Trends" live on real data — 30-day gap-filled daily series API + console wiring, task-51)
 
 ## NOW (verified facts, not hopes)
+- **Analytics "Trends" live on real data (2026-07-30, task-51):** `GET /orgs/:orgId/metrics/trends`
+  returns a gap-filled 30-day daily series (new_leads/conversations_started/bookings) via new
+  `funnelTrends` (`packages/db/src/screens.ts`, `withOrg`); console Analytics page's Trends section
+  now renders it (`useTrendsQuery` → per-series CSS bar tracks through `DataShell`), retiring the
+  "Time-series trends arrive with the analytics API." placeholder. Env-free gates green (typecheck/
+  lint/118 console tests); the real-DB tenancy suite `services/worker/test/metrics-trends-api.test.ts`
+  is CI-owned — CI `checks` is the verdict. @1bf1ccb.
 - **M2 acceptance replay GREEN — durable agentic lifecycle proven end-to-end (2026-07-27,
   T9/task-49):** `m2-replay.test.ts` drives the real `scheduler.tick` + T7 job handlers through a
   deterministic multi-day replay — call_1→no_answer→wait 2h→WhatsApp→wait_until 11:00→call_2→booked
@@ -88,10 +95,10 @@ Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle pr
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Console backend wave — 3 worker routes + Zod console hooks to light up the styled shells left by
-   the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows list) → wire
-   AgentsPage; an analytics-trends endpoint → wire the Analytics "Trends" section; `GET`/`PUT
-   /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy config) → wire Settings "Guardrails".
+1. Console backend wave — 2 remaining worker routes + Zod console hooks to light up the styled
+   shells left by the page-fleet fan-out (#58–#64): `GET /orgs/:orgId/agents` (agents/workflows
+   list) → wire AgentsPage; `GET`/`PUT /orgs/:orgId/guardrail-policies` (quiet-hours + autonomy
+   config) → wire Settings "Guardrails".
 2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
@@ -122,6 +129,11 @@ Updated: 2026-07-27 (M2 acceptance replay GREEN — durable agentic lifecycle pr
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Analytics trends query posture (2026-07-30, task-51):** `funnelTrends` adds an explicit
+  `org_id = $1` predicate to every series (drizzle-query.md belt-and-suspenders) where
+  `funnelMetrics` omits it — `withOrg` RLS stays the net, tile↔trend agreement unaffected; gap-fill
+  uses `generate_series(0, 29)` integer offsets, not a date/timestamp series, to sidestep Postgres
+  function-resolution ambiguity.
 - **T6 scheduler DB-error policy (2026-07-25):** a failed inline write rolls the per-run tx back and leaves the run 'waiting' (retried); only interpret-throws dead-letter to 'failed'. tick() catches per-run and continues so one bad run never aborts the tick — required because the RED suite ticks without .catch and a rolled-back poison run stays due.
 - **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
