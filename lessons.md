@@ -334,3 +334,4 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   password (`app_service:app_service_local`, in-repo at .github/workflows/ci.yml:60) — a
   passwordless DSN fails as `SASL … password must be a string`, surfacing as a misleading HTTP 500
   in receiver tests.
+- 2026-07-31 · watchdog-rebuild archaeology: the 379-line TICK implementation lives in orchestrator commit 3a236a7 (an anonymous session-end auto-checkpoint), NOT in 2c805f1 "feat(watchdog)…" which holds only HANDOFF — auto-checkpoint hooks race hand-authored commits AND sweep any new file in state/ into history (leaked gitignored-content copies at 42c8e8b, cleaned b30be3b). Scope the checkpoint hook; never leave temp copies in state/.
