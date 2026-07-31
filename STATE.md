@@ -4,9 +4,13 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-31 (tasks 53+54 — memory wave Feed-2: write fold M1 + retrieval M2)
+Updated: 2026-07-31 (memory wave complete: M1+M2+M3)
 
 ## NOW (verified facts, not hopes)
+- **Memory wave Feed-2 COMPLETE — M3 acceptance gate (task-55, 2026-07-31):** `memory-e2e.test.ts`
+  (6 criteria, mutation-verified) proves M1 (#88) + M2 (#89) compose end-to-end — the agent's second
+  call knows what the first call learned, superseded memory never speaks, hostile summaries are
+  inert, and budget + tenancy hold — through the real pipeline; CI-owned.
 - **Memory retrieval live — M2 (task-54, 2026-07-31):** `retrieveMemories` + an S8.4-labeled memory
   block now wire into `assembleContext` — the harness barrel stays the one door. Recall is
   deterministic SQL (kind priority summary>preference>objection>fact then recency, live rows only)
@@ -121,19 +125,21 @@ Updated: 2026-07-31 (tasks 53+54 — memory wave Feed-2: write fold M1 + retriev
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
-1. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
+1. M4 KB/semantic retrieval — GATED on Devesh's Voyage approval (voyage-3-lite, new account+key+BOM
+   row); the phased design's only open fork.
+2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
    wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
    must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-2. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
-3. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
+4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
-4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
+5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
-5. ~~Wire apps/www into the root typecheck script~~ — DONE in this PR (#87 @48881df; review round 1).
+6. ~~Wire apps/www into the root typecheck script~~ — DONE in this PR (#87 @48881df; review round 1).
    type-clean manually).
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
@@ -278,8 +284,8 @@ Updated: 2026-07-31 (tasks 53+54 — memory wave Feed-2: write fold M1 + retriev
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
 - (this PR) task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
 - #88 task-53 memory-write M1 (contact_memories fold) — 2026-07-31
 - (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
 - (this PR) T9/task-49 — M2 REPLAY (the acceptance gate): deterministic multi-day lifecycle GREEN on a SimClock + synthetic providers; two integration gaps fixed (booking outcome run-attributed via conversation_id; completed runs rest at current_step='end'); T8-H2 barrel closed. @b00d0f2 + @bae1f37. — 2026-07-27
-- (this PR) T8 (task-48) GREEN @c8b2b9f — worker production boot wired: action queues (policy 'short') + call.post dead-letter, 4 T7 handlers via boss.work, durable pg-boss scheduler.tick; ANTHROPIC_API_KEY optional, makeProvider gates the Claude provider (null ⇒ boot still green). wiring-unit 3/3, wiring-jobs CI-owned. — 2026-07-27
