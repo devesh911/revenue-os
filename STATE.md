@@ -122,7 +122,7 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
-5. Wire apps/www into the root typecheck script (`tsc -p apps/www` — currently ungated; verified
+5. ~~Wire apps/www into the root typecheck script~~ — DONE in this PR (#87 @48881df; review round 1).
    type-clean manually).
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
