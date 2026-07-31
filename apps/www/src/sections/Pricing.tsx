@@ -35,7 +35,7 @@ export function Pricing() {
           intent scoring, and outcome-based pricing on qualified site visits.
         </Text>
       </div>
-      <div className="grid grid-cols-3 gap-[26px] px-[28px] pt-[36px] pb-[40px] max-[980px]:mx-auto max-[980px]:max-w-[560px] max-[980px]:grid-cols-1 max-[680px]:px-[16px]">
+      <div className="grid grid-cols-3 gap-[26px] px-[28px] pt-[36px] pb-[40px] max-[980px]:mx-auto max-[980px]:max-w-[560px] max-[980px]:grid-cols-1 max-[680px]:px-[16px] max-[680px]:pt-[28px] max-[680px]:pb-[32px]">
         {plans.map((plan) => {
           const isSelected = plan.id === selected;
           return (

@@ -25,7 +25,7 @@ export function StageGrid() {
         {stages.map((stage) => (
           <div
             key={stage.num}
-            className="flex flex-col gap-[14px] border-r border-hairline-12 px-[34px] pt-[38px] pb-[44px] hover:bg-cream-03 max-[1100px]:border-b max-[1100px]:border-hairline-12 max-[680px]:border-r-0 max-[680px]:px-[24px] max-[680px]:pt-[30px] max-[680px]:pb-[34px]"
+            className="flex flex-col gap-[14px] border-r border-hairline-12 px-[34px] pt-[38px] pb-[44px] hover:bg-cream-03 max-[1100px]:border-b max-[1100px]:border-hairline-12 max-[1100px]:last:border-b-0 max-[680px]:border-r-0 max-[680px]:px-[24px] max-[680px]:pt-[30px] max-[680px]:pb-[34px]"
           >
             <MonoLabel className="text-[12px] tracking-[0.26em] text-cream-45">
               {stage.num}
