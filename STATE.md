@@ -4,10 +4,15 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-30 (tasks 50+51+52 — console backend wave COMPLETE: AgentsPage,
-Analytics "Trends", and Settings Guardrails all live on real data)
+Updated: 2026-07-31 (task-54 — memory retrieval (M2) wired into assembleContext)
 
 ## NOW (verified facts, not hopes)
+- **Memory retrieval live — M2 (task-54, 2026-07-31):** `retrieveMemories` + an S8.4-labeled memory
+  block now wire into `assembleContext` — the harness barrel stays the one door. Recall is
+  deterministic SQL (kind priority summary>preference>objection>fact then recency, live rows only)
+  under a ≤800-token block budget that drops whole rows; delimiter-breakout defence is proven by
+  hostile-row tests. DB tier (real ordering, superseded filter, cross-tenant denial) ran green
+  locally against the local stack; CI `checks` is the verdict.
 - **Settings Guardrails live on real data (task 52, 2026-07-30):** `GET`/`PUT
   /orgs/:orgId/guardrail-policies` (GET any member, PUT admin-only S1.7) share one
   `GuardrailPolicyInputSchema` — the strict-Zod boundary parsed by both the worker route and the
@@ -155,6 +160,11 @@ Analytics "Trends", and Settings Guardrails all live on real data)
   now mirrors apps/console/biome.json exactly (root:false, extends "//", css.parser.tailwindDirectives:true)
   so Biome parses the Tailwind v4 @theme/@utility rules — the same mechanism as the console
   design-system decision below, now standing convention for any Tailwind-v4 app in this monorepo.
+- **Memory retrieval posture (task-54, 2026-07-31):** deterministic SQL — kind priority
+  (summary>preference>objection>fact) then recency, live rows only — is the retrieval mechanism now;
+  embeddings/semantic recall are deferred to the Voyage-gated M4 per the accepted phased design. The
+  ≤800-token budget drops whole rows, and the S8.4 frame renders next to the budget math so the cap
+  is measured on the real block.
 - **Guardrail-policies config decisions (task 52, 2026-07-30):** `attempt_caps` is a `strictObject`
   with optional `voice`/`whatsapp` keys — strict rejects unknown channels, optional lets an org cap
   just one channel; a missing channel means no cap, by design. One `GuardrailPolicyInputSchema`
@@ -256,8 +266,8 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- #TBD task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
 - (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
 - (this PR) T9/task-49 — M2 REPLAY (the acceptance gate): deterministic multi-day lifecycle GREEN on a SimClock + synthetic providers; two integration gaps fixed (booking outcome run-attributed via conversation_id; completed runs rest at current_step='end'); T8-H2 barrel closed. @b00d0f2 + @bae1f37. — 2026-07-27
 - (this PR) T8 (task-48) GREEN @c8b2b9f — worker production boot wired: action queues (policy 'short') + call.post dead-letter, 4 T7 handlers via boss.work, durable pg-boss scheduler.tick; ANTHROPIC_API_KEY optional, makeProvider gates the Claude provider (null ⇒ boot still green). wiring-unit 3/3, wiring-jobs CI-owned. — 2026-07-27
 - (this PR) T7 (task-47) GREEN @1adf15b — job handlers + agent.turn bridge + Feed-1 + M2 lastDisposition-clear; env-free gates green (typecheck/lint/context 2·2), handler+scheduler suites CI-owned. — 2026-07-27
-- (this PR) T6 scheduler tick + run writer GREEN @6d250ee — startRun + tick over the T1 interpreter: per-run withOrg tx, FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned. T6→T7 payload {orgId,runId,action}; T6→T8 createQueue(ACTION_QUEUES). — 2026-07-25
