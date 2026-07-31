@@ -9,9 +9,49 @@ import { assembleContext } from "./context";
 import { emitUsage } from "./meter";
 import { guard } from "./policies";
 import type { ToolRegistry } from "./registry";
-import type { LlmProvider, OrgCtx, PolicyHook, ToolResult } from "./types";
+import type {
+  GuardedAction,
+  LlmProvider,
+  OrgCtx,
+  PolicyHook,
+  ToolResult,
+} from "./types";
 
 const MAX_TOOL_ROUNDS = 5;
+
+// task-56 — what guard() is told about a tool call. dnc/quiet-hours/attempt-cap all key on
+// action.channel, so a send that arrives channel-less is a send nobody guards (moat #4: no code
+// path around guard()). Both facts are read off the ZOD-VALIDATED args (the T11 seatbelt has
+// already run): send_confirmation declares {contactId, channel, body}.
+const WIRE_CHANNELS = ["voice", "whatsapp", "sms", "email"] as const;
+type WireChannel = (typeof WIRE_CHANNELS)[number];
+
+const strField = (args: unknown, key: string): string | undefined => {
+  const v = (args as Record<string, unknown> | null | undefined)?.[key];
+  return typeof v === "string" ? v : undefined;
+};
+
+/** Only the four wire channels make an action a guarded SEND — 'internal' and friends do not. */
+const wireChannel = (args: unknown): WireChannel | undefined => {
+  const c = strField(args, "channel");
+  return WIRE_CHANNELS.includes(c as WireChannel)
+    ? (c as WireChannel)
+    : undefined;
+};
+
+/** The conversation's own contact — the fallback recipient when the args name none (nullable:
+ *  "unknown caller until resolved", retrieval.ts:50). Read only for identity-less sends. */
+async function conversationContactId(
+  ctx: OrgCtx,
+  conversationId: string,
+): Promise<string | undefined> {
+  const r = await ctx.db.query(
+    `select contact_id from conversations where id = $1`,
+    [conversationId],
+  );
+  const id = r.rows[0]?.contact_id;
+  return typeof id === "string" ? id : undefined;
+}
 
 export interface TurnDeps {
   provider: LlmProvider;
@@ -108,11 +148,19 @@ export async function runTurn(
         continue;
       }
 
-      const verdict = await guard(
-        ctx,
-        { kind: "tool", toolName: tool.name, autonomy: tool.autonomy },
-        deps.pipeline,
-      );
+      const channel = wireChannel(parsed.data);
+      const action: GuardedAction = {
+        kind: "tool",
+        toolName: tool.name,
+        autonomy: tool.autonomy,
+        channel,
+        contactId:
+          strField(parsed.data, "contactId") ??
+          (channel
+            ? await conversationContactId(ctx, conversationId)
+            : undefined),
+      };
+      const verdict = await guard(ctx, action, deps.pipeline);
 
       let result: ToolResult;
       if (verdict.ok) {
