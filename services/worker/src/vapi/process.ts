@@ -75,15 +75,33 @@ export async function processVapiEvents(
             callId,
             null,
           );
-          await tx.query(
+          const summary = m.summary ?? null;
+          const done = await tx.query<{ contact_id: string | null }>(
             `update conversations set status = 'completed', ended_at = $2, summary = $3
-						 where id = $1`,
-            [
-              conversationId,
-              m.timestamp ?? new Date().toISOString(),
-              m.summary ?? null,
-            ],
+						 where id = $1 returning contact_id`,
+            [conversationId, m.timestamp ?? new Date().toISOString(), summary],
           );
+          const contactId = done.rows[0]?.contact_id;
+          // Fold the summary into long-term memory (M1: verbatim, no embedding yet):
+          // insert the new live row, then point the contact's previous live summary at it.
+          // Scoped by CONTACT — an org-wide supersede would bury every other contact's memory.
+          // Unknown caller (no contact) or a report with nothing to say → no memory, event
+          // still 'processed'.
+          if (contactId && summary) {
+            await tx.query(
+              `with new_memory as (
+							   insert into contact_memories (org_id, contact_id, kind, content, source_conversation_id)
+							   values ($1, $2, 'summary', $3, $4) returning id
+							 )
+							 update contact_memories set superseded_by = new_memory.id
+							 from new_memory
+							 where contact_memories.org_id = $1 and contact_memories.contact_id = $2
+							   and contact_memories.kind = 'summary'
+							   and contact_memories.superseded_by is null
+							   and contact_memories.id <> new_memory.id`,
+              [orgId, contactId, summary, conversationId],
+            );
+          }
           outcome = "processed";
         } else if (m.type === "status-update") {
           await ensureConversation(tx, orgId, callId, m.timestamp ?? null);
