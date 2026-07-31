@@ -14,6 +14,8 @@ export { runTurn, type TurnDeps } from "./loop";
 export { emitUsage } from "./meter";
 export { autonomyHook, defaultPipeline, guard } from "./policies";
 export { ToolRegistry } from "./registry";
+// M2 (task-54): memory retrieval — same one-door rule as above.
+export { retrieveMemories } from "./retrieval";
 export { buildCatalog, type SendPort } from "./tools";
 export type * from "./types";
 export { interpret } from "./workflow/interpret";
