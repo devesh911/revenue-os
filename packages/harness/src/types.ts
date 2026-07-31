@@ -18,11 +18,20 @@ export interface OrgScopedDb {
 // attribute to the run — book_appointment stamps outcomes.conversation_id, which traces to the run
 // via conversations.workflow_run_id (moat #4, spec §9). Optional: absent outside a turn (unit tests,
 // inline callers) where the tool writes a null link.
+//
+// onGuardEvent (task-56): the guard pipeline's observability sink, shaped like the clock seam —
+// optional, so prod may ignore it. A hook that DECLINES to evaluate (quiet-hours fails open when
+// tz:'contact' cannot be resolved) says so here instead of guessing silently.
 export type OrgCtx = {
   orgId: string;
   db: OrgScopedDb;
   now?: () => Date;
   conversationId?: string;
+  onGuardEvent?: (e: {
+    hook: string;
+    decision?: string;
+    reason?: string;
+  }) => void;
 };
 
 export type ToolResult =

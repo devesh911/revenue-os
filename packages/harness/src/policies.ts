@@ -55,11 +55,23 @@ export const quietHoursHook: PolicyHook = async (ctx, action) => {
     const tzMode = config.tz;
     let zone: string;
     if (tzMode === "contact") {
-      const c = await ctx.db.query(
-        "select timezone from contacts where id = $1 limit 1",
-        [action.contactId],
-      );
-      const contactTz = c.rows[0]?.timezone;
+      const c = action.contactId
+        ? await ctx.db.query(
+            "select timezone from contacts where id = $1 limit 1",
+            [action.contactId],
+          )
+        : undefined;
+      const row = c?.rows[0];
+      if (!row) {
+        // No identity (or a deleted/cross-tenant id) ⇒ no timezone. A courtesy gate may not GUESS
+        // one: fail open, but never silently — the skip is the observable decision (task-56 AC2).
+        ctx.onGuardEvent?.({
+          hook: "quiet_hours",
+          reason: "unresolved_contact_tz",
+        });
+        return null;
+      }
+      const contactTz = row.timezone;
       zone =
         typeof contactTz === "string" && contactTz ? contactTz : DEFAULT_TZ;
     } else if (typeof tzMode === "string" && tzMode) {
@@ -83,15 +95,21 @@ export const quietHoursHook: PolicyHook = async (ctx, action) => {
  * contactId is the "do-not-contact THIS person" signal. Hard-safety, so it FAILS CLOSED — any
  * read error blocks (never fall open to a send on uncertainty). A channel-less tool carries no
  * send, so it returns null BEFORE any DB read: a DB outage must not block the plain-tool path.
+ * task-56: an UNRESOLVABLE identity (no contactId, or an id matching zero rows — deleted,
+ * hallucinated, or another tenant's under RLS) is strictly less knowledge than a failed read, so
+ * it blocks too. You may not send to someone whose consent you cannot look up.
  */
 export const dncHook: PolicyHook = async (ctx, action) => {
   if (!action.channel) return null; // plain-tool path — never DNC-gated, never DB-read
+  if (!action.contactId) return { ok: false, reason: "dnc" };
   try {
     const res = await ctx.db.query(
       "select consent from contacts where id = $1 limit 1",
       [action.contactId],
     );
-    const consent = res.rows[0]?.consent as Record<string, unknown> | undefined;
+    const row = res.rows[0];
+    if (!row) return { ok: false, reason: "dnc" }; // unknown recipient ⇒ unknowable consent
+    const consent = row.consent as Record<string, unknown> | undefined;
     return consent?.dnc === true ? { ok: false, reason: "dnc" } : null;
   } catch {
     // FAIL-CLOSED: block on uncertainty — a DNC read error must never fall open to a send.
