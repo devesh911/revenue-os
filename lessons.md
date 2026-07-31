@@ -327,3 +327,6 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   (`...realAgentsApi, useAgentsQuery: …`), the pattern the same file already uses for screens/api +
   orgs/api. Same regression class as PR #71. At RED the spread was impossible (module absent), so this
   is a GREEN-phase test-mock update owed by the tester, not the implementer.
+- 2026-07-31 · task-34 (www componentization) · Tailwind-v4 apps in this monorepo need a per-app
+  biome.json with css.parser.tailwindDirectives (mirror apps/console/biome.json) or `bun run lint`
+  fails to parse @theme/@utility.
