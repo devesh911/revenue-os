@@ -5,6 +5,7 @@
 !package.json
 !bun.lock
 !apps/console/package.json
+!apps/www/package.json
 !packages
 !services/worker
 # nested junk inside the allowlisted trees
