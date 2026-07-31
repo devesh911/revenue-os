@@ -168,6 +168,18 @@ describe("end-of-call-report folds a summary into contact memory (M1)", () => {
     const call1 = `mem-lin1-${RUN}`;
     const call2 = `mem-lin2-${RUN}`;
 
+    // A BYSTANDER in the same org with its own live summary: the supersede must be scoped by
+    // contact, not by org. An update that only matched (kind, superseded_by is null) would
+    // bury this row too and RLS would not notice — same tenant.
+    const bystander = await newContact(orgA, "Bystander");
+    const bystanderCall = `mem-lin-by-${RUN}`;
+    await newCall(orgA, bystander, bystanderCall);
+    await post(orgA, report(bystanderCall, SUMMARY_1));
+    await processVapiEvents(pool, orgA);
+    const bystanderBefore = await memories(bystander);
+    expect(bystanderBefore.length).toBe(1);
+    expect(bystanderBefore[0].superseded_by).toBeNull();
+
     const convo1 = await newCall(orgA, contact, call1);
     await post(orgA, report(call1, SUMMARY_1));
     await processVapiEvents(pool, orgA);
@@ -187,6 +199,12 @@ describe("end-of-call-report folds a summary into contact memory (M1)", () => {
     expect(superseded.superseded_by).toBe(live[0].id); // lineage points at the new row
     expect(superseded.content).toBe(SUMMARY_1); // history preserved verbatim
     expect(superseded.source_conversation_id).toBe(convo1);
+
+    // the bystander's summary is untouched — Bianca's fold is none of its business
+    const bystanderAfter = await memories(bystander);
+    expect(bystanderAfter.length).toBe(1);
+    expect(bystanderAfter[0].superseded_by).toBeNull(); // still live
+    expect(bystanderAfter[0].content).toBe(SUMMARY_1); // and unchanged
   });
 });
 
