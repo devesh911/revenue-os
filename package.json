@@ -14,7 +14,7 @@
     "test": "bun test",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc --noEmit -p tsconfig.base.json && tsc --noEmit -p apps/console",
+    "typecheck": "tsc --noEmit -p tsconfig.base.json && tsc --noEmit -p apps/console && tsc --noEmit -p apps/www",
     "db:migrate": "supabase db push",
     "db:reset": "supabase db reset",
     "db:seed": "bun scripts/seed.ts",

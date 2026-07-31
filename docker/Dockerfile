@@ -6,6 +6,7 @@ WORKDIR /app
 # (console ships no code into this image — its package.json only satisfies the workspace set).
 COPY package.json bun.lock ./
 COPY apps/console/package.json ./apps/console/package.json
+COPY apps/www/package.json ./apps/www/package.json
 COPY packages/channels/package.json ./packages/channels/package.json
 COPY packages/db/package.json ./packages/db/package.json
 COPY packages/harness/package.json ./packages/harness/package.json

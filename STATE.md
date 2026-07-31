@@ -122,6 +122,8 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 4. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
+5. ~~Wire apps/www into the root typecheck script~~ — DONE in this PR (#87 @48881df; review round 1).
+   type-clean manually).
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
 
@@ -140,6 +142,19 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **apps/www zero-dep reframe (task-34, 2026-07-31):** Devesh redefined zero-dep for apps/www as
+  "no backend connectivity" (no API calls, no secrets) — not "no build tooling." Reframes the
+  task-26 zero-dep decision; does not reverse it. Build tooling (react/vite/tailwind) is allowed
+  and now used.
+- **apps/www stack = console's stack, not Astro (task-34, 2026-07-31):** componentization reuses
+  react/react-dom/vite/@vitejs/plugin-react/tailwindcss/@tailwindcss/vite — already-approved
+  tech-stack.md §T24 pins, zero new BOM row. Further retires the README's week-3 Astro reservation
+  (task-26 already superseded it once) rather than reviving it — Astro would need a new BOM row via
+  the agent-denied docs/tech-stack.md path.
+- **Per-app biome.json convention extended to apps/www (task-34, 2026-07-31):** apps/www/biome.json
+  now mirrors apps/console/biome.json exactly (root:false, extends "//", css.parser.tailwindDirectives:true)
+  so Biome parses the Tailwind v4 @theme/@utility rules — the same mechanism as the console
+  design-system decision below, now standing convention for any Tailwind-v4 app in this monorepo.
 - **Guardrail-policies config decisions (task 52, 2026-07-30):** `attempt_caps` is a `strictObject`
   with optional `voice`/`whatsapp` keys — strict rejects unknown channels, optional lets an org cap
   just one channel; a missing channel means no cap, by design. One `GuardrailPolicyInputSchema`
@@ -241,8 +256,8 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
 - (this PR) T9/task-49 — M2 REPLAY (the acceptance gate): deterministic multi-day lifecycle GREEN on a SimClock + synthetic providers; two integration gaps fixed (booking outcome run-attributed via conversation_id; completed runs rest at current_step='end'); T8-H2 barrel closed. @b00d0f2 + @bae1f37. — 2026-07-27
 - (this PR) T8 (task-48) GREEN @c8b2b9f — worker production boot wired: action queues (policy 'short') + call.post dead-letter, 4 T7 handlers via boss.work, durable pg-boss scheduler.tick; ANTHROPIC_API_KEY optional, makeProvider gates the Claude provider (null ⇒ boot still green). wiring-unit 3/3, wiring-jobs CI-owned. — 2026-07-27
 - (this PR) T7 (task-47) GREEN @1adf15b — job handlers + agent.turn bridge + Feed-1 + M2 lastDisposition-clear; env-free gates green (typecheck/lint/context 2·2), handler+scheduler suites CI-owned. — 2026-07-27
 - (this PR) T6 scheduler tick + run writer GREEN @6d250ee — startRun + tick over the T1 interpreter: per-run withOrg tx, FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned. T6→T7 payload {orgId,runId,action}; T6→T8 createQueue(ACTION_QUEUES). — 2026-07-25
-- (this PR) T4 tool catalog GREEN @6106660 — book_appointment/update_contact/send_confirmation + buildCatalog wired; 12/12 env-free unit pass, 4 integration CI-owned — 2026-07-25

@@ -1,34 +1,148 @@
-/* tokens.css — the design tokens for the Revenue OS marketing surface.
-   Loaded FIRST (before components.css and page.css): it defines every custom
-   property the other two layers reference, and owns the only raw colour hex on
-   the site. Editing rule: a colour, hairline, or font family changes HERE and
-   nowhere else. The @font-face blocks below are the self-hosted families; their
-   url()s resolve relative to this file's dir (styles/), i.e. ../fonts/<file>. */
+/* styles.css — the marketing surface's single visual vocabulary, ported from the
+   retired styles/{tokens,components,page}.css into Tailwind v4's @theme idiom (the
+   console's stack). Raw colour hex lives ONLY here (architecture.test.ts); every
+   component references tokens through generated utilities (bg-ground, text-cream,
+   border-hairline-22, text-cream-68 …) or the decorative @utility background layers
+   below (gradients / glows / scrims / noise) — never raw hex. Biome parses these
+   Tailwind v4 directives via apps/www/biome.json (mirrors apps/console/biome.json).
+   The @font-face families are self-hosted; their url()s resolve from
+   this file's dir (src/) as ../fonts/<file>.woff2, unchanged from the static export.
+   main.tsx owns the side-effect `import "./styles.css"`, keeping App SSR-safe. */
+@import "tailwindcss";
 
-:root {
-  /* ── palette (the only raw hex on the site) ───────────────────────────── */
-  --ground: #0b1712;
-  --cream: #ede3cf;
-  --gold: #e8c87a;
-  --intent-teal: #8fb8a8;
+@theme {
+  /* ── palette — the only raw colour hex on the surface ─────────────────── */
+  --color-ground: #0b1712;
+  --color-cream: #ede3cf;
+  --color-gold: #e8c87a;
+  --color-intent-teal: #8fb8a8;
 
   /* cream channel — composed with an alpha for every hairline + text tier so
-     the tiers stay a single source of truth (rgba(var(--cream-rgb), <a>)). */
+     the tiers stay a single source of truth: rgba(var(--cream-rgb), <a>). */
   --cream-rgb: 237, 227, 207;
 
-  /* hairline scale — cream borders at the four alphas the export draws with. */
-  --hairline-22: rgba(237, 227, 207, 0.22);
-  --hairline-18: rgba(237, 227, 207, 0.18);
-  --hairline-12: rgba(237, 227, 207, 0.12);
-  --hairline-09: rgba(237, 227, 207, 0.09);
+  /* hairline scale — cream borders at the four alphas the export draws with */
+  --color-hairline-22: rgba(var(--cream-rgb), 0.22);
+  --color-hairline-18: rgba(var(--cream-rgb), 0.18);
+  --color-hairline-12: rgba(var(--cream-rgb), 0.12);
+  --color-hairline-09: rgba(var(--cream-rgb), 0.09);
 
-  /* type families */
+  /* cream text/border tiers — cream at the descending opacities the export uses */
+  --color-cream-85: rgba(var(--cream-rgb), 0.85);
+  --color-cream-75: rgba(var(--cream-rgb), 0.75);
+  --color-cream-72: rgba(var(--cream-rgb), 0.72);
+  --color-cream-70: rgba(var(--cream-rgb), 0.7);
+  --color-cream-68: rgba(var(--cream-rgb), 0.68);
+  --color-cream-65: rgba(var(--cream-rgb), 0.65);
+  --color-cream-60: rgba(var(--cream-rgb), 0.6);
+  --color-cream-55: rgba(var(--cream-rgb), 0.55);
+  --color-cream-50: rgba(var(--cream-rgb), 0.5);
+  --color-cream-45: rgba(var(--cream-rgb), 0.45);
+  --color-cream-35: rgba(var(--cream-rgb), 0.35);
+  --color-cream-25: rgba(var(--cream-rgb), 0.25);
+  --color-cream-07: rgba(var(--cream-rgb), 0.07);
+  --color-cream-06: rgba(var(--cream-rgb), 0.06);
+  --color-cream-04: rgba(var(--cream-rgb), 0.04);
+  --color-cream-03: rgba(var(--cream-rgb), 0.03);
+  --color-cream-02: rgba(var(--cream-rgb), 0.02);
+
+  /* type families — self-hosted faces declared below */
   --font-display: "Playfair Display", serif;
   --font-mono: "IBM Plex Mono", monospace;
   --font-body: "Lora", Georgia, serif;
 }
 
-/* ── self-hosted families ─────────────────────────────────────────────── */
+/* ── decorative background layers — gradients / glows / scrims / noise kept out
+      of the component tsx (no raw hex there) and expressed once, here. The teal
+      glow stays a literal rgba: a one-off decorative wash, not a reusable token. */
+@utility bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22/%3E%3CfeColorMatrix values=%220 0 0 0 0.93 0 0 0 0 0.89 0 0 0 0 0.81 0 0 0 0.05 0%22/%3E%3C/filter%3E%3Crect width=%22180%22 height=%22180%22 filter=%22url(%23n)%22/%3E%3C/svg%3E");
+}
+@utility bg-hero-glow {
+  background: radial-gradient(
+    ellipse 70% 90% at 50% -20%,
+    rgba(46, 110, 98, 0.28),
+    transparent 65%
+  );
+}
+@utility bg-footcta-glow {
+  background: radial-gradient(
+    ellipse 60% 100% at 50% 120%,
+    rgba(46, 110, 98, 0.3),
+    transparent 65%
+  );
+}
+@utility bg-moat-a {
+  background: linear-gradient(
+    160deg,
+    rgba(20, 58, 44, 0.8),
+    rgba(31, 84, 64, 0.9)
+  );
+}
+@utility bg-moat-b {
+  background: linear-gradient(
+    160deg,
+    rgba(16, 38, 74, 0.8),
+    rgba(24, 52, 102, 0.9)
+  );
+}
+@utility bg-moat-c {
+  background: linear-gradient(
+    160deg,
+    rgba(74, 16, 12, 0.8),
+    rgba(112, 24, 18, 0.9)
+  );
+}
+@utility bg-plan-a {
+  background: linear-gradient(
+    160deg,
+    rgba(20, 58, 44, 0.78),
+    rgba(31, 84, 64, 0.9)
+  );
+}
+@utility bg-plan-b {
+  background: linear-gradient(
+    160deg,
+    rgba(16, 38, 74, 0.78),
+    rgba(24, 52, 102, 0.9)
+  );
+}
+@utility bg-plan-c {
+  background: linear-gradient(
+    160deg,
+    rgba(74, 16, 12, 0.78),
+    rgba(112, 24, 18, 0.9)
+  );
+}
+@utility bg-plan-scrim {
+  background: linear-gradient(
+    180deg,
+    rgba(11, 23, 18, 0.55) 0%,
+    rgba(11, 23, 18, 0.15) 30%,
+    rgba(11, 23, 18, 0.2) 55%,
+    rgba(11, 23, 18, 0.82) 100%
+  );
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--color-ground);
+  }
+  body {
+    color: var(--color-cream);
+    font-family: var(--font-body);
+  }
+  ::selection {
+    background: var(--color-cream);
+    color: var(--color-ground);
+  }
+}
+
+/* ── self-hosted families — url()s resolve from src/ as ../fonts/<file>.woff2,
+      unchanged from the retired styles/tokens.css (self-hosting: AC-3). ────── */
 /* cyrillic-ext */
 @font-face {
   font-family: "IBM Plex Mono";

@@ -35,6 +35,21 @@
         "vite": "8.1.4",
       },
     },
+    "apps/www": {
+      "name": "www",
+      "dependencies": {
+        "react": "19.2.7",
+        "react-dom": "19.2.7",
+      },
+      "devDependencies": {
+        "@tailwindcss/vite": "4.3.2",
+        "@types/react": "19.2.17",
+        "@types/react-dom": "19.2.3",
+        "@vitejs/plugin-react": "6.0.3",
+        "tailwindcss": "4.3.2",
+        "vite": "8.1.4",
+      },
+    },
     "packages/channels": {
       "name": "@revenue-os/channels",
     },
@@ -424,6 +439,8 @@
     "worker": ["worker@workspace:services/worker"],
 
     "wouter": ["wouter@3.10.0", "", { "dependencies": { "mitt": "^3.0.1", "regexparam": "^3.0.0", "use-sync-external-store": "^1.0.0" }, "peerDependencies": { "react": ">=16.8.0" } }, "sha512-zTfddD80zc2/J5l8JKcdvzOK6AwP0kpyHEI3DxRN2bn8U1oJPnrSVm8v+X3WwDamvLAOxTO7ZvkxkpRWlyeJ1Q=="],
+
+    "www": ["www@workspace:apps/www"],
 
     "xtend": ["xtend@4.0.2", "", {}, "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="],
 
