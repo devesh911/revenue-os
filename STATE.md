@@ -4,9 +4,20 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-31 (memory wave complete: M1+M2+M3)
+Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path)
 
 ## NOW (verified facts, not hopes)
+- **Guardrail pipeline activated on the loop send path (task-56, 2026-08-01):** `runTurn` now
+  hands `guard()` the channel and recipient behind every tool-driven send
+  (`packages/harness/src/{loop,policies,types}.ts`) — closes moat invariant #4's tool-loop hole:
+  `dncHook`/`quietHoursHook`/`attemptCapHook` all keyed on `action.channel`, which the loop never
+  set, so all three returned `null` before any DB read on every tool-driven send. An unresolvable
+  contact identity now gets an explicit posture per hook: `dncHook` fails CLOSED, `quietHoursHook`
+  fails OPEN and records `{hook:'quiet_hours', reason:'unresolved_contact_tz'}` via a new optional
+  `OrgCtx.onGuardEvent` sink (no more silent `Asia/Kolkata` guess). Operator-facing: a conversation
+  whose `contact_id` is still null cannot make a tool-driven outbound send until the contact
+  resolves. `bun test packages/harness` 114 pass / 11 skip / 0 fail, run twice; CI owns the DB-backed
+  suites.
 - **Memory wave Feed-2 COMPLETE — M3 acceptance gate (task-55, 2026-07-31):** `memory-e2e.test.ts`
   (6 criteria, mutation-verified) proves M1 (#88) + M2 (#89) compose end-to-end — the agent's second
   call knows what the first call learned, superseded memory never speaks, hostile summaries are
@@ -127,13 +138,16 @@ Updated: 2026-07-31 (memory wave complete: M1+M2+M3)
 ## NEXT (top = take it; one task, one branch, one PR)
 1. M4 KB/semantic retrieval — GATED on Devesh's Voyage approval (voyage-3-lite, new account+key+BOM
    row); the phased design's only open fork.
-2. Guardrail hooks — dnc/attempt-caps/spend-caps (task 25 follow-on, spec §12, moat invariant #4):
-   wire into `packages/harness` `defaultPipeline` alongside `autonomyHook`/`quietHoursHook`. DNC
-   must fail closed (hard-safety) — opposite of quiet-hours' fail-open posture (see DECISIONS).
-3. Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
+2. Org-level `autonomy` policy activation (task-56 follow-on, spec §12, moat invariant #4): the
+   `autonomy` key is seeded (`seeds/real_estate.sql:48`) and `packages/harness/src/types.ts:38`
+   promises a config-driven `approval` tier, but no hook reads `guardrail_policies` for it — an org
+   cannot tighten a tool from `auto` to `approval` via config yet. Remaining piece of the activation
+   surface after task-56 wired the loop's channel-bearing sends.
+3. ~~Activate the guardrail hooks — wire `action.channel` + `contactId` at the send call site
    (`packages/channels` / `loop.ts`) so quiet-hours (and dnc/attempt-caps) actually fire; fix the
    latent tz `'contact'` + missing-`contactId` path to fail OPEN (not default `Asia/Kolkata`);
-   handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)
+   handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)~~ — DONE in
+   this PR (task-56).
 4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
    needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
 5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
@@ -141,6 +155,12 @@ Updated: 2026-07-31 (memory wave complete: M1+M2+M3)
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
 6. ~~Wire apps/www into the root typecheck script~~ — DONE in this PR (#87 @48881df; review round 1).
    type-clean manually).
+7. Spend-cap guardrail hook (task-56 follow-on, security S8.2): `Verdict` reserves `'spend_cap'`
+   (`packages/harness/src/types.ts:73-79`, `docs/tech-stack.md:151`) and S8.2 requires per-org spend
+   caps, but no `guardrail_policies` key exists yet (seeds ship only `quiet_hours`/`attempt_caps`/
+   `dnc`/`autonomy`). Meter exists (`usage_events.cost_usd`, `007_ops.sql:38`, indexed
+   `usage_org_time`). Blocked on choosing + seeding a key shape (e.g. `spend_caps {usd, per_hours}`)
+   — a schema/seed decision, not code.
 ## IN FLIGHT
 (nothing in flight — task-14b is gated, see WAITING)
 
@@ -159,6 +179,12 @@ Updated: 2026-07-31 (memory wave complete: M1+M2+M3)
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Guardrail posture on unresolvable contact identity (task-56, 2026-08-01):** on an unresolvable
+  contact identity behind a channel-bearing action, the two guard classes take OPPOSITE postures on
+  purpose — `dncHook` (hard safety) blocks, `quietHoursHook` (courtesy) passes but records
+  `{hook:'quiet_hours', reason:'unresolved_contact_tz'}` via the new optional `ctx.onGuardEvent`. A
+  missed send is a courtesy failure; a send to a DNC-listed person is a legal one — and a guard that
+  guesses a timezone is not a guard.
 - **Memory-write newest-wins supersede (task-53, 2026-07-31):** a duplicate `end-of-call-report`
   under a DISTINCT provider event id supersedes the prior live summary, not a dedupe — newest wins.
   Exact replays die at the receiver's `dedupe_key` first, so drained/duplicate events never re-fold.
@@ -284,8 +310,8 @@ Updated: 2026-07-31 (memory wave complete: M1+M2+M3)
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
 - (this PR) task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
 - (this PR) task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
 - #88 task-53 memory-write M1 (contact_memories fold) — 2026-07-31
 - (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
-- (this PR) T9/task-49 — M2 REPLAY (the acceptance gate): deterministic multi-day lifecycle GREEN on a SimClock + synthetic providers; two integration gaps fixed (booking outcome run-attributed via conversation_id; completed runs rest at current_step='end'); T8-H2 barrel closed. @b00d0f2 + @bae1f37. — 2026-07-27
