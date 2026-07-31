@@ -330,3 +330,7 @@ transcript screen (P1) — needs an explicit deferral note or the test.
 - 2026-07-31 · task-34 (www componentization) · Tailwind-v4 apps in this monorepo need a per-app
   biome.json with css.parser.tailwindDirectives (mirror apps/console/biome.json) or `bun run lint`
   fails to parse @theme/@utility.
+- 2026-07-31 · task-53 (memory-write M1) · worktree missions need the full app_service DSN with
+  password (`app_service:app_service_local`, in-repo at .github/workflows/ci.yml:60) — a
+  passwordless DSN fails as `SASL … password must be a string`, surfacing as a misleading HTTP 500
+  in receiver tests.

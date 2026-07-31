@@ -4,10 +4,15 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-07-30 (tasks 50+51+52 — console backend wave COMPLETE: AgentsPage,
-Analytics "Trends", and Settings Guardrails all live on real data)
+Updated: 2026-07-31 (task-53 — memory-write M1: end-of-call summaries fold into contact_memories)
 
 ## NOW (verified facts, not hopes)
+- **Calls now leave a memory (task-53, Feed-2 M1, 2026-07-31):** the Vapi `end-of-call-report`
+  branch folds the call summary into `contact_memories` in the same transaction that completes the
+  conversation — verbatim content, `kind='summary'`, `embedding` NULL; the previous live summary
+  per contact is superseded via `superseded_by` (append-only, per-contact lineage). No contact or
+  empty summary → silent skip (event still `processed`); no migration (006 already ships the
+  table). Real-DB suite memory-write.test.ts (8 tests) is CI-owned.
 - **Settings Guardrails live on real data (task 52, 2026-07-30):** `GET`/`PUT
   /orgs/:orgId/guardrail-policies` (GET any member, PUT admin-only S1.7) share one
   `GuardrailPolicyInputSchema` — the strict-Zod boundary parsed by both the worker route and the
@@ -142,6 +147,12 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Memory-write newest-wins supersede (task-53, 2026-07-31):** a duplicate `end-of-call-report`
+  under a DISTINCT provider event id supersedes the prior live summary, not a dedupe — newest wins.
+  Exact replays die at the receiver's `dedupe_key` first, so drained/duplicate events never re-fold.
+- **Memory-write skip-on-null-contact posture (task-53, 2026-07-31):** inbound conversations carry
+  `contact_id` null until contact resolution exists — skipping the memory fold is their normal path,
+  not an error; memory fires on workflow-placed (outbound) calls only, today.
 - **apps/www zero-dep reframe (task-34, 2026-07-31):** Devesh redefined zero-dep for apps/www as
   "no backend connectivity" (no API calls, no secrets) — not "no build tooling." Reframes the
   task-26 zero-dep decision; does not reverse it. Build tooling (react/vite/tailwind) is allowed
@@ -256,8 +267,8 @@ Analytics "Trends", and Settings Guardrails all live on real data)
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- #TBD task-53 memory-write M1 (contact_memories fold) — 2026-07-31
 - (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
 - (this PR) T9/task-49 — M2 REPLAY (the acceptance gate): deterministic multi-day lifecycle GREEN on a SimClock + synthetic providers; two integration gaps fixed (booking outcome run-attributed via conversation_id; completed runs rest at current_step='end'); T8-H2 barrel closed. @b00d0f2 + @bae1f37. — 2026-07-27
 - (this PR) T8 (task-48) GREEN @c8b2b9f — worker production boot wired: action queues (policy 'short') + call.post dead-letter, 4 T7 handlers via boss.work, durable pg-boss scheduler.tick; ANTHROPIC_API_KEY optional, makeProvider gates the Claude provider (null ⇒ boot still green). wiring-unit 3/3, wiring-jobs CI-owned. — 2026-07-27
 - (this PR) T7 (task-47) GREEN @1adf15b — job handlers + agent.turn bridge + Feed-1 + M2 lastDisposition-clear; env-free gates green (typecheck/lint/context 2·2), handler+scheduler suites CI-owned. — 2026-07-27
-- (this PR) T6 scheduler tick + run writer GREEN @6d250ee — startRun + tick over the T1 interpreter: per-run withOrg tx, FOR UPDATE SKIP LOCKED, pgboss.job singleton_key dedup (policy 'short'), park(place_call)/advance(send_wa), interpret-throw dead-letter vs DB-error rollback; real-DB suite CI-owned. T6→T7 payload {orgId,runId,action}; T6→T8 createQueue(ACTION_QUEUES). — 2026-07-25
