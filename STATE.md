@@ -4,9 +4,22 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path)
+Updated: 2026-08-01 (task-57: LLM/tool path repaired — the agent can actually use its tools now)
 
 ## NOW (verified facts, not hopes)
+- **LLM/tool path repaired (task-57, 2026-08-01):** the three stacked defects that made every
+  tool-driven turn broken against the real Anthropic API are fixed as one unit (hole-audit
+  Package 1, H1→H2→H3). H1: `registry.specs()` shipped the live ZodType as `input_schema` (wire
+  object was `{def,type}`, no `properties` — the model saw parameterless tools); `z.toJSONSchema`
+  now runs once at `register()`, `Tool.schema` stays the live zod seatbelt. H2: the adapter parsed
+  the body regardless of status — a 401/429/500/529 envelope returned an EMPTY turn recorded as
+  success; non-2xx now throws `AnthropicHttpError` carrying the status (pg-boss retries are real
+  again). H3: `messages.tool_call` was never read back into the prompt (tool rows arrived as ""),
+  so a context-conditioned model re-issues the same call every round — up to 5 duplicate sends per
+  turn; `assembleContext` now renders name/args/result into the transcript and drops empty rows
+  (also sanitises pre-task-57 rows, and an empty content block is a 400 at Anthropic). Persisted
+  rows unchanged (structured jsonb record intact). RED 10 fail → GREEN: harness 129/11/0,
+  typecheck 0, biome clean; DB-backed suites CI-owned.
 - **Guardrail pipeline activated on the loop send path (task-56, 2026-08-01):** `runTurn` now
   hands `guard()` the channel and recipient behind every tool-driven send
   (`packages/harness/src/{loop,policies,types}.ts`) — closes moat invariant #4's tool-loop hole:
@@ -136,6 +149,11 @@ Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
+0. **Workflow-path repair (task-58, hole-audit Package 2 — spec in docs/sdlc.md §3):** the seeded
+   workflow engine cannot run in prod for two independent reasons (H9 seeds fail the engine's own
+   schema; H10 org discovery is RLS-empty). Land H9+H7 together, then H5, plus the H10 enumerator;
+   H8 (send_wa dedupe key lacks step/idx) is an independent one-liner. Guard-critical → tester RED,
+   Fable line-review before GREEN.
 1. M4 KB/semantic retrieval — GATED on Devesh's Voyage approval (voyage-3-lite, new account+key+BOM
    row); the phased design's only open fork.
 2. Org-level `autonomy` policy activation (task-56 follow-on, spec §12, moat invariant #4): the
@@ -310,8 +328,8 @@ Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
-- (this PR) task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
-- (this PR) task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
+- (this PR) task-57 LLM/tool path repair (JSON-Schema tool wire, loud HTTP errors, tool-result feedback) — 10 RED → GREEN, harness 129/11/0 — 2026-08-01
+- #91 task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
+- #90 task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
+- #89 task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
 - #88 task-53 memory-write M1 (contact_memories fold) — 2026-07-31
-- (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
