@@ -51,16 +51,33 @@ insert into agents (org_id, key, version, status, model, system_prompt, tools_al
    '{"supported":["en","hi","hi-en"],"detect":"first_utterance","fallback":"en"}')
 on conflict (org_id, key, version) do nothing;
 
+-- Workflow v1 (DRAFT): outbound qualification. Engine dialect (WorkflowDefinitionSchema) —
+-- `entry` + a keyed `steps` record, kinds from the closed set; every ref resolves in-definition.
 insert into workflows (org_id, key, version, status, definition) values
   (current_setting('seed.org_id')::uuid, 'outbound_qualification', 1, 'draft',
-   '{"steps":[
-      {"id":"call","kind":"conversation","agent":"qualifier","direction":"outbound"},
-      {"id":"no_answer_wait","kind":"wait","duration":"2h","on":"no_answer"},
-      {"id":"whatsapp_followup","kind":"send","channel":"whatsapp","template":"intro_1","requires":"whatsapp_optin"},
-      {"id":"recall_wait","kind":"wait","until":"next_day_11:00"},
-      {"id":"recall","kind":"conversation","agent":"qualifier"},
-      {"id":"callback_task","kind":"task","task_kind":"callback","on":"qualified"}
-    ]}')
+   '{"entry":"outbound_call",
+     "steps":{
+       "outbound_call":{"kind":"call","agent":"qualifier",
+         "on":{"completed":"route","no_answer":"retry_wait","busy":"retry_wait","failed":"end"}},
+       "retry_wait":{"kind":"wait","for":"PT2H","then":"whatsapp_intro"},
+       "whatsapp_intro":{"kind":"whatsapp","template":"intro_1","then":"recall_wait"},
+       "recall_wait":{"kind":"wait_until","localTime":"11:00","then":"recall"},
+       "recall":{"kind":"call","agent":"qualifier",
+         "on":{"completed":"route","no_answer":"end","busy":"end","failed":"end"}},
+       "route":{"kind":"branch",
+         "onDisposition":{"sample_requested":"sample_task","interested":"callback_task",
+                          "callback":"callback_task","send_catalog":"catalog_task",
+                          "price_objection":"quote_task","dnc":"end","*":"end"}},
+       "sample_task":{"kind":"tool","tool":"create_task",
+         "args":{"kind":"manual","title":"Dispatch a sample kit to the buyer"},"then":"end"},
+       "callback_task":{"kind":"tool","tool":"create_task",
+         "args":{"kind":"callback","title":"Callback from a human rep"},"then":"end"},
+       "catalog_task":{"kind":"tool","tool":"create_task",
+         "args":{"kind":"manual","title":"Send the product catalogue"},"then":"end"},
+       "quote_task":{"kind":"tool","tool":"create_task",
+         "args":{"kind":"approval","title":"Approve a quote before it goes out"},"then":"end"},
+       "end":{"kind":"end"}
+     }}')
 on conflict (org_id, key, version) do nothing;
 
 insert into eval_scenarios (org_id, key, persona, script, assertions) values

@@ -37,6 +37,11 @@ export type SendWaDeps = {
 export type SendWaJob = {
   orgId: string;
   runId: string;
+  /** Per-send identity from the scheduler (its singleton_key is `<runId>:<step>:<idx>`). Optional
+   *  because jobs enqueued before this field existed are still in flight: those fall back to the
+   *  old per-template key, which is exactly-once for the only sends they can represent. */
+  step?: string;
+  idx?: number;
   action: {
     kind: "send_wa";
     contactId: string;
@@ -63,7 +68,11 @@ export async function handleSendWa(
     if (!run) return; // RLS-hidden (cross-tenant) or gone
     const state = (run.state ?? {}) as { vars?: Record<string, string> };
 
-    const dedupeKey = `send_wa:${runId}:${action.template}`;
+    // Identify the SEND, not the template: a reminder cadence reuses one template across steps,
+    // and a template-keyed marker would silently swallow every send after the first.
+    const sendKey =
+      job.step === undefined ? action.template : `${job.step}:${job.idx ?? 0}`;
+    const dedupeKey = `send_wa:${runId}:${sendKey}`;
     const seen = await tx.query(
       `select 1 from usage_events
         where org_id = $1 and kind = 'wa_message' and meta ->> 'dedupeKey' = $2 limit 1`,

@@ -30,7 +30,7 @@ import {
   type WaSenderPort,
 } from "./handlers/send-wa";
 import { logger } from "./logger";
-import { ACTION_QUEUES, tick } from "./scheduler";
+import { ACTION_QUEUES, discoverDueOrgs, tick } from "./scheduler";
 import { processVapiEvents } from "./vapi/process";
 
 export const WEBHOOK_PROCESS_VAPI = "webhook.process.vapi";
@@ -193,25 +193,18 @@ export async function enqueueVapiProcess(orgId: string): Promise<void> {
 
 /**
  * The pg-boss-scheduled tick: discover orgs with due runs and drive each through the scheduler's
- * per-org `tick`. app_service is RLS-bound, so this cross-tenant scan of workflow_runs returns
- * nothing without a request.org_id scope — in production the fan-out is EMPTY until an RLS-exempt
- * org enumerator lands, which is why the read is wrapped: an RLS error means "tick what's visible"
- * (nothing), never a crashed tick. The M2 replay (T9) drives tick() per-org directly, so day-scale
- * runs never depend on this discovery. See CLEANUP-LEDGER.
- * ponytail: single-tenant fan-out ceiling — cross-tenant org discovery needs a SECURITY DEFINER
- * enumerator (or the postgres role); wire it when multi-tenant scheduling actually matters.
+ * per-org `tick`. Discovery is the RLS-exempt `app.due_org_ids()` enumerator (migration 016) —
+ * ids only, no row payload — so the fan-out is genuinely cross-tenant while every subsequent read
+ * stays org-scoped through withOrg. A discovery failure means "tick what's visible" (nothing),
+ * never a crashed tick. The M2 replay (T9) drives tick() per-org directly.
  */
 async function runScheduledTick(): Promise<void> {
   const now = new Date();
   let orgIds: string[] = [];
   try {
-    const r = await pool.query<{ org_id: string }>(
-      `select distinct org_id from workflow_runs
-        where status in ('pending', 'waiting') and wake_at <= now()`,
-    );
-    orgIds = r.rows.map((row) => row.org_id);
+    orgIds = await discoverDueOrgs(pool);
   } catch (err) {
-    logger.error({ err }, "scheduler tick: org discovery unavailable (RLS)");
+    logger.error({ err }, "scheduler tick: org discovery unavailable");
   }
   for (const orgId of orgIds) {
     try {
