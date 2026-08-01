@@ -36,6 +36,33 @@ function whyBlock(workflow: {
   return lines.join("\n");
 }
 
+/** task-57 — a tool round rendered back INTO the prompt. messages.tool_call (jsonb) is the
+ *  structured record; content on those rows is null, so without this the model sees an empty
+ *  message and re-issues the same call every round (duplicate sends). Name + args + outcome is
+ *  the minimum evidence "your call already ran" needs. */
+function renderToolCall(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const { name, args, result } = payload as {
+    name?: unknown;
+    args?: unknown;
+    result?: unknown;
+  };
+  const parts = [`tool ${typeof name === "string" ? name : "unknown"}`];
+  if (args !== undefined) parts.push(`args ${JSON.stringify(args)}`);
+  if (result !== undefined) parts.push(`result ${JSON.stringify(result)}`);
+  return `[${parts.join(" · ")}]`;
+}
+
+/** The prompt-facing line for one transcript row: what was said, plus any tool payload. */
+function renderRow(row: Record<string, unknown>): string {
+  return [
+    typeof row.content === "string" ? row.content : "",
+    renderToolCall(row.tool_call),
+  ]
+    .filter((part) => part.trim() !== "")
+    .join("\n");
+}
+
 export async function assembleContext(
   ctx: OrgCtx,
   conversationId: string,
@@ -43,8 +70,8 @@ export async function assembleContext(
   workflow?: { currentStep: string; state: WorkflowState },
 ): Promise<{ system: string; messages: Msg[] }> {
   const r = await ctx.db.query(
-    `select role, content from (
-		   select role, content, seq from messages
+    `select role, content, tool_call from (
+		   select role, content, tool_call, seq from messages
 		   where conversation_id = $1 order by seq desc limit $2
 		 ) tail order by seq asc`,
     [conversationId, TRANSCRIPT_TAIL],
@@ -57,9 +84,10 @@ export async function assembleContext(
   const block = memoryBlock(await retrieveMemories(ctx, conversationId));
   return {
     system: block ? `${prompt}\n\n${block}` : prompt,
-    messages: r.rows.map((m) => ({
-      role: m.role as Msg["role"],
-      content: (m.content as string) ?? "",
-    })),
+    // Empty rows are DROPPED, never sent: a content-less block is a 400 at Anthropic, and rows
+    // written before task-57 (tool rows with a null content and no payload) are exactly that.
+    messages: r.rows
+      .map((m) => ({ role: m.role as Msg["role"], content: renderRow(m) }))
+      .filter((m) => m.content.trim() !== ""),
   };
 }
