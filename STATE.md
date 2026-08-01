@@ -4,9 +4,40 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path)
+Updated: 2026-08-02 (task-58: workflow path repaired — seeded workflows can actually run now)
 
 ## NOW (verified facts, not hopes)
+- **Workflow path repaired (task-58, 2026-08-02, hole-audit Package 2 — H9+H7 → H5 → H10, H8
+  rode along):** the engine's five stacked prod-blockers are fixed as one unit. H9: both seed
+  packs' `definition` jsonb rewritten into the engine's own dialect (entry + keyed steps, closed
+  kind set) — `db:seed → startRun → tick` works end-to-end for the first time. H7: inline action
+  payloads are interpreter-owned (`args` spreads FIRST; outcome kind + attribution contactId can
+  never be overridden by definition JSON — the FK-bypasses-RLS cross-tenant attribution hole is
+  closed) and author-owned task content is zod-validated at the producer (`TaskContentSchema`,
+  tasks.kind CHECK set + non-empty title; invalid → loud interpret throw → phase-1 dead-letter).
+  H5: apply-phase poison runs dead-letter at MAX_APPLY_FAILURES=3 (counter in
+  `attempts.apply_errors`, own-tx bookkeeping, SKIP LOCKED; one failure still retried; committed
+  apply spends the counter). H8: send_wa idempotency keys on `runId:step:idx` (per-SEND, carried
+  in the job payload; template fallback keeps in-flight jobs exactly-once — expand-contract). H10:
+  migration 016 `app.due_org_ids()` (SECURITY DEFINER, search_path '', ids only, REVOKED from
+  public/anon/authenticated — the schema-app default-privilege grants would have leaked the org
+  list — EXECUTE to app_service only); `scheduler.discoverDueOrgs` + `runScheduledTick` fan out
+  over it; app_service row visibility unchanged (RED pins it). Gates: 617/0 repo-wide (local
+  stack), typecheck 0, biome clean, rls_coverage 0, guards PASS, `supabase db reset` applies 016
+  clean. RED 19 tests / 11 fail @304182f (Fable line-reviewed) → GREEN @4595a5d (Fable reviewed).
+- **LLM/tool path repaired (task-57, 2026-08-01):** the three stacked defects that made every
+  tool-driven turn broken against the real Anthropic API are fixed as one unit (hole-audit
+  Package 1, H1→H2→H3). H1: `registry.specs()` shipped the live ZodType as `input_schema` (wire
+  object was `{def,type}`, no `properties` — the model saw parameterless tools); `z.toJSONSchema`
+  now runs once at `register()`, `Tool.schema` stays the live zod seatbelt. H2: the adapter parsed
+  the body regardless of status — a 401/429/500/529 envelope returned an EMPTY turn recorded as
+  success; non-2xx now throws `AnthropicHttpError` carrying the status (pg-boss retries are real
+  again). H3: `messages.tool_call` was never read back into the prompt (tool rows arrived as ""),
+  so a context-conditioned model re-issues the same call every round — up to 5 duplicate sends per
+  turn; `assembleContext` now renders name/args/result into the transcript and drops empty rows
+  (also sanitises pre-task-57 rows, and an empty content block is a 400 at Anthropic). Persisted
+  rows unchanged (structured jsonb record intact). RED 10 fail → GREEN: harness 129/11/0,
+  typecheck 0, biome clean; DB-backed suites CI-owned.
 - **Guardrail pipeline activated on the loop send path (task-56, 2026-08-01):** `runTurn` now
   hands `guard()` the channel and recipient behind every tool-driven send
   (`packages/harness/src/{loop,policies,types}.ts`) — closes moat invariant #4's tool-loop hole:
@@ -136,6 +167,12 @@ Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
+0. **Package 3 + loose ends (hole audit, cheap, independent):** loop.ts nextSeq → atomic
+   insert-with-on-conflict (process.ts:65-67 is the pattern; loop.ts is the lone outlier) ·
+   attempt-cap stamping on the tool-loop send path (the Wave-C pair — must land BEFORE wiring
+   UNWIRED_SEND) · `Tool`-declares-send invariant (arg-name convention → declared property) ·
+   workflow schema `tool` field → enum (task-58 out-of-scope find: a typo'd tool name silently
+   becomes create_task) · outcomes.kind CHECK constraint (H7 closed the interpreter path only).
 1. M4 KB/semantic retrieval — GATED on Devesh's Voyage approval (voyage-3-lite, new account+key+BOM
    row); the phased design's only open fork.
 2. Org-level `autonomy` policy activation (task-56 follow-on, spec §12, moat invariant #4): the
@@ -226,7 +263,16 @@ Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path
   `funnelMetrics` omits it — `withOrg` RLS stays the net, tile↔trend agreement unaffected; gap-fill
   uses `generate_series(0, 29)` integer offsets, not a date/timestamp series, to sidestep Postgres
   function-resolution ambiguity.
-- **T6 scheduler DB-error policy (2026-07-25):** a failed inline write rolls the per-run tx back and leaves the run 'waiting' (retried); only interpret-throws dead-letter to 'failed'. tick() catches per-run and continues so one bad run never aborts the tick — required because the RED suite ticks without .catch and a rolled-back poison run stays due.
+- **T6 scheduler DB-error policy (2026-07-25, AMENDED by task-58 2026-08-02):** a failed inline
+  write rolls the per-run tx back and the run is retried; interpret-throws still dead-letter
+  immediately. NEW: apply-phase failures are now BOUNDED — after MAX_APPLY_FAILURES=3 consecutive
+  rolled-back applies the run dead-letters to 'failed' with last_error set (a committed apply
+  clears the counter, so transient DB errors keep their retry semantics). tick() still catches
+  per-run and continues.
+- **H7 task-content schema home (task-58, 2026-08-02):** `TaskContentSchema` lives in
+  `packages/harness/src/workflow/schema.ts` (the workflow module's own boundary file), NOT
+  packages/shared — shared is the HTTP/API boundary; this is an intra-engine producer contract.
+  `.catchall(z.unknown())` deliberately passes extra args through to `tasks.payload`.
 - **Attempt-cap DB-outage posture (2026-07-25):** fail-CLOSED (block on read error), matching its hard-safety class alongside DNC (STATE quiet-hours-vs-DNC posture note). No test pins it; revisit if a courtesy-gate (fail-open) posture is later preferred.
 - **Console design system (2026-07-18):** console adopts a Bland-style design system — `@theme`
   tokens, `ui/` primitives, `routes.tsx` manifest as the single nav/router source; `screens/*` stay
@@ -310,8 +356,8 @@ Updated: 2026-08-01 (task-56: guardrail pipeline activated on the loop send path
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
-- (this PR) task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
-- (this PR) task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
-- #88 task-53 memory-write M1 (contact_memories fold) — 2026-07-31
-- (this PR) task-34 wave-8 — www componentized: react+vite+tailwind v4 (console's exact stack, ZERO new deps — T24-approved pins; retires the week-3 Astro reservation); `src/design` (6 primitives) + `src/sections` (9) + `src/content` (5 typed modules) separation; `@theme` owns all tokens+fonts; Pricing/Faq interactivity via `useState` with the same `data-*` hooks; old `styles/*.css` deleted; 95/95 new suite (copy-parity SSR + architecture + build gate) + console 139/0 + tests/ 49/0, typecheck+lint clean. — 2026-07-31
+- (this PR) task-58 workflow-path repair (seed dialect, interpreter-owned payloads, bounded poison retry, per-send dedupe, org-discovery enumerator — migration 016) — 11 RED → GREEN, 617/0 — 2026-08-02
+- #92 task-57 LLM/tool path repair (JSON-Schema tool wire, loud HTTP errors, tool-result feedback) — 10 RED → GREEN, harness 129/11/0 — 2026-08-01
+- #91 task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
+- #90 task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
+- #89 task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
