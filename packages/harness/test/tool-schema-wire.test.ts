@@ -19,15 +19,10 @@
 // is a no-op fake. TENANCY: this task adds no table, so the cross-tenant-denial non-negotiable
 // has no target here — flagged in the report.
 import { afterEach, describe, expect, it } from "bun:test";
-import { runTurn } from "../src/loop";
 import { createAnthropicProvider } from "../src/llm";
+import { runTurn } from "../src/loop";
 import { buildCatalog } from "../src/tools";
-import type {
-  LlmProvider,
-  OrgCtx,
-  OrgScopedDb,
-  ToolSpec,
-} from "../src/types";
+import type { LlmProvider, OrgCtx, OrgScopedDb, ToolSpec } from "../src/types";
 
 const ORG = "org-1";
 const CONVERSATION = "conv-1";
@@ -91,9 +86,11 @@ function expectJsonSchema(name: string, live: unknown) {
   });
   expect(Object.keys(properties ?? {}).sort()).toEqual([...spec.props].sort());
   for (const [key, value] of Object.entries(properties ?? {})) {
-    expect({ tool: name, prop: key, schemaShaped: describesAType(value) }).toEqual(
-      { tool: name, prop: key, schemaShaped: true },
-    );
+    expect({
+      tool: name,
+      prop: key,
+      schemaShaped: describesAType(value),
+    }).toEqual({ tool: name, prop: key, schemaShaped: true });
   }
 
   const required = (wire.required ?? []) as string[];
@@ -112,7 +109,8 @@ function expectJsonSchema(name: string, live: unknown) {
 /** Write-only fake db: the text-only turn never reads a row it cares about. */
 const stubDb: OrgScopedDb = {
   query: async (text: string) => {
-    if (/coalesce\(max\(seq\)/i.test(text)) return { rows: [{ seq: 1 }], rowCount: 1 };
+    if (/coalesce\(max\(seq\)/i.test(text))
+      return { rows: [{ seq: 1 }], rowCount: 1 };
     return { rows: [], rowCount: 0 };
   },
 };
@@ -159,9 +157,10 @@ describe("task-57 H1 — the tool specs a provider is handed are JSON Schema, no
     const registry = buildCatalog({ send: noopSend });
     const tool = registry.get("send_confirmation", ALL_TOOLS);
     expect(tool).toBeDefined();
-    expect(tool?.schema.safeParse({ contactId: "nope", channel: "carrier-pigeon" }).success).toBe(
-      false,
-    );
+    expect(
+      tool?.schema.safeParse({ contactId: "nope", channel: "carrier-pigeon" })
+        .success,
+    ).toBe(false);
     expect(
       tool?.schema.safeParse({
         contactId: "11111111-1111-4111-8111-111111111111",
