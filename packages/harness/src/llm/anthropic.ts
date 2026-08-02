@@ -26,6 +26,19 @@ type AnthropicResponse = {
   usage?: { input_tokens?: number; output_tokens?: number };
 };
 
+/** task-57 — a non-2xx /v1/messages response. LlmProvider.complete has no error channel, so a
+ *  throw is the only honest failure signal: parsing an error envelope yields a contentless turn
+ *  the loop would record as a completed (silent) turn, and the job would never be retried.
+ *  `status` is what a retry policy keys on (429/529 retryable, 401 not). */
+class AnthropicHttpError extends Error {
+  readonly status: number;
+  constructor(status: number, detail: string) {
+    super(`anthropic /v1/messages failed: HTTP ${status} ${detail}`.trim());
+    this.name = "AnthropicHttpError";
+    this.status = status;
+  }
+}
+
 export function createAnthropicProvider(config: {
   apiKey: string;
   model: string;
@@ -61,6 +74,12 @@ export function createAnthropicProvider(config: {
         },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        // Body read is best-effort: an unreadable/non-JSON body must never turn the failure
+        // back into a return. Truncated — provider bodies can be long, and logs carry them.
+        const detail = await res.text().catch(() => "");
+        throw new AnthropicHttpError(res.status, detail.slice(0, 500));
+      }
       const json = (await res.json()) as AnthropicResponse;
 
       let text = "";
