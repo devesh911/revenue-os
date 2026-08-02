@@ -335,3 +335,8 @@ transcript screen (P1) — needs an explicit deferral note or the test.
   passwordless DSN fails as `SASL … password must be a string`, surfacing as a misleading HTTP 500
   in receiver tests.
 - 2026-07-31 · watchdog-rebuild archaeology: the 379-line TICK implementation lives in orchestrator commit 3a236a7 (an anonymous session-end auto-checkpoint), NOT in 2c805f1 "feat(watchdog)…" which holds only HANDOFF — auto-checkpoint hooks race hand-authored commits AND sweep any new file in state/ into history (leaked gitignored-content copies at 42c8e8b, cleaned b30be3b). Scope the checkpoint hook; never leave temp copies in state/.
+- 2026-08-01 · watchdog GREEN (D1–D6) · the anomaly class (D2) is exit status ≥ 2, NOT merely
+  "nonzero": the L-N* controls pin exit 1 ("Request timed out", "API Error…", a spend cap) as an
+  ordinary COUNTED retry cycle, while N5/N8 (exit 3/5) are uncounted anomalies. Brief prose said
+  "nonzero"; the tests are the real contract — exit 1 stays a work cycle, exit ≥ 2 is the anomaly.
+- 2026-08-02: A green test proved nothing twice in one session, same shape both times — the FIXTURE encoded a false world. (1) The watchdog suite's default sandbox seeded no transcript file, so 27 controls reached gate 8 *through* the fail-open bug they were unrelated to; fixing the bug broke them. (2) The anti-hijack teams filter greps for a `sessionId` key that real team configs never emit on members — its test passed only because the fixture fabricated the field, and teammates hijacked the live watchdog twice while the suite was green. When a guard's test passes, verify its fixture against a payload captured from production, not from inference.
