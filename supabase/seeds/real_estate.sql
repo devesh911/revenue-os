@@ -57,18 +57,31 @@ insert into agents (org_id, key, version, status, model, system_prompt, tools_al
    '{"supported":["en","hi","hi-en"],"detect":"first_utterance","fallback":"en"}')
 on conflict (org_id, key, version) do nothing;
 
--- Workflow v1 (DRAFT): qualification flow
+-- Workflow v1 (DRAFT): qualification flow. The definition dialect is the ENGINE's
+-- (WorkflowDefinitionSchema, packages/harness/src/workflow/schema.ts): `entry` + `steps` as a
+-- keyed record, kinds from the closed set call|wait|wait_until|whatsapp|branch|tool|end. Every
+-- referenced step resolves in this definition — a dangling ref dead-letters the run on tick 1.
 insert into workflows (org_id, key, version, status, definition) values
   (current_setting('seed.org_id')::uuid, 'qualification', 1, 'draft',
-   '{"steps":[
-      {"id":"answer","kind":"conversation","agent":"qualifier"},
-      {"id":"no_answer_wait","kind":"wait","duration":"2h","on":"no_answer"},
-      {"id":"whatsapp_followup","kind":"send","channel":"whatsapp","template":"followup_1"},
-      {"id":"recall_wait","kind":"wait","until":"next_day_11:00"},
-      {"id":"recall","kind":"conversation","agent":"qualifier"},
-      {"id":"book","kind":"tool","tool":"book_appointment","on":"qualified"},
-      {"id":"handoff","kind":"handoff","on":"high_intent"}
-    ]}')
+   '{"entry":"qualify_call",
+     "steps":{
+       "qualify_call":{"kind":"call","agent":"qualifier",
+         "on":{"completed":"route","no_answer":"retry_wait","busy":"retry_wait","failed":"end"}},
+       "retry_wait":{"kind":"wait","for":"PT2H","then":"whatsapp_followup"},
+       "whatsapp_followup":{"kind":"whatsapp","template":"followup_1","then":"recall_wait"},
+       "recall_wait":{"kind":"wait_until","localTime":"11:00","then":"recall"},
+       "recall":{"kind":"call","agent":"qualifier",
+         "on":{"completed":"route","no_answer":"end","busy":"end","failed":"end"}},
+       "route":{"kind":"branch",
+         "onDisposition":{"site_visit_agreed":"book","interested":"handoff_task",
+                          "callback":"callback_task","dnc":"end","*":"end"}},
+       "book":{"kind":"tool","tool":"book_appointment","args":{},"then":"end"},
+       "handoff_task":{"kind":"tool","tool":"create_task",
+         "args":{"kind":"handoff","title":"Hand a high-intent buyer to a human closer"},"then":"end"},
+       "callback_task":{"kind":"tool","tool":"create_task",
+         "args":{"kind":"callback","title":"Call back the buyer about the site visit"},"then":"end"},
+       "end":{"kind":"end"}
+     }}')
 on conflict (org_id, key, version) do nothing;
 
 -- Eval personas (10 — activation gate corpus, S8.6 injection cases included)

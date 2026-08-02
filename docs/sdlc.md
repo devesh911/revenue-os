@@ -87,7 +87,8 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 | Memory retrieval (M2) — `retrieveMemories` + S8.4-labeled memory block wired into `assembleContext` (task-54) | ✅ | (this PR) | tester RED `32a5b69` (`packages/harness/test/retrieval.test.ts`, 16 env-free + 3 CI-owned DB) → worker GREEN `b043714`; files: `packages/harness/src/retrieval.ts` (new), `context.ts`, `index.ts`; gates: 19/19 target (DB tier local), typecheck 0, lint 0, full env-free no new failures; no migration, no dep. |
 | Memory acceptance gate M3 — write→read e2e (task-55) | ✅ | (this PR) | tester-only suite @2e2307e `services/worker/test/memory-e2e.test.ts` — six e2e criteria (loop closes, lineage, S8.4 injection-inert, ≤800 budget, cross-tenant denial, whyBlock composition) ALL PASS vs main@2cb5742 (M1 #88 + M2 #89 compose, zero gaps); gate mutation-verified (5 seeded mutations each caught, reverted); 6/0 suite, full 576/0, typecheck 0, lint 0; real-DB CI-owned |
 | Guardrail activation — loop wiring + unresolved-identity postures (task-56) | ✅ | (this PR) | RED `packages/harness/test/{loop-guard-wiring,policies-activation}.test.ts` (12 fail → 0), GREEN `packages/harness/src/{loop,policies,types}.ts` — closes moat invariant #4's tool-loop hole (security S8.2); new optional `OrgCtx.onGuardEvent` sink; `dncHook` fails CLOSED / `quietHoursHook` fails OPEN on an unresolvable contact identity (no more silent `Asia/Kolkata` guess); gates: harness 114/11/0 (×2), typecheck 0, biome 0, guards 0; CI-owned: DB-backed harness/worker suites, rls:check; PR diff also carries one pre-existing lessons.md line (watchdog-rebuild archaeology, predates this branch) |
-| LLM/tool path repair — JSON-Schema tool wire + loud HTTP errors + tool-result feedback (task-57, hole-audit Package 1: H1+H2+H3 as one unit) | ✅ | (this PR) | tester RED @9f1a459 (3 suites, 612 lines, Fable line-reviewed: `tool-schema-wire` / `anthropic-http-errors` / `loop-tool-feedback`, 10 fail) → worker GREEN @054cce0 — H1 `z.toJSONSchema` once at `register()` (wireSchemas cache; `Tool.schema` stays the live T11 seatbelt, test-pinned); H2 `AnthropicHttpError` w/ status on non-2xx (best-effort body read — non-JSON body can't re-swallow); H3 `assembleContext` selects+renders `tool_call` (name·args·result) and drops empty rows (pre-fix rows sanitised; persisted jsonb unchanged); gates: harness 129/11/0, typecheck 0, biome clean (one reviewer-applied formatting commit on the RED file); repo-wide delta = exactly the 10 RED flips; DB-backed suites CI-owned; no migration, no dep |
+| Workflow-path repair — seed dialect + interpreter-owned payloads + bounded poison retry + per-send dedupe + org-discovery enumerator (task-58, hole-audit Package 2: H9+H7 → H5 → H10, H8 rode) | ✅ | (this PR) | tester RED @304182f (5 suites, 19 tests / 11 fail, Fable line-reviewed; cross-tenant denial in every DB suite) → worker GREEN @4595a5d — seeds rewritten to the engine dialect (intent 1:1); `TaskContentSchema` validates author-owned task content at interpret (loud throw → phase-1 dead-letter); `attempts.apply_errors` counter dead-letters poison at 3 (own-tx, SKIP LOCKED, spent on committed apply); send_wa keys exactly-once on `runId:step:idx` (payload-carried, template fallback for in-flight jobs); **migration 016** `app.due_org_ids()` SECURITY DEFINER (search_path '', revoke public/anon/authenticated, execute app_service — ids only) + `discoverDueOrgs` wired into `runScheduledTick`; gates: 617/0 repo-wide (local stack), typecheck 0, biome 0, rls 0, guards PASS, db reset clean; no dep, no test edits |
+| LLM/tool path repair — JSON-Schema tool wire + loud HTTP errors + tool-result feedback (task-57, hole-audit Package 1: H1+H2+H3 as one unit) | ✅ | #92 | tester RED @9f1a459 (3 suites, 612 lines, Fable line-reviewed: `tool-schema-wire` / `anthropic-http-errors` / `loop-tool-feedback`, 10 fail) → worker GREEN @054cce0 — H1 `z.toJSONSchema` once at `register()` (wireSchemas cache; `Tool.schema` stays the live T11 seatbelt, test-pinned); H2 `AnthropicHttpError` w/ status on non-2xx (best-effort body read — non-JSON body can't re-swallow); H3 `assembleContext` selects+renders `tool_call` (name·args·result) and drops empty rows (pre-fix rows sanitised; persisted jsonb unchanged); gates: harness 129/11/0, typecheck 0, biome clean (one reviewer-applied formatting commit on the RED file); repo-wide delta = exactly the 10 RED flips; DB-backed suites CI-owned; no migration, no dep |
 
 ### Read-only goals (no PR — findings in lessons.md)
 
@@ -119,25 +120,6 @@ Legend: ✅ done · 🔨 in flight · ⏳ queued · 🚧 gated (waiting on Deves
 ---
 
 ## 3. Queued (each block is the mini-spec; top of STATE NEXT wins)
-
-### task-58 — workflow-path repair (hole-audit Package 2) ⏳ P2, guard-critical
-- **Why:** the workflow engine has TWO independent reasons it never runs in prod (hole audit
-  2026-08-01, reports in orchestrator state): **H9** the shipped seed workflows fail the engine's
-  own `WorkflowDefinitionSchema` (no `entry`, `steps` array not record, kinds outside the closed
-  union — every test authors its own correct-dialect definition, which is why nothing caught it);
-  **H10** `runScheduledTick` discovers orgs via the RLS-bound `app_service` pool → fan-out is
-  EMPTY in prod (its own docblock says so; needs an RLS-exempt enumerator, `ponytail:` marker).
-- **Scope (land together; partial fixes make it worse):** H9 seed-definition repair + **H7 WITH
-  it** (validate Action payloads; stop spreading tenant `...args` LAST over interpreter-owned
-  fields — becomes a live attribution bug the instant real definitions exist) → then **H5**
-  (apply-phase poison retries forever — needs a terminal state) → **H10** org enumerator
-  (SECURITY DEFINER or postgres role — schema decision, flag at RED review). **H8** (send_wa
-  dedupe key omits step/idx → a reused template silently never sends twice) is an independent
-  one-liner that may ride along.
-- **Fixing H9 alone immediately exposes H5 and H8** (real_estate.sql:69 uses a `tool` step; a
-  reminder cadence reusing one template is the ordinary shape). RED-first; Fable line-reviews.
-- Verifier verdicts + full mechanics: `~/revenue-os/orchestrator/state/reports/holes-draft.md` +
-  `holes-verdicts.md`.
 
 ### Vapi spike — remote half (task 8 residual) 🚧 P1/M1
 - Real webhook delivery to the VPS URL (S6.2 `x-vapi-secret` confirm on RAW body) · real call

@@ -6,12 +6,13 @@
 // reads the clock — callers pass `now` explicitly. No db/ctx handle is in the signature, so
 // durability lives entirely in the tables, never here. Guardrail checks are NOT here (they run
 // per-action in the executor). G1: runtime-agnostic (Intl only — no date libs, no Bun globals).
-import type {
-  Action,
-  Transition,
-  WorkflowDefinition,
-  WorkflowEvent,
-  WorkflowState,
+import {
+  type Action,
+  TaskContentSchema,
+  type Transition,
+  type WorkflowDefinition,
+  type WorkflowEvent,
+  type WorkflowState,
 } from "./schema";
 
 // --- pure helpers -----------------------------------------------------------
@@ -58,6 +59,21 @@ function zonedParts(now: Date, tz: string) {
     minute: at("minute"),
     second: at("second"),
   };
+}
+
+// Author-owned task content, validated at the PRODUCER of the action. A payload the DB would
+// reject throws here, so the scheduler dead-letters the run in phase 1 (operator-visible) instead
+// of rolling back the apply phase every tick forever.
+function taskContent(
+  id: string,
+  args: Record<string, unknown>,
+): Record<string, unknown> {
+  const parsed = TaskContentSchema.safeParse(args);
+  if (parsed.success) return parsed.data;
+  const issues = parsed.error.issues
+    .map((i) => `${i.path.join(".") || "args"}: ${i.message}`)
+    .join("; ");
+  throw new Error(`invalid create_task args at step ${id}: ${issues}`);
 }
 
 // The next instant whose wall-clock in `tz` is exactly hh:mm:00, STRICTLY after `now`.
@@ -158,6 +174,9 @@ export function interpret(
       }
       case "tool": {
         // Closed side-effect set: create_task drafts a task; book_appointment records an outcome.
+        // The Action kind, the outcome kind and the attribution contact are INTERPRETER-owned:
+        // `args` is spread FIRST so a definition can never repoint an outcome at another tenant's
+        // contact (outcomes.contact_id is an FK, and FK checks bypass RLS) or rewrite the kind.
         const target = step.then as string;
         const args = (step.args as Record<string, unknown> | undefined) ?? {};
         const action: Action =
@@ -165,12 +184,12 @@ export function interpret(
             ? {
                 kind: "write_outcome",
                 outcome: {
+                  ...args,
                   kind: "site_visit_booked",
                   contactId: state.contactId,
-                  ...args,
                 },
               }
-            : { kind: "create_task", task: { ...args } };
+            : { kind: "create_task", task: taskContent(id, args) };
         return {
           actions: [action],
           nextStep: target,

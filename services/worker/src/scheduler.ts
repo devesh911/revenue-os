@@ -42,6 +42,14 @@ const EXTERNAL = new Set<string>(ACTION_QUEUES);
 // would spin forever and hang the tick; cap the in-tick walk and dead-letter past it.
 const MAX_STEPS = 64;
 
+// Apply-phase retry ceiling. A rolled-back apply leaves the run 'waiting' with the SAME wake_at,
+// so the next tick re-selects it: without a bound a deterministically poisoned run burns a tick
+// slot every minute forever and never surfaces to an operator. Failures below the ceiling are
+// still RETRIED (STATE.md DECISIONS "T6 scheduler DB-error policy"); at it the run is dead-lettered.
+const MAX_APPLY_FAILURES = 3;
+/** attempts key for the apply-failure log. Not a channel — guardrails read 'voice' / 'whatsapp'. */
+const APPLY_ERRORS = "apply_errors";
+
 type RunRow = {
   id: string;
   workflow_id: string;
@@ -53,6 +61,19 @@ type RunRow = {
 
 /** Per-channel attempt log: ISO-timestamp arrays (NOT a counter) — guardrails read this. */
 type Attempts = Record<string, string[]>;
+
+/**
+ * Which orgs have runs due right now — the cron tick's fan-out list, asked BEFORE there is an org
+ * to scope to. app_service is RLS-bound, so an unscoped `select distinct org_id from
+ * workflow_runs` returns nothing; the answer comes from `app.due_org_ids()` (migration 016), a
+ * SECURITY DEFINER function that returns org IDS ONLY and widens no row visibility.
+ */
+export async function discoverDueOrgs(pool: Pool): Promise<string[]> {
+  const r = await pool.query<{ org_id: string }>(
+    `select org_id from app.due_org_ids() as org_id`,
+  );
+  return r.rows.map((row) => row.org_id);
+}
 
 /**
  * Select this org's due runs (status waiting/pending, wake_at <= ctx.now) and process each in
@@ -86,13 +107,14 @@ export async function tick(
       if (did) processed += 1;
     } catch (err) {
       // A DB / inline-apply error: withOrg has already ROLLED BACK this run's tx (enqueue and
-      // advance undone; the run stays 'waiting', never marked failed). One poisoned run must
-      // not abort the tick or starve the other due runs — log and continue. Interpret throws
-      // never reach here; processRun dead-letters those in-tx.
+      // advance undone; the run stays 'waiting'). One poisoned run must not abort the tick or
+      // starve the other due runs — log, count the failure, continue. Interpret throws never
+      // reach here; processRun dead-letters those in-tx.
       logger.error(
         { err, org_id: orgId, run_id: id },
         "tick: run apply rolled back",
       );
+      await recordApplyFailure(pool, orgId, id, err, now);
     }
   }
   return { processed };
@@ -155,6 +177,56 @@ async function processRun(
 }
 
 /**
+ * Bounded retry for the APPLY phase. The run's own tx is already rolled back, so this runs in its
+ * OWN withOrg tx (org-scoped: another tenant's run is invisible here) and is the only write that
+ * commits for this run this tick. It appends the failure timestamp to attempts.apply_errors and,
+ * at MAX_APPLY_FAILURES, dead-letters the run — 'failed' is outside the selection's
+ * `status in ('pending','waiting')`, so a poisoned run stops being re-picked. Never throws: a
+ * bookkeeping failure may not abort the tick (criterion 6).
+ */
+async function recordApplyFailure(
+  pool: Pool,
+  orgId: string,
+  id: string,
+  err: unknown,
+  now: Date,
+): Promise<void> {
+  try {
+    await withOrg(pool, orgId, async (tx) => {
+      // SKIP LOCKED: a concurrent tick holding the run owns its bookkeeping — never block here.
+      const locked = await tx.query<{ attempts: unknown }>(
+        `select attempts from workflow_runs
+          where id = $1 and status in ('pending', 'waiting')
+          for update skip locked`,
+        [id],
+      );
+      if (!locked.rows[0]) return; // already terminal, or held by another tick
+      const attempts = normalizeAttempts(locked.rows[0].attempts);
+      pushAttempt(attempts, APPLY_ERRORS, now.toISOString());
+      const failures = attempts[APPLY_ERRORS]?.length ?? 0;
+      await tx.query(
+        `update workflow_runs
+            set attempts = $2::jsonb, last_error = $3,
+                status = case when $4::boolean then 'failed' else status end,
+                updated_at = now()
+          where id = $1`,
+        [
+          id,
+          JSON.stringify(attempts),
+          errorMessage(err),
+          failures >= MAX_APPLY_FAILURES,
+        ],
+      );
+    });
+  } catch (bookkeepingErr) {
+    logger.error(
+      { err: bookkeepingErr, org_id: orgId, run_id: id },
+      "tick: apply-failure bookkeeping failed",
+    );
+  }
+}
+
+/**
  * Walk the interpreter from the run's current step, in memory, until it PARKS ('waiting') or
  * ENDS ('completed'). 'running' means "keep interpreting this tick" (routing steps chain), so
  * we re-interpret from the next step. Pure: interpret does no I/O and never reads the clock.
@@ -195,6 +267,7 @@ async function applyTransitions(
 ): Promise<void> {
   const iso = now.toISOString();
   const attempts = normalizeAttempts(run.attempts);
+  delete attempts[APPLY_ERRORS]; // this apply commits — an earlier transient failure is spent
 
   let final: Transition | undefined;
   for (const { step, transition } of steps) {
@@ -251,7 +324,9 @@ async function applyTransitions(
  * some stacks, but always owns the partition it works through (proven by the pg-boss send path).
  * Idempotent by singleton_key `<runId>:<step>:<idx>` + policy 'short' (job_i1 dedupes while
  * state='created'), so a re-tick of a still-parked run no-ops. Payload = ids + action only; T7
- * re-scopes via withOrg. Returns true iff a row was inserted (false on singleton_key conflict).
+ * re-scopes via withOrg. `step`/`idx` ride the payload so the HANDLER's own exactly-once marker
+ * identifies THIS SEND, not the template — two steps may legitimately share one template (the
+ * reminder cadence), and the two dedupe layers must agree. Returns true iff a row was inserted.
  */
 async function enqueueJob(
   tx: PoolClient,
@@ -266,7 +341,11 @@ async function enqueueJob(
     `insert into pgboss.job_common (name, data, singleton_key, policy)
      values ($1, $2::jsonb, $3, 'short')
      on conflict do nothing`,
-    [action.kind, JSON.stringify({ orgId, runId, action }), singletonKey],
+    [
+      action.kind,
+      JSON.stringify({ orgId, runId, step, idx, action }),
+      singletonKey,
+    ],
   );
   return (r.rowCount ?? 0) > 0;
 }

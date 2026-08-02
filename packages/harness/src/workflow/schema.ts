@@ -125,3 +125,20 @@ export const WorkflowDefinitionSchema = z.object({
   entry: z.string(),
   steps: z.record(z.string(), StepSchema),
 });
+
+/** tasks.kind CHECK set, 006_harness.sql:87. */
+const TASK_KINDS = [
+  "approval",
+  "callback",
+  "review",
+  "handoff",
+  "manual",
+] as const;
+
+/** The AUTHOR-owned half of a create_task action: the `args` of a `tool` step. tasks.kind and
+ *  tasks.title are `not null` and kind is CHECK-constrained, so a payload missing either can
+ *  NEVER insert — the interpreter validates here rather than emitting SQL the DB rejects on
+ *  every tick. Extra keys pass through: applyTransitions destructures them into tasks.payload. */
+export const TaskContentSchema = z
+  .object({ kind: z.enum(TASK_KINDS), title: z.string().min(1) })
+  .catchall(z.unknown());
