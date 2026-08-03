@@ -4,9 +4,28 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-08-04 (task-60: demo driver landed — a real booking-path engine defect it exposed is fixed)
+Updated: 2026-08-04 (task-59: eval runner live — `bun run evals` is P4's activation-gate infra)
 
 ## NOW (verified facts, not hopes)
+- **Eval runner live — `bun run evals` (task-59, 2026-08-04, P4 activation-gate infra):** for each
+  `eval_scenarios` row of an org, drives a REAL conversation through the harness `runTurn` (real tool
+  catalog; sends CAPTURED by an eval-mode port, never delivered) — contact turns replayed from the
+  scenario's script by a v1 persona player, agent turns by the injected LLM provider (runtime = real
+  Anthropic via `ANTHROPIC_API_KEY`; tests use mocks, Anthropic never called in tests). Assertions are
+  MECHANICAL v1: `must_capture` fields read BACK from the contact row (ground truth, snake_case
+  columns — an arg-echo implementation is impossible by test design); `expect_outcome` matched against
+  the conversation's append-only outcomes row. One `eval_runs` row per scenario (`passed`, per-assertion
+  `scores` jsonb, `transcript_ref` = conversation id); malformed scenario jsonb fails ONLY that
+  scenario (recorded error), never the whole run. `--scenario <key>` runs one; `--org`/`--agent` select
+  targets; exit 1 on any failure; refuses non-local DBs (same posture as `scripts/seed.ts`). Module
+  split: `scripts/eval-runner.ts` is the testable lib, `scripts/evals.ts` a thin CLI shell. New
+  `ScenarioPersonaSchema`/`ScenarioScriptSchema`/`ScenarioAssertionsSchema`
+  (`packages/shared/src/schemas.ts`, R6 canonical home) cover the three `eval_scenarios` jsonb
+  boundaries. `tsconfig.base.json` now excludes `**/*.test.ts` — restores the repo invariant that test
+  files sit outside typecheck scope (`scripts/` was the one include glob sweeping them in). Running it
+  for real makes PAID Anthropic calls (10 scenarios); `--scenario` limits cost — the free full-cycle
+  check is the demo driver (task-60, #94). Gates: task suites 22/22, repo-wide `bun test` 654/0 (main
+  baseline 632 + 22 new), typecheck clean, biome clean, rls_coverage 0 offenders.
 - **Demo driver + booking-path disposition defect fixed (task-60, 2026-08-04):** `bun run demo`
   drives the full engine cycle locally — no telephony, no LLM cost: `startRun` enroll → a direct
   `scheduler.tick` → `place_call` through the real guard pipeline (stubbed voice sender) → a SIGNED
@@ -379,8 +398,10 @@ Updated: 2026-08-04 (task-60: demo driver landed — a real booking-path engine 
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) task-60 demo driver (`bun run demo`) + booking-path disposition defect fix (interpret.ts + scheduler.ts, migration 017 cascade) — task suites 15/15, repo-wide 647/0 — 2026-08-04
+- (this PR) task-59 eval runner (`bun run evals` — P4 activation-gate infra; scenario-driven real
+  conversations via harness `runTurn`, mechanical ground-truth assertions, `eval_runs` rows) — task
+  suites 22/22, repo-wide 654/0 — 2026-08-04
+- #94 task-60 demo driver (`bun run demo`) + booking-path disposition defect fix (interpret.ts + scheduler.ts, migration 017 cascade) — task suites 15/15, repo-wide 647/0 — 2026-08-04
 - #93 task-58 workflow-path repair (seed dialect, interpreter-owned payloads, bounded poison retry, per-send dedupe, org-discovery enumerator — migration 016) — 11 RED → GREEN, 617/0 — 2026-08-02
 - #92 task-57 LLM/tool path repair (JSON-Schema tool wire, loud HTTP errors, tool-result feedback) — 10 RED → GREEN, harness 129/11/0 — 2026-08-01
 - #91 task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
-- #90 task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
