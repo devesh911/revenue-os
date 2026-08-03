@@ -249,9 +249,16 @@ function drive(
     // Advancing OUT of a routing step (a `call` re-entry or a `branch`) CONSUMES lastDisposition
     // (M2 P0): clear it so a same-tick chain (call->call) sees the next routing step FRESH, and so
     // applyTransitions persists a cleared state — never a stale disposition for the next tick.
+    // EXCEPTION: keep it alive across a call->branch hop, so the branch routes on the SAME qualified
+    // disposition (the seeded qualification path: qualify_call -> route -> book). The branch's own
+    // advance (nextKind != branch) then clears it, so nothing stale is ever persisted.
     const kind = def.steps[step]?.kind;
-    state = { ...state, currentStep: transition.nextStep ?? step };
-    if (kind === "call" || kind === "branch") delete state.lastDisposition;
+    const nextStepId = transition.nextStep ?? step;
+    const nextKind = def.steps[nextStepId]?.kind;
+    state = { ...state, currentStep: nextStepId };
+    if ((kind === "call" || kind === "branch") && nextKind !== "branch") {
+      delete state.lastDisposition;
+    }
   }
   throw new Error(`workflow step limit exceeded (${MAX_STEPS})`);
 }

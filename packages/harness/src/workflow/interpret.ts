@@ -93,6 +93,11 @@ function nextLocalTime(now: Date, hhmm: string, tz: string): Date {
   return today.getTime() > now.getTime() ? today : utcAt(day + 1);
 }
 
+// The technical results a `call` step's `on` map names directly. Anything else the handler folds
+// (site_visit_agreed, interested, callback, …) is a BUSINESS disposition — the call COMPLETED and
+// carries it — so it routes via the `completed` arm and survives to a downstream `branch`.
+const CALL_OUTCOMES = new Set(["completed", "no_answer", "busy", "failed"]);
+
 // --- interpreter ------------------------------------------------------------
 
 export function interpret(
@@ -110,9 +115,16 @@ export function interpret(
         const disposition = state.lastDisposition;
         if (disposition) {
           const on = step.on as Record<string, string>;
+          // A named technical outcome routes directly. A business disposition the map does not name
+          // routes as `completed` (the call was answered and qualified) and is carried forward by the
+          // scheduler across a call→branch hop so the branch routes on the SAME disposition.
+          const routed =
+            on[disposition] ??
+            (CALL_OUTCOMES.has(disposition) ? undefined : on.completed) ??
+            null;
           return {
             actions: [],
-            nextStep: on[disposition] ?? null,
+            nextStep: routed,
             wakeAt: null,
             runStatus: "running",
           };

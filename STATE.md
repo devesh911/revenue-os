@@ -4,9 +4,32 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-08-02 (task-58: workflow path repaired — seeded workflows can actually run now)
+Updated: 2026-08-04 (task-60: demo driver landed — a real booking-path engine defect it exposed is fixed)
 
 ## NOW (verified facts, not hopes)
+- **Demo driver + booking-path disposition defect fixed (task-60, 2026-08-04):** `bun run demo`
+  drives the full engine cycle locally — no telephony, no LLM cost: `startRun` enroll → a direct
+  `scheduler.tick` → `place_call` through the real guard pipeline (stubbed voice sender) → a SIGNED
+  end-of-call webhook through the REAL Vapi receiver → tick routes the disposition → terminal,
+  printing the ordered journey. `bun run db:reset` now runs `scripts/db-reset.ts`: `supabase db
+  reset` THEN the D31 app_service login restore (refuses non-local URLs). 🔴 REAL ENGINE DEFECT
+  found by the RED suite and fixed here: the engine conflated a call's TECHNICAL outcome
+  (completed/no_answer/busy/failed) with its BUSINESS disposition (site_visit_agreed/…) in one
+  `state.lastDisposition` slot — the seeded qualification path `qualify_call → route(branch) →
+  book` could NEVER reach `book` (disposition consumed before the branch read it; every seeded run
+  fell through `onDisposition["*"]` → end; booking was unreachable in the shipped seed). Fix, two
+  coordinated edits: `packages/harness/src/workflow/interpret.ts` — a call re-entry routes an
+  unnamed business disposition via the `completed` arm (the `CALL_OUTCOMES` set gates the
+  fallback); `services/worker/src/scheduler.ts` `drive()` — preserves `lastDisposition` across a
+  call→branch hop ONLY (deletes it when `nextKind != branch`; call→call still clears, M2 P0
+  semantics preserved). Migration 017 adds `on delete cascade` to `webhook_events.org_id`
+  (007_ops.sql), matching every other org-scoped harness table in 006 — org deletion previously
+  23503'd while a webhook_events row referenced it; expand-style drop+re-add FK, no data change.
+  Gates: task suites 15/15, repo-wide `bun test` 647/0 (main baseline 632 + 15 new), typecheck 0,
+  biome clean; a live CLI run against the seeded real_estate org printed the full journey
+  (enrolled → tick_advanced → call_placed → webhook_simulated (receiver 202) → run_advanced →
+  terminal completed at 'end') and wrote qualified + booking outcome rows. RED was authored with an
+  explicit DO-NOT-WEAKEN defect note; zero test edits during GREEN.
 - **Workflow path repaired (task-58, 2026-08-02, hole-audit Package 2 — H9+H7 → H5 → H10, H8
   rode along):** the engine's five stacked prod-blockers are fixed as one unit. H9: both seed
   packs' `definition` jsonb rewritten into the engine's own dialect (entry + keyed steps, closed
@@ -356,8 +379,8 @@ Updated: 2026-08-02 (task-58: workflow path repaired — seeded workflows can ac
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) task-58 workflow-path repair (seed dialect, interpreter-owned payloads, bounded poison retry, per-send dedupe, org-discovery enumerator — migration 016) — 11 RED → GREEN, 617/0 — 2026-08-02
+- (this PR) task-60 demo driver (`bun run demo`) + booking-path disposition defect fix (interpret.ts + scheduler.ts, migration 017 cascade) — task suites 15/15, repo-wide 647/0 — 2026-08-04
+- #93 task-58 workflow-path repair (seed dialect, interpreter-owned payloads, bounded poison retry, per-send dedupe, org-discovery enumerator — migration 016) — 11 RED → GREEN, 617/0 — 2026-08-02
 - #92 task-57 LLM/tool path repair (JSON-Schema tool wire, loud HTTP errors, tool-result feedback) — 10 RED → GREEN, harness 129/11/0 — 2026-08-01
 - #91 task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01
 - #90 task-55 memory acceptance gate M3 (mutation-verified e2e) — 2026-07-31
-- #89 task-54 memory-retrieval M2 (S8.4 labeled block) — 2026-07-31
