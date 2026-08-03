@@ -108,3 +108,27 @@ export const VapiWebhookSchema = z
   })
   .passthrough();
 export type VapiWebhook = z.infer<typeof VapiWebhookSchema>;
+
+// ── Eval scenarios (task-59) — the three JSONB columns of eval_scenarios. A row that fails ANY
+//    of these is a malformed scenario: the eval runner records it and fails ONLY that scenario,
+//    never the whole run. Extra keys pass through (.passthrough) so assertions can carry future
+//    v2 checks the mechanical engine does not yet read.
+export const ScenarioPersonaSchema = z
+  .object({
+    name: z.string().min(1),
+    traits: z.array(z.string()).optional(),
+    language: z.string().optional(),
+  })
+  .passthrough();
+export type ScenarioPersona = z.infer<typeof ScenarioPersonaSchema>;
+
+export const ScenarioScriptSchema = z.object({ turns: z.array(z.string()) });
+export type ScenarioScript = z.infer<typeof ScenarioScriptSchema>;
+
+export const ScenarioAssertionsSchema = z
+  .object({
+    must_capture: z.array(z.string()).optional(),
+    expect_outcome: z.string().optional(),
+  })
+  .passthrough();
+export type ScenarioAssertions = z.infer<typeof ScenarioAssertionsSchema>;
