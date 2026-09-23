@@ -1,51 +1,71 @@
 import type { MouseEventHandler, ReactNode } from "react";
 import { cx } from "../lib/cx";
 
-// The two button skins from the export. `accent` = gold fill, dark ink (the primary
-// CTAs); `ghost` = cream text on a cream hairline border (SEE THE ENGINE, CHOOSE
-// PLAN). Sizing comes from the caller's className — shared skin, context modifier.
-// Renders an <a> when `href` is set (marketing anchors), a real <button> otherwise
-// (plan select). Hover is instant (no transition, matching the export); focus-visible
-// draws a gold ring on the night ground — the keyboard-a11y quality floor.
-export type CtaVariant = "accent" | "ghost";
+// The button skins. `accent` = the primary ink pill (paper text); `ghost` = ink
+// text on a quiet hairline pill; `inverse` = the paper pill used on the dark ink
+// and clay panels. `size` sets the pill's height and type; extra layout comes from
+// the caller's className. Renders an <a> when `href` is set (marketing anchors), a
+// real <button> otherwise (plan select). A trailing `arrow` nudges right on hover.
+export type CtaVariant = "accent" | "ghost" | "inverse";
 
 const VARIANTS: Record<CtaVariant, string> = {
-  accent: "bg-gold text-ground font-medium hover:opacity-[0.88]",
-  ghost: "text-cream border border-cream-45 hover:bg-cream-07",
+  accent: "bg-ink text-paper hover:bg-ink-2",
+  ghost:
+    "border border-ink/15 text-ink hover:border-ink/40 hover:bg-ink/[0.03]",
+  inverse: "bg-paper text-ink hover:bg-paper-2",
 };
 
-const FOCUS =
-  "focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-[3px]";
+const SIZES = {
+  md: "h-[42px] px-[18px] text-[14.5px]",
+  lg: "h-[52px] px-[26px] text-[15.5px]",
+} as const;
 
 export function CtaButton({
   variant,
+  size = "lg",
+  arrow = false,
   href,
   onClick,
   className,
   children,
 }: {
   variant: CtaVariant;
+  size?: keyof typeof SIZES;
+  arrow?: boolean;
   href?: string;
   onClick?: MouseEventHandler<HTMLButtonElement>;
   className?: string;
   children: ReactNode;
 }) {
   const cls = cx(
-    "inline-block no-underline",
+    "group inline-flex cursor-pointer items-center justify-center gap-[8px] whitespace-nowrap rounded-full font-medium font-sans no-underline transition-colors duration-200",
     VARIANTS[variant],
-    FOCUS,
+    SIZES[size],
     className,
+  );
+  const body = (
+    <>
+      {children}
+      {arrow ? (
+        <span
+          aria-hidden="true"
+          className="transition-transform duration-300 ease-[var(--ease-soft)] group-hover:translate-x-[3px]"
+        >
+          →
+        </span>
+      ) : null}
+    </>
   );
   if (href !== undefined) {
     return (
       <a href={href} className={cls}>
-        {children}
+        {body}
       </a>
     );
   }
   return (
     <button type="button" className={cls} onClick={onClick}>
-      {children}
+      {body}
     </button>
   );
 }
