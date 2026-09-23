@@ -14,10 +14,10 @@
 //     become semantic <th scope="col"> only once the Table primitive lands.
 //
 // Env-free by construction (bun test + renderToStaticMarkup, no DOM library, no DB/network, no new
-// deps): the two server-state hooks are MOCKED via mock.module so no QueryClient/provider is needed,
+// deps): the server-state hooks are MOCKED via mockModule so no QueryClient/provider is needed,
 // and a real wouter <Router>/<Route> supplies useParams — exactly the seams the boot-honesty and
-// contact-link suites already use. mock.module is process-global, so afterAll restores it.
-import { afterAll, describe, expect, it, mock } from "bun:test";
+// contact-link suites already use. mock.module is process-global, so afterAll restores the real modules.
+import { afterAll, describe, expect, it } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
@@ -25,6 +25,7 @@ import * as realAgentsApi from "../src/features/agents/api";
 import * as realGuardrailsApi from "../src/features/guardrails/api";
 import * as realOrgsApi from "../src/features/orgs/api";
 import * as realScreensApi from "../src/features/screens/api";
+import { mockModule } from "./test-utils";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
@@ -98,37 +99,44 @@ let agentsResult: unknown = noDataState;
 // bare `{ useTasksQuery }` factory drops the module's sibling exports (useContactsQuery,
 // useConversationsQuery, queryKeys, …) and kills any other test file that imports them — the
 // exact regression that broke PR #71's merged run.
-mock.module("../src/features/screens/api", () => ({
-  ...realScreensApi,
-  useTasksQuery: () => tasksResult,
-}));
-mock.module("../src/features/orgs/api", () => ({
-  ...realOrgsApi,
+const restoreScreens = mockModule(
+  "../src/features/screens/api",
+  realScreensApi,
+  {
+    useTasksQuery: () => tasksResult,
+  },
+);
+const restoreOrgs = mockModule("../src/features/orgs/api", realOrgsApi, {
   useOrgsQuery: () => orgsResult,
-}));
+});
 // task-52: SettingsPage's live Guardrails section calls useGuardrailPoliciesQuery — hold it in
 // loading so these OrganizationCard renders stay isolated (loading's only copy, "Loading…",
 // collides with none of the org assertions below). SPREAD the real module (same rule as
 // screens/orgs/agents): a bare factory drops sibling exports process-wide — the PR #71 class.
-mock.module("../src/features/guardrails/api", () => ({
-  ...realGuardrailsApi,
-  useGuardrailPoliciesQuery: () => ({
-    isLoading: true,
-    isError: false,
-    data: undefined,
-  }),
-  useUpdateGuardrailPolicy: () => ({ mutate: () => {}, isPending: false }),
-}));
+const restoreGuardrails = mockModule(
+  "../src/features/guardrails/api",
+  realGuardrailsApi,
+  {
+    useGuardrailPoliciesQuery: () => ({
+      isLoading: true,
+      isError: false,
+      data: undefined,
+    }),
+    useUpdateGuardrailPolicy: () => ({ mutate: () => {}, isPending: false }),
+  },
+);
 // SPREAD the real module (same reason as screens/orgs above): a bare `{ useAgentsQuery }` factory
 // drops the module's sibling exports (queryKeys, AgentsResponse) process-wide and breaks
 // agents-api-hook.test.ts in a combined run — the PR #71 regression class.
-mock.module("../src/features/agents/api", () => ({
-  ...realAgentsApi,
+const restoreAgents = mockModule("../src/features/agents/api", realAgentsApi, {
   useAgentsQuery: () => agentsResult,
-}));
+});
 
 afterAll(() => {
-  mock.restore();
+  restoreScreens();
+  restoreOrgs();
+  restoreGuardrails();
+  restoreAgents();
 });
 
 // strip tags → visible text, then decode the entities renderToStaticMarkup emits (' → &#x27;,

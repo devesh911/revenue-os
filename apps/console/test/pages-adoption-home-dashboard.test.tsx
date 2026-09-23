@@ -13,13 +13,14 @@
 //
 // Env-free by construction (bun test + renderToStaticMarkup, no DOM library, no DB/network, no new
 // deps) — imitates apps/console/test/ui-smoke.test.tsx and tests/console-boot-honesty.test.tsx.
-// The query hooks are MOCKED via mock.module so the page renders each data state deterministically
+// The query hooks are MOCKED via mockModule so the page renders each data state deterministically
 // with no QueryClient, network, or env (the real features/screens/api pulls lib/api → import.meta.env).
-import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
+import { afterAll, describe, expect, it } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
-import { visible } from "./test-utils";
+import * as realScreensApi from "../src/features/screens/api";
+import { mockModule, visible } from "./test-utils";
 
 // CWD-relative, like tests/console-boot-honesty + apps/console/test/readme-coverage (suite runs
 // from the repo/worktree root).
@@ -42,23 +43,18 @@ let metricsState: QueryState;
 // Dashboard case can put the Trends section in a state that keeps the stat-tile pins byte-identical.
 let trendsState: QueryState;
 
-beforeAll(() => {
-  // Keyed by the path the PAGES import ("../../features/screens/api") — the same resolved module.
-  mock.module("../src/features/screens/api", () => ({
+// Keyed by the path the PAGES import ("../../features/screens/api") — the same resolved module.
+// The fakes lie over the real exports, and afterAll restores the real module for later files.
+const restoreScreens = mockModule(
+  "../src/features/screens/api",
+  realScreensApi,
+  {
     useConversationsQuery: () => convoState,
     useMetricsQuery: () => metricsState,
     useTrendsQuery: () => trendsState,
-    queryKeys: {
-      tasks: () => [],
-      contacts: () => [],
-      conversations: () => [],
-      metrics: () => [],
-      trends: () => [],
-    },
-  }));
-});
-// mock.module is process-global — restore so the fake api never leaks into another test file.
-afterAll(() => mock.restore());
+  },
+);
+afterAll(restoreScreens);
 
 function renderPage(ssrPath: string, pattern: string, node: ReactNode): string {
   return renderToStaticMarkup(

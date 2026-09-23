@@ -422,6 +422,7 @@ Updated: 2026-09-23 (apps/www editorial redesign — Anthropic-inspired landing 
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23
 - (this PR) bun audit gate unblocked: hono 4.12.34 → 4.13.8 (GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc, GHSA-crvj-82cr-hjcx) + root override nanoid 3.3.19 (GHSA-2v37-7h3g-55p8, via vite › postcss) — `bun audit` clean; full `bun test` 691/0 with CI's local-stack env, typecheck 0, lint 0, rls 0 offenders — 2026-09-23
 - (this PR) apps/www editorial redesign — Anthropic-inspired landing page, animated demo call + lead-flow + illustrations, pause switch, mobile menu — www 117/0, typecheck 0, biome 0 — 2026-09-23
 - (this PR) task-59 eval runner (`bun run evals` — P4 activation-gate infra; scenario-driven real
