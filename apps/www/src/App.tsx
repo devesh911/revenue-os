@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { brand, footerMeta } from "./content/site";
 import { MonoLabel } from "./design/MonoLabel";
 import { useReveal } from "./lib/reveal";
@@ -11,18 +12,25 @@ import { Pricing } from "./sections/Pricing";
 import { StageGrid } from "./sections/StageGrid";
 import { BrandMark } from "./visuals/BrandMark";
 
-// The composed marketing page on warm paper: a sticky header → nav, the sections in
-// <main> (StageGrid hosts the funnel flow + IntentRouting inside its dark panel),
-// and the footer meta row. SSR-safe: no CSS side-effect import lives here (main.tsx
-// owns `import "./styles.css"`), so the copy-parity suite can
-// renderToStaticMarkup(<App/>). useReveal() arms the one-shot scroll reveals.
+// The composed marketing page on warm paper: a skip link, a sticky header → nav,
+// the sections in <main> (StageGrid hosts the funnel flow + IntentRouting inside
+// its dark panel), and the footer meta row. SSR-safe: no CSS side-effect import
+// lives here (main.tsx owns `import "./styles.css"`), so the copy-parity suite can
+// renderToStaticMarkup(<App/>). useReveal() arms the one-shot scroll reveals; the
+// layout effect honours a deep link (/#pricing) — the page renders client-side,
+// so the browser's own jump fires before the target exists.
 export function App() {
   useReveal();
+  useLayoutEffect(() => {
+    const target =
+      location.hash && document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ behavior: "instant" });
+  }, []);
   return (
     <div id="top" className="relative min-h-screen bg-paper font-sans text-ink">
       <a
         href="#main"
-        className="sr-only rounded-full bg-ink px-[16px] py-[10px] text-paper focus:not-sr-only focus:fixed focus:top-[12px] focus:left-[12px] focus:z-[60]"
+        className="-translate-y-[200%] fixed top-[12px] left-[12px] z-[60] rounded-full bg-ink px-[16px] py-[10px] text-[14.5px] text-paper transition-transform duration-200 focus:translate-y-0"
       >
         {footerMeta.skip}
       </a>
@@ -39,14 +47,14 @@ export function App() {
         <FooterCta />
       </main>
       <footer className="mx-auto mt-[40px] max-w-[1200px] px-[20px] md:mt-[64px] md:px-[40px]">
-        <div className="flex flex-col gap-[14px] border-line border-t py-[36px] md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-[14px] border-line border-t py-[36px] lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-[10px] text-ink">
             <BrandMark className="size-[20px]" />
             <span className="font-serif text-[17px] tracking-[-0.02em]">
               {brand}
             </span>
           </div>
-          <MonoLabel className="text-[11.5px] text-stone uppercase tracking-[0.1em]">
+          <MonoLabel className="text-balance text-[11.5px] text-stone uppercase tracking-[0.1em]">
             {footerMeta.compliance}
           </MonoLabel>
           <MonoLabel className="text-[11.5px] text-stone tracking-[0.06em]">

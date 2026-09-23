@@ -1,9 +1,9 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentProps } from "react";
 import { cx } from "../lib/cx";
 import { MonoLabel } from "./MonoLabel";
 
 // A section eyebrow above a heading: small tracked mono caps led by a clay dot.
-// `tone="hero"` is the pill badge above the <h1> with a softly pulsing dot;
+// `tone="hero"` is the pill badge above the <h1> with a softly rippling dot;
 // `tone="inverse"` is the eyebrow on the dark ink panel, `tone="clay"` the one on
 // the clay panel (ink text, ink dot). Renders block-level.
 const TONES = {
@@ -17,7 +17,7 @@ export function Kicker({
   className,
   children,
   ...rest
-}: ComponentPropsWithoutRef<"span"> & {
+}: ComponentProps<"span"> & {
   tone?: "section" | "hero" | "inverse" | "clay";
 }) {
   if (tone === "hero") {

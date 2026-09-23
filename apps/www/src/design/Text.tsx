@@ -1,10 +1,11 @@
-import type { ComponentPropsWithoutRef, ElementType } from "react";
+import type { ComponentProps } from "react";
 import { cx } from "../lib/cx";
 
-// Body copy in the UI sans. Defaults to <p>; pass `as="span"` for inline copy.
-// `size`: "lede" (hero / section intros), "body" (cards), "small" (fine print).
-// Colour defaults to ink-2 on paper; on the dark panel pass a text-paper/* class.
-export type TextSize = "lede" | "body" | "small";
+// Body copy in the UI sans, as a <p>. `size`: "lede" (hero / section intros),
+// "body" (cards), "small" (fine print). `tone` sets the colour for the ground it
+// sits on — never recolour through className (cx() doesn't dedupe utilities).
+type TextSize = "lede" | "body" | "small";
+type TextTone = "default" | "muted" | "inverse" | "inverse-strong";
 
 const SIZES: Record<TextSize, string> = {
   lede: "text-[18px] leading-[1.6] md:text-[20px]",
@@ -12,15 +13,22 @@ const SIZES: Record<TextSize, string> = {
   small: "text-[14px] leading-[1.6]",
 };
 
+const TONES: Record<TextTone, string> = {
+  default: "text-ink-2",
+  muted: "text-stone",
+  inverse: "text-paper/70",
+  "inverse-strong": "text-paper/85",
+};
+
 export function Text({
-  as: Tag = "p",
   size = "body",
+  tone = "default",
   className,
   ...rest
-}: ComponentPropsWithoutRef<"p"> & { as?: ElementType; size?: TextSize }) {
+}: ComponentProps<"p"> & { size?: TextSize; tone?: TextTone }) {
   return (
-    <Tag
-      className={cx("m-0 text-pretty text-ink-2", SIZES[size], className)}
+    <p
+      className={cx("text-pretty", SIZES[size], TONES[tone], className)}
       {...rest}
     />
   );

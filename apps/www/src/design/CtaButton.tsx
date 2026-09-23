@@ -1,18 +1,18 @@
 import type { MouseEventHandler, ReactNode } from "react";
 import { cx } from "../lib/cx";
 
-// The button skins. `accent` = the primary ink pill (paper text); `ghost` = ink
-// text on a quiet hairline pill; `inverse` = the paper pill used on the dark ink
-// and clay panels. `size` sets the pill's height and type; extra layout comes from
+// The button skins. `accent` = the primary ink pill (paper text — it reads on paper
+// and on the clay panel alike); `ghost` = ink text on a quiet hairline pill. Both
+// carry a border (transparent on accent) so Windows forced-colours mode still
+// draws the pill. `size` sets the pill's height and type; extra layout comes from
 // the caller's className. Renders an <a> when `href` is set (marketing anchors), a
 // real <button> otherwise (plan select). A trailing `arrow` nudges right on hover.
-export type CtaVariant = "accent" | "ghost" | "inverse";
+type CtaVariant = "accent" | "ghost";
 
 const VARIANTS: Record<CtaVariant, string> = {
-  accent: "bg-ink text-paper hover:bg-ink-2",
+  accent: "border border-transparent bg-ink text-paper hover:bg-ink-2",
   ghost:
     "border border-ink/15 text-ink hover:border-ink/40 hover:bg-ink/[0.03]",
-  inverse: "bg-paper text-ink hover:bg-paper-2",
 };
 
 const SIZES = {

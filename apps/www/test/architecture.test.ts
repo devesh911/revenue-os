@@ -93,6 +93,10 @@ describe("architecture — src/styles.css @theme tokens", () => {
     ["clay #D97757", /--color-clay\s*:\s*#D97757\b/i],
     ["clay-deep #A9492A", /--color-clay-deep\s*:\s*#A9492A\b/i],
     ["olive #788C5D", /--color-olive\s*:\s*#788C5D\b/i],
+    // the text tiers the ≥4.5:1 contrast floor rests on
+    ["ink-2 #3D3D3A", /--color-ink-2\s*:\s*#3D3D3A\b/i],
+    ["stone #6B6A64", /--color-stone\s*:\s*#6B6A64\b/i],
+    ["olive-deep #56663F", /--color-olive-deep\s*:\s*#56663F\b/i],
   ];
   for (const [label, re] of TOKENS) {
     test(`defines token: ${label}`, () => {
@@ -175,17 +179,22 @@ describe("architecture — src/design/ reusable elements", () => {
     });
   }
 
-  test("CtaButton declares accent + ghost + inverse variants", () => {
+  test("CtaButton declares accent + ghost variants", () => {
     const src = read(resolve(SRC_DIR, "design", "CtaButton.tsx"));
     expect(src).toContain("accent");
     expect(src).toContain("ghost");
-    expect(src).toContain("inverse");
   });
 });
 
 // ── visuals: the animated set pieces, one file each ─────────────────────────
 describe("architecture — src/visuals/ animated set pieces", () => {
-  for (const name of ["BrandMark", "HeroCall", "FunnelFlow", "MoatArt"]) {
+  for (const name of [
+    "BrandMark",
+    "HeroCall",
+    "FunnelFlow",
+    "MoatArt",
+    "CallArt",
+  ]) {
     test(`src/visuals/${name}.tsx exists and exports ${name}`, () => {
       const p = resolve(SRC_DIR, "visuals", `${name}.tsx`);
       expect(existsSync(p), `${p} must exist`).toBe(true);
@@ -231,11 +240,14 @@ describe("architecture — src/content/ typed data modules", () => {
         "Vertical depth beats breadth",
         "Built for India, not ported",
         "The data loop, not the calling",
+        "Namaste",
+        "INVENTORY",
       ],
     ],
     ["logos", ["MERIDIAN", "VASTU ONE", "GRIHA CO.", "NORTHGATE", "ANVAYA"]],
     ["hero", ["Site visit booked", "Nurture loop"]],
-    ["site", ["How it works", "Book a pilot"]],
+    ["site", ["How it works", "Book a pilot", "Pause animations"]],
+    ["cta", ["Give us one project"]],
   ];
   for (const [mod, strings] of CONTENT) {
     test(`src/content/${mod}.ts exists, is typed, and holds its copy`, () => {
@@ -264,7 +276,12 @@ describe("architecture — sections import content, never inline it", () => {
     ["sections/Faq", "faqs", ["Is this compliant with TRAI and DND rules?"]],
     ["sections/Logos", "logos", ["MERIDIAN", "ANVAYA"]],
     ["sections/Nav", "site", ["How it works", "Book a pilot"]],
+    ["sections/Hero", "hero", ["Run our pilot", "See the engine"]],
+    ["sections/IntentRouting", "stages", ["HIGH INTENT", "LOW INTENT"]],
+    ["sections/FooterCta", "cta", ["Give us one project"]],
     ["visuals/HeroCall", "hero", ["Site visit booked"]],
+    ["visuals/FunnelFlow", "stages", ["Human closer"]],
+    ["visuals/MoatArt", "moats", ["Namaste", "INVENTORY"]],
   ];
   for (const [section, mod, strings] of SEPARATION) {
     test(`${section} imports ../content/${mod} and inlines none of its data`, () => {

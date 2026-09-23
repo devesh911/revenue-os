@@ -157,6 +157,12 @@ describe("accessibility — animated visuals", () => {
   test("the hero demo call is a single labelled image", () => {
     expect(markup).toMatch(/role="img"[^>]*aria-label="[^"]{20,}"/);
   });
+  test("a control can pause every animation (WCAG 2.2.2)", () => {
+    // a <button> whose own content (up to its </button>) carries the label
+    expect(markup).toMatch(
+      /<button\b(?:(?!<\/button>).)*Pause animations(?:(?!<\/button>).)*<\/button>/s,
+    );
+  });
   test("faq toggles expose their state via aria-expanded", () => {
     expect(markup).toContain('aria-expanded="true"');
     expect(markup).toContain('aria-expanded="false"');

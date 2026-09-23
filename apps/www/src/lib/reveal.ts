@@ -1,44 +1,51 @@
-import { type CSSProperties, useLayoutEffect } from "react";
+import { type CSSProperties, type RefCallback, useLayoutEffect } from "react";
 
 // Scroll reveal, CSS-first. `reveal(delayMs)` returns the props that mark an
-// element for a one-shot fade-and-rise (styles.css owns the transition);
-// `useReveal()` — called once, in App — opts the document in (html[data-motion])
-// and flips data-shown as each marked element enters the viewport. It runs in a
-// layout effect so nothing flashes before paint, and bails out (content simply
-// stays visible) under reduced motion or without IntersectionObserver.
+// element for a one-shot fade-and-rise (styles.css owns the transition), including
+// a ref that observes the node as it mounts — so a block that mounts late still
+// reveals. `useReveal()` — called once, in App — opts the document in
+// (html[data-motion]) before paint; only then is anything hidden. Under reduced
+// motion or without IntersectionObserver nothing is observed and nothing hides.
+const REDUCED = "(prefers-reduced-motion: reduce)";
+const motionOk = () =>
+  "IntersectionObserver" in window && !window.matchMedia(REDUCED).matches;
+
+let io: IntersectionObserver | undefined;
+
+const observe: RefCallback<Element> = (node) => {
+  if (!node || !motionOk()) return;
+  io ??= new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        (e.target as HTMLElement).dataset.shown = "";
+        io?.unobserve(e.target);
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px" },
+  );
+  io.observe(node);
+  return () => io?.unobserve(node);
+};
+
 export function reveal(delayMs = 0): {
   "data-reveal": "";
+  ref: RefCallback<Element>;
   style: CSSProperties;
 } {
   return {
     "data-reveal": "",
+    ref: observe,
     style: { "--reveal-delay": `${delayMs}ms` } as CSSProperties,
   };
 }
 
 export function useReveal(): void {
   useLayoutEffect(() => {
-    if (
-      !("IntersectionObserver" in window) ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
+    if (!motionOk()) return;
     const root = document.documentElement;
     root.dataset.motion = "";
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          (e.target as HTMLElement).dataset.shown = "";
-          io.unobserve(e.target);
-        }
-      },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0 },
-    );
-    for (const el of document.querySelectorAll("[data-reveal]")) io.observe(el);
     return () => {
-      io.disconnect();
       delete root.dataset.motion;
     };
   }, []);
