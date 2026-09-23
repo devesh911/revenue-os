@@ -1,51 +1,47 @@
-import { moats } from "../content/moats";
+import { moats, moatsHead } from "../content/moats";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
 import { MonoLabel } from "../design/MonoLabel";
 import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
-import { cx } from "../lib/cx";
+import { reveal } from "../lib/reveal";
+import { MoatArt } from "../visuals/MoatArt";
 
-// The three competitive moats — a centred head over a three-up card grid, each card
-// a gradient "media" plate above kicker/title/copy. Folds 3 → 1 below 980.
-const GRAD: Record<"a" | "b" | "c", string> = {
-  a: "bg-moat-a",
-  b: "bg-moat-b",
-  c: "bg-moat-c",
-};
-
+// "Why us": a left-aligned head over the three moat cards — an illustration plate
+// (MoatArt) above a mono kicker, serif title and copy, revealed in a stagger.
+// Titles are capped to two lines so the copy starts on one line across the row.
+// Three up on lg; on md the third card turns landscape across both columns so the
+// 2 + 1 split reads as deliberate; one column on phones.
 export function Moats() {
   return (
     <SectionFrame id="moats">
-      <div className="px-[60px] pt-[72px] pb-[56px] text-center max-[680px]:px-[22px] max-[680px]:pt-[48px] max-[680px]:pb-[38px]">
-        <Kicker className="mb-[20px]">PLOT 02 — WHY THIS SURVIVES</Kicker>
-        <Heading className="text-[clamp(30px,3.4vw,48px)] tracking-[0.02em]">
-          THREE COMPETITORS, THREE MOATS
-        </Heading>
+      <div {...reveal()} className="max-w-[720px]">
+        <Kicker>{moatsHead.kicker}</Kicker>
+        <Heading className="mt-[20px]">{moatsHead.title}</Heading>
+        <Text size="lede" className="mt-[20px] max-w-[540px]">
+          {moatsHead.lede}
+        </Text>
       </div>
-      <div className="grid grid-cols-3 border-t border-hairline-18 max-[980px]:grid-cols-1">
-        {moats.map((moat) => (
-          <div
+      <ul className="mt-[56px] grid gap-[20px] md:mt-[72px] md:grid-cols-2 lg:grid-cols-3 lg:gap-[24px]">
+        {moats.map((moat, i) => (
+          <li
             key={moat.title}
-            className="flex flex-col border-r border-hairline-12 last:border-r-0 max-[980px]:border-r-0 max-[980px]:border-b max-[980px]:border-hairline-12 max-[980px]:last:border-b-0"
+            {...reveal(120 + i * 120)}
+            className="grid grid-rows-[232px_auto] overflow-hidden rounded-[24px] bg-paper-2 md:last:col-span-2 md:last:grid-cols-2 md:last:grid-rows-none md:last:gap-x-[20px] lg:last:col-span-1 lg:last:grid-cols-none lg:last:grid-rows-[232px_auto]"
           >
-            <div className="relative h-[220px] overflow-hidden border-b border-hairline-12 bg-ground">
-              <div className={cx("absolute inset-0", GRAD[moat.grad])} />
-            </div>
-            <div className="flex flex-col gap-[14px] px-[34px] pt-[34px] pb-[44px]">
-              <MonoLabel className="text-[11.5px] tracking-[0.26em] text-cream-50">
+            <MoatArt variant={moat.art} />
+            <div className="p-[28px]">
+              <MonoLabel className="text-[11.5px] text-ink-2/80 uppercase tracking-[0.14em]">
                 {moat.kicker}
               </MonoLabel>
-              <Heading as="div" className="text-[26px]">
+              <Heading as="h3" size="card" className="mt-[14px] max-w-[13ch]">
                 {moat.title}
               </Heading>
-              <Text className="text-[15px] leading-[1.7] text-cream-68">
-                {moat.copy}
-              </Text>
+              <Text className="mt-[12px]">{moat.copy}</Text>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </SectionFrame>
   );
 }

@@ -18,7 +18,7 @@
   --color-paper-2: #f0eee6; /* card fills, washed bands */
   --color-line: #e8e6dc; /* hairlines, dividers */
   --color-mute: #b0aea5; /* decorative strokes only — never text */
-  --color-stone: #73726c; /* tertiary text (4.6:1 on paper) */
+  --color-stone: #6b6a64; /* tertiary text (5.1:1 on paper, 4.7:1 on paper-2) */
   --color-ink-2: #3d3d3a; /* body text */
   --color-ink: #141413; /* headings, primary buttons, the dark panel */
   --color-clay: #d97757; /* the one accent: fills, strokes, large type */

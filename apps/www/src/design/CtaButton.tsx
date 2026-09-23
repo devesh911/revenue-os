@@ -38,7 +38,7 @@ export function CtaButton({
   children: ReactNode;
 }) {
   const cls = cx(
-    "group inline-flex cursor-pointer items-center justify-center gap-[8px] whitespace-nowrap rounded-full font-medium font-sans no-underline transition-colors duration-200",
+    "group inline-flex cursor-pointer items-center justify-center gap-[8px] whitespace-nowrap rounded-full font-medium font-sans no-underline transition-[color,background-color,border-color] duration-200",
     VARIANTS[variant],
     SIZES[size],
     className,

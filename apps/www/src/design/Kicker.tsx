@@ -9,7 +9,7 @@ import { MonoLabel } from "./MonoLabel";
 const TONES = {
   section: "text-stone",
   inverse: "text-paper/60",
-  clay: "text-ink/75",
+  clay: "text-ink/85",
 } as const;
 
 export function Kicker({

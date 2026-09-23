@@ -1,11 +1,19 @@
-// The five questions asked before every pilot. Copy lives here; Faq.tsx composes it
-// and inlines none of these strings (separation pin). `defaultOpenFaq` is the item
-// open on first paint — the SSR default the copy-parity suite pins.
+// The five questions asked before every pilot, plus the section's side-head copy.
+// Faq.tsx composes it and inlines none of these strings (separation pin).
+// `defaultOpenFaq` is the item open on first paint — the SSR default the
+// copy-parity suite pins.
 
 export interface Faq {
   q: string;
   a: string;
 }
+
+export const faqCopy = {
+  kicker: "Questions",
+  title: "Asked before every pilot.",
+  sub: "Can’t find your answer? We’ll walk through your lead flow on a pilot call.",
+  cta: "Book a pilot call",
+} as const;
 
 export const faqs: Faq[] = [
   {
