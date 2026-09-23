@@ -1,8 +1,20 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-// Mirrors apps/console/vite.config.ts — same stack (react + tailwind v4 vite plugin).
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
+// Mirrors apps/console/vite.config.ts — same stack (react + tailwind v4 vite plugin). A production
+// build without the Cal.com settings ships the booking flow in PREVIEW mode, where buyers complete
+// a flow that books nothing (the dialog says so) — so the build says so too, loudly.
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, import.meta.dirname, "VITE_");
+  if (
+    command === "build" &&
+    mode === "production" &&
+    !(env.VITE_CALCOM_USERNAME && env.VITE_CALCOM_EVENT_SLUG)
+  ) {
+    console.warn(
+      "\n[www] VITE_CALCOM_USERNAME / VITE_CALCOM_EVENT_SLUG are not set: the booking flow ships in PREVIEW mode and books nothing.\n",
+    );
+  }
+  return { plugins: [react(), tailwindcss()] };
 });

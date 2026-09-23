@@ -4,25 +4,30 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-09-23 (apps/www editorial redesign — Anthropic-inspired landing page with animated product demo)
+Updated: 2026-09-23 (apps/www rebuilt demo-first — one Book a demo journey, controllable sample call, Cal.com booking, Plausible events)
 
 ## NOW (verified facts, not hopes)
-- **Marketing landing page redesigned (apps/www, 2026-09-23, Devesh's ask: "a tasteful, Anthropic-
-  inspired landing page with animated elements for the messaging and the hook"):** warm paper / ink /
-  one clay accent, Lora display + platform UI sans + Plex Mono for machine data, three inset panels
-  (dark engine, paper-2 pricing, clay offer). Motion explains the product: the hero is a looping demo
-  CALL (lead rung → Hinglish transcript → captured fields → intent meter → "Site visit booked", then a
-  low-intent lead → "Nurture loop"); the engine panel animates lead dots through the four stages and
-  splits them by intent; the moats get original line illustrations. Motion floor: prefers-reduced-motion
-  shows static final frames; a page-wide "Pause animations" switch (WCAG 2.2.2) freezes CSS + SMIL +
-  the demo; off-screen SVGs pause. Also: mobile nav menu, deep links (/#pricing) on cold load,
-  scroll-padding for the sticky nav, favicon/theme-color/OG/color-scheme meta, forced-colours support.
-  No new dependencies, no font downloads (Playfair + Plex 500 retired). Tests re-pinned to the new
-  tokens + sentence-case copy, plus a11y/motion/separation pins: www 117/0 (incl. vite build),
-  typecheck 0, biome 0, rls 0 offenders. Full `bun test` in this worktree: 579 pass / 43 fail — all 43
-  in untouched services/worker + demo-driver suites that cannot boot without a worker `.env` here
-  (hard rail #1: not created); CI `checks` is the verdict. Built via 3 multi-agent workflow rounds
-  (build → per-area design review → 4-lens whole-page review → fixes → verification).
+- **Marketing landing page rebuilt demo-first (apps/www, 2026-09-23, Devesh's 12-point brief; the
+  editorial look from #98 kept, its motion-led hero and pricing checkout replaced):** one goal — a booked
+  demo. Every primary button reads "Book a demo" and opens ONE in-page booking dialog (name, work email,
+  company, optional phone → a weekday time in IST → confirmation) that books through Cal.com's public
+  booking API straight from the browser (keyless, no backend of ours); without `VITE_CALCOM_USERNAME` /
+  `VITE_CALCOM_EVENT_SLUG` it runs in an honest preview mode ("Preview complete — nothing was booked")
+  and `vite build` warns. The four-week pilot is introduced inside the demo, not sold on the page.
+  Hero: "Turn property enquiries into qualified site visits." beside a controllable sample call — play/
+  pause with its 0:42 duration, a transcript that follows the audio (tap a line to jump there), and the
+  captured result (budget, location, timeline, next action) visible before playback; nothing auto-cycles.
+  The recording is labelled as a text-to-speech recreation, not the product voice. Then: an illustrative
+  pilot report (labelled example — no invented customer or quote), three steps with small product
+  examples + the follow-up branch, three buyer demonstrations (Hinglish call, qualification summary,
+  site-visit confirmation + follow-up), a compact four-week pilot block with fees explained in words (no
+  rates), the plan comparison as a secondary disclosure (built vs planned), a six-question FAQ and a
+  closing invitation. System: #F7F6F2 / #191A17 / #62645E, terracotta only where it means something;
+  1160px column; serif only for the hero and closing line; mono only for times and numbers; content
+  never waits on animation. Measurement: Plausible events Demo click {source}, Booking start, Booking
+  complete {heard_sample}, Booking error {kind}, Sample play — README holds the baseline-then-one-change
+  plan. Copy is held to what exists: leads arrive by CSV import today, so speed reads "called 2 min
+  after import", never portal-live. Gates: www 147/0 (incl. vite build), typecheck 0, lint 0, bun audit clean, rls 0 offenders; repo-wide `bun test` 721/0 with CI's local-stack env.
 - **Eval runner live — `bun run evals` (task-59, 2026-08-04, P4 activation-gate infra):** for each
   `eval_scenarios` row of an org, drives a REAL conversation through the harness `runTurn` (real tool
   catalog; sends CAPTURED by an eval-mode port, never delivered) — contact turns replayed from the
@@ -268,6 +273,15 @@ Updated: 2026-09-23 (apps/www editorial redesign — Anthropic-inspired landing 
   for migrations): generate + wire the staging SSH key,
   either by naming the action to an agent session or yourself:
   `ssh deploy@168.144.147.90 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
+- **Landing page go-live inputs (apps/www):** (1) a Cal.com account + a demo event type with a
+  required short-text booking question whose identifier is `company`, then `VITE_CALCOM_USERNAME` +
+  `VITE_CALCOM_EVENT_SLUG` in the Pages build env; (2) a Plausible site → `VITE_PLAUSIBLE_SRC` + the
+  five goals (apps/www/README) — the event properties (source, heard_sample, kind) and funnels need
+  Plausible's Business plan (money); (3) confirm the pilot guarantee as worded: "If Revenue OS doesn't
+  beat your current process on conversion to site visit, you pay nothing for the pilot."; (4) the AI
+  self-identification line — the sample's "main Asha bol rahi hoon" doesn't say it's an AI; (5) a real,
+  consented call recording and measured pilot results to replace the synthetic sample and the
+  illustrative report.
 - Vapi India telephony decision inputs: Exotel vs Plivo SIP trunk account (spec risk #4).
 - Stale merged branches: agents are classifier-blocked from `git push origin --delete`; run flip-kit
   item 5 (orchestrator/state/FLIP-KIT-2026-07-11.md) or leave them.
@@ -276,12 +290,17 @@ Updated: 2026-09-23 (apps/www editorial redesign — Anthropic-inspired landing 
 ## DECISIONS (open forks; the noted default is what we build toward)
 - **apps/www visual source of truth moved (2026-09-23):** the editorial redesign Devesh asked for
   supersedes the dark-green/gold claude.ai "Revenue OS Design System" Marketing export; apps/www/README
-  (design language + motion rules) is the reference until that project is updated. Copy-parity pins were
-  re-cased to sentence case (meaning unchanged); palette pins moved to paper/ink/clay.
-- **apps/www booking endpoint (2026-09-23, OPEN — needs Devesh):** every CTA is an in-page anchor; the
-  closing "Book a pilot" still points at #pricing (inherited from main) and the plan CTAs point back at
-  #cta. Default: leave anchors until Devesh supplies a real booking URL or email (outward-facing — not
-  invented).
+  (design system, honesty rules, measurement plan) is the reference until that project is updated.
+- **apps/www books through Cal.com and measures with Plausible (2026-09-23, Devesh chose both):** the
+  browser calls api.cal.com (slots + bookings; keyless, CORS-open) and loads Plausible's script — the
+  first network calls apps/www makes. This narrows the task-34 "no backend connectivity" reading rather
+  than reversing it: still no secrets, no key in the bundle, no backend of ours (an architecture test
+  keeps api.cal.com the only external URL, inside lib/booking.ts). Rates stay off the page (Devesh:
+  "explain the mechanism only").
+- **apps/www honesty defaults (2026-09-23):** no live customers yet → the proof block is a labelled
+  illustrative example with no quotation; leads enter by CSV import only (the worker has no portal or
+  live-intake route) → no seconds-to-call or portal claims; the plan comparison separates built
+  features from planned ones. Each is pinned by copy tests; lift them when real data exists.
 - **Guardrail posture on unresolvable contact identity (task-56, 2026-08-01):** on an unresolvable
   contact identity behind a channel-bearing action, the two guard classes take OPPOSITE postures on
   purpose — `dncHook` (hard safety) blocks, `quietHoursHook` (courtesy) passes but records
@@ -422,13 +441,12 @@ Updated: 2026-09-23 (apps/www editorial redesign — Anthropic-inspired landing 
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
-- (this PR) console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23
-- (this PR) bun audit gate unblocked: hono 4.12.34 → 4.13.8 (GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc, GHSA-crvj-82cr-hjcx) + root override nanoid 3.3.19 (GHSA-2v37-7h3g-55p8, via vite › postcss) — `bun audit` clean; full `bun test` 691/0 with CI's local-stack env, typecheck 0, lint 0, rls 0 offenders — 2026-09-23
-- (this PR) apps/www editorial redesign — Anthropic-inspired landing page, animated demo call + lead-flow + illustrations, pause switch, mobile menu — www 117/0, typecheck 0, biome 0 — 2026-09-23
+- (this PR) apps/www rebuilt demo-first — one Book a demo journey (Cal.com booking dialog), controllable sample call with following transcript, honest proof + pilot + plans, FAQ, Plausible funnel events — www 147/0, repo-wide 721/0 — 2026-09-23
+- #98 console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23
+- #98 bun audit gate unblocked: hono 4.12.34 → 4.13.8 (GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc, GHSA-crvj-82cr-hjcx) + root override nanoid 3.3.19 (GHSA-2v37-7h3g-55p8, via vite › postcss) — `bun audit` clean; full `bun test` 691/0 with CI's local-stack env, typecheck 0, lint 0, rls 0 offenders — 2026-09-23
+- #98 apps/www editorial redesign — Anthropic-inspired landing page, animated demo call + lead-flow + illustrations, pause switch, mobile menu — www 117/0, typecheck 0, biome 0 — 2026-09-23
 - (this PR) task-59 eval runner (`bun run evals` — P4 activation-gate infra; scenario-driven real
   conversations via harness `runTurn`, mechanical ground-truth assertions, `eval_runs` rows) — task
   suites 22/22, repo-wide 654/0 — 2026-08-04
 - #94 task-60 demo driver (`bun run demo`) + booking-path disposition defect fix (interpret.ts + scheduler.ts, migration 017 cascade) — task suites 15/15, repo-wide 647/0 — 2026-08-04
 - #93 task-58 workflow-path repair (seed dialect, interpreter-owned payloads, bounded poison retry, per-send dedupe, org-discovery enumerator — migration 016) — 11 RED → GREEN, 617/0 — 2026-08-02
-- #92 task-57 LLM/tool path repair (JSON-Schema tool wire, loud HTTP errors, tool-result feedback) — 10 RED → GREEN, harness 129/11/0 — 2026-08-01
-- #91 task-56 guardrail activation (loop wiring + unresolved-identity postures) — 12 RED → GREEN, harness 114/11/0 — 2026-08-01

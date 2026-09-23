@@ -1,15 +1,11 @@
-// RED spec for TASK-34 — www componentization · COPY-PARITY + DEFAULT-STATE.
-// The regression net carried from the retired static suite (landing.test.ts
-// AC-1/AC-4, structure.test.ts AC-10): the SAME load-bearing copy and the SAME
-// default UI state, now asserted against the SSR render of <App/> instead of a
-// hand-authored index.html string. Machine tests pin copy + state, never pixels —
-// visual parity still needs a human review.
+// Copy + first-paint spec for the demo-first landing page (v2), asserted on the
+// SSR render of <App/> — which is exactly what a visitor sees before any script
+// runs or any animation plays. Pins: the buyer-outcome copy, one "Book a demo"
+// action, the sample call readable (and its result visible) before playback, the
+// honest labelling of examples, and the retired copy staying retired.
 //
-// App + react-dom/server load via try/catch so the pre-implementation state fails
-// as ASSERTIONS (App undefined → markup === "") and NEVER an opaque import crash.
-// react / react-dom resolve from the workspace root. App is imported directly (not
-// main.tsx) so it must be SSR-safe — no CSS-import side effects — exactly the
-// console's App/main split (main.tsx owns `import "./styles.css"`, App does not).
+// App + react-dom/server load via try/catch so a broken tree fails as assertions,
+// never as an opaque import crash.
 import { beforeAll, describe, expect, test } from "bun:test";
 import { type ComponentType, createElement } from "react";
 
@@ -19,165 +15,174 @@ let appLoaded = false;
 beforeAll(async () => {
   try {
     const server = await import("react-dom/server");
-    const mod = (await import("../src/App")) as {
-      App?: ComponentType;
-      default?: ComponentType;
-    };
-    const App = mod.App ?? mod.default;
-    if (
-      typeof App === "function" &&
-      typeof server.renderToStaticMarkup === "function"
-    ) {
-      markup = server.renderToStaticMarkup(createElement(App));
+    const mod = (await import("../src/App")) as { App?: ComponentType };
+    if (typeof mod.App === "function") {
+      markup = server.renderToStaticMarkup(createElement(mod.App));
       appLoaded = true;
     }
-  } catch {
-    markup = "";
-    appLoaded = false;
+  } catch (err) {
+    console.error(err);
   }
 });
 
-describe("copy parity — App SSR carries every load-bearing string", () => {
-  test("App exports a component that renders to static markup", () => {
-    expect(
-      appLoaded,
-      "apps/www/src/App must export a React component renderable via renderToStaticMarkup",
-    ).toBe(true);
-  });
+// Text content only (tags stripped, entities for & ' " decoded) — copy pins
+// shouldn't care which element carries the words.
+const text = () =>
+  markup
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ");
 
-  // Anchors carried from the static export, re-cased for the editorial redesign
-  // (sentence-case heads and buttons; tracked-caps labels + wordmarks unchanged).
-  // Apostrophe-free / nbsp-robust stems where the source has curly quotes or nbsp.
+test("App renders to static markup", () => {
+  expect(appLoaded).toBe(true);
+});
+
+describe("copy — the buyer-outcome story", () => {
   const COPY: Array<[string, string]> = [
-    ["hero h1", "The revenue operating system for Indian real"],
-    ["hero CTA — run pilot", "Run our pilot"],
-    ["hero CTA — see engine", "See the engine"],
-    ["nav CTA — book a pilot", "Book a pilot"],
-    ["nav link — how it works", "How it works"],
-    ["stage 1 title", "Answer fast"],
-    ["stage 2 title", "Score intent"],
-    ["stage 3 title", "Qualify"],
-    ["stage 4 title", "Book visit"],
-    ["low intent label", "LOW INTENT"],
-    ["low intent copy", "Nurture loop"],
-    ["high intent label", "HIGH INTENT"],
-    ["high intent copy", "Human closer, briefed by the machine"],
-    ["section head — how it works", "Four stages run on machine time"],
-    ["section head — moats", "Three competitors, three moats"],
-    ["section head — pricing", "Choose a plan to connect Revenue OS"],
-    ["section head — faq", "Asked before every pilot"],
-    ["moat 1 title", "Vertical depth beats breadth"],
-    ["moat 2 title", "Built for India, not ported"],
-    ["moat 3 title", "The data loop, not the calling"],
-    ["plan — pilot", "Pilot"],
-    ["plan — funnel engine", "Funnel Engine"],
-    ["plan — revenue os", "Revenue OS"],
-    ["price — free", "₹0"],
-    ["price — 60k", "₹60K"],
-    ["price — custom", "Custom"],
-    ["faq q1 — TRAI/DND", "Is this compliant with TRAI and DND rules?"],
-    ["faq q2 — Hinglish", "Can the agents actually handle Hinglish?"],
-    ["faq q3 — telecalling", "Does it replace my telecalling team?"],
-    ["faq q4 — outcome pricing", "How does outcome pricing work?"],
-    ["faq q5 — pilot involves", "What does the pilot involve?"],
-    ["faq TRAI answer", "honors DND registries"],
-    ["logo — meridian", "MERIDIAN"],
-    ["logo — vastu one", "VASTU ONE"],
-    ["logo — griha co", "GRIHA CO."],
-    ["logo — northgate", "NORTHGATE"],
-    ["logo — anvaya", "ANVAYA"],
-    ["guarantee headline a", "Give us one project"],
-    ["guarantee headline b", "beat your telecalling team"],
-    // The hero demo call SSRs its finished state (the no-JS / reduced-motion frame).
-    ["hero demo — booked outcome", "Site visit booked"],
+    ["hero headline", "Turn property enquiries into qualified site visits."],
+    [
+      "hero sub",
+      "Revenue OS calls new leads in Hinglish, qualifies budget and timeline, and follows up on WhatsApp",
+    ],
+    ["hero secondary", "Hear a sample call"],
+    ["proof badge", "Illustrative example"],
+    ["proof title", "What your pilot report shows"],
+    ["proof metric", "Enquiries called the same day"],
+    ["how it works", "From enquiry to site visit"],
+    ["step 1", "Respond quickly"],
+    ["step 1 body", "Call a new enquiry."],
+    ["step 2", "Understand the buyer"],
+    ["step 2 body", "Capture budget, location, and timeline."],
+    ["step 3", "Arrange the next step"],
+    ["step 3 body", "Book a visit or continue following up."],
+    ["follow-up branch", "Not ready to visit yet?"],
+    ["examples heading", "Built around how property sales actually work"],
+    ["example 1", "A natural Hinglish conversation"],
+    ["example 2", "A summary your salesperson can use"],
+    ["example 3", "Site-visit confirmation and follow-up"],
+    ["pilot", "Start with a four-week pilot"],
+    ["pilot — who", "Who it suits"],
+    ["pilot — measured", "How success is measured"],
+    ["pilot — fees", "How fees work"],
+    ["plans are secondary", "Compare plans"],
+    ["faq — voice", "How natural does the voice sound?"],
+    ["faq — team", "Does it replace my sales team?"],
+    ["faq — integrations", "Which tools does it work with?"],
+    ["faq — onboarding", "How long does onboarding take?"],
+    ["faq — pricing", "How does pricing work?"],
+    ["closing", "See how Revenue OS would handle your next property enquiry."],
+    [
+      "closing sub",
+      "Hear a sample call, review the qualification summary, and see how a site visit gets booked.",
+    ],
   ];
   for (const [label, needle] of COPY) {
-    test(`renders copy: ${label}`, () => {
-      expect(markup).toContain(needle);
-    });
+    test(`renders: ${label}`, () => expect(text()).toContain(needle));
+  }
+
+  const RETIRED = [
+    "Run our pilot",
+    "Subscribe and connect",
+    "Book a pilot",
+    "12,000+",
+    "eleven Indian languages",
+    "₹60K",
+    "The revenue operating system for Indian real",
+    // honesty: no live portal intake, no seconds-to-call claim, no absolute promise, no
+    // invented plan limit or metric that implies live intake (CSV import only, today)
+    "99acres",
+    "47 sec",
+    "no enquiry goes quiet",
+    "Up to 500 leads",
+    "Median time to first call",
+  ];
+  for (const needle of RETIRED) {
+    test(`no longer renders: ${needle}`, () =>
+      expect(text()).not.toContain(needle));
   }
 });
 
-// First opening tag (any element) whose attribute text contains `needle`; "" if
-// none. `[^>]*` is bounded by `>`, so a match proves both attrs sit on ONE element.
-function openingTagWith(doc: string, needle: string): string {
-  const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const m = new RegExp(`<[a-zA-Z][^>]*${esc}[^>]*>`).exec(doc);
-  return m ? m[0] : "";
-}
-
-// AC — default state baked into the SSR markup: funnel plan selected, FAQ 0 open.
-// Carries landing.test.ts AC-4 forward. The plan-select + accordion are React
-// state; their DEFAULT is what renderToStaticMarkup emits. State is exposed via the
-// same data hooks the static export used (data-plan/data-selected, data-faq/
-// data-open) so the contract is unambiguous for the GREEN rebuild.
-describe("default state — funnel selected, faq 0 open (SSR markup)", () => {
-  test("funnel plan is selected by default; pilot and os are not", () => {
-    const funnel = openingTagWith(markup, 'data-plan="funnel"');
-    const pilot = openingTagWith(markup, 'data-plan="pilot"');
-    const os = openingTagWith(markup, 'data-plan="os"');
-    expect(funnel, 'a [data-plan="funnel"] element must render').not.toBe("");
-    expect(pilot, 'a [data-plan="pilot"] element must render').not.toBe("");
-    expect(os, 'a [data-plan="os"] element must render').not.toBe("");
-    expect(funnel).toContain('data-selected="true"');
-    expect(pilot).toContain('data-selected="false"');
-    expect(os).toContain('data-selected="false"');
+describe("one primary action — Book a demo", () => {
+  test("appears on at least four primary buttons (nav, hero, pilot, closing)", () => {
+    const buttons =
+      markup.match(
+        /<button\b[^>]*>(?:(?!<\/button>).)*Book a demo(?:(?!<\/button>).)*<\/button>/gs,
+      ) ?? [];
+    expect(buttons.length).toBeGreaterThanOrEqual(4);
   });
 
-  test('exactly one plan carries data-selected="true"', () => {
-    const selected = markup.match(/data-selected="true"/g) ?? [];
-    expect(selected.length).toBe(1);
+  test("is never a plain link to another section", () => {
+    expect(markup).not.toMatch(
+      /<a\b[^>]*>(?:(?!<\/a>).)*Book a demo(?:(?!<\/a>).)*<\/a>/s,
+    );
   });
 
-  test("selected + unselected plans show their distinct CTA states", () => {
-    // funnel (selected) shows its subscribe CTA; unselected plans show Choose plan.
-    expect(markup).toContain("Subscribe and connect");
-    expect(markup).toContain("Choose plan");
+  test("the booking dialog is on the page, labelled, and closed on first paint", () => {
+    const dialog = /<dialog\b[^>]*>/.exec(markup)?.[0] ?? "";
+    expect(dialog, "a <dialog> must render").not.toBe("");
+    expect(dialog).toMatch(/aria-labelledby="[^"]+"/);
+    expect(dialog).not.toMatch(/\sopen(?:=|\s|>)/);
+  });
+});
+
+describe("the sample call — useful before playback", () => {
+  test("is labelled as a text-to-speech recreation, not the product voice", () => {
+    expect(text()).toContain("Sample call");
+    expect(text()).toContain("not the voice used on real calls");
   });
 
-  test("faq item 0 is open by default; items 1..4 are closed", () => {
-    for (let i = 0; i < 5; i++) {
-      const tag = openingTagWith(markup, `data-faq="${i}"`);
-      expect(tag, `a [data-faq="${i}"] element must render`).not.toBe("");
-      expect(tag).toContain(i === 0 ? 'data-open="true"' : 'data-open="false"');
+  test("has a play control showing the recording's duration", () => {
+    expect(markup).toMatch(
+      /<button\b(?:(?!<\/button>).)*Play sample call(?:(?!<\/button>).)*<\/button>/s,
+    );
+    expect(text()).toContain("0:42");
+    expect(markup).toMatch(/<audio\b[^>]*src="\/sample-call\.m4a"/);
+  });
+
+  test("shows the whole transcript before playback", () => {
+    for (const stem of [
+      "Namaste Rohan ji",
+      "Budget around 90 lakh hai",
+      "Saturday, 11 baje theek rahega",
+      "Location aur details main WhatsApp par bhej rahi hoon",
+    ]) {
+      expect(text()).toContain(stem);
     }
   });
 
-  test("exactly one faq item is open, and item 0's answer is rendered", () => {
-    const open = markup.match(/data-open="true"/g) ?? [];
-    expect(open.length).toBe(1);
-    expect(markup).toContain("honors DND registries");
+  test("shows the result before playback: budget, location, timeline, next action", () => {
+    for (const s of [
+      "Budget",
+      "₹90 L",
+      "Location",
+      "Whitefield, Bengaluru",
+      "Buying timeline",
+      "Next action",
+      "Site visit, Sat 11:00 AM",
+    ]) {
+      expect(text()).toContain(s);
+    }
   });
 });
 
-// The animated set pieces are decorative motion over real copy: each one either
-// hides from assistive tech (aria-hidden) or speaks as ONE labelled image — the
-// hero demo call must carry a text alternative, never a stream of live updates.
-describe("accessibility — animated visuals", () => {
-  test("the hero demo call is a single labelled image", () => {
-    expect(markup).toMatch(/role="img"[^>]*aria-label="[^"]{20,}"/);
-  });
-  test("a control can pause every animation (WCAG 2.2.2)", () => {
-    // a <button> whose own content (up to its </button>) carries the label
-    expect(markup).toMatch(
-      /<button\b(?:(?!<\/button>).)*Pause animations(?:(?!<\/button>).)*<\/button>/s,
-    );
-  });
-  test("faq toggles expose their state via aria-expanded", () => {
+describe("accessibility + first paint", () => {
+  test("faq toggles expose state; exactly one answer open by default", () => {
     expect(markup).toContain('aria-expanded="true"');
     expect(markup).toContain('aria-expanded="false"');
+    expect((markup.match(/data-open="true"/g) ?? []).length).toBe(1);
   });
-});
 
-// Carries structure.test.ts AC-9 forward: semantic landmarks + a single h1, now
-// asserted on the composed SSR render instead of the hand-authored index.html.
-describe("semantic structure — landmarks + single h1 (SSR markup)", () => {
-  test("renders header/nav/main/footer landmarks and exactly one h1", () => {
-    expect(/<nav[\s>]/i.test(markup), "must render a <nav>").toBe(true);
-    expect(/<header[\s>]/i.test(markup), "must render a <header>").toBe(true);
-    expect(/<main[\s>]/i.test(markup), "must render a <main>").toBe(true);
-    expect(/<footer[\s>]/i.test(markup), "must render a <footer>").toBe(true);
-    const h1s = markup.match(/<h1[\s>]/gi) ?? [];
-    expect(h1s.length, "exactly one <h1>").toBe(1);
+  test("landmarks and exactly one h1", () => {
+    for (const tag of ["nav", "header", "main", "footer"]) {
+      expect(new RegExp(`<${tag}[\\s>]`, "i").test(markup)).toBe(true);
+    }
+    expect((markup.match(/<h1[\s>]/gi) ?? []).length).toBe(1);
+  });
+
+  test("nothing is hidden waiting for a scroll reveal", () => {
+    expect(markup).not.toContain("data-reveal");
+    expect(markup).not.toMatch(/style="[^"]*opacity:\s*0/);
   });
 });

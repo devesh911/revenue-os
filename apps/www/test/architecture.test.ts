@@ -1,22 +1,17 @@
-// RED spec for TASK-34 — www componentization · ARCHITECTURE (source-level).
-// Pins the TARGET file layout the GREEN rebuild produces — the component surface
-// matching the console's stack (react + vite + tailwind v4). Pure fs + regex over
-// SOURCE (no imports, no build): env-free, no DOM libs, no new deps — same posture
-// as the retired structure.test.ts, one layer up (files/exports/separation instead
-// of a single index.html string).
-//
-// Carries forward, restated against src/: self-hosted fonts (AC-3), self-containment
-// (AC-2), and "raw hex lives in ONE place" (AC-7/AC-8 — now src/styles.css @theme).
+// Architecture spec for the demo-first landing page (v2) — source-level, env-free
+// (pure fs + regex; no DOM, no build). Pins the file layout, the design-system
+// tokens and type ranking, content separation, motion discipline, and the
+// self-containment rules (self-hosted fonts; the only external host is the
+// booking API, in one file).
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 
 const WWW_DIR = resolve(import.meta.dir, "..");
 const SRC_DIR = resolve(WWW_DIR, "src");
 const STYLES = resolve(SRC_DIR, "styles.css");
 
-// Read a file, or "" when absent — so a missing artifact fails as a clear content
-// assertion (the RED reason) rather than an opaque fs throw.
+// Read a file, or "" when absent — a missing artifact fails as a clear assertion.
 function read(path: string): string {
   return existsSync(path) ? readFileSync(path, "utf8") : "";
 }
@@ -33,8 +28,10 @@ function walk(dir: string, exts: string[]): string[] {
   return out;
 }
 
+const rel = (f: string) => relative(SRC_DIR, f);
+const sources = () => walk(SRC_DIR, [".ts", ".tsx"]);
+
 // A NAMED export of `name`: `export function|const|class Name`, or `export { Name }`.
-// Named exports are the console idiom (export function App / AppShell / Button …).
 function exportsName(src: string, name: string): boolean {
   return (
     new RegExp(
@@ -53,283 +50,255 @@ describe("architecture — vite entry wiring", () => {
   });
 
   test("src/main.tsx imports App and the stylesheet", () => {
-    const p = resolve(SRC_DIR, "main.tsx");
-    expect(existsSync(p), `${p} must exist`).toBe(true);
-    const src = read(p);
-    // main.tsx owns the CSS side-effect import, keeping App SSR-safe.
-    expect(
-      /from\s+["']\.\/App["']/.test(src),
-      "main.tsx must import ./App",
-    ).toBe(true);
-    expect(
-      /["']\.\/styles\.css["']/.test(src),
-      "main.tsx must import ./styles.css",
-    ).toBe(true);
+    const src = read(resolve(SRC_DIR, "main.tsx"));
+    expect(/from\s+["']\.\/App["']/.test(src)).toBe(true);
+    expect(/["']\.\/styles\.css["']/.test(src)).toBe(true);
   });
 
-  test("src/App.tsx exists and exports App", () => {
-    const p = resolve(SRC_DIR, "App.tsx");
-    expect(existsSync(p), `${p} must exist`).toBe(true);
-    expect(exportsName(read(p), "App"), "App.tsx must export App").toBe(true);
+  test("src/App.tsx exports App", () => {
+    expect(exportsName(read(resolve(SRC_DIR, "App.tsx")), "App")).toBe(true);
   });
 });
 
-// ── src/styles.css owns the @theme tokens (raw hex lives ONLY here) ──────────
-describe("architecture — src/styles.css @theme tokens", () => {
+// ── the visual system: tokens (raw hex lives ONLY in styles.css) ─────────────
+describe("architecture — src/styles.css tokens", () => {
   test("imports tailwind and declares an @theme block", () => {
-    expect(existsSync(STYLES), `${STYLES} must exist`).toBe(true);
     const css = read(STYLES);
     expect(css).toContain('@import "tailwindcss"');
     expect(/@theme\b/.test(css)).toBe(true);
   });
 
-  // EXACT palette values (case-insensitive hex) — the warm paper / ink / clay
-  // system. Alpha tiers are Tailwind `/<alpha>` modifiers on these, not tokens.
-  const TOKENS: Array<[string, RegExp]> = [
-    ["paper #FAF9F5", /--color-paper\s*:\s*#FAF9F5\b/i],
-    ["paper-2 #F0EEE6", /--color-paper-2\s*:\s*#F0EEE6\b/i],
-    ["line #E8E6DC", /--color-line\s*:\s*#E8E6DC\b/i],
-    ["ink #141413", /--color-ink\s*:\s*#141413\b/i],
-    ["clay #D97757", /--color-clay\s*:\s*#D97757\b/i],
-    ["clay-deep #A9492A", /--color-clay-deep\s*:\s*#A9492A\b/i],
-    ["olive #788C5D", /--color-olive\s*:\s*#788C5D\b/i],
-    // the text tiers the ≥4.5:1 contrast floor rests on
-    ["ink-2 #3D3D3A", /--color-ink-2\s*:\s*#3D3D3A\b/i],
-    ["stone #6B6A64", /--color-stone\s*:\s*#6B6A64\b/i],
-    ["olive-deep #56663F", /--color-olive-deep\s*:\s*#56663F\b/i],
+  const TOKENS: Array<[string, string]> = [
+    ["paper", "#F7F6F2"],
+    ["wash", "#EFEDE7"],
+    ["surface", "#FFFFFF"],
+    ["line", "#E2E0D8"],
+    ["ink", "#191A17"],
+    ["ink-2", "#62645E"],
+    ["clay", "#D97757"],
+    ["clay-deep", "#A9492A"],
+    ["olive-deep", "#56663F"],
   ];
-  for (const [label, re] of TOKENS) {
-    test(`defines token: ${label}`, () => {
-      expect(re.test(read(STYLES))).toBe(true);
+  for (const [name, hex] of TOKENS) {
+    test(`defines --color-${name}: ${hex}`, () => {
+      expect(
+        new RegExp(`--color-${name}\\s*:\\s*${hex}\\b`, "i").test(read(STYLES)),
+      ).toBe(true);
     });
   }
 
-  // Motion safety floor: every animation is switched off under reduced motion,
-  // and the scroll reveal only hides content behind the JS opt-in html[data-motion].
   test("honours prefers-reduced-motion", () => {
     expect(read(STYLES)).toMatch(
       /@media\s*\(prefers-reduced-motion:\s*reduce\)/,
     );
   });
-  test("scroll reveal hides content only behind html[data-motion]", () => {
-    const css = read(STYLES);
-    const hides = [
-      ...css.matchAll(/([^{}]*\[data-reveal\][^{}]*)\{[^}]*opacity:\s*0\b/g),
-    ];
-    expect(hides.length).toBeGreaterThan(0);
-    for (const m of hides) expect(m[1]).toContain("html[data-motion]");
-  });
-
-  for (const fam of ["Lora", "IBM Plex Mono"]) {
-    test(`declares font family ${fam}`, () => {
-      expect(read(STYLES)).toContain(fam);
-    });
-  }
 });
 
-// ── self-hosted fonts (carries AC-3): @font-face url()s stay local ──────────
-describe("architecture — @font-face self-hosting in src/styles.css", () => {
+// ── type ranking + motion discipline (items 5 and 11) ────────────────────────
+describe("architecture — type ranking and motion discipline", () => {
+  test("serif appears only in design/Heading.tsx (hero + closing statement)", () => {
+    const offenders = sources()
+      .filter((f) => read(f).includes("font-serif"))
+      .map(rel)
+      .filter((f) => f !== "design/Heading.tsx");
+    expect(offenders, `font-serif outside Heading: ${offenders}`).toEqual([]);
+  });
+
+  test("no upper-case utility labels anywhere", () => {
+    const offenders = sources()
+      .filter((f) => /(?:^|[\s"'`])uppercase(?:[\s"'`]|$)/m.test(read(f)))
+      .map(rel);
+    expect(offenders, `uppercase in: ${offenders}`).toEqual([]);
+  });
+
+  test("looping animation lives only in the sample player", () => {
+    const offenders = sources()
+      .filter((f) => /infinite/.test(read(f)))
+      .map(rel)
+      .filter((f) => f !== "visuals/SampleCall.tsx");
+    expect(offenders, `infinite animation in: ${offenders}`).toEqual([]);
+  });
+
+  test("no scroll-reveal hiding: content is visible on first paint", () => {
+    const all = sources().map(read).join("\n") + read(STYLES);
+    expect(all).not.toContain("data-reveal");
+    expect(all).not.toContain("IntersectionObserver(");
+  });
+});
+
+// ── fonts are self-hosted ────────────────────────────────────────────────────
+describe("architecture — self-hosted fonts", () => {
   const faceBlocks = (css: string): string[] =>
     [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1] ?? "");
 
-  test("both self-hosted families have @font-face rules", () => {
+  test("Lora and IBM Plex Mono have @font-face rules", () => {
     const blocks = faceBlocks(read(STYLES));
     expect(blocks.some((b) => b.includes("Lora"))).toBe(true);
     expect(blocks.some((b) => b.includes("IBM Plex Mono"))).toBe(true);
   });
 
-  test("every @font-face src url() is a local ../fonts/ file that exists", () => {
+  test("every @font-face url() is a local ../fonts/ file that exists", () => {
     const urls = faceBlocks(read(STYLES))
       .flatMap((b) => [...b.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)])
-      .map((m) => (m[1] ?? "").trim())
-      .filter((u) => u.length > 0 && !u.startsWith("data:"));
+      .map((m) => (m[1] ?? "").trim());
     expect(urls.length).toBeGreaterThanOrEqual(3);
     for (const u of urls) {
-      expect(u, `font url must be local (../fonts/…): ${u}`).toContain(
-        "fonts/",
-      );
-      expect(/^https?:/i.test(u), `font url must not be external: ${u}`).toBe(
-        false,
-      );
-      const clean = (u.split("?")[0] ?? u).split("#")[0] ?? u;
-      // url()s in src/styles.css resolve relative to its dir (src/) → ../fonts/<f>.
-      expect(
-        existsSync(resolve(SRC_DIR, clean)),
-        `must resolve: ${clean}`,
-      ).toBe(true);
+      expect(u).toContain("fonts/");
+      expect(/^https?:/i.test(u)).toBe(false);
+      expect(existsSync(resolve(SRC_DIR, u)), `must resolve: ${u}`).toBe(true);
     }
   });
 });
 
-// ── design elements: one file each, exports its component ───────────────────
-describe("architecture — src/design/ reusable elements", () => {
-  const DESIGN = [
-    "Heading",
-    "Text",
-    "Kicker",
-    "MonoLabel",
-    "CtaButton",
-    "SectionFrame",
+// ── file layout: design / sections / visuals / lib ───────────────────────────
+describe("architecture — component layout", () => {
+  const LAYOUT: Array<[string, string[]]> = [
+    ["design", ["Heading", "Text", "Label", "Button", "Section", "Card"]],
+    [
+      "sections",
+      [
+        "Nav",
+        "Hero",
+        "Proof",
+        "HowItWorks",
+        "Examples",
+        "Pilot",
+        "Faq",
+        "ClosingCta",
+      ],
+    ],
+    ["visuals", ["BrandMark", "Icon", "SampleCall", "BookingDialog"]],
   ];
-  for (const name of DESIGN) {
-    test(`src/design/${name}.tsx exists and exports ${name}`, () => {
-      const p = resolve(SRC_DIR, "design", `${name}.tsx`);
-      expect(existsSync(p), `${p} must exist`).toBe(true);
-      expect(exportsName(read(p), name), `must export ${name}`).toBe(true);
-    });
+  for (const [dir, names] of LAYOUT) {
+    for (const name of names) {
+      test(`src/${dir}/${name}.tsx exports ${name}`, () => {
+        const p = resolve(SRC_DIR, dir, `${name}.tsx`);
+        expect(existsSync(p), `${p} must exist`).toBe(true);
+        expect(exportsName(read(p), name)).toBe(true);
+      });
+    }
   }
 
-  test("CtaButton declares accent + ghost variants", () => {
-    const src = read(resolve(SRC_DIR, "design", "CtaButton.tsx"));
-    expect(src).toContain("accent");
-    expect(src).toContain("ghost");
+  test("lib exposes the booking client, analytics and the booking context", () => {
+    expect(
+      exportsName(
+        read(resolve(SRC_DIR, "lib/booking.ts")),
+        "createBookingClient",
+      ),
+    ).toBe(true);
+    expect(
+      exportsName(read(resolve(SRC_DIR, "lib/analytics.ts")), "track"),
+    ).toBe(true);
+    const ctx = read(resolve(SRC_DIR, "lib/bookingContext.tsx"));
+    expect(exportsName(ctx, "BookingProvider")).toBe(true);
+    expect(exportsName(ctx, "BookDemoButton")).toBe(true);
   });
 });
 
-// ── visuals: the animated set pieces, one file each ─────────────────────────
-describe("architecture — src/visuals/ animated set pieces", () => {
-  for (const name of [
-    "BrandMark",
-    "HeroCall",
-    "FunnelFlow",
-    "MoatArt",
-    "CallArt",
-  ]) {
-    test(`src/visuals/${name}.tsx exists and exports ${name}`, () => {
-      const p = resolve(SRC_DIR, "visuals", `${name}.tsx`);
-      expect(existsSync(p), `${p} must exist`).toBe(true);
-      expect(exportsName(read(p), name), `must export ${name}`).toBe(true);
-    });
-  }
-});
-
-// ── sections: one file each, exports its component ──────────────────────────
-describe("architecture — src/sections/ compose design elements", () => {
-  const SECTIONS = [
-    "Nav",
-    "Hero",
-    "Logos",
-    "StageGrid",
-    "IntentRouting",
-    "Moats",
-    "Pricing",
-    "Faq",
-    "FooterCta",
-  ];
-  for (const name of SECTIONS) {
-    test(`src/sections/${name}.tsx exists and exports ${name}`, () => {
-      const p = resolve(SRC_DIR, "sections", `${name}.tsx`);
-      expect(existsSync(p), `${p} must exist`).toBe(true);
-      expect(exportsName(read(p), name), `must export ${name}`).toBe(true);
-    });
-  }
-});
-
-// ── content modules: typed data holding the copy (separation of concerns) ───
-describe("architecture — src/content/ typed data modules", () => {
+// ── content: typed modules hold the copy; files import it, never inline it ──
+describe("architecture — src/content/ holds the copy", () => {
   const CONTENT: Array<[string, string[]]> = [
-    ["plans", ["Pilot", "Funnel Engine", "Revenue OS", "₹0", "₹60K", "Custom"]],
-    ["stages", ["Answer fast", "Score intent", "Qualify", "Book visit"]],
+    ["site", ["Book a demo", "How it works"]],
     [
-      "faqs",
-      ["Is this compliant with TRAI and DND rules?", "honors DND registries"],
-    ],
-    [
-      "moats",
+      "hero",
       [
-        "Vertical depth beats breadth",
-        "Built for India, not ported",
-        "The data loop, not the calling",
-        "Namaste",
-        "INVENTORY",
+        "Turn property enquiries into qualified site visits.",
+        "Hear a sample call",
+        "Namaste Rohan ji",
       ],
     ],
-    ["logos", ["MERIDIAN", "VASTU ONE", "GRIHA CO.", "NORTHGATE", "ANVAYA"]],
-    ["hero", ["Site visit booked", "Nurture loop"]],
-    ["site", ["How it works", "Book a pilot", "Pause animations"]],
-    ["cta", ["Give us one project"]],
+    ["proof", ["Illustrative example", "Enquiries called the same day"]],
+    [
+      "workflow",
+      ["Respond quickly", "Understand the buyer", "Arrange the next step"],
+    ],
+    ["examples", ["Built around how property sales actually work"]],
+    ["pilot", ["Start with a four-week pilot", "How fees work"]],
+    ["faqs", ["How natural does the voice sound?"]],
+    [
+      "closing",
+      ["See how Revenue OS would handle your next property enquiry."],
+    ],
+    ["booking", ["Choose a time", "Work email"]],
   ];
   for (const [mod, strings] of CONTENT) {
-    test(`src/content/${mod}.ts exists, is typed, and holds its copy`, () => {
-      const p = resolve(SRC_DIR, "content", `${mod}.ts`);
-      expect(existsSync(p), `${p} must exist`).toBe(true);
-      const src = read(p);
-      expect(/export\s+const\s+\w+/.test(src), "must export a const").toBe(
-        true,
-      );
+    test(`src/content/${mod}.ts is typed and holds its copy`, () => {
+      const src = read(resolve(SRC_DIR, "content", `${mod}.ts`));
+      expect(/export\s+const\s+\w+/.test(src)).toBe(true);
       expect(
-        /\bas\s+const\b|\binterface\s+\w+|\btype\s+\w+/.test(src),
-        "must carry a TypeScript type (interface / type / as const)",
+        /\bas\s+const\b|\binterface\s+\w+|\btype\s+\w+|\bsatisfies\b|from\s+["']\.\/site["']/.test(
+          src,
+        ),
       ).toBe(true);
       for (const s of strings) expect(src).toContain(s);
     });
   }
-});
 
-// ── sections import content, never inline it ────────────────────────────────
-describe("architecture — sections import content, never inline it", () => {
-  // [dir/file, content module, strings that MUST live in content — not the file]
   const SEPARATION: Array<[string, string, string[]]> = [
-    ["sections/StageGrid", "stages", ["Answer fast", "Score intent"]],
-    ["sections/Moats", "moats", ["Vertical depth beats breadth"]],
-    ["sections/Pricing", "plans", ["Funnel Engine", "₹60K"]],
-    ["sections/Faq", "faqs", ["Is this compliant with TRAI and DND rules?"]],
-    ["sections/Logos", "logos", ["MERIDIAN", "ANVAYA"]],
-    ["sections/Nav", "site", ["How it works", "Book a pilot"]],
-    ["sections/Hero", "hero", ["Run our pilot", "See the engine"]],
-    ["sections/IntentRouting", "stages", ["HIGH INTENT", "LOW INTENT"]],
-    ["sections/FooterCta", "cta", ["Give us one project"]],
-    ["visuals/HeroCall", "hero", ["Site visit booked"]],
-    ["visuals/FunnelFlow", "stages", ["Human closer"]],
-    ["visuals/MoatArt", "moats", ["Namaste", "INVENTORY"]],
+    ["sections/Nav", "site", ["How it works"]],
+    [
+      "sections/Hero",
+      "hero",
+      ["Turn property enquiries", "Hear a sample call"],
+    ],
+    ["visuals/SampleCall", "hero", ["Namaste Rohan", "What the call captured"]],
+    ["sections/Proof", "proof", ["Enquiries called the same day"]],
+    [
+      "sections/HowItWorks",
+      "workflow",
+      ["Respond quickly", "Not ready to visit yet?"],
+    ],
+    ["sections/Examples", "examples", ["A natural Hinglish conversation"]],
+    ["sections/Pilot", "pilot", ["How fees work", "Who it suits"]],
+    ["sections/Faq", "faqs", ["How natural does the voice sound?"]],
+    ["sections/ClosingCta", "closing", ["See how Revenue OS would handle"]],
+    ["visuals/BookingDialog", "booking", ["Work email", "Choose a time"]],
+    ["lib/bookingContext", "site", []],
   ];
-  for (const [section, mod, strings] of SEPARATION) {
-    test(`${section} imports ../content/${mod} and inlines none of its data`, () => {
-      const p = resolve(SRC_DIR, `${section}.tsx`);
-      expect(existsSync(p), `${p} must exist`).toBe(true);
-      const src = read(p);
+  for (const [file, mod, strings] of SEPARATION) {
+    test(`${file} imports content/${mod} and inlines none of it`, () => {
+      const src = read(resolve(SRC_DIR, `${file}.tsx`));
       expect(
-        new RegExp(`from\\s+["'][^"']*content/${mod}(?:\\.[jt]sx?)?["']`).test(
-          src,
-        ),
-        `${section} must import from ../content/${mod}`,
+        new RegExp(`from\\s+["'][^"']*content/${mod}["']`).test(src),
+        `${file} must import content/${mod}`,
       ).toBe(true);
-      for (const s of strings) {
-        expect(
-          src.includes(s),
-          `${section} must NOT inline "${s}" — it lives in content/${mod}`,
-        ).toBe(false);
-      }
+      for (const s of strings)
+        expect(src.includes(s), `inlines "${s}"`).toBe(false);
     });
   }
-});
 
-// ── raw colour hex lives ONLY in src/styles.css (carries AC-7/AC-8) ─────────
-const HEX_COLOR = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/;
-describe("architecture — raw hex only in src/styles.css", () => {
-  test("no raw colour hex in any src/**/*.{ts,tsx}", () => {
-    const offenders = walk(SRC_DIR, [".ts", ".tsx"]).filter((f) =>
-      HEX_COLOR.test(read(f)),
-    );
-    expect(
-      offenders.length,
-      `raw hex found in: ${offenders.map((f) => f.replace(SRC_DIR, "src")).join(", ")}`,
-    ).toBe(0);
+  test('"Book a demo" is defined once (content/site.ts) — every primary button shares it', () => {
+    const holders = sources()
+      .filter((f) => read(f).includes("Book a demo"))
+      .map(rel);
+    expect(holders).toEqual(["content/site.ts"]);
   });
 });
 
-// ── self-containment (carries AC-2): zero external URLs anywhere in src/ ─────
-describe("architecture — self-containment: no external URLs in src/", () => {
-  test("no external http(s) URLs (XML/SVG namespaces excepted)", () => {
+// ── raw colour hex lives ONLY in src/styles.css ─────────────────────────────
+describe("architecture — raw hex only in src/styles.css", () => {
+  test("no raw colour hex in any src/**/*.{ts,tsx}", () => {
+    const offenders = sources()
+      .filter((f) => /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/.test(read(f)))
+      .map(rel);
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ── self-containment: the only external host is the booking API, in one file ──
+describe("architecture — external hosts", () => {
+  test("only lib/booking.ts reaches out, and only to api.cal.com", () => {
     const hits: string[] = [];
     for (const f of walk(SRC_DIR, [".ts", ".tsx", ".css"])) {
-      for (const m of read(f).matchAll(/https?:\/\/[^\s"')]+/gi)) {
+      for (const m of read(f).matchAll(/https?:\/\/[^\s"'`)]+/gi)) {
         const u = m[0];
-        if (/^https?:\/\/www\.w3\.org\//i.test(u)) continue; // namespace, never fetched
-        hits.push(`${f.replace(SRC_DIR, "src")}: ${u}`);
+        if (/^https?:\/\/www\.w3\.org\//i.test(u)) continue; // SVG namespace, never fetched
+        if (rel(f) === "lib/booking.ts" && u.startsWith("https://api.cal.com/"))
+          continue;
+        hits.push(`${rel(f)}: ${u}`);
       }
     }
-    expect(hits.length, `external URLs found:\n${hits.join("\n")}`).toBe(0);
+    expect(hits, `external URLs:\n${hits.join("\n")}`).toEqual([]);
   });
 
   test("no CDN font/script hosts referenced in src/", () => {
@@ -339,19 +308,20 @@ describe("architecture — self-containment: no external URLs in src/", () => {
   });
 });
 
-// ── README documents the new component layout (incl. "adding a page") ───────
-describe("architecture — README documents the component layout", () => {
+// ── README documents the layout ──────────────────────────────────────────────
+describe("architecture — README", () => {
   const readme = () => read(resolve(WWW_DIR, "README.md"));
-  test("references the component structure (sections/design/content + vite)", () => {
-    expect(existsSync(resolve(WWW_DIR, "README.md"))).toBe(true);
+  test("references the component structure and the booking + analytics setup", () => {
     const r = readme();
-    expect(r).toContain("src/sections");
-    expect(r).toContain("src/design");
-    expect(r).toContain("src/content");
-    expect(r.toLowerCase()).toContain("vite");
-  });
-
-  test("carries an 'adding a page' note (future contact-us)", () => {
-    expect(readme().toLowerCase()).toContain("adding a page");
+    for (const s of [
+      "src/sections",
+      "src/design",
+      "src/content",
+      "VITE_CALCOM_USERNAME",
+      "VITE_PLAUSIBLE_SRC",
+    ]) {
+      expect(r).toContain(s);
+    }
+    expect(r.toLowerCase()).toContain("adding a page");
   });
 });

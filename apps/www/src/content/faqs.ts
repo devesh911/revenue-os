@@ -1,40 +1,41 @@
-// The five questions asked before every pilot, plus the section's side-head copy.
-// Faq.tsx composes it and inlines none of these strings (separation pin).
-// `defaultOpenFaq` is the item open on first paint — the SSR default the
-// copy-parity suite pins.
+// The short FAQ before the closing invitation: voice quality, existing sales
+// teams, integrations, onboarding, pricing — and how do-not-call rules are handled.
+// Answers describe what exists today; planned work is called planned.
 
-export interface Faq {
+interface Faq {
   q: string;
   a: string;
 }
 
 export const faqCopy = {
-  kicker: "Questions",
-  title: "Asked before every pilot.",
-  sub: "Can’t find your answer? We’ll walk through your lead flow on a pilot call.",
-  cta: "Book a pilot call",
+  title: "Questions",
+  sub: "Anything else, ask us on the demo.",
 } as const;
 
 export const faqs: Faq[] = [
   {
-    q: "Is this compliant with TRAI and DND rules?",
-    a: "Yes. Every outbound call runs through consent-checked lists, honors DND registries, and logs a full audit trail. RERA-relevant disclosures are built into the agent’s scripts per project.",
+    q: "How natural does the voice sound?",
+    a: "The sample on this page is recreated with basic text-to-speech, not the voice used on real calls. On the demo you'll hear the production voice speaking Hinglish, and you approve the call script before any call goes out.",
   },
   {
-    q: "Can the agents actually handle Hinglish?",
-    a: "Hinglish is the default, not a feature. Agents code-switch mid-sentence the way buyers do, and support eleven Indian languages for regional projects.",
+    q: "Does it replace my sales team?",
+    a: "No. It handles the machine-time work—first calls, qualifying questions and follow-ups—so your salespeople spend their time with buyers who are ready to visit.",
   },
   {
-    q: "Does it replace my telecalling team?",
-    a: "It replaces machine-time work\u00a0— first response, screening, follow-ups. Your best closers stay, and they only ever talk to briefed, high-intent buyers.",
+    q: "Which tools does it work with?",
+    a: "Today, leads come in through a CSV import, and follow-ups go out by voice and WhatsApp. Connectors for CRMs such as Zoho and HubSpot are planned; tell us what you use on the demo.",
   },
   {
-    q: "How does outcome pricing work?",
-    a: "You pay per qualified site visit that actually happens. Platform fees on paid tiers credit against outcome fees, so you never pay twice for the same visit.",
+    q: "How long does onboarding take?",
+    a: "Setup happens in the first week of the pilot: we load your project details, agree the call script with you and set up your lead import. Calls start once you've approved the script.",
   },
   {
-    q: "What does the pilot involve?",
-    a: "One project, your live lead flow, four weeks. We run head-to-head against your current telecalling process. If we don’t beat it on conversion to site visit, you pay nothing.",
+    q: "How does pricing work?",
+    a: "During the four-week pilot there's no platform fee: you pay only for qualified site visits that happen, and nothing at all if Revenue OS doesn't beat your current process on conversion to site visit. After that, a monthly platform fee is credited against your visit fees, so you never pay twice for the same visit. Rates are agreed per project.",
+  },
+  {
+    q: "How are do-not-call rules handled?",
+    a: "Before every outbound call, Revenue OS checks your do-not-call list, quiet hours and attempt limits, and every conversation is logged so you can review it.",
   },
 ];
 

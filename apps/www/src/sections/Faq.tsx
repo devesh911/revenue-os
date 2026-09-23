@@ -1,106 +1,96 @@
 import { useId, useState } from "react";
 import { defaultOpenFaq, faqCopy, faqs } from "../content/faqs";
-import { CtaButton } from "../design/CtaButton";
 import { Heading } from "../design/Heading";
-import { Kicker } from "../design/Kicker";
-import { SectionFrame } from "../design/SectionFrame";
+import { Section } from "../design/Section";
 import { Text } from "../design/Text";
 import { cx } from "../lib/cx";
-import { reveal } from "../lib/reveal";
+import { BAR, Icon } from "../visuals/Icon";
 
-// FAQ — a sticky side head beside an accordion whose items open and close
-// independently (default = item 0 alone, the SSR pin), so opening one never collapses
-// another and slides the tapped question away. Each item's outer element carries
-// the data-faq / data-open hooks. Answers are always rendered so their height can
-// ease open (grid-rows 0fr → 1fr); closed panels are `inert`, so keyboard and
-// assistive tech skip them. The plus folds into a minus as its vertical bar turns.
+// The short FAQ: the head beside (lg, on the page's 5/7 split) or above the list,
+// and an accordion whose items open and close independently — one open on first
+// paint (defaultOpenFaq, the SSR pin), so opening a question never collapses the
+// one being read. Each item's outer element carries data-faq / data-open. Answers
+// are always rendered so they can ease open (grid rows 0fr → 1fr); closed ones are
+// `inert`, so keyboard and screen readers skip them. Panels stay plain blocks, not
+// regions — six named landmarks would crowd screen-reader navigation. The plus is
+// two bars: the vertical one turns flat to make the minus. Hairlines separate
+// items — no boxes.
 export function Faq() {
   const [open, setOpen] = useState(() => new Set([defaultOpenFaq]));
+  const id = useId();
   const toggle = (i: number) =>
     setOpen((prev) => {
       const next = new Set(prev);
       if (!next.delete(i)) next.add(i);
       return next;
     });
-  const id = useId();
   return (
-    <SectionFrame
+    <Section
       id="faq"
-      className="grid gap-[48px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-[80px]"
+      aria-labelledby="faq-title"
+      className="grid gap-[28px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-[64px]"
     >
-      <div {...reveal()} className="lg:sticky lg:top-[112px] lg:self-start">
-        <Kicker>{faqCopy.kicker}</Kicker>
-        <Heading className="mt-[20px]">{faqCopy.title}</Heading>
-        <Text className="mt-[20px] max-w-[40ch]">{faqCopy.sub}</Text>
-        <CtaButton
-          variant="ghost"
-          size="md"
-          arrow
-          href="#cta"
-          className="mt-[28px]"
-        >
-          {faqCopy.cta}
-        </CtaButton>
+      <div>
+        <Heading id="faq-title">{faqCopy.title}</Heading>
+        <Text tone="muted" className="mt-[12px]">
+          {faqCopy.sub}
+        </Text>
       </div>
-      <div {...reveal(120)}>
+      <div>
         {faqs.map((faq, i) => {
           const isOpen = open.has(i);
           return (
             <div
               key={faq.q}
               data-faq={i}
-              data-open={isOpen ? "true" : "false"}
+              data-open={isOpen}
               className="border-line border-b first:border-t"
             >
-              <Heading as="h3" size="none">
+              <Heading as="h3">
                 <button
                   type="button"
-                  id={`${id}q${i}`}
                   aria-expanded={isOpen}
                   aria-controls={`${id}a${i}`}
                   onClick={() => toggle(i)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-[24px] py-[26px] text-left text-[20px] text-ink leading-[1.35] tracking-[-0.01em] transition-colors duration-200 hover:text-clay-deep md:text-[22px]"
+                  className="group flex min-h-[64px] w-full cursor-pointer items-center justify-between gap-[24px] py-[18px] text-left text-pretty"
                 >
                   {faq.q}
-                  <svg
-                    viewBox="0 0 14 14"
+                  <span
                     aria-hidden="true"
-                    className="size-[14px] shrink-0"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
+                    className="grid shrink-0 text-ink-2 transition-colors duration-150 group-hover:text-ink *:col-start-1 *:row-start-1"
                   >
-                    <path d="M0 7h14" />
-                    <path
-                      d="M7 0v14"
+                    <Icon d={BAR} className="size-[16px]" />
+                    <Icon
+                      d={BAR}
                       className={cx(
-                        "origin-center transition-transform duration-300 ease-[var(--ease-soft)] [transform-box:fill-box]",
-                        isOpen && "rotate-90",
+                        "size-[16px] transition-transform duration-200",
+                        !isOpen && "rotate-90",
                       )}
                     />
-                  </svg>
+                  </span>
                 </button>
               </Heading>
-              <section
+              <div
                 id={`${id}a${i}`}
-                aria-labelledby={`${id}q${i}`}
                 inert={!isOpen}
                 className={cx(
-                  "grid transition-[grid-template-rows,opacity] duration-[400ms] ease-[var(--ease-soft)]",
-                  isOpen
-                    ? "grid-rows-[1fr] opacity-100"
-                    : "grid-rows-[0fr] opacity-0",
+                  "grid transition-[grid-template-rows] duration-200",
+                  isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                 )}
               >
                 <div className="overflow-hidden">
-                  <Text className="max-w-[62ch] pr-[38px] pb-[36px]">
+                  <Text
+                    tone="muted"
+                    className="max-w-[64ch] pb-[24px] md:pr-[40px]"
+                  >
                     {faq.a}
                   </Text>
                 </div>
-              </section>
+              </div>
             </div>
           );
         })}
       </div>
-    </SectionFrame>
+    </Section>
   );
 }
