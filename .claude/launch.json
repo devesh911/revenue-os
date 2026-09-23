@@ -6,6 +6,21 @@
       "runtimeExecutable": "/Users/deveshlakwal/.bun/bin/bun",
       "runtimeArgs": ["run", "dev:console"],
       "port": 5173
+    },
+    {
+      "name": "www",
+      "runtimeExecutable": "/Users/deveshlakwal/.bun/bin/bun",
+      "runtimeArgs": [
+        "run",
+        "--filter",
+        "www",
+        "dev",
+        "--",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "port": 5174
     }
   ]
 }

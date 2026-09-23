@@ -7,12 +7,12 @@
 //     and honest states via stable text — NOT pixel layout or an invented empty-note wording.
 // Env-free by construction (bun test + renderToStaticMarkup + Bun.file, no DOM lib / DB / network /
 // new deps) — imitates apps/console/test/pages-adoption-behavior.test.tsx.
-import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
 import * as realScreensApi from "../src/features/screens/api";
-import { visible } from "./test-utils";
+import { mockModule, visible } from "./test-utils";
 
 const API_SRC = "apps/console/src/features/screens/api.ts";
 const DASH_SRC = "apps/console/src/pages/Dashboard/index.tsx";
@@ -65,17 +65,20 @@ let metricsState: Query<unknown>;
 let trendsState: Query<TrendsData>;
 let DashboardPage: () => ReactElement;
 
-beforeAll(async () => {
-  // Spread the real module first, override only the two hooks — else a sibling that imports another
-  // export fails to link once the suites run merged (pages-adoption-behavior #71).
-  mock.module("../src/features/screens/api", () => ({
-    ...realScreensApi,
+// The two fakes lie over the real exports (a dropped export breaks a sibling file, #71); afterAll
+// restores the real module so no later file sees them.
+const restoreScreens = mockModule(
+  "../src/features/screens/api",
+  realScreensApi,
+  {
     useMetricsQuery: () => metricsState,
     useTrendsQuery: () => trendsState,
-  }));
+  },
+);
+beforeAll(async () => {
   DashboardPage = (await import("../src/pages/Dashboard")).DashboardPage;
 });
-afterAll(() => mock.restore()); // mock.module is process-global — restore so no other file sees the fakes
+afterAll(restoreScreens);
 
 const renderDash = (): string =>
   renderToStaticMarkup(

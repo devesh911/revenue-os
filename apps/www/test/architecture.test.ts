@@ -83,13 +83,20 @@ describe("architecture — src/styles.css @theme tokens", () => {
     expect(/@theme\b/.test(css)).toBe(true);
   });
 
-  // EXACT current values (case-insensitive hex, as the retired suite matched).
+  // EXACT palette values (case-insensitive hex) — the warm paper / ink / clay
+  // system. Alpha tiers are Tailwind `/<alpha>` modifiers on these, not tokens.
   const TOKENS: Array<[string, RegExp]> = [
-    ["ground #0B1712", /--[\w-]+\s*:\s*#0B1712\b/i],
-    ["cream #EDE3CF", /--[\w-]+\s*:\s*#EDE3CF\b/i],
-    ["gold #E8C87A", /--[\w-]+\s*:\s*#E8C87A\b/i],
-    ["intent teal #8FB8A8", /--[\w-]+\s*:\s*#8FB8A8\b/i],
-    ["cream-rgb channel", /--cream-rgb\s*:\s*237\s*,\s*227\s*,\s*207\b/i],
+    ["paper #FAF9F5", /--color-paper\s*:\s*#FAF9F5\b/i],
+    ["paper-2 #F0EEE6", /--color-paper-2\s*:\s*#F0EEE6\b/i],
+    ["line #E8E6DC", /--color-line\s*:\s*#E8E6DC\b/i],
+    ["ink #141413", /--color-ink\s*:\s*#141413\b/i],
+    ["clay #D97757", /--color-clay\s*:\s*#D97757\b/i],
+    ["clay-deep #A9492A", /--color-clay-deep\s*:\s*#A9492A\b/i],
+    ["olive #788C5D", /--color-olive\s*:\s*#788C5D\b/i],
+    // the text tiers the ≥4.5:1 contrast floor rests on
+    ["ink-2 #3D3D3A", /--color-ink-2\s*:\s*#3D3D3A\b/i],
+    ["stone #6B6A64", /--color-stone\s*:\s*#6B6A64\b/i],
+    ["olive-deep #56663F", /--color-olive-deep\s*:\s*#56663F\b/i],
   ];
   for (const [label, re] of TOKENS) {
     test(`defines token: ${label}`, () => {
@@ -97,32 +104,23 @@ describe("architecture — src/styles.css @theme tokens", () => {
     });
   }
 
-  // Hairline tiers — cream channel at four alphas, literal OR var(--cream-rgb).
-  const HAIRLINES: Array<[string, RegExp]> = [
-    [
-      ".22",
-      /rgba\(\s*(?:237\s*,\s*227\s*,\s*207|var\(--cream-rgb\))\s*,\s*0?\.22\s*\)/,
-    ],
-    [
-      ".18",
-      /rgba\(\s*(?:237\s*,\s*227\s*,\s*207|var\(--cream-rgb\))\s*,\s*0?\.18\s*\)/,
-    ],
-    [
-      ".12",
-      /rgba\(\s*(?:237\s*,\s*227\s*,\s*207|var\(--cream-rgb\))\s*,\s*0?\.12\s*\)/,
-    ],
-    [
-      ".09",
-      /rgba\(\s*(?:237\s*,\s*227\s*,\s*207|var\(--cream-rgb\))\s*,\s*0?\.09\s*\)/,
-    ],
-  ];
-  for (const [label, re] of HAIRLINES) {
-    test(`defines hairline tier ${label}`, () => {
-      expect(re.test(read(STYLES))).toBe(true);
-    });
-  }
+  // Motion safety floor: every animation is switched off under reduced motion,
+  // and the scroll reveal only hides content behind the JS opt-in html[data-motion].
+  test("honours prefers-reduced-motion", () => {
+    expect(read(STYLES)).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)/,
+    );
+  });
+  test("scroll reveal hides content only behind html[data-motion]", () => {
+    const css = read(STYLES);
+    const hides = [
+      ...css.matchAll(/([^{}]*\[data-reveal\][^{}]*)\{[^}]*opacity:\s*0\b/g),
+    ];
+    expect(hides.length).toBeGreaterThan(0);
+    for (const m of hides) expect(m[1]).toContain("html[data-motion]");
+  });
 
-  for (const fam of ["Playfair Display", "IBM Plex Mono", "Lora"]) {
+  for (const fam of ["Lora", "IBM Plex Mono"]) {
     test(`declares font family ${fam}`, () => {
       expect(read(STYLES)).toContain(fam);
     });
@@ -134,9 +132,9 @@ describe("architecture — @font-face self-hosting in src/styles.css", () => {
   const faceBlocks = (css: string): string[] =>
     [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1] ?? "");
 
-  test("both display families have @font-face rules", () => {
+  test("both self-hosted families have @font-face rules", () => {
     const blocks = faceBlocks(read(STYLES));
-    expect(blocks.some((b) => b.includes("Playfair Display"))).toBe(true);
+    expect(blocks.some((b) => b.includes("Lora"))).toBe(true);
     expect(blocks.some((b) => b.includes("IBM Plex Mono"))).toBe(true);
   });
 
@@ -188,6 +186,23 @@ describe("architecture — src/design/ reusable elements", () => {
   });
 });
 
+// ── visuals: the animated set pieces, one file each ─────────────────────────
+describe("architecture — src/visuals/ animated set pieces", () => {
+  for (const name of [
+    "BrandMark",
+    "HeroCall",
+    "FunnelFlow",
+    "MoatArt",
+    "CallArt",
+  ]) {
+    test(`src/visuals/${name}.tsx exists and exports ${name}`, () => {
+      const p = resolve(SRC_DIR, "visuals", `${name}.tsx`);
+      expect(existsSync(p), `${p} must exist`).toBe(true);
+      expect(exportsName(read(p), name), `must export ${name}`).toBe(true);
+    });
+  }
+});
+
 // ── sections: one file each, exports its component ──────────────────────────
 describe("architecture — src/sections/ compose design elements", () => {
   const SECTIONS = [
@@ -225,9 +240,14 @@ describe("architecture — src/content/ typed data modules", () => {
         "Vertical depth beats breadth",
         "Built for India, not ported",
         "The data loop, not the calling",
+        "Namaste",
+        "INVENTORY",
       ],
     ],
     ["logos", ["MERIDIAN", "VASTU ONE", "GRIHA CO.", "NORTHGATE", "ANVAYA"]],
+    ["hero", ["Site visit booked", "Nurture loop"]],
+    ["site", ["How it works", "Book a pilot", "Pause animations"]],
+    ["cta", ["Give us one project"]],
   ];
   for (const [mod, strings] of CONTENT) {
     test(`src/content/${mod}.ts exists, is typed, and holds its copy`, () => {
@@ -248,17 +268,24 @@ describe("architecture — src/content/ typed data modules", () => {
 
 // ── sections import content, never inline it ────────────────────────────────
 describe("architecture — sections import content, never inline it", () => {
-  // [section, content module, strings that MUST live in content — not the section]
+  // [dir/file, content module, strings that MUST live in content — not the file]
   const SEPARATION: Array<[string, string, string[]]> = [
-    ["StageGrid", "stages", ["Answer fast", "Score intent"]],
-    ["Moats", "moats", ["Vertical depth beats breadth"]],
-    ["Pricing", "plans", ["Funnel Engine", "₹60K"]],
-    ["Faq", "faqs", ["Is this compliant with TRAI and DND rules?"]],
-    ["Logos", "logos", ["MERIDIAN", "ANVAYA"]],
+    ["sections/StageGrid", "stages", ["Answer fast", "Score intent"]],
+    ["sections/Moats", "moats", ["Vertical depth beats breadth"]],
+    ["sections/Pricing", "plans", ["Funnel Engine", "₹60K"]],
+    ["sections/Faq", "faqs", ["Is this compliant with TRAI and DND rules?"]],
+    ["sections/Logos", "logos", ["MERIDIAN", "ANVAYA"]],
+    ["sections/Nav", "site", ["How it works", "Book a pilot"]],
+    ["sections/Hero", "hero", ["Run our pilot", "See the engine"]],
+    ["sections/IntentRouting", "stages", ["HIGH INTENT", "LOW INTENT"]],
+    ["sections/FooterCta", "cta", ["Give us one project"]],
+    ["visuals/HeroCall", "hero", ["Site visit booked"]],
+    ["visuals/FunnelFlow", "stages", ["Human closer"]],
+    ["visuals/MoatArt", "moats", ["Namaste", "INVENTORY"]],
   ];
   for (const [section, mod, strings] of SEPARATION) {
     test(`${section} imports ../content/${mod} and inlines none of its data`, () => {
-      const p = resolve(SRC_DIR, "sections", `${section}.tsx`);
+      const p = resolve(SRC_DIR, `${section}.tsx`);
       expect(existsSync(p), `${p} must exist`).toBe(true);
       const src = read(p);
       expect(

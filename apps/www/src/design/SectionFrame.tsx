@@ -1,18 +1,47 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentProps } from "react";
 import { cx } from "../lib/cx";
 
-// The section frame — a cream hairline box with no top border, so consecutive
-// sections share one seam down the page (the retired `.ro-section` chrome, and the
-// top-border-less stacking of hero/logos/footer). Renders a semantic <section>;
-// pass `id` for the in-page anchor links (#how, #moats, #pricing, #cta).
+// A page section: a full-width semantic <section> holding the centred 1200px
+// content column. `tone` sets the ground — "plain" (paper) or one of the three
+// inset rounded panels that pace the page: "ink" (the dark engine panel), "wash"
+// (the paper-2 pricing panel), "clay" (the closing CTA — its focus rings turn
+// ink, as the global ring vanishes on clay).
+// `className` tunes the INNER column (layout, extra padding); `flush` drops the
+// default vertical padding so a band can set its own without fighting it. Pass
+// `id` for the in-page anchors (#how, #moats, #pricing, #faq, #cta); html's
+// scroll-padding clears the sticky nav.
+type SectionTone = "plain" | "wash" | "ink" | "clay";
+
+const PANEL = "mx-[10px] rounded-[28px] md:mx-[20px] md:rounded-[40px]";
+
+const TONES: Record<SectionTone, string> = {
+  plain: "",
+  wash: cx(PANEL, "bg-paper-2"),
+  ink: cx(PANEL, "bg-grain bg-ink text-paper"),
+  clay: cx(PANEL, "bg-grain bg-clay text-ink [&_:focus-visible]:outline-ink"),
+};
+
 export function SectionFrame({
+  tone = "plain",
+  flush = false,
   className,
+  children,
   ...rest
-}: ComponentPropsWithoutRef<"section">) {
+}: ComponentProps<"section"> & {
+  tone?: SectionTone;
+  flush?: boolean;
+}) {
   return (
-    <section
-      className={cx("border border-hairline-22 border-t-0", className)}
-      {...rest}
-    />
+    <section className={TONES[tone]} {...rest}>
+      <div
+        className={cx(
+          "mx-auto w-full max-w-[1200px] px-[20px] md:px-[40px]",
+          !flush && "py-[88px] md:py-[128px]",
+          className,
+        )}
+      >
+        {children}
+      </div>
+    </section>
   );
 }

@@ -1,6 +1,6 @@
 // task-31 (wave 5 B) · B2-RED — BEHAVIOR pins: after adopting DataShell + the Table suite each page
 // must still render the SAME per-state copy and the SAME key content. renderToStaticMarkup over the
-// REAL page with its query hook MOCKED (bun mock.module) and orgId/conversationId supplied by a
+// REAL page with its query hook MOCKED (mockModule over bun mock.module) and orgId/conversationId supplied by a
 // static SSR <Router>/<Route> — the ui-smoke + console-boot-honesty precedent, env-free by
 // construction (mocking the api module also keeps lib/api's import.meta.env off the module graph).
 // Conversations & Contacts read features/screens/api; Transcript reads features/conversations/api.
@@ -8,13 +8,13 @@
 // Most cases are regression pins (copy/content is unchanged by the refactor); the ONE RED-today case
 // is the KNOWN intended visual delta — Contacts' header cells gain the standardized TH token
 // `font-medium` when they adopt the TH primitive (today Contacts' header string omits it).
-import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
 import * as realConversationsApi from "../src/features/conversations/api";
 import * as realScreensApi from "../src/features/screens/api";
-import { visible } from "./test-utils";
+import { mockModule, visible } from "./test-utils";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const CONV = "22222222-2222-4222-8222-222222222222";
@@ -62,20 +62,24 @@ let ConversationsPage: () => ReactElement;
 let ContactsPage: () => ReactElement;
 let TranscriptPage: () => ReactElement;
 
-beforeAll(async () => {
-  // mock.module is process-global and REPLACES the whole module for every LATER importer in the
-  // process — so spread the real module first and override only the hooks this file stubs. Else a
-  // sibling test file that imports an export we'd otherwise drop (e.g. useMetricsQuery, read by the
-  // Dashboard page) fails to link with "Export named '…' not found" once the suites run merged (#71).
-  mock.module("../src/features/screens/api", () => ({
-    ...realScreensApi,
+// mock.module is process-global and REPLACES the whole module for every LATER importer in the
+// process — mockModule lays the fakes over the real exports (a dropped export fails a sibling file
+// with "Export named '…' not found", #71) and afterAll restores the real module.
+const restoreScreens = mockModule(
+  "../src/features/screens/api",
+  realScreensApi,
+  {
     useConversationsQuery: () => convState,
     useContactsQuery: () => contactsState,
-  }));
-  mock.module("../src/features/conversations/api", () => ({
-    ...realConversationsApi,
-    useTranscriptQuery: () => transcriptState,
-  }));
+  },
+);
+const restoreConversations = mockModule(
+  "../src/features/conversations/api",
+  realConversationsApi,
+  { useTranscriptQuery: () => transcriptState },
+);
+
+beforeAll(async () => {
   ConversationsPage = (await import("../src/pages/Conversations"))
     .ConversationsPage;
   ContactsPage = (await import("../src/pages/Contacts")).ContactsPage;
@@ -83,7 +87,8 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  mock.restore(); // mock.module is process-global — restore so no other file sees the fakes
+  restoreScreens();
+  restoreConversations();
 });
 
 // Render a page element under a static SSR router so wouter's useParams() yields the URL params and

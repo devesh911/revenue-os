@@ -1,50 +1,69 @@
+import { useLayoutEffect } from "react";
+import { brand, footerMeta } from "./content/site";
+import { DotList } from "./design/DotList";
 import { MonoLabel } from "./design/MonoLabel";
+import { useReveal } from "./lib/reveal";
 import { Faq } from "./sections/Faq";
 import { FooterCta } from "./sections/FooterCta";
 import { Hero } from "./sections/Hero";
-import { IntentRouting } from "./sections/IntentRouting";
 import { Logos } from "./sections/Logos";
 import { Moats } from "./sections/Moats";
 import { Nav } from "./sections/Nav";
 import { Pricing } from "./sections/Pricing";
 import { StageGrid } from "./sections/StageGrid";
+import { BrandMark } from "./visuals/BrandMark";
 
-// The composed marketing page — the nine sections pinned to their landmarks
-// (header → nav, main → the content sections, footer → the meta row). SSR-safe: no
-// CSS side-effect import lives here (main.tsx owns `import "./styles.css"`), so the
-// copy-parity suite can renderToStaticMarkup(<App/>) without a stylesheet loader.
-// The page shell — night ground, a fixed grain overlay, a centred max-width wrap —
-// frames them all.
-const FOOT_META = "text-[11.5px] tracking-[0.24em] text-cream-45";
-
+// The composed marketing page on warm paper: a skip link, a sticky header → nav,
+// the sections in <main> (StageGrid hosts the funnel flow + IntentRouting inside
+// its dark panel), and the footer meta row. SSR-safe: no CSS side-effect import
+// lives here (main.tsx owns `import "./styles.css"`), so the copy-parity suite can
+// renderToStaticMarkup(<App/>). useReveal() arms the one-shot scroll reveals; the
+// layout effect honours a deep link (/#pricing) — the page renders client-side,
+// so the browser's own jump fires before the target exists.
 export function App() {
+  useReveal();
+  useLayoutEffect(() => {
+    const target =
+      location.hash && document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ behavior: "instant" });
+  }, []);
   return (
-    <div className="relative min-h-screen bg-ground font-body text-cream">
-      <div
-        aria-hidden="true"
-        className="bg-noise pointer-events-none fixed inset-0 z-[60] opacity-35"
-      />
-      <div className="relative mx-auto max-w-[1360px] px-[28px] pt-[28px] max-[680px]:px-[12px] max-[680px]:pt-[12px]">
-        <header>
-          <Nav />
-        </header>
-        <main>
-          <Hero />
-          <Logos />
-          <StageGrid />
-          <IntentRouting />
-          <Moats />
-          <Pricing />
-          <Faq />
-          <FooterCta />
-        </main>
-        <footer className="mb-[28px] flex flex-wrap justify-between gap-[12px] border border-hairline-22 border-t-0 px-[32px] py-[24px]">
-          <MonoLabel className={FOOT_META}>REVENUE OS © 2026</MonoLabel>
-          <MonoLabel className={FOOT_META}>
-            TRAI / DND COMPLIANT · RERA AWARE · BUILT IN INDIA
+    <div id="top" className="relative min-h-screen bg-paper font-sans text-ink">
+      <a
+        href="#main"
+        className="-translate-y-[200%] fixed top-[12px] left-[12px] z-[60] rounded-full bg-ink px-[16px] py-[10px] text-[14.5px] text-paper transition-transform duration-200 focus:translate-y-0"
+      >
+        {footerMeta.skip}
+      </a>
+      <header className="sticky top-0 z-50">
+        <Nav />
+      </header>
+      <main id="main">
+        <Hero />
+        <Logos />
+        <StageGrid />
+        <Moats />
+        <Pricing />
+        <Faq />
+        <FooterCta />
+      </main>
+      <footer className="mx-auto mt-[40px] max-w-[1200px] px-[20px] md:mt-[64px] md:px-[40px]">
+        <div className="flex flex-col gap-[14px] border-line border-t py-[36px] lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-[10px] text-ink">
+            <BrandMark className="size-[20px]" />
+            <span className="font-serif text-[17px] tracking-[-0.02em]">
+              {brand}
+            </span>
+          </div>
+          <DotList
+            items={footerMeta.compliance}
+            className="gap-y-[6px] font-mono text-[11.5px] text-stone uppercase tracking-[0.1em]"
+          />
+          <MonoLabel className="text-[11.5px] text-stone tracking-[0.06em]">
+            {footerMeta.copyright}
           </MonoLabel>
-        </footer>
-      </div>
+        </div>
+      </footer>
     </div>
   );
 }

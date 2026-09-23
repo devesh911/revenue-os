@@ -1,57 +1,102 @@
-import { useState } from "react";
-import { defaultOpenFaq, faqs } from "../content/faqs";
+import { useId, useState } from "react";
+import { defaultOpenFaq, faqCopy, faqs } from "../content/faqs";
+import { CtaButton } from "../design/CtaButton";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
-import { MonoLabel } from "../design/MonoLabel";
 import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
+import { cx } from "../lib/cx";
+import { reveal } from "../lib/reveal";
 
-// FAQ accordion — a sticky-feeling side head beside the questions. Exactly one item
-// is open (default = item 0, the SSR pin); its answer renders and its mark flips
-// − / +. The data-faq / data-open hooks make the open state machine-checkable.
+// FAQ — a sticky side head beside an accordion whose items open and close
+// independently (default = item 0 alone, the SSR pin), so opening one never collapses
+// another and slides the tapped question away. Each item's outer element carries
+// the data-faq / data-open hooks. Answers are always rendered so their height can
+// ease open (grid-rows 0fr → 1fr); closed panels are `inert`, so keyboard and
+// assistive tech skip them. The plus folds into a minus as its vertical bar turns.
 export function Faq() {
-  const [open, setOpen] = useState<number>(defaultOpenFaq);
+  const [open, setOpen] = useState(() => new Set([defaultOpenFaq]));
+  const toggle = (i: number) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
+  const id = useId();
   return (
     <SectionFrame
       id="faq"
-      className="grid grid-cols-[380px_1fr] max-[980px]:grid-cols-1"
+      className="grid gap-[48px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-[80px]"
     >
-      <div className="border-r border-hairline-18 px-[40px] py-[64px] max-[980px]:border-r-0 max-[980px]:border-b max-[980px]:border-hairline-18 max-[980px]:px-[28px] max-[980px]:py-[44px]">
-        <Kicker className="mb-[20px]">PLOT 03 — QUESTIONS</Kicker>
-        <Heading className="text-[40px] leading-[1.15] tracking-[0.02em]">
-          ASKED BEFORE EVERY PILOT
-        </Heading>
+      <div {...reveal()} className="lg:sticky lg:top-[112px] lg:self-start">
+        <Kicker>{faqCopy.kicker}</Kicker>
+        <Heading className="mt-[20px]">{faqCopy.title}</Heading>
+        <Text className="mt-[20px] max-w-[40ch]">{faqCopy.sub}</Text>
+        <CtaButton
+          variant="ghost"
+          size="md"
+          arrow
+          href="#cta"
+          className="mt-[28px]"
+        >
+          {faqCopy.cta}
+        </CtaButton>
       </div>
-      <div>
+      <div {...reveal(120)}>
         {faqs.map((faq, i) => {
-          const isOpen = i === open;
+          const isOpen = open.has(i);
           return (
             <div
               key={faq.q}
               data-faq={i}
               data-open={isOpen ? "true" : "false"}
-              className="border-b border-hairline-12"
+              className="border-line border-b first:border-t"
             >
-              <button
-                type="button"
-                onClick={() => setOpen(isOpen ? -1 : i)}
-                className="flex w-full cursor-pointer items-center justify-between gap-[20px] border-none bg-transparent px-[36px] py-[26px] text-left text-cream hover:bg-cream-03 focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-[3px] max-[680px]:px-[22px] max-[680px]:py-[20px]"
-              >
-                <Heading
-                  as="span"
-                  className="text-[21px] max-[680px]:text-[18px]"
+              <Heading as="h3" size="none">
+                <button
+                  type="button"
+                  id={`${id}q${i}`}
+                  aria-expanded={isOpen}
+                  aria-controls={`${id}a${i}`}
+                  onClick={() => toggle(i)}
+                  className="flex w-full cursor-pointer items-center justify-between gap-[24px] py-[26px] text-left text-[20px] text-ink leading-[1.35] tracking-[-0.01em] transition-colors duration-200 hover:text-clay-deep md:text-[22px]"
                 >
                   {faq.q}
-                </Heading>
-                <MonoLabel className="text-[16px] text-cream-50">
-                  {isOpen ? "−" : "+"}
-                </MonoLabel>
-              </button>
-              {isOpen ? (
-                <Text className="max-w-[68ch] px-[36px] pt-0 pb-[28px] text-[15.5px] leading-[1.75] text-cream-68 max-[680px]:px-[22px] max-[680px]:pb-[24px]">
-                  {faq.a}
-                </Text>
-              ) : null}
+                  <svg
+                    viewBox="0 0 14 14"
+                    aria-hidden="true"
+                    className="size-[14px] shrink-0"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M0 7h14" />
+                    <path
+                      d="M7 0v14"
+                      className={cx(
+                        "origin-center transition-transform duration-300 ease-[var(--ease-soft)] [transform-box:fill-box]",
+                        isOpen && "rotate-90",
+                      )}
+                    />
+                  </svg>
+                </button>
+              </Heading>
+              <section
+                id={`${id}a${i}`}
+                aria-labelledby={`${id}q${i}`}
+                inert={!isOpen}
+                className={cx(
+                  "grid transition-[grid-template-rows,opacity] duration-[400ms] ease-[var(--ease-soft)]",
+                  isOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0",
+                )}
+              >
+                <div className="overflow-hidden">
+                  <Text className="max-w-[62ch] pr-[38px] pb-[36px]">
+                    {faq.a}
+                  </Text>
+                </div>
+              </section>
             </div>
           );
         })}

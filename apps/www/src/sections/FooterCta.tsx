@@ -1,30 +1,44 @@
+import { cta } from "../content/cta";
 import { CtaButton } from "../design/CtaButton";
+import { DotList } from "../design/DotList";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
 import { SectionFrame } from "../design/SectionFrame";
+import { reveal } from "../lib/reveal";
+import { CallArt } from "../visuals/CallArt";
 
-// The closing guarantee CTA (#cta) — eyebrow, the risk-reversal headline, and a
-// single gold "BOOK A PILOT →". A teal glow rises from the bottom (decorative).
+// The closing offer (#cta) on the clay panel: eyebrow, the risk-reversal headline,
+// the pilot's terms, one ink pill; beside it (md+) the brand mark at poster scale.
+// Everything on clay is ink — small text at ink/85 (≥4.5:1); SectionFrame turns
+// the focus rings ink. Each term is led by a "·" the list clips at every line
+// start, so a wrapped line neither starts nor ends on a separator; the dot is
+// generated content with empty alt text, so screen readers skip it.
 export function FooterCta() {
   return (
     <SectionFrame
       id="cta"
-      className="relative overflow-hidden px-[60px] py-[96px] text-center max-[680px]:px-[22px] max-[680px]:py-[60px]"
+      tone="clay"
+      className="grid items-center gap-[48px] md:grid-cols-[3fr_2fr] lg:gap-[64px]"
     >
-      <div className="bg-footcta-glow pointer-events-none absolute inset-0" />
-      <div className="relative flex flex-col items-center gap-[26px]">
-        <Kicker>TEST BEFORE BUILDING</Kicker>
-        <Heading className="max-w-[22ch] text-[clamp(34px,4vw,60px)] leading-[1.12] tracking-[0.01em]">
-          Give us one project’s lead flow. If we don’t beat your telecalling
-          team, you don’t pay.
-        </Heading>
+      <div {...reveal()} className="flex flex-col items-start">
+        <Kicker tone="clay">{cta.kicker}</Kicker>
+        <Heading className="mt-[24px] max-w-[19ch]">{cta.headline}</Heading>
+        <DotList
+          items={cta.terms}
+          className="mt-[28px] gap-y-[4px] font-mono text-[12.5px] text-ink/85 tracking-[0.04em]"
+        />
         <CtaButton
           variant="accent"
-          href="#pricing"
-          className="mt-[8px] px-[40px] py-[18px] font-mono text-[14px] tracking-[0.22em]"
+          size="lg"
+          arrow
+          href={cta.href}
+          className="mt-[40px]"
         >
-          BOOK A PILOT →
+          {cta.button}
         </CtaButton>
+      </div>
+      <div {...reveal(160)} className="hidden justify-center md:flex">
+        <CallArt className="w-full max-w-[420px]" />
       </div>
     </SectionFrame>
   );

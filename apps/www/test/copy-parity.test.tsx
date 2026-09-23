@@ -45,13 +45,15 @@ describe("copy parity — App SSR carries every load-bearing string", () => {
     ).toBe(true);
   });
 
-  // Every anchor below was grep-validated against the current index.html export.
+  // Anchors carried from the static export, re-cased for the editorial redesign
+  // (sentence-case heads and buttons; tracked-caps labels + wordmarks unchanged).
   // Apostrophe-free / nbsp-robust stems where the source has curly quotes or nbsp.
   const COPY: Array<[string, string]> = [
     ["hero h1", "The revenue operating system for Indian real"],
-    ["hero CTA — run pilot", "RUN OUR PILOT"],
-    ["hero CTA — see engine", "SEE THE ENGINE"],
-    ["nav CTA — book a pilot", "BOOK A PILOT"],
+    ["hero CTA — run pilot", "Run our pilot"],
+    ["hero CTA — see engine", "See the engine"],
+    ["nav CTA — book a pilot", "Book a pilot"],
+    ["nav link — how it works", "How it works"],
     ["stage 1 title", "Answer fast"],
     ["stage 2 title", "Score intent"],
     ["stage 3 title", "Qualify"],
@@ -60,10 +62,10 @@ describe("copy parity — App SSR carries every load-bearing string", () => {
     ["low intent copy", "Nurture loop"],
     ["high intent label", "HIGH INTENT"],
     ["high intent copy", "Human closer, briefed by the machine"],
-    ["section head — how it works", "FOUR STAGES RUN ON MACHINE TIME"],
-    ["section head — moats", "THREE COMPETITORS, THREE MOATS"],
-    ["section head — pricing", "CHOOSE A PLAN TO CONNECT REVENUE OS"],
-    ["section head — faq", "ASKED BEFORE EVERY PILOT"],
+    ["section head — how it works", "Four stages run on machine time"],
+    ["section head — moats", "Three competitors, three moats"],
+    ["section head — pricing", "Choose a plan to connect Revenue OS"],
+    ["section head — faq", "Asked before every pilot"],
     ["moat 1 title", "Vertical depth beats breadth"],
     ["moat 2 title", "Built for India, not ported"],
     ["moat 3 title", "The data loop, not the calling"],
@@ -86,6 +88,8 @@ describe("copy parity — App SSR carries every load-bearing string", () => {
     ["logo — anvaya", "ANVAYA"],
     ["guarantee headline a", "Give us one project"],
     ["guarantee headline b", "beat your telecalling team"],
+    // The hero demo call SSRs its finished state (the no-JS / reduced-motion frame).
+    ["hero demo — booked outcome", "Site visit booked"],
   ];
   for (const [label, needle] of COPY) {
     test(`renders copy: ${label}`, () => {
@@ -126,9 +130,9 @@ describe("default state — funnel selected, faq 0 open (SSR markup)", () => {
   });
 
   test("selected + unselected plans show their distinct CTA states", () => {
-    // funnel (selected) shows its subscribe CTA; unselected plans show CHOOSE PLAN.
-    expect(markup).toContain("SUBSCRIBE AND CONNECT");
-    expect(markup).toContain("CHOOSE PLAN");
+    // funnel (selected) shows its subscribe CTA; unselected plans show Choose plan.
+    expect(markup).toContain("Subscribe and connect");
+    expect(markup).toContain("Choose plan");
   });
 
   test("faq item 0 is open by default; items 1..4 are closed", () => {
@@ -143,6 +147,25 @@ describe("default state — funnel selected, faq 0 open (SSR markup)", () => {
     const open = markup.match(/data-open="true"/g) ?? [];
     expect(open.length).toBe(1);
     expect(markup).toContain("honors DND registries");
+  });
+});
+
+// The animated set pieces are decorative motion over real copy: each one either
+// hides from assistive tech (aria-hidden) or speaks as ONE labelled image — the
+// hero demo call must carry a text alternative, never a stream of live updates.
+describe("accessibility — animated visuals", () => {
+  test("the hero demo call is a single labelled image", () => {
+    expect(markup).toMatch(/role="img"[^>]*aria-label="[^"]{20,}"/);
+  });
+  test("a control can pause every animation (WCAG 2.2.2)", () => {
+    // a <button> whose own content (up to its </button>) carries the label
+    expect(markup).toMatch(
+      /<button\b(?:(?!<\/button>).)*Pause animations(?:(?!<\/button>).)*<\/button>/s,
+    );
+  });
+  test("faq toggles expose their state via aria-expanded", () => {
+    expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain('aria-expanded="false"');
   });
 });
 

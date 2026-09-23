@@ -2,14 +2,16 @@
 // "Guardrails" section. Env-free by construction (bun test + renderToStaticMarkup, no DOM library,
 // no DB/network, no new deps) — the two source-pin describes read the files as text (the repo's
 // established RED idiom, imitates pages-adoption-*), and the behavior describes render the real
-// SettingsPage with its two server-state hooks MOCKED via mock.module (process-global, so afterAll
-// restores). Interaction (an actual submit event) is NOT reachable without a DOM/interaction lib
+// SettingsPage with its two server-state hooks MOCKED via mockModule (process-global, so afterAll
+// restores the real modules). Interaction (an actual submit event) is NOT reachable without a DOM/interaction lib
 // (a new dep, forbidden), so "submit fires the PUT" is pinned at the source layer (useMutation +
 // PUT + invalidateQueries) — see report.
-import { afterAll, describe, expect, it, mock } from "bun:test";
+import { afterAll, describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
+import * as realGuardrailsApi from "../src/features/guardrails/api";
 import * as realOrgsApi from "../src/features/orgs/api";
+import { mockModule } from "./test-utils";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const orgFixture = { id: ORG, name: "Acme Co", slug: "acme", role: "admin" };
@@ -52,23 +54,22 @@ const ok = (data: unknown) => ({ isLoading: false, isError: false, data });
 // SettingsPage reads these live via the mocked hooks. orgs is pinned happy so OrganizationCard
 // renders cleanly and never contributes the strings the guardrail assertions look for.
 let guardrailsResult: unknown = loadingState;
-mock.module("../src/features/orgs/api", () => ({
-  ...realOrgsApi,
+const restoreOrgs = mockModule("../src/features/orgs/api", realOrgsApi, {
   useOrgsQuery: () => ok([orgFixture]),
-}));
-// guardrails/api.ts does not exist at RED time — a virtual, non-spreading mock (only this file and
-// the sanctioned pages-adoption edit consume it, each sets its own). Exposes exactly the two hooks
-// SettingsPage will call.
-mock.module("../src/features/guardrails/api", () => ({
-  useGuardrailPoliciesQuery: () => guardrailsResult,
-  useUpdateGuardrailPolicy: () => ({ mutate: () => {}, isPending: false }),
-  queryKeys: {
-    guardrailPolicies: (orgId: string) => ["guardrail-policies", orgId],
+});
+// The two hooks SettingsPage calls, over the real module (which exists since task-52 GREEN).
+const restoreGuardrails = mockModule(
+  "../src/features/guardrails/api",
+  realGuardrailsApi,
+  {
+    useGuardrailPoliciesQuery: () => guardrailsResult,
+    useUpdateGuardrailPolicy: () => ({ mutate: () => {}, isPending: false }),
   },
-}));
+);
 
 afterAll(() => {
-  mock.restore();
+  restoreOrgs();
+  restoreGuardrails();
 });
 
 const text = (html: string): string =>
