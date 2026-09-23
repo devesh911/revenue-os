@@ -13,16 +13,23 @@ import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
 import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
+import { CHECK, Icon, INFO } from "../visuals/Icon";
 
-// Pricing — a centred head over three plan cards on the wash band. Exactly one plan
+// Pricing — a centred head over three plan cards on the wash panel. Exactly one plan
 // is selected (default = funnel, the SSR pin): it takes the ink border and the
-// section's one soft shadow, fills its radio with clay and offers its own CTA. The
-// others offer "Choose plan", whose hit area stretches over the whole card (the
-// radio reads as clickable, so the card is). The outer <li> carries the data-plan /
+// page's soft lift, fills its radio with clay and offers its own CTA. The others
+// offer "Choose plan", whose hit area stretches over the whole card (the radio reads
+// as clickable, so the card is). The outer <li> carries the data-plan /
 // data-selected hooks. Choosing a plan swaps that button for a link, so focus is
-// handed to the new CTA instead of dropping to <body>.
-const SELECTED_SHADOW =
-  "shadow-[0_1px_2px_rgba(20,20,19,0.04),0_12px_32px_-12px_rgba(20,20,19,0.12)]";
+// handed to the new CTA instead of dropping to <body>. On lg the cards share five
+// subgrid rows, so a blurb that wraps pushes every price and hairline down together.
+// In forced-colours mode (where borders and fills go system-colour) the selected
+// card keeps a heavier border and its radio dot a system-colour fill.
+const SUBGRID = "lg:row-span-5 lg:grid lg:grid-rows-subgrid";
+// The swapped-in CTA fades in — except under the page-wide pause, where a frozen
+// first keyframe would leave it (and the focus handed to it) invisible.
+const ENTER =
+  "animate-[ro-fade_400ms_var(--ease-soft)] [html[data-still]_&]:animate-none";
 
 export function Pricing() {
   const [selected, setSelected] = useState(defaultPlanId);
@@ -35,7 +42,7 @@ export function Pricing() {
           {pricingCopy.sub}
         </Text>
       </div>
-      <ul className="mx-auto mt-[56px] grid max-w-[520px] list-none gap-[20px] p-0 md:mt-[72px] lg:max-w-none lg:grid-cols-3">
+      <ul className="mx-auto mt-[56px] grid max-w-[520px] gap-[20px] md:mt-[72px] lg:max-w-none lg:grid-cols-3 lg:gap-y-0">
         {plans.map((plan, i) => {
           const isSelected = plan.id === selected;
           return (
@@ -44,20 +51,19 @@ export function Pricing() {
               data-plan={plan.id}
               data-selected={isSelected ? "true" : "false"}
               {...reveal(100 + i * 90)}
-              className="flex"
+              className={cx("flex", SUBGRID)}
             >
               <article
                 className={cx(
                   "relative flex flex-1 flex-col rounded-[24px] border bg-paper p-[28px] transition-[border-color,box-shadow] duration-300 ease-[var(--ease-soft)]",
+                  SUBGRID,
                   isSelected
-                    ? cx("border-ink", SELECTED_SHADOW)
+                    ? "border-ink shadow-lift forced-colors:border-[3px]"
                     : "border-line hover:border-ink/25",
                 )}
               >
                 <div className="flex items-center justify-between gap-[16px]">
-                  <Heading as="h3" size="card">
-                    {plan.name}
-                  </Heading>
+                  <Heading as="h3">{plan.name}</Heading>
                   <span
                     aria-hidden="true"
                     className={cx(
@@ -67,7 +73,7 @@ export function Pricing() {
                   >
                     <span
                       className={cx(
-                        "size-[8px] rounded-full bg-clay transition-transform duration-300 ease-[var(--ease-soft)]",
+                        "size-[8px] rounded-full bg-clay transition-transform duration-300 ease-[var(--ease-soft)] forced-colors:bg-[CanvasText]",
                         isSelected ? "scale-100" : "scale-0",
                       )}
                     />
@@ -76,10 +82,10 @@ export function Pricing() {
                     <span className="sr-only">{pricingCopy.selectedHint}</span>
                   ) : null}
                 </div>
-                <Text size="small" className="mt-[6px] text-stone">
+                <Text size="small" tone="muted" className="mt-[6px]">
                   {plan.blurb}
                 </Text>
-                <p className="m-0 mt-[28px] flex items-baseline gap-[8px]">
+                <p className="mt-[28px] flex items-baseline gap-[8px]">
                   <span className="font-serif text-[48px] leading-none tracking-[-0.03em]">
                     {plan.price}
                   </span>
@@ -89,24 +95,16 @@ export function Pricing() {
                     </span>
                   ) : null}
                 </p>
-                <ul className="m-0 mt-[28px] flex list-none flex-col gap-[12px] border-line border-t p-0 pt-[24px]">
+                <ul className="mt-[28px] flex flex-col gap-[12px] border-line border-t pt-[24px]">
                   {plan.features.map((feature) => (
                     <li
                       key={feature}
                       className="flex items-start gap-[12px] text-[15px] text-ink-2 leading-[1.5]"
                     >
-                      <svg
-                        viewBox="0 0 16 16"
-                        aria-hidden="true"
+                      <Icon
+                        d={CHECK}
                         className="mt-[3px] size-[16px] shrink-0 text-olive-deep"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
-                      </svg>
+                      />
                       {feature}
                     </li>
                   ))}
@@ -117,14 +115,17 @@ export function Pricing() {
                       variant="accent"
                       arrow
                       href="#cta"
-                      className="w-full animate-[ro-fade_400ms_var(--ease-soft)]"
+                      className={cx("w-full", ENTER)}
                     >
                       {plan.cta}
                     </CtaButton>
                   ) : (
                     <CtaButton
                       variant="ghost"
-                      className="w-full animate-[ro-fade_400ms_var(--ease-soft)] after:absolute after:inset-0 after:rounded-[24px]"
+                      className={cx(
+                        "w-full after:absolute after:inset-0 after:rounded-[24px]",
+                        ENTER,
+                      )}
                       onClick={(e) => {
                         const card = e.currentTarget.closest("article");
                         flushSync(() => setSelected(plan.id));
@@ -141,20 +142,11 @@ export function Pricing() {
           );
         })}
       </ul>
-      <Text size="small" className="mt-[40px] text-center text-ink-2/80">
-        <svg
-          viewBox="0 0 16 16"
-          aria-hidden="true"
+      <Text size="small" tone="muted" className="mt-[40px] text-center">
+        <Icon
+          d={INFO}
           className="mr-[8px] inline-block size-[15px] align-[-3px]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.25"
-          strokeLinecap="round"
-        >
-          <circle cx="8" cy="8" r="6.25" />
-          <path d="M8 7.25v4" />
-          <circle cx="8" cy="4.9" r="0.5" fill="currentColor" stroke="none" />
-        </svg>
+        />
         {pricingCopy.footnote}
       </Text>
     </SectionFrame>

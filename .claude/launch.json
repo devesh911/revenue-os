@@ -10,7 +10,16 @@
     {
       "name": "www",
       "runtimeExecutable": "/Users/deveshlakwal/.bun/bin/bun",
-      "runtimeArgs": ["run", "--filter", "www", "dev", "--", "--port", "5174", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "--filter",
+        "www",
+        "dev",
+        "--",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
       "port": 5174
     }
   ]

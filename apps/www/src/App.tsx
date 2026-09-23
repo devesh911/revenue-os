@@ -1,5 +1,6 @@
 import { useLayoutEffect } from "react";
 import { brand, footerMeta } from "./content/site";
+import { DotList } from "./design/DotList";
 import { MonoLabel } from "./design/MonoLabel";
 import { useReveal } from "./lib/reveal";
 import { Faq } from "./sections/Faq";
@@ -54,9 +55,10 @@ export function App() {
               {brand}
             </span>
           </div>
-          <MonoLabel className="text-balance text-[11.5px] text-stone uppercase tracking-[0.1em]">
-            {footerMeta.compliance}
-          </MonoLabel>
+          <DotList
+            items={footerMeta.compliance}
+            className="gap-y-[6px] font-mono text-[11.5px] text-stone uppercase tracking-[0.1em]"
+          />
           <MonoLabel className="text-[11.5px] text-stone tracking-[0.06em]">
             {footerMeta.copyright}
           </MonoLabel>

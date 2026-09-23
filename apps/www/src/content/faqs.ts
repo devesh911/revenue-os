@@ -26,7 +26,7 @@ export const faqs: Faq[] = [
   },
   {
     q: "Does it replace my telecalling team?",
-    a: "It replaces machine-time work — first response, screening, follow-ups. Your best closers stay, and they only ever talk to briefed, high-intent buyers.",
+    a: "It replaces machine-time work\u00a0— first response, screening, follow-ups. Your best closers stay, and they only ever talk to briefed, high-intent buyers.",
   },
   {
     q: "How does outcome pricing work?",

@@ -1,11 +1,14 @@
 import { hero } from "../content/hero";
+import { motionToggle } from "../content/site";
 import { CtaButton } from "../design/CtaButton";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
 import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
+import { setStill, useStill } from "../lib/motion";
 import { reveal } from "../lib/reveal";
 import { HeroCall } from "../visuals/HeroCall";
+import { Icon, PAUSE, PLAY } from "../visuals/Icon";
 
 // The hook: eyebrow · the page's single <h1> · lede · the two CTAs · a hairline
 // row of the three promises — beside the demo call, which shows the product doing
@@ -13,7 +16,12 @@ import { HeroCall } from "../visuals/HeroCall";
 // column, centred against the card by the two 1fr spacer rows; below lg the card
 // follows the CTAs directly and the promises close the section. The greedy wrap
 // keeps "operating system" on one line. Blocks rise in on a short stagger.
+// Under the card, beside its caption, sits the page-wide pause switch (WCAG
+// 2.2.2): it holds the demo call and freezes every other loop on the page; under
+// reduced motion there is nothing to pause, so it hides.
+
 export function Hero() {
+  const still = useStill();
   return (
     <SectionFrame
       flush
@@ -28,7 +36,8 @@ export function Hero() {
         </Kicker>
         <Heading
           level={1}
-          className="mt-[28px] text-wrap lg:text-[clamp(50px,4.7vw,60px)]"
+          balance={false}
+          className="mt-[28px]"
           {...reveal(80)}
         >
           {hero.title}
@@ -56,17 +65,29 @@ export function Hero() {
           </CtaButton>
         </div>
       </div>
+      {/* The switch precedes the figcaption in the DOM (a figcaption must be the
+          figure's last child); the grid seats it on the caption's right, on the
+          caption's first baseline. The caption's top padding matches the
+          switch's, so the row sits the same when reduced motion hides it. */}
       <figure
-        className="m-0 lg:col-start-2 lg:row-span-4 lg:row-start-1 lg:self-center"
+        className="grid grid-cols-[1fr_auto] items-baseline gap-x-[16px] gap-y-[2px] lg:col-start-2 lg:row-span-4 lg:row-start-1 lg:self-center"
         {...reveal(200)}
       >
-        <HeroCall />
-        <figcaption className="mt-[14px] text-balance text-center font-mono text-[11px] text-stone tracking-[0.04em]">
+        <HeroCall className="col-span-2" />
+        <button
+          type="button"
+          onClick={() => setStill(!still)}
+          className="col-start-2 row-start-2 -mr-[10px] inline-flex min-h-[40px] cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-full px-[10px] font-mono text-[11px] text-stone transition-colors duration-200 hover:text-ink motion-reduce:hidden"
+        >
+          <Icon d={still ? PLAY : PAUSE} className="size-[10px]" />
+          {still ? motionToggle.play : motionToggle.pause}
+        </button>
+        <figcaption className="col-start-1 row-start-2 text-balance pt-[11px] font-mono text-[11px] text-stone leading-[1.6]">
           {hero.caption}
         </figcaption>
       </figure>
       <dl
-        className="m-0 grid items-start gap-[14px] border-line border-t pt-[22px] sm:grid-cols-3 sm:gap-[28px] lg:row-start-3 lg:mt-[48px]"
+        className="grid items-start gap-[14px] border-line border-t pt-[22px] sm:grid-cols-3 sm:gap-[28px] lg:row-start-3 lg:mt-[48px]"
         {...reveal(320)}
       >
         {hero.facts.map((f) => (
@@ -77,7 +98,7 @@ export function Hero() {
             <dt className="font-serif text-[22px] text-ink leading-[1.2] tracking-[-0.01em]">
               {f.k}
             </dt>
-            <dd className="m-0 text-[13.5px] text-stone leading-[1.5]">
+            <dd className="text-pretty text-[13.5px] text-stone leading-[1.5]">
               {f.v}
             </dd>
           </div>

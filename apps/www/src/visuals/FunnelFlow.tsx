@@ -1,25 +1,31 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { flowLabels, stages } from "../content/stages";
 import { cx } from "../lib/cx";
+import { useLiveSvg } from "../lib/motion";
 import { reveal } from "../lib/reveal";
 
 // The engine, drawn. Leads (paper dots) enter the four-stage track; stage 02
 // scores each one — clay leads run on through 03 and 04 to the human closer,
 // olive leads drop into the nurture loop under the track and re-enter until
-// intent changes (then they turn clay and convert). Nodes sit at the stage
-// columns' centres (12.5 / 37.5 / 62.5 / 87.5 %), so the diagram lines up over
-// StageGrid. Lines + dots live in a uniformly scaled viewBox; rings and labels
-// are HTML placed by percentage so they stay crisp at every width. SMIL motion
-// sits in [data-motion-only] (reduced motion drops it and shows static dots) and
-// pauses while off-screen. Decorative beside the stage copy, so aria-hidden.
+// intent changes (then they turn clay and convert). The viewBox is the content
+// column at full width (1120px, which it is exactly from xl up); there StageGrid
+// sets the stages as four equal columns on 56px gutters, and each node sits over
+// its stage column's centre. Below xl the stages wrap 2×2 and the diagram stands
+// apart as its own figure — the sequence, not a column header. Lines + dots live
+// in a uniformly scaled viewBox; rings and labels are HTML placed by percentage so
+// they stay crisp at every width. SMIL motion sits in [data-motion-only] and holds
+// still off screen; reduced motion or the page-wide pause swaps it for three
+// static dots at rest. Decorative beside the stage copy, so aria-hidden.
 const W = 1120; // viewBox width = the content column at full width
+const GUTTER = 56; // StageGrid's column gutter (gap-x-[56px])
+const COL = (W - 3 * GUTTER) / 4; // one stage column at xl: 238
+const node = (i: number) => COL / 2 + i * (COL + GUTTER);
 const H = 196;
 const Y = 64; // the track
 const R = 44; // nurture-loop turn radius
 const Y2 = Y + 2 * R; // the loop's return lane
-const LX = 90; // loop turn centres: just before 01 …
-const RX = 470; // … and just past 02
-const node = (i: number) => ((2 * i + 1) * W) / 8;
+const LX = node(0) - 50; // loop turn centres: just before 01 …
+const RX = node(1) + 50; // … and just past 02
 
 const LOOP = `A${R} ${R} 0 0 1 ${RX} ${Y2} H${LX} A${R} ${R} 0 0 1 ${LX} ${Y}`;
 const HIGH = `M0 ${Y} H${W}`;
@@ -92,15 +98,7 @@ const aboveTrack = { top: `calc(${pct(Y, H)} - 32px)` };
 
 export function FunnelFlow({ className }: { className?: string }) {
   const svg = useRef<SVGSVGElement>(null);
-  useEffect(() => {
-    const el = svg.current;
-    if (!el || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver((es) =>
-      es.at(-1)?.isIntersecting ? el.unpauseAnimations() : el.pauseAnimations(),
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  useLiveSvg(svg);
   return (
     <div
       aria-hidden="true"
@@ -132,12 +130,22 @@ export function FunnelFlow({ className }: { className?: string }) {
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
-        <g className="motion-safe:hidden">
-          <circle cx={36} cy={Y} r={4.5} className="fill-paper" />
-          <circle cx={250} cy={Y2} r={4.5} className="fill-olive" />
-          <circle cx={840} cy={Y} r={4.5} className="fill-clay" />
+        <g className="motion-safe:hidden [html[data-still]_&]:inline">
+          <circle cx={LX - R - 10} cy={Y} r={4.5} className="fill-paper" />
+          <circle
+            cx={(LX + RX) / 2 - 30}
+            cy={Y2}
+            r={4.5}
+            className="fill-olive"
+          />
+          <circle
+            cx={(node(2) + node(3)) / 2}
+            cy={Y}
+            r={4.5}
+            className="fill-clay"
+          />
         </g>
-        <g data-motion-only>
+        <g data-motion-only className="[html[data-still]_&]:hidden">
           {LEADS.map((lead) => (
             <Lead key={lead.phase} {...lead} />
           ))}
@@ -159,13 +167,14 @@ export function FunnelFlow({ className }: { className?: string }) {
         {flowLabels.exit}
       </span>
       <span
-        className={cx(label, "-translate-x-1/2 text-olive")}
+        className={cx(label, "-translate-x-1/2 text-olive-lift")}
         style={{
           left: pct((LX + RX) / 2, W),
           top: `calc(${pct(Y2, H)} + 26px)`,
         }}
       >
-        <span className="font-sans text-[11.5px]">↻</span> {flowLabels.loop}
+        <span className="font-sans text-[11.5px]">{flowLabels.loopArrow}</span>{" "}
+        {flowLabels.loop}
       </span>
     </div>
   );

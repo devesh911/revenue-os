@@ -1,16 +1,20 @@
-import type { CSSProperties, ReactNode } from "react";
-import type { Moat } from "../content/moats";
+import { type CSSProperties, type ReactNode, useRef } from "react";
+import { type Moat, moatArt } from "../content/moats";
 import { cx } from "../lib/cx";
+import { useLiveSvg } from "../lib/motion";
 
 // The moat plates: editorial ink line art on a flat plate colour, one clay accent
 // each, and one calm loop that restates the claim. `depth`: ten shallow probes
 // (the generalists' ten industries) beside one shaft a dot descends, stratum by
 // stratum; `india`: the conversation floats in the words buyers actually use,
 // stamped RERA; `loop`: a dot rides a spiral inward — every pass tighter than the
-// last — and lands on the next buyer. Decorative beside real copy (aria-hidden).
-// Strokes are drawn by default — they only hide to draw on (after --draw-after)
-// once JS has opted motion in (html[data-motion]) and the card is revealed. Each
-// SMIL dot sits in data-motion-only, with a static twin shown under reduced motion.
+// last — and lands on the next buyer. Decorative beside real copy (aria-hidden);
+// the plate words come from content/moats. Strokes are drawn by default — they
+// only hide to draw on (after --draw-after, once the card is revealed) while JS has
+// opted motion in (html[data-motion]) and the page-wide pause is off. Each SMIL dot
+// sits in data-motion-only, with a static twin at rest shown instead under reduced
+// motion or the page-wide pause (LIVE / REST); every loop (SMIL and the CSS float)
+// holds still while the plate is off screen.
 type Variant = Moat["art"];
 
 const PLATE: Record<Variant, string> = {
@@ -19,8 +23,11 @@ const PLATE: Record<Variant, string> = {
   loop: "bg-heather",
 };
 
+const LIVE = "[html[data-still]_&]:hidden";
+const REST = "fill-clay motion-safe:hidden [html[data-still]_&]:inline";
+
 const DRAW =
-  "[html[data-motion]_&]:[stroke-dasharray:1_2] [html[data-motion]_&]:[stroke-dashoffset:1] in-data-shown:animate-[ro-draw_1.6s_var(--ease-soft)_calc(var(--reveal-delay,0ms)_+_var(--draw-after,250ms))_forwards]";
+  "[html[data-motion]:not([data-still])_&]:[stroke-dasharray:1_2] [html[data-motion]:not([data-still])_&]:[stroke-dashoffset:1] in-data-shown:animate-[ro-draw_1.6s_var(--ease-soft)_calc(var(--reveal-delay,0ms)_+_var(--draw-after,250ms))_forwards]";
 
 // A pill speech bubble at (x, y, w, h), its tail leaning `dir` from near that side.
 const bubble = (x: number, y: number, w: number, h: number, dir: 1 | -1) => {
@@ -28,11 +35,12 @@ const bubble = (x: number, y: number, w: number, h: number, dir: 1 | -1) => {
   return `M${x + r} ${y}H${x + w - r}a${r} ${r} 0 0 1 0 ${h}H${t + 5}L${t + dir * 9} ${y + h + 10}L${t - 5} ${y + h}H${x + r}a${r} ${r} 0 0 1 0 ${-h}Z`;
 };
 
-// The reply tucks over the greeting's lower edge; the third line stands clear.
-const BUBBLES: Array<[string, number, number, number, number, 1 | -1]> = [
-  ["Namaste", 56, 36, 136, 48, -1],
-  ["Haan ji", 140, 76, 124, 48, 1],
-  ["Hello", 96, 140, 104, 44, -1],
+// One bubble per moatArt.greetings word, sized to it: the reply tucks over the
+// greeting's lower edge; the third line stands clear.
+const BUBBLES: Array<[number, number, number, number, 1 | -1]> = [
+  [56, 36, 136, 48, -1],
+  [140, 76, 124, 48, 1],
+  [96, 140, 104, 44, -1],
 ];
 
 // The loop: a spiral of half-turns, each 14 tighter than the last, alternating
@@ -69,17 +77,13 @@ const ART: Record<Variant, ReactNode> = {
         textAnchor="end"
         className="fill-ink-2 font-mono text-[10.5px] tracking-[0.12em]"
       >
-        <text x="222" y="109.5">
-          INVENTORY
-        </text>
-        <text x="222" y="145.5">
-          SITE VISITS
-        </text>
-        <text x="222" y="181.5">
-          RERA
-        </text>
+        {moatArt.strata.map((word, i) => (
+          <text key={word} x="222" y={109.5 + i * 36}>
+            {word}
+          </text>
+        ))}
       </g>
-      <g data-motion-only="">
+      <g data-motion-only="" className={LIVE}>
         <circle cx="244" cy="178" r="5" className="fill-clay">
           <animate
             attributeName="cy"
@@ -99,19 +103,14 @@ const ART: Record<Variant, ReactNode> = {
           />
         </circle>
       </g>
-      <circle
-        cx="244"
-        cy="178"
-        r="5"
-        className="fill-clay motion-safe:hidden"
-      />
+      <circle cx="244" cy="178" r="5" className={REST} />
     </>
   ),
   india: (
     <>
-      {BUBBLES.map(([word, x, y, w, h, dir], i) => (
+      {BUBBLES.map(([x, y, w, h, dir], i) => (
         <g
-          key={word}
+          key={x}
           className="animate-[ro-float_6s_ease-in-out_infinite]"
           style={
             {
@@ -132,7 +131,7 @@ const ART: Record<Variant, ReactNode> = {
             textAnchor="middle"
             className="fill-ink font-serif text-[18px] italic"
           >
-            {word}
+            {moatArt.greetings[i]}
           </text>
         </g>
       ))}
@@ -152,7 +151,7 @@ const ART: Record<Variant, ReactNode> = {
           textAnchor="middle"
           className="fill-ink font-mono text-[11px] tracking-[0.12em]"
         >
-          RERA
+          {moatArt.stamp}
         </text>
       </g>
     </>
@@ -160,7 +159,7 @@ const ART: Record<Variant, ReactNode> = {
   loop: (
     <>
       <path d={SPIRAL} stroke="currentColor" pathLength={1} className={DRAW} />
-      <g data-motion-only="">
+      <g data-motion-only="" className={LIVE}>
         <circle r="6" className="fill-clay">
           <animateMotion
             dur="8s"
@@ -180,19 +179,17 @@ const ART: Record<Variant, ReactNode> = {
           />
         </circle>
       </g>
-      <circle
-        cx="186"
-        cy="123"
-        r="6"
-        className="fill-clay motion-safe:hidden"
-      />
+      <circle cx="186" cy="123" r="6" className={REST} />
     </>
   ),
 };
 
 export function MoatArt({ variant }: { variant: Variant }) {
+  const svg = useRef<SVGSVGElement>(null);
+  useLiveSvg(svg);
   return (
     <svg
+      ref={svg}
       viewBox="0 0 360 232"
       fill="none"
       strokeWidth={1.75}

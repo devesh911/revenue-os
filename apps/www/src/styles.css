@@ -26,6 +26,11 @@
   --color-clay-deep: #a9492a; /* clay for small text on paper (5.4:1) */
   --color-olive: #788c5d; /* low intent / nurture */
   --color-olive-deep: #56663f; /* olive for small text on paper (5.9:1) */
+  --color-olive-lift: color-mix(
+    in oklab,
+    var(--color-olive) 92%,
+    var(--color-paper)
+  ); /* olive for small text on the ink panel (≥5:1) */
   --color-card: #fdfcfa; /* the hero call card, a shade above paper */
   --color-oat: #e3dacc; /* illustration plate */
   --color-cactus: #bcd1ca; /* illustration plate */

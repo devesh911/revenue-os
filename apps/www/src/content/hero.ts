@@ -2,7 +2,7 @@
 // high-intent lead who books a site visit and a low-intent one routed into the
 // nurture loop, so the hook shows both branches of the engine. Hero and HeroCall
 // compose these and inline none of them. Names, numbers and projects are
-// illustrative.
+// illustrative. A \u00a0 before an em dash keeps the dash off the start of a line.
 
 export const hero = {
   // The tail folds away on phones, where the full line would wrap the pill.
@@ -12,12 +12,12 @@ export const hero = {
   },
   // The nbsp keeps "real estate" from breaking across lines.
   title: "The revenue operating system for Indian real\u00a0estate.",
-  lede: "Voice agents are the front door. The product is the funnel — every conversation feeds the machine that decides who gets called next, and a human is inserted only when a human changes the outcome.",
+  lede: "Voice agents are the front door. The product is the funnel\u00a0— every conversation feeds the machine that decides who gets called next, and a human is inserted only when a human changes the outcome.",
   cta: { primary: "Run our pilot", secondary: "See the engine" },
   facts: [
     {
       k: "Minutes",
-      v: "to the first call on every new lead — not tomorrow morning",
+      v: "to the first call on every new lead\u00a0— not tomorrow morning",
     },
     { k: "Hinglish", v: "by default, plus eleven Indian languages" },
     { k: "Per visit", v: "pay for qualified site visits, not minutes" },
@@ -30,6 +30,7 @@ export const callLabels = {
   aria: "Example: an AI agent calls a new property lead within minutes, talks in Hinglish, captures budget and timeline, scores intent, and books a site visit or starts a nurture loop.",
   newLead: "New lead",
   status: { ringing: "Ringing…", live: "On call", ended: "Ended" },
+  calling: "Calling", // the empty transcript while the phone rings
   calledIn: "Called in",
   agent: "Agent · Asha",
   captured: "Captured",
@@ -45,6 +46,7 @@ export interface CallScenario {
   lead: string;
   source: string; // portal · configuration · locality
   calledIn: string; // enquiry → first ring (mm:ss)
+  duration: string; // the finished call's length (mm:ss)
   lines: { who: "agent" | "lead"; text: string }[];
   captured: string[]; // the fields written to the CRM
   score: number; // intent, 0–100
@@ -59,6 +61,7 @@ export const calls: CallScenario[] = [
     lead: "Priya S.",
     source: "99acres · 2BHK · Whitefield, Bengaluru",
     calledIn: "00:47",
+    duration: "00:41",
     lines: [
       {
         who: "agent",
@@ -66,7 +69,7 @@ export const calls: CallScenario[] = [
       },
       {
         who: "lead",
-        text: "Haan ji. Budget around 90 lakh hai — possession kab tak milega?",
+        text: "Haan ji. Budget around 90 lakh hai\u00a0— possession kab tak milega?",
       },
       {
         who: "agent",
@@ -88,6 +91,7 @@ export const calls: CallScenario[] = [
     lead: "Rahul M.",
     source: "MagicBricks · 3BHK · Kharadi, Pune",
     calledIn: "01:12",
+    duration: "00:34",
     lines: [
       {
         who: "agent",
@@ -99,7 +103,7 @@ export const calls: CallScenario[] = [
       },
       {
         who: "agent",
-        text: "Bilkul. Main floor plans WhatsApp kar deti hoon — March mein phir baat karein?",
+        text: "Bilkul. Main floor plans WhatsApp kar deti hoon\u00a0— March mein phir baat karein?",
       },
       { who: "lead", text: "Theek hai, bhej dijiye." },
     ],

@@ -8,13 +8,20 @@ import { Text } from "../design/Text";
 import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
 
-// FAQ — a sticky side head beside a one-open-at-a-time accordion (default = item 0,
-// the SSR pin; clicking the open item closes it). Each item's outer element carries
+// FAQ — a sticky side head beside an accordion whose items open and close
+// independently (default = item 0 alone, the SSR pin), so opening one never collapses
+// another and slides the tapped question away. Each item's outer element carries
 // the data-faq / data-open hooks. Answers are always rendered so their height can
 // ease open (grid-rows 0fr → 1fr); closed panels are `inert`, so keyboard and
 // assistive tech skip them. The plus folds into a minus as its vertical bar turns.
 export function Faq() {
-  const [open, setOpen] = useState(defaultOpenFaq);
+  const [open, setOpen] = useState(() => new Set([defaultOpenFaq]));
+  const toggle = (i: number) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
   const id = useId();
   return (
     <SectionFrame
@@ -37,7 +44,7 @@ export function Faq() {
       </div>
       <div {...reveal(120)}>
         {faqs.map((faq, i) => {
-          const isOpen = i === open;
+          const isOpen = open.has(i);
           return (
             <div
               key={faq.q}
@@ -51,7 +58,7 @@ export function Faq() {
                   id={`${id}q${i}`}
                   aria-expanded={isOpen}
                   aria-controls={`${id}a${i}`}
-                  onClick={() => setOpen(isOpen ? -1 : i)}
+                  onClick={() => toggle(i)}
                   className="flex w-full cursor-pointer items-center justify-between gap-[24px] py-[26px] text-left text-[20px] text-ink leading-[1.35] tracking-[-0.01em] transition-colors duration-200 hover:text-clay-deep md:text-[22px]"
                 >
                   {faq.q}

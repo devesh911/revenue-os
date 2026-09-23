@@ -8,10 +8,13 @@ import { reveal } from "../lib/reveal";
 import { FunnelFlow } from "../visuals/FunnelFlow";
 import { IntentRouting } from "./IntentRouting";
 
-// "How it works" — the dark engine panel: the head (split on desktop, the intro
-// starting on the third column's edge), the animated funnel flow, the four stages
-// in hairline columns under its nodes, then the intent split. Stages read as a
-// railed sequence on phones, 2-up on tablets, four columns on desktop.
+// "How it works" — the dark engine panel: the head (split from lg, the intro
+// starting on the text edge of the stage column below it), the animated funnel
+// flow, the four stages, then the intent split. Stages read as a railed sequence
+// on phones and 2×2 from md, with the flow standing well apart above them as its
+// own figure; from xl they run as four equal columns on 56px gutters (a hairline
+// centred in each), tucked right under the flow's nodes — FunnelFlow shares that
+// geometry, so each node sits over its column's centre.
 export function StageGrid() {
   return (
     <SectionFrame id="how" tone="ink">
@@ -25,17 +28,17 @@ export function StageGrid() {
           </Kicker>
           <Heading>{engineHead.heading}</Heading>
         </div>
-        <Text size="lede" className="max-w-[46ch] text-paper/70 lg:pl-[28px]">
+        <Text size="lede" tone="inverse" className="max-w-[46ch] lg:pl-[28px]">
           {engineHead.intro}
         </Text>
       </div>
       <FunnelFlow className="mt-[72px]" />
-      <ol className="m-0 mt-[56px] grid list-none gap-y-[40px] p-0 md:mt-[64px] md:grid-cols-2 md:gap-y-[56px] lg:mt-[40px] lg:grid-cols-4">
+      <ol className="mt-[56px] grid gap-y-[40px] md:mt-[96px] md:grid-cols-2 md:gap-x-[56px] md:gap-y-[56px] xl:mt-[40px] xl:grid-cols-4">
         {stages.map((s, i) => (
           <li
             key={s.num}
             {...reveal(120 + i * 90)}
-            className="relative border-paper/10 pl-[32px] md:pr-[28px] md:pl-0 md:even:border-l md:even:pl-[28px] lg:border-l lg:pl-[28px] lg:first:border-l-0 lg:first:pl-0"
+            className="relative pl-[32px] before:absolute before:inset-y-0 before:-left-[28px] before:hidden before:w-px before:bg-paper/10 md:pl-0 md:even:before:block xl:not-first:before:block"
           >
             <span
               aria-hidden="true"
@@ -51,10 +54,12 @@ export function StageGrid() {
               <span className="text-paper">{s.num}</span>
               <span className="text-paper/50">{s.kicker}</span>
             </MonoLabel>
-            <Heading as="h3" size="card" className="mt-[18px]">
+            <Heading as="h3" className="mt-[18px]">
               {s.title}
             </Heading>
-            <Text className="mt-[12px] text-paper/70">{s.copy}</Text>
+            <Text tone="inverse" className="mt-[12px]">
+              {s.copy}
+            </Text>
           </li>
         ))}
       </ol>

@@ -8,10 +8,12 @@ import { reveal } from "../lib/reveal";
 // The two routes out of stage 02, closing the ink panel: low intent (olive) →
 // the nurture loop, high intent (clay) → the human closer. Each card's glyph is
 // drawn in the FunnelFlow vocabulary (the dotted loop, the line out to the
-// closer), so the cards read as the diagram's legend. Stacks on phones.
+// closer), so the cards read as the diagram's legend. Stacks on phones. The
+// olive label is lifted 8% toward paper (as is the diagram's loop label): plain
+// olive holds only ~4.5:1 on the card's fill over the panel grain; this holds 5:1.
 const TONE = {
   low: {
-    text: "text-olive",
+    text: "text-olive-lift",
     glyph: (
       <>
         <rect
@@ -69,10 +71,12 @@ export function IntentRouting({ className }: { className?: string }) {
               {TONE[it.tone].glyph}
             </svg>
           </div>
-          <Heading as="h3" size="card" className="mt-[28px]">
+          <Heading as="h3" className="mt-[28px]">
             {it.title}
           </Heading>
-          <Text className="mt-[10px] text-paper/80">{it.copy}</Text>
+          <Text tone="inverse-strong" className="mt-[10px]">
+            {it.copy}
+          </Text>
         </article>
       ))}
     </div>

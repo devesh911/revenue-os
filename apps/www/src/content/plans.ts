@@ -18,7 +18,7 @@ export const pricingCopy = {
   title: "Choose a plan to connect Revenue OS.",
   sub: "All tiers run the full funnel engine — voice\u00a0+\u00a0WhatsApp agents, intent scoring, and outcome-based pricing on qualified site visits.",
   footnote:
-    "Platform fees credit against outcome fees — you never pay twice for the same visit.",
+    "Platform fees credit against outcome fees\u00a0— you never pay twice for the same visit.",
   selectedHint: "Selected plan",
 } as const;
 

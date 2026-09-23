@@ -13,6 +13,7 @@ export const engineHead = {
 export const flowLabels = {
   entry: "New leads",
   loop: "Nurture loop",
+  loopArrow: "↻", // the loop's glyph, shared with the low-intent route below
   exit: "Human closer",
 } as const;
 
@@ -61,7 +62,7 @@ export interface IntentRoute {
 export const intents: IntentRoute[] = [
   {
     tone: "low",
-    arrow: "↻",
+    arrow: flowLabels.loopArrow,
     label: "LOW INTENT",
     title: "Nurture loop",
     copy: "WhatsApp follow-ups and scheduled re-calls until intent changes.",

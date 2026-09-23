@@ -28,6 +28,6 @@ export const motionToggle = {
 
 export const footerMeta = {
   copyright: "Revenue OS © 2026",
-  compliance: "TRAI / DND compliant · RERA aware · Built in India",
+  compliance: ["TRAI / DND compliant", "RERA aware", "Built in India"],
   skip: "Skip to content",
 } as const;

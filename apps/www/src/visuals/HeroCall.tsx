@@ -2,26 +2,38 @@ import { useEffect, useRef, useState } from "react";
 import { type CallScenario, callLabels, calls } from "../content/hero";
 import { MonoLabel } from "../design/MonoLabel";
 import { cx } from "../lib/cx";
+import { useStill } from "../lib/motion";
+import { CHECK, Icon, RECALL } from "./Icon";
 
 // The hero's show-don't-tell demo: an AI agent rings a fresh portal lead, talks
 // Hinglish, captures the qualifying fields, scores intent and routes the lead —
 // alternating a booked site visit (high intent) with a nurture loop (low). One
 // integer `tick` (250ms beats) drives it all: each call's beats are planned once
 // below and every row is derived from them. Both calls stay stacked in one grid
-// cell, so the card keeps the taller one's height and never shifts. SSR, reduced
-// motion and browsers without IntersectionObserver get the first call's finished
-// frame; the loop runs only while the card is in view and the tab is visible.
+// cell, so the card keeps the taller one's height and never shifts; pending
+// fields are hairline outlines, space held for what the call will capture. SSR,
+// reduced motion and browsers without IntersectionObserver get the first call's
+// finished frame; the loop runs only while the card is in view, the tab is
+// visible and the page-wide pause switch is off. The card speaks as one labelled
+// image, so each call's own markup is hidden from assistive tech.
 
 const TICK = 250;
+const LEAD_IN = 1; // first play only: the ring holds while the card rises in
+const RING = 4; // beats of ringing before the lead picks up
 const TYPING = 3; // beats of "…" before each agent line
+const FILL_MS = 900; // the intent meter's fill; the outcome lands as it does
 const HOLD = 14; // beats the outcome rests before the fade
 const FADE = 2;
-const IN_VIEW = 0.4; // share of the card on screen before the call plays
-const LEAD_IN = 4; // first play only: the ring holds while the card rises in
+// The call plays once 40% of the card is on screen — or, when the card outgrows
+// the viewport (high zoom), once it fills 60% of it; the fine thresholds let the
+// observer notice either.
+const IN_VIEW = 0.4;
+const FILLS_VIEW = 0.6;
+const THRESHOLDS = Array.from({ length: 9 }, (_, i) => (i * IN_VIEW) / 8);
 
 function plan(call: CallScenario, start: number) {
-  const connect = start + 5; // 1.25s of ringing
-  let t = connect + 2;
+  const connect = start + RING;
+  let t = connect + 1;
   const lines = call.lines.map((line) => {
     if (line.who === "agent") t += TYPING;
     const at = t;
@@ -32,7 +44,7 @@ function plan(call: CallScenario, start: number) {
   const captured = call.captured.map((label, i) => ({ label, at: t + 1 + i }));
   const crm = t + captured.length + 2;
   const meter = crm + 2;
-  const outcome = meter + 4; // as the 900ms fill lands
+  const outcome = meter + Math.ceil(FILL_MS / TICK);
   const fade = outcome + HOLD;
   return {
     call,
@@ -55,7 +67,6 @@ for (const c of calls) PLANS.push(plan(c, PLANS.at(-1)?.end ?? 0));
 const CYCLE = PLANS.at(-1)?.end ?? 1;
 const STILL = PLANS[0]?.outcome ?? 0; // the first call, finished
 
-const CHECK = "M3.5 8.5 6.5 11.5 12.5 4.5";
 const TONES = {
   high: {
     avatar: "bg-oat",
@@ -67,7 +78,7 @@ const TONES = {
     avatar: "bg-cactus",
     fill: "bg-olive",
     text: "text-olive-deep",
-    icon: "M12.8 9.5A5 5 0 1 1 11.5 4.3M12 1.8v2.9H9.1", // the re-call loop
+    icon: RECALL,
   },
 } as const;
 
@@ -75,16 +86,22 @@ const CAPS = "text-[11px] uppercase tracking-[0.1em]";
 const RISE = "animate-[ro-rise_500ms_var(--ease-soft)_both]";
 const FADE_IN = "animate-[ro-fade_500ms_both]";
 const show = (on: boolean, anim = RISE) => (on ? anim : "opacity-0");
-// A pending field is a faint ghost that takes its fill when its beat lands
-// (the fade runs one way only, so a reset while hidden snaps back).
+// A pending field is an empty hairline outline that takes its fill when its beat
+// lands (the fill eases in one way only, so a reset while hidden snaps back).
 const slot = (done: boolean, fill: string) =>
-  done
-    ? cx(fill, "transition-colors duration-500")
-    : "border-transparent bg-ink/[0.035]";
-const mmss = (s: number) =>
-  `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  done ? cx(fill, "transition-colors duration-500") : "border-line";
 
-export function HeroCall() {
+function Dots() {
+  return [0, 1, 2].map((k) => (
+    <span
+      key={k}
+      className="size-[5px] animate-[ro-blink_1.2s_ease-in-out_infinite] rounded-full bg-stone"
+      style={{ animationDelay: `${k * 160}ms` }}
+    />
+  ));
+}
+
+export function HeroCall({ className }: { className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [motion] = useState(
     () =>
@@ -94,6 +111,7 @@ export function HeroCall() {
   );
   const [tick, setTick] = useState(motion ? -LEAD_IN : STILL);
   const [live, setLive] = useState(false);
+  const still = useStill();
 
   useEffect(() => {
     const el = ref.current;
@@ -102,10 +120,15 @@ export function HeroCall() {
     const sync = () => setLive(seen && !document.hidden);
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) seen = e.intersectionRatio >= IN_VIEW;
+        for (const e of entries) {
+          const view = e.rootBounds?.height ?? window.innerHeight;
+          seen =
+            e.intersectionRatio >= IN_VIEW ||
+            e.intersectionRect.height >= view * FILLS_VIEW;
+        }
         sync();
       },
-      { threshold: IN_VIEW },
+      { threshold: THRESHOLDS },
     );
     io.observe(el);
     document.addEventListener("visibilitychange", sync);
@@ -116,10 +139,10 @@ export function HeroCall() {
   }, [motion]);
 
   useEffect(() => {
-    if (!live) return;
+    if (!live || still) return;
     const id = setTimeout(() => setTick((tick + 1) % CYCLE), TICK);
     return () => clearTimeout(id);
-  }, [live, tick]);
+  }, [live, still, tick]);
 
   const now = Math.max(tick, 0); // the lead-in rests on beat 0
   return (
@@ -127,7 +150,10 @@ export function HeroCall() {
       ref={ref}
       role="img"
       aria-label={callLabels.aria}
-      className="grid rounded-[24px] border border-line bg-white/70 p-[16px] shadow-[0_1px_2px_rgba(20,20,19,0.04),0_12px_32px_-12px_rgba(20,20,19,0.12)] sm:p-[24px]"
+      className={cx(
+        "grid rounded-[24px] border border-line bg-card p-[16px] shadow-lift sm:p-[24px]",
+        className,
+      )}
     >
       {PLANS.map((p) => {
         const on = now >= p.start && now < p.end;
@@ -151,13 +177,14 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
   const filled = t >= p.meter;
   return (
     <div
+      aria-hidden="true"
       className={cx(
-        "flex flex-col gap-[16px] transition-opacity duration-[400ms] [grid-area:1/1]",
+        "flex flex-col gap-[12px] transition-opacity duration-[400ms] [grid-area:1/1] sm:gap-[16px]",
         !shown && "opacity-0",
       )}
     >
       <div className="flex items-center justify-between gap-[8px]">
-        <MonoLabel className={cx(CAPS, "text-stone")}>
+        <MonoLabel className={cx(CAPS, "whitespace-nowrap text-stone")}>
           {callLabels.newLead} · {call.time}
         </MonoLabel>
         <MonoLabel className="flex h-[26px] shrink-0 items-center gap-[8px] whitespace-nowrap rounded-full border border-line bg-paper px-[10px] text-[11px] text-ink-2">
@@ -185,15 +212,13 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
             </span>
           )}
           {callLabels.status[state]}
-          {state !== "ringing" && (
-            <span className="text-stone">
-              {mmss(Math.min(t, p.hangup) - p.connect)}
-            </span>
+          {state === "ended" && (
+            <span className="text-stone">{call.duration}</span>
           )}
         </MonoLabel>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-[12px] gap-y-[2px] border-line border-b pb-[16px]">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-[12px] gap-y-[2px] border-line border-b pb-[12px] sm:pb-[16px]">
         <span
           className={cx(
             "row-span-2 grid size-[40px] place-items-center rounded-full font-serif text-[18px] text-ink",
@@ -213,64 +238,73 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
         >
           {callLabels.calledIn} {call.calledIn}
         </MonoLabel>
-        <MonoLabel className="col-span-2 text-[11px] text-stone">
+        <MonoLabel className="col-span-2 truncate text-[11px] text-stone">
           {call.source}
         </MonoLabel>
       </div>
 
-      <div className="flex flex-1 flex-col gap-[8px]">
-        {p.lines.map((line) => {
-          const agent = line.who === "agent";
-          return (
-            <div
-              key={line.text}
-              className={cx(
-                "flex flex-col",
-                agent
-                  ? "items-start pr-[20px] sm:pr-[32px]"
-                  : "items-end pl-[20px] sm:pl-[32px]",
-              )}
-            >
-              {agent && (
-                <MonoLabel
-                  className={cx(
-                    "mb-[5px] text-[10.5px] text-stone tracking-[0.06em]",
-                    show(t >= line.at - TYPING),
-                  )}
-                >
-                  {callLabels.agent}
-                </MonoLabel>
-              )}
-              <div className="grid">
-                {agent && t >= line.at - TYPING && t < line.at && (
-                  <span className="flex h-[38px] w-[58px] animate-[ro-fade_300ms_both] items-center justify-center gap-[4px] rounded-[16px] rounded-tl-[6px] bg-paper-2 [grid-area:1/1]">
-                    {[0, 1, 2].map((k) => (
-                      <span
-                        key={k}
-                        className="size-[5px] animate-[ro-blink_1.2s_ease-in-out_infinite] rounded-full bg-stone"
-                        style={{ animationDelay: `${k * 160}ms` }}
-                      />
-                    ))}
-                  </span>
+      <div className="grid flex-1">
+        {state === "ringing" && (
+          <MonoLabel
+            className={cx(
+              CAPS,
+              "flex animate-[ro-fade_500ms_both] items-center gap-[10px] place-self-center text-stone [grid-area:1/1]",
+            )}
+          >
+            {callLabels.calling} {call.lead}
+            <span className="flex gap-[4px]">
+              <Dots />
+            </span>
+          </MonoLabel>
+        )}
+        <div className="flex flex-col gap-[6px] [grid-area:1/1] sm:gap-[8px]">
+          {p.lines.map((line) => {
+            const agent = line.who === "agent";
+            return (
+              <div
+                key={line.text}
+                className={cx(
+                  "flex flex-col",
+                  agent
+                    ? "items-start pr-[16px] sm:pr-[32px]"
+                    : "items-end pl-[16px] sm:pl-[32px]",
                 )}
-                <p
-                  className={cx(
-                    "m-0 rounded-[16px] px-[14px] py-[9px] text-[14px] leading-[1.5] [grid-area:1/1]",
-                    agent
-                      ? "rounded-tl-[6px] bg-paper-2 text-ink-2"
-                      : "rounded-tr-[6px] bg-ink text-paper",
-                    show(t >= line.at),
+              >
+                {agent && (
+                  <MonoLabel
+                    className={cx(
+                      "mb-[5px] text-[10.5px] text-stone tracking-[0.06em]",
+                      show(t >= line.at - TYPING),
+                    )}
+                  >
+                    {callLabels.agent}
+                  </MonoLabel>
+                )}
+                <div className="grid">
+                  {agent && t >= line.at - TYPING && t < line.at && (
+                    <span className="flex h-[38px] w-[58px] animate-[ro-fade_300ms_both] items-center justify-center gap-[4px] rounded-[16px] rounded-tl-[6px] bg-paper-2 [grid-area:1/1]">
+                      <Dots />
+                    </span>
                   )}
-                >
-                  {line.text}
-                </p>
+                  <p
+                    className={cx(
+                      "text-pretty rounded-[16px] px-[14px] py-[8px] text-[13.5px] leading-[1.5] [grid-area:1/1] sm:py-[9px] sm:text-[14px]",
+                      agent
+                        ? "rounded-tl-[6px] bg-paper-2 text-ink-2"
+                        : "rounded-tr-[6px] bg-ink text-paper",
+                      show(t >= line.at),
+                    )}
+                  >
+                    {line.text}
+                  </p>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-[12px] border-line border-t pt-[16px]">
+      <div className="flex flex-col gap-[12px] border-line border-t pt-[12px] sm:pt-[16px]">
         <div className="flex items-center justify-between gap-[12px]">
           <MonoLabel className={cx(CAPS, "text-stone")}>
             {callLabels.captured}
@@ -308,13 +342,14 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
           </MonoLabel>
           <span className="h-[4px] flex-1 overflow-hidden rounded-full bg-ink/[0.08]">
             <span
-              className={cx(
-                "block h-full origin-left rounded-full",
-                tone.fill,
-                filled &&
-                  "transition-transform duration-[900ms] ease-[var(--ease-soft)]",
-              )}
-              style={{ transform: `scaleX(${filled ? call.score / 100 : 0})` }}
+              className={cx("block h-full origin-left rounded-full", tone.fill)}
+              style={{
+                transform: `scaleX(${filled ? call.score / 100 : 0})`,
+                // eases up to the score; a reset (while hidden) snaps back
+                transition: filled
+                  ? `transform ${FILL_MS}ms var(--ease-soft)`
+                  : undefined,
+              }}
             />
           </span>
           <MonoLabel className={cx("text-[11px]", tone.text, show(filled))}>
@@ -325,7 +360,7 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
 
       <div
         className={cx(
-          "rounded-[16px] border p-[14px]",
+          "rounded-[16px] border p-[12px] sm:p-[14px]",
           slot(t >= p.outcome, "border-transparent bg-paper-2"),
         )}
       >
@@ -341,34 +376,15 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
             <Icon d={tone.icon} className="size-[16px]" />
           </span>
           <div className="min-w-0">
-            <p className="m-0 font-serif text-[18px] text-ink leading-[1.3] tracking-[-0.01em]">
+            <p className="font-serif text-[18px] text-ink leading-[1.3] tracking-[-0.01em]">
               {call.outcome.title}
             </p>
-            <p className="m-0 mt-[2px] text-[12.5px] text-stone leading-[1.45]">
+            <p className="mt-[2px] text-[12.5px] text-stone leading-[1.45]">
               {call.outcome.detail}
             </p>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function Icon({ d, className }: { d: string; className: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-      className={className}
-    >
-      <path
-        d={d}
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

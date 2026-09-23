@@ -34,7 +34,7 @@ export function Moats() {
               <MonoLabel className="text-[11.5px] text-ink-2/80 uppercase tracking-[0.14em]">
                 {moat.kicker}
               </MonoLabel>
-              <Heading as="h3" size="card" className="mt-[14px] max-w-[13ch]">
+              <Heading as="h3" className="mt-[14px] max-w-[13ch]">
                 {moat.title}
               </Heading>
               <Text className="mt-[12px]">{moat.copy}</Text>
