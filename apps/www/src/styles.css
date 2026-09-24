@@ -31,7 +31,7 @@
     var(--color-olive) 92%,
     var(--color-paper)
   ); /* olive for small text on the ink panel (≥5:1) */
-  --color-card: #fdfcfa; /* the hero call card, a shade above paper */
+  --color-card: #fdfcfa; /* product cards (the hero's result card, briefs), a shade above paper */
   --color-oat: #e3dacc; /* illustration plate */
   --color-cactus: #bcd1ca; /* illustration plate */
   --color-heather: #cbcadb; /* illustration plate */
@@ -144,6 +144,222 @@
     transform: translateY(-4px);
   }
 }
+/* ── hero survey ground (visuals/SurveyGround.tsx): its keyframes and utilities ── */
+/* The drawing's inks, all mixed from the palette: the sheet's margin, graph paper
+   (minor 8px, major 40px), the sheet's border and registration marks, the plan's
+   walls, linework and door swings — and the plan's width, which Hero's grid and the
+   sheet's clearing share: 432px, less on a short screen (never under 360px) so the
+   headline, both buttons and the card share a laptop's first screen. Set on the
+   hero's band. */
+@utility survey {
+  --survey-plan: min(432px, max(360px, calc((100svh - 236px) * 0.8)));
+  --survey-margin: color-mix(
+    in oklab,
+    var(--color-paper-2) 34%,
+    var(--color-paper)
+  );
+  --survey-minor: color-mix(in oklab, var(--color-line) 54%, transparent);
+  --survey-major: color-mix(in oklab, var(--color-mute) 22%, transparent);
+  --survey-border: color-mix(
+    in oklab,
+    var(--color-mute) 70%,
+    var(--color-paper)
+  );
+  --survey-mark: color-mix(in oklab, var(--color-ink) 40%, var(--color-paper));
+  --survey-wall: color-mix(in oklab, var(--color-ink) 14%, var(--color-paper));
+  --survey-draw: color-mix(in oklab, var(--color-ink) 30%, var(--color-paper));
+  --survey-swing: color-mix(
+    in oklab,
+    var(--color-clay) 64%,
+    var(--color-paper)
+  );
+}
+/* The sheet: paper with a hairline border, ruled as graph paper that clears behind
+   the hero's copy (the minor lines fully, the major ones to 35%). Phones keep it
+   faint, toward the top right; stacked, it clears round the copy on top; from lg
+   round the copy column — its centre is the content's left edge plus half the
+   column left of the plan (the 1200px column less its 40px gutters, the plan and
+   the 48px gap), a little below the sheet's middle, where the copy sits. */
+@utility survey-sheet {
+  background: var(--color-paper);
+  border: 1px solid var(--survey-border);
+  --survey-clear: radial-gradient(
+    130% 720px at 100% 0%,
+    black,
+    rgb(0 0 0 / 0.4) 50%,
+    transparent 85%
+  );
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  &::before {
+    background-image:
+      linear-gradient(to right, var(--survey-minor) 1px, transparent 1px),
+      linear-gradient(var(--survey-minor) 1px, transparent 1px);
+    background-size: 8px 8px;
+    mask-image: var(--survey-clear);
+  }
+  &::after {
+    background-image:
+      linear-gradient(to right, var(--survey-major) 1px, transparent 1px),
+      linear-gradient(var(--survey-major) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image:
+      linear-gradient(rgb(0 0 0 / 0.35), rgb(0 0 0 / 0.35)), var(--survey-clear);
+  }
+  @media (width >= 40rem) {
+    --survey-clear: radial-gradient(
+      ellipse 78% 340px at 42% 250px,
+      transparent 50%,
+      black 100%
+    );
+  }
+  @media (width >= 64rem) {
+    --survey-clear: radial-gradient(
+      ellipse 520px 400px at
+        calc(
+          max(50% - 580px, 0px) +
+          20px +
+          (min(100%, 1160px) - 88px - var(--survey-plan)) /
+          2
+        )
+        calc(50% + 14px),
+      transparent 45%,
+      black 100%
+    );
+  }
+}
+/* the plot, once: the plan wipes in left to right; the dimension line draws out */
+@keyframes survey-wipe {
+  from {
+    clip-path: inset(-3% 103% -3% -3%);
+  }
+  to {
+    clip-path: inset(-3%);
+  }
+}
+@keyframes survey-grow {
+  from {
+    scale: 0 1;
+  }
+}
+
+/* ── intent evidence (visuals/IntentEvidence.tsx): its keyframes and utilities ── */
+/* the halo that rings the meter's endpoint once, as the total lands */
+@keyframes intent-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+/* the clay token that drops from the endpoint, through the router, to "Call now" */
+@keyframes intent-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(68px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(72px);
+  }
+}
+
+/* ── call brief (visuals/CallBrief.tsx): its keyframes and utilities ── */
+/* the stage's ground: a clay wash behind the brief, a heather one low left */
+@utility brief-ground {
+  background:
+    radial-gradient(
+      34% 46% at 70% 30%,
+      color-mix(in oklab, var(--color-clay) 12%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      36% 50% at 12% 92%,
+      color-mix(in oklab, var(--color-heather) 40%, transparent),
+      transparent 72%
+    );
+}
+/* Priya's message floats over the brief: a deeper lift than --shadow-lift */
+@utility brief-float {
+  box-shadow:
+    0 2px 6px color-mix(in oklab, var(--color-ink) 6%, transparent),
+    0 28px 64px -24px color-mix(in oklab, var(--color-ink) 34%, transparent);
+}
+/* the Intent row's value. Narrow, it adds the signals up itself: their lines, then
+   the verdict, the bar and its running total, then the note. From 720px the rail
+   does the adding, so it is one line under a note. */
+@utility brief-intent {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "sig sig sig" "level bar run" "note note note";
+  @container (width >= 720px) {
+    grid-template-columns: auto 72px auto minmax(0, 1fr);
+    grid-template-areas: "level bar run ." "note note note note";
+  }
+}
+/* a row lights as it is written (clay), or as Priya's answer lands (olive) */
+@keyframes brief-flash {
+  from {
+    background-color: var(
+      --brief-flash,
+      color-mix(in oklab, var(--color-clay) 9%, transparent)
+    );
+  }
+  to {
+    background-color: transparent;
+  }
+}
+/* Priya's message arrives: a quick rise with a touch of overshoot */
+@keyframes brief-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* the next brief, waiting behind, breathes */
+@keyframes brief-drift {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -5px;
+  }
+}
+/* the call's clock: a column of digits, 0 to 8, one per second */
+@keyframes brief-count {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-112px);
+  }
+}
+
 /* ── scroll reveal — mark an element with {...reveal(delayMs)} (lib/reveal.ts).
       Content is only hidden once lib/reveal.ts has set html[data-motion] (JS on,
       motion allowed), so a failed script or reduced motion never hides anything —
@@ -190,6 +406,18 @@ html[data-still] *::before,
 html[data-still] *::after,
 [data-paused] * {
   animation-play-state: paused;
+}
+/* …except a visual the Pause switch caught before it ever ran: it shows its finished
+   frame (lib/sequence.ts `settled`), so its entry animations complete at once, as
+   under reduced motion, instead of freezing on their first keyframe. Same
+   specificity as the rule above and later, so it wins. */
+html [data-settled] *,
+html [data-settled] *::before,
+html [data-settled] *::after {
+  animation-duration: 0.01ms;
+  animation-iteration-count: 1;
+  animation-play-state: running;
+  transition-duration: 0.01ms;
 }
 
 /* ── decorative utilities ─────────────────────────────────────────────────── */

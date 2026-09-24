@@ -1,4 +1,4 @@
-// "Built around how property sales actually work" — three demonstrations, each a
+// "What the buyer hears, and what your team gets" — Rohan's call up close: three demonstrations, each a
 // small product example and one short explanation. All names, places and times are
 // illustrative. In the summary, the last field is the outcome (the next step).
 // \u00a0 keeps a number with its unit (1,050 sq ft, 11:00 AM, Tower B) on one line.
@@ -9,9 +9,9 @@
 
 export const examples = {
   kicker: "Examples",
-  title: "Built around how property sales actually work",
+  title: "What the buyer hears, and what your team gets",
   intro:
-    "One enquiry, followed from the call to the site visit. Names, places and times are illustrative.",
+    "Rohan's call, up close: the conversation in Hinglish, the summary your salesperson receives, and the WhatsApp confirmation that follows. Names, places and times are illustrative.",
   badge: "Example",
   conversation: {
     title: "A natural Hinglish conversation",
@@ -49,13 +49,13 @@ export const examples = {
     plate: ["Budget", "Timeline", "Next step"],
   },
   visit: {
-    title: "Site-visit confirmation and follow-up",
+    title: "Site-visit confirmation and reminder",
     body: "The buyer gets the time, the address and a reminder on WhatsApp, without anyone on your team typing it.",
     contact: "Rohan Mehta",
     channel: "WhatsApp",
     messages: [
       {
-        time: "Thu 11:48\u00a0AM",
+        time: "Thu 7:16\u00a0PM",
         text: "Hi Rohan, your site visit to Meridian Greens, Tower\u00a0B is confirmed for Saturday at 11:00\u00a0AM. We'll share the location pin before the visit.",
       },
       {

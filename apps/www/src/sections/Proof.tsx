@@ -8,11 +8,11 @@ import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
 import { Icon, INFO } from "../visuals/Icon";
 
-// The proof band under the hero, in the trust row's hairlined slot: an EXAMPLE of
-// the pilot report, never a customer result. The eyebrow ("Illustrative example"),
+// The pilot report, after the Pilot section it reports on: an EXAMPLE, never a
+// customer result. The "Illustrative example" tag beside the eyebrow,
 // the project line, both column heads and the footnote all say so. Head left and
-// the report card right from lg; stacked below. The card borrows the hero call
-// card's header (a serif line beside a mono pill) and the plan cards' hairlines;
+// the report card right from lg; stacked below. The card has a serif line beside
+// a mono pill for its header and the plan cards' hairlines;
 // figures are serif numerals — the current process in stone, Revenue OS in ink.
 // The comparison is a <dl> (one group per measure), so it survives the phone
 // reflow for screen readers: each value carries its column name, visually hidden;
@@ -29,9 +29,14 @@ export function Proof() {
   const { columns } = proof;
   return (
     <SectionFrame flush aria-labelledby="proof-title">
-      <div className="grid gap-[36px] border-line border-t pt-[48px] pb-[64px] md:gap-[48px] md:pt-[64px] md:pb-[88px] lg:grid-cols-12 lg:gap-x-[40px]">
+      <div className="grid gap-[36px] pt-[48px] pb-[64px] md:gap-[48px] md:pt-[64px] md:pb-[88px] lg:grid-cols-12 lg:gap-x-[40px]">
         <div {...reveal(200)} className="lg:col-span-5">
-          <Kicker>{proof.badge}</Kicker>
+          <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px]">
+            <Kicker>{proof.kicker}</Kicker>
+            <MonoLabel className="inline-flex rounded-full border border-line px-[10px] py-[5px] text-[11px] text-stone uppercase tracking-[0.1em]">
+              {proof.badge}
+            </MonoLabel>
+          </div>
           <Heading id="proof-title" className="mt-[20px]">
             {proof.title}
           </Heading>

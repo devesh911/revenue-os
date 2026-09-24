@@ -14,6 +14,17 @@ let io: IntersectionObserver | undefined;
 
 const observe: RefCallback<Element> = (node) => {
   if (!node || !motionOk()) return;
+  // Already on the first screen: rise in now. (The observer's -8% bottom margin would
+  // hold a block starting in the screen's bottom band until the visitor scrolls.) Two
+  // frames, so the hidden state paints first and the rise still plays.
+  if (node.getBoundingClientRect().top < window.innerHeight) {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        (node as HTMLElement).dataset.shown = "";
+      }),
+    );
+    return;
+  }
   io ??= new IntersectionObserver(
     (entries) => {
       for (const e of entries) {

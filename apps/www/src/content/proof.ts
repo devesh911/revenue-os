@@ -1,4 +1,4 @@
-// The inspectable proof under the hero. Revenue OS has no measured customer
+// The pilot report, right after the Pilot section it reports on. Revenue OS has no measured customer
 // results yet, so this is an EXAMPLE of the pilot report — clearly labelled, with
 // illustrative figures — never presented as a customer result. Replace with a
 // real project, period, comparison and attributed quote once a pilot has run.
@@ -11,6 +11,7 @@ export interface ReportRow {
 }
 
 export const proof = {
+  kicker: "Pilot report",
   badge: "Illustrative example",
   title: "What your pilot report shows",
   intro:

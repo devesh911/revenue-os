@@ -4,9 +4,26 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-09-24 (apps/www: the demo-first copy, Cal.com booking and Plausible events, inside the #98 editorial design)
+Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 
 ## NOW (verified facts, not hopes)
+- **Landing page reads as one enquiry, in order; hero = board study A3 (apps/www, 2026-09-24, stacked on
+  the editorial-design PR):** from Devesh's picks on the hook-studies board and his follow-up ("A3 … as it
+  is, remove the older call card … make sure the user gets correct and systematic information as they
+  scroll"). Hero: architect's graph paper, a 2 BHK floor plan plotted once, and a small illustrative
+  result card (Rohan Mehta · called 2 min after import · captured facts · site visit booked); the old
+  looping call card is deleted. Page order: Hero → How it works ("Follow one enquiry, from import to
+  site visit", naming Rohan and the CSV lead import) → 01 · Before the call ("Your team answers once.
+  Every call knows." above the call brief that assembles itself — Priya Nair's reply about parking pops
+  up large with a soft Web Audio chime that unlocks on a real gesture, with a remembered Sound switch)
+  → 02 · Call now or follow up ("Every score shows its working." — the brief's Intent row opened up:
+  four signals +24 +22 +16 +16 = 78 / 100, one shared content module) → 03 · The call and after (the
+  dark engine panel, starting at the 7:14 PM call, no second numbering) → Examples ("What the buyer
+  hears, and what your team gets") → Pilot → the pilot report (moved from under the hero) → FAQ →
+  Closing. One clock (7:12 import, 7:13 Priya, 7:14 call, 7:16 WhatsApp), one follow-up plan, one
+  call-now rule (50 or more). Chapters 01–02 carry "Illustrative example" (intent scoring and
+  sales-team questions are planned). Gates: www 309/0 (incl. vite build), typecheck 0, lint 0, bun
+  audit clean; DB-backed suites are CI's.
 - **Marketing landing page: demo-first copy inside the editorial design (apps/www, 2026-09-24):** Devesh's
   12-point brief (2026-09-23) was first built as a restyle; he rejected the look ("so bad, keep the copy
   changes, but revert back to the previous design"), so the page is the #98 editorial design again —
@@ -289,6 +306,10 @@ Updated: 2026-09-24 (apps/www: the demo-first copy, Cal.com booking and Plausibl
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **apps/www How it works chapters 01–02 are illustrative (2026-09-24, Devesh chose the label):** the numeric intent
+  score and questions to the sales team aren't built yet, so the section carries "Illustrative
+  example" and the RETIRED "/100" pin is scoped: allowed only inside How it works (id "how"). Build either, then
+  lift the label.
 - **apps/www keeps the #98 editorial design (2026-09-24, Devesh):** the demo-first restyle (flat cards,
   sans section heads, no kickers or illustrations, player hero) was rejected on sight; copy and behaviour
   briefs land inside the editorial design, and restyles need an explicit, shown-first confirmation.
@@ -445,6 +466,7 @@ Updated: 2026-09-24 (apps/www: the demo-first copy, Cal.com booking and Plausibl
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) apps/www page told as one enquiry in order (How it works 01 brief → 02 score → 03 call), hero = board study A3 (call card removed), pilot report after Pilot — www 309/0 — 2026-09-24
 - (this PR) apps/www demo-first copy + Cal.com booking dialog + Plausible funnel events, inside the restored #98 editorial design (the demo-first restyle was rejected) — www 208/0, repo-wide 782/0 — 2026-09-24
 - #98 console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23
 - #98 bun audit gate unblocked: hono 4.12.34 → 4.13.8 (GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc, GHSA-crvj-82cr-hjcx) + root override nanoid 3.3.19 (GHSA-2v37-7h3g-55p8, via vite › postcss) — `bun audit` clean; full `bun test` 691/0 with CI's local-stack env, typecheck 0, lint 0, rls 0 offenders — 2026-09-23

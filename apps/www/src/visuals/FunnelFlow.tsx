@@ -4,9 +4,9 @@ import { cx } from "../lib/cx";
 import { useLiveSvg } from "../lib/motion";
 import { reveal } from "../lib/reveal";
 
-// The engine, drawn. Enquiries (paper dots) enter the three-step track; step 02,
-// where the call learns the buyer's budget, location and timeline, sorts each one
-// — clay leads run on through 03 to the site visit, olive leads drop into the
+// The engine, drawn. Enquiries (paper dots) enter the three-step track; the middle
+// step, where the call learns the buyer's budget, location and timeline, sorts each
+// one — clay leads run on through the last step to the site visit, olive leads drop into the
 // follow-up loop under the track and re-enter until they are ready (then they turn
 // clay and book). The viewBox is the content column at full width (1120px, which
 // it is exactly from xl up); from lg StageGrid sets the steps as three equal
@@ -157,11 +157,11 @@ export function FunnelFlow({ className }: { className?: string }) {
       </svg>
       {steps.map((s, i) => (
         <span
-          key={s.num}
+          key={s.tag}
           className="absolute grid size-[34px] -translate-1/2 place-items-center rounded-full border border-paper/20 bg-grain bg-ink font-mono text-[11px] text-paper/70"
           style={{ left: pct(node(i), W), top: pct(Y, H) }}
         >
-          {s.num}
+          <span className="size-[6px] rounded-full bg-paper/50" />
         </span>
       ))}
       <span className={cx(label, "left-0 text-paper/50")} style={aboveTrack}>

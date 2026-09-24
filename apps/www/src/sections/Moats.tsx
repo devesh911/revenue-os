@@ -12,8 +12,8 @@ import { MoatArt, type Variant } from "../visuals/MoatArt";
 
 // "Examples": a left-aligned head over three demonstration cards — an illustration
 // plate (MoatArt), a mono kicker ("Example 01"), serif title and one short
-// explanation, then the example itself on a small inset slip in the hero call
-// card's vocabulary (mono caps labels, serif names, paper-2 agent bubbles, ink buyer
+// explanation, then the example itself on a small inset slip in the page's product
+// vocabulary (mono caps labels, serif names, paper-2 agent bubbles, ink buyer
 // bubbles), revealed in a stagger. Three up on lg,
 // where the cards share three subgrid rows so every title and slip lines up; on md
 // the third card turns landscape across both columns (plate left, words right, its

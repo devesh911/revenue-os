@@ -7,6 +7,7 @@ import { useReveal } from "./lib/reveal";
 import { Faq } from "./sections/Faq";
 import { FooterCta } from "./sections/FooterCta";
 import { Hero } from "./sections/Hero";
+import { HowItWorks } from "./sections/HowItWorks";
 import { Moats } from "./sections/Moats";
 import { Nav } from "./sections/Nav";
 import { Pricing } from "./sections/Pricing";
@@ -47,10 +48,11 @@ export function App() {
         </header>
         <main id="main">
           <Hero />
-          <Proof />
+          <HowItWorks />
           <StageGrid />
           <Moats />
           <Pricing />
+          <Proof />
           <Faq />
           <FooterCta />
         </main>

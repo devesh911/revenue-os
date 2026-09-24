@@ -23,7 +23,7 @@ export const bookDemo = "Book a demo";
 
 export const menuLabels = { open: "Menu", close: "Close" } as const;
 
-// The page-wide switch under the hero's call card (WCAG 2.2.2).
+// The page-wide switch in the hero, under the sample-call note (WCAG 2.2.2).
 export const motionToggle = {
   pause: "Pause animations",
   play: "Play animations",
