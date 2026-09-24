@@ -20,9 +20,9 @@ import { resolve } from "node:path";
 
 const WWW_DIR = resolve(import.meta.dir, "..");
 const DIST_DIR = resolve(WWW_DIR, "dist");
-// Hero headline stem (nbsp-robust) — the one string that proves the component
+// The hero headline — the one string that proves the component
 // tree, not just an empty shell, made it into the bundle.
-const HERO = "The revenue operating system for Indian real";
+const HERO = "Turn property enquiries into qualified site visits.";
 
 describe("AC build gate — apps/www builds into a bundled component app", () => {
   test("vite build succeeds and emits a JS bundle carrying the hero copy", () => {

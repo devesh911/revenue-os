@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { brand, menuLabels, navCta, navLabel, navLinks } from "../content/site";
-import { CtaButton } from "../design/CtaButton";
+import { brand, menuLabels, navLabel, navLinks } from "../content/site";
+import { BookDemoButton } from "../lib/bookingContext";
 import { cx } from "../lib/cx";
 import { BrandMark } from "../visuals/BrandMark";
 import { CLOSE, Icon, MENU } from "../visuals/Icon";
 
-// The top bar: wordmark · section anchors · the primary CTA pill. App wraps it in
+// The top bar: wordmark · section anchors · the demo button. App wraps it in
 // the sticky <header>; once the page scrolls (or the menu opens) the bar turns
 // solid paper over a hairline — opaque, so no panel below ghosts through it.
 // Below md the anchors move into a disclosure menu: a 40px glyph button beside the
 // CTA (its glyph optically flush with the gutter, so all three fit one line at
 // 360px) drops a full-width panel under the bar — absolute, so the sticky header
-// never grows and nothing below shifts. It closes on any link (the bar's CTA
-// too), on a click outside the nav, on Escape (focus returns to the button), and
+// never grows and nothing below shifts. It closes on any link or button but its
+// own toggle (the demo button too, as the booking dialog opens over it), on a
+// click outside the nav, on Escape (focus returns to the button), and
 // when the viewport crosses md. Below 360px the
 // wordmark text steps back to the mark alone (still named for screen readers).
 const MD = "(min-width: 768px)";
@@ -43,7 +44,11 @@ export function Nav() {
     };
     const onClick = (e: MouseEvent) => {
       const t = e.target as Element;
-      if (t.closest("a") || !nav.current?.contains(t)) setOpen(false);
+      if (
+        !button.current?.contains(t) &&
+        (t.closest("a, button") || !nav.current?.contains(t))
+      )
+        setOpen(false);
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("click", onClick);
@@ -89,9 +94,7 @@ export function Nav() {
           ))}
         </ul>
         <div className="flex items-center gap-[4px]">
-          <CtaButton variant="accent" size="md" href="#cta">
-            {navCta}
-          </CtaButton>
+          <BookDemoButton source="nav" size="md" />
           <button
             ref={button}
             type="button"

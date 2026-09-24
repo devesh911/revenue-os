@@ -144,12 +144,6 @@
     transform: translateY(-4px);
   }
 }
-@keyframes ro-marquee {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 /* ── scroll reveal — mark an element with {...reveal(delayMs)} (lib/reveal.ts).
       Content is only hidden once lib/reveal.ts has set html[data-motion] (JS on,
       motion allowed), so a failed script or reduced motion never hides anything —
@@ -199,16 +193,6 @@ html[data-still] *::after,
 }
 
 /* ── decorative utilities ─────────────────────────────────────────────────── */
-/* fades a horizontally scrolling row out at both edges (logo marquee). */
-@utility mask-fade-x {
-  mask-image: linear-gradient(
-    90deg,
-    transparent,
-    #000 12%,
-    #000 88%,
-    transparent
-  );
-}
 /* a fine paper grain for the dark + clay panels (kept subtle: 4% alpha). */
 @utility bg-grain {
   background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%222%22 stitchTiles=%22stitch%22/%3E%3CfeColorMatrix values=%220 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0%22/%3E%3C/filter%3E%3Crect width=%22160%22 height=%22160%22 filter=%22url(%23n)%22/%3E%3C/svg%3E");

@@ -8,7 +8,7 @@ import { cx } from "../lib/cx";
 // ink, as the global ring vanishes on clay).
 // `className` tunes the INNER column (layout, extra padding); `flush` drops the
 // default vertical padding so a band can set its own without fighting it. Pass
-// `id` for the in-page anchors (#how, #moats, #pricing, #faq, #cta); html's
+// `id` for the in-page anchors (#how, #examples, #pilot, #faq, #cta); html's
 // scroll-padding clears the sticky nav.
 type SectionTone = "plain" | "wash" | "ink" | "clay";
 

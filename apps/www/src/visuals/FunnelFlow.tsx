@@ -1,28 +1,32 @@
 import { useRef } from "react";
-import { flowLabels, stages } from "../content/stages";
+import { workflow } from "../content/workflow";
 import { cx } from "../lib/cx";
 import { useLiveSvg } from "../lib/motion";
 import { reveal } from "../lib/reveal";
 
-// The engine, drawn. Leads (paper dots) enter the four-stage track; stage 02
-// scores each one — clay leads run on through 03 and 04 to the human closer,
-// olive leads drop into the nurture loop under the track and re-enter until
-// intent changes (then they turn clay and convert). The viewBox is the content
-// column at full width (1120px, which it is exactly from xl up); there StageGrid
-// sets the stages as four equal columns on 56px gutters, and each node sits over
-// its stage column's centre. Below xl the stages wrap 2×2 and the diagram stands
-// apart as its own figure — the sequence, not a column header. Lines + dots live
-// in a uniformly scaled viewBox; rings and labels are HTML placed by percentage so
-// they stay crisp at every width. SMIL motion sits in [data-motion-only] and holds
-// still off screen; reduced motion or the page-wide pause swaps it for three
-// static dots at rest. Decorative beside the stage copy, so aria-hidden.
+// The engine, drawn. Enquiries (paper dots) enter the three-step track; step 02,
+// where the call learns the buyer's budget, location and timeline, sorts each one
+// — clay leads run on through 03 to the site visit, olive leads drop into the
+// follow-up loop under the track and re-enter until they are ready (then they turn
+// clay and book). The viewBox is the content column at full width (1120px, which
+// it is exactly from xl up); from lg StageGrid sets the steps as three equal
+// columns on 56px gutters, and each node sits over its step column's centre (to
+// within a few px at lg, where the whole figure scales down). At md the steps wrap
+// 2 + 1 and the diagram stands apart as its own figure — the sequence, not a
+// column header. Lines + dots live in a uniformly scaled viewBox; rings and labels
+// are HTML placed by percentage so they stay crisp at every width. SMIL motion
+// sits in [data-motion-only] and holds still off screen; reduced motion or the
+// page-wide pause swaps it for three static dots at rest. Decorative beside the
+// step copy, so aria-hidden.
+const { steps, flow } = workflow;
+const LAST = steps.length - 1;
 const W = 1120; // viewBox width = the content column at full width
 const GUTTER = 56; // StageGrid's column gutter (gap-x-[56px])
-const COL = (W - 3 * GUTTER) / 4; // one stage column at xl: 238
+const COL = (W - LAST * GUTTER) / steps.length; // one step column at xl: 336
 const node = (i: number) => COL / 2 + i * (COL + GUTTER);
 const H = 196;
 const Y = 64; // the track
-const R = 44; // nurture-loop turn radius
+const R = 44; // follow-up loop turn radius
 const Y2 = Y + 2 * R; // the loop's return lane
 const LX = node(0) - 50; // loop turn centres: just before 01 …
 const RX = node(1) + 50; // … and just past 02
@@ -31,12 +35,12 @@ const LOOP = `A${R} ${R} 0 0 1 ${RX} ${Y2} H${LX} A${R} ${R} 0 0 1 ${LX} ${Y}`;
 const HIGH = `M0 ${Y} H${W}`;
 const LOW = `M0 ${Y} H${RX} ${LOOP} H${W}`;
 const LOW_LEN = W + 2 * (RX - LX) + 2 * Math.PI * R;
-const REJOIN = LOW_LEN - (W - node(1)); // a nurtured lead's second pass through 02
+const REJOIN = LOW_LEN - (W - node(1)); // a followed-up lead's second pass through 02
 const SPAN = LOW_LEN + 60; // one period, in track units (a beat of rest per lap)
 const SPEED = 140; // track units per second: a high-intent lead crosses in 8s
 const f = (d: number) => (d / SPAN).toFixed(4); // track distance → period fraction
 
-// Seven leads, evenly phased through the period (every other one nurtured).
+// Seven leads, evenly phased through the period (every other one followed up).
 // Negative begins, so the flow is already running on first paint.
 const LEADS = Array.from({ length: 7 }, (_, i) => ({
   low: i % 2 === 1,
@@ -118,7 +122,7 @@ export function FunnelFlow({ className }: { className?: string }) {
           vectorEffect="non-scaling-stroke"
         />
         <path
-          d={`M${node(3)} ${Y} H${W} m-7 -5 l7 5 l-7 5`}
+          d={`M${node(LAST)} ${Y} H${W} m-7 -5 l7 5 l-7 5`}
           className="stroke-clay"
           vectorEffect="non-scaling-stroke"
         />
@@ -139,7 +143,7 @@ export function FunnelFlow({ className }: { className?: string }) {
             className="fill-olive"
           />
           <circle
-            cx={(node(2) + node(3)) / 2}
+            cx={(node(1) + node(2)) / 2}
             cy={Y}
             r={4.5}
             className="fill-clay"
@@ -151,7 +155,7 @@ export function FunnelFlow({ className }: { className?: string }) {
           ))}
         </g>
       </svg>
-      {stages.map((s, i) => (
+      {steps.map((s, i) => (
         <span
           key={s.num}
           className="absolute grid size-[34px] -translate-1/2 place-items-center rounded-full border border-paper/20 bg-grain bg-ink font-mono text-[11px] text-paper/70"
@@ -161,10 +165,10 @@ export function FunnelFlow({ className }: { className?: string }) {
         </span>
       ))}
       <span className={cx(label, "left-0 text-paper/50")} style={aboveTrack}>
-        {flowLabels.entry}
+        {flow.entry}
       </span>
       <span className={cx(label, "right-0 text-clay")} style={aboveTrack}>
-        {flowLabels.exit}
+        {flow.exit}
       </span>
       <span
         className={cx(label, "-translate-x-1/2 text-olive-lift")}
@@ -173,8 +177,8 @@ export function FunnelFlow({ className }: { className?: string }) {
           top: `calc(${pct(Y2, H)} + 26px)`,
         }}
       >
-        <span className="font-sans text-[11.5px]">{flowLabels.loopArrow}</span>{" "}
-        {flowLabels.loop}
+        <span className="font-sans text-[11.5px]">{flow.loopArrow}</span>{" "}
+        {flow.loop}
       </span>
     </div>
   );

@@ -5,9 +5,9 @@ import { cx } from "../lib/cx";
 import { useStill } from "../lib/motion";
 import { CHECK, Icon, RECALL } from "./Icon";
 
-// The hero's show-don't-tell demo: an AI agent rings a fresh portal lead, talks
-// Hinglish, captures the qualifying fields, scores intent and routes the lead —
-// alternating a booked site visit (high intent) with a nurture loop (low). One
+// The hero's show-don't-tell demo: an AI agent rings a freshly imported enquiry,
+// talks Hinglish, captures the qualifying fields, gauges readiness and routes the
+// lead — alternating a booked site visit (ready) with follow-ups (not yet). One
 // integer `tick` (250ms beats) drives it all: each call's beats are planned once
 // below and every row is derived from them. Both calls stay stacked in one grid
 // cell, so the card keeps the taller one's height and never shifts; pending
@@ -15,7 +15,8 @@ import { CHECK, Icon, RECALL } from "./Icon";
 // reduced motion and browsers without IntersectionObserver get the first call's
 // finished frame; the loop runs only while the card is in view, the tab is
 // visible and the page-wide pause switch is off. The card speaks as one labelled
-// image, so each call's own markup is hidden from assistive tech.
+// image, so each call's own markup is hidden from assistive tech. On phones the
+// "Called … after import" chip takes its own row under the source line.
 
 const TICK = 250;
 const LEAD_IN = 1; // first play only: the ring holds while the card rises in
@@ -30,6 +31,8 @@ const FADE = 2;
 const IN_VIEW = 0.4;
 const FILLS_VIEW = 0.6;
 const THRESHOLDS = Array.from({ length: 9 }, (_, i) => (i * IN_VIEW) / 8);
+const mmss = (s: number) =>
+  [s / 60, s % 60].map((n) => String(Math.floor(n)).padStart(2, "0")).join(":");
 
 function plan(call: CallScenario, start: number) {
   const connect = start + RING;
@@ -42,8 +45,8 @@ function plan(call: CallScenario, start: number) {
   });
   const hangup = t;
   const captured = call.captured.map((label, i) => ({ label, at: t + 1 + i }));
-  const crm = t + captured.length + 2;
-  const meter = crm + 2;
+  const summary = t + captured.length + 2;
+  const meter = summary + 2;
   const outcome = meter + Math.ceil(FILL_MS / TICK);
   const fade = outcome + HOLD;
   return {
@@ -53,7 +56,7 @@ function plan(call: CallScenario, start: number) {
     lines,
     hangup,
     captured,
-    crm,
+    summary,
     meter,
     outcome,
     fade,
@@ -213,7 +216,7 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
           )}
           {callLabels.status[state]}
           {state === "ended" && (
-            <span className="text-stone">{call.duration}</span>
+            <span className="text-stone">{mmss(call.seconds)}</span>
           )}
         </MonoLabel>
       </div>
@@ -221,22 +224,22 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-[12px] gap-y-[2px] border-line border-b pb-[12px] sm:pb-[16px]">
         <span
           className={cx(
-            "row-span-2 grid size-[40px] place-items-center rounded-full font-serif text-[18px] text-ink",
+            "row-span-2 grid size-[40px] place-items-center rounded-full font-serif text-[18px] text-ink max-sm:row-span-3",
             tone.avatar,
           )}
         >
           {call.lead.charAt(0)}
         </span>
-        <span className="font-serif text-[18px] text-ink leading-[1.3] tracking-[-0.01em]">
+        <span className="font-serif text-[18px] text-ink leading-[1.3] tracking-[-0.01em] max-sm:col-span-2">
           {call.lead}
         </span>
         <MonoLabel
           className={cx(
-            "rounded-full bg-clay/10 px-[8px] py-[3px] text-[11px] text-clay-deep",
+            "whitespace-nowrap rounded-full bg-clay/10 px-[8px] py-[3px] text-[11px] text-clay-deep max-sm:col-start-2 max-sm:row-start-3 max-sm:mt-[4px] max-sm:justify-self-start",
             show(t >= p.connect),
           )}
         >
-          {callLabels.calledIn} {call.calledIn}
+          {callLabels.called} {call.calledAfter}
         </MonoLabel>
         <MonoLabel className="col-span-2 truncate text-[11px] text-stone">
           {call.source}
@@ -310,9 +313,9 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
             {callLabels.captured}
           </MonoLabel>
           <MonoLabel
-            className={cx("text-[11px] text-olive-deep", show(t >= p.crm))}
+            className={cx("text-[11px] text-olive-deep", show(t >= p.summary))}
           >
-            {callLabels.crm}
+            {callLabels.summary}
           </MonoLabel>
         </div>
         <div className="flex flex-wrap gap-[6px] sm:gap-[8px]">
@@ -338,7 +341,7 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
         </div>
         <div className="flex items-center gap-[12px]">
           <MonoLabel className={cx(CAPS, "text-stone")}>
-            {callLabels.intent}
+            {callLabels.readiness}
           </MonoLabel>
           <span className="h-[4px] flex-1 overflow-hidden rounded-full bg-ink/[0.08]">
             <span
@@ -353,7 +356,7 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
             />
           </span>
           <MonoLabel className={cx("text-[11px]", tone.text, show(filled))}>
-            {call.score}/100 · {call.verdict}
+            {call.verdict}
           </MonoLabel>
         </div>
       </div>
@@ -379,7 +382,7 @@ function Call({ p, t, shown }: { p: Plan; t: number; shown: boolean }) {
             <p className="font-serif text-[18px] text-ink leading-[1.3] tracking-[-0.01em]">
               {call.outcome.title}
             </p>
-            <p className="mt-[2px] text-[12.5px] text-stone leading-[1.45]">
+            <p className="mt-[2px] text-pretty text-[12.5px] text-stone leading-[1.45]">
               {call.outcome.detail}
             </p>
           </div>

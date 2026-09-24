@@ -1,19 +1,31 @@
 import { useId, useState } from "react";
 import { defaultOpenFaq, faqCopy, faqs } from "../content/faqs";
-import { CtaButton } from "../design/CtaButton";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
 import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
+import { BookDemoButton } from "../lib/bookingContext";
 import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
 
-// FAQ — a sticky side head beside an accordion whose items open and close
-// independently (default = item 0 alone, the SSR pin), so opening one never collapses
-// another and slides the tapped question away. Each item's outer element carries
+// FAQ — a sticky side head ("ask us on the demo", with a quiet Book a demo) beside an accordion whose items open and close independently
+// (default = item 0 alone, the SSR pin), so opening one never collapses another
+// and slides the tapped question away. Each item's outer element carries
 // the data-faq / data-open hooks. Answers are always rendered so their height can
 // ease open (grid-rows 0fr → 1fr); closed panels are `inert`, so keyboard and
 // assistive tech skip them. The plus folds into a minus as its vertical bar turns.
+// A hyphenated word ("do-not-call") stays whole when a question wraps.
+const unbroken = (text: string) =>
+  text.split(/(\S+-\S+)/).map((part, i) =>
+    i % 2 ? (
+      <span key={part} className="whitespace-nowrap">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+
 export function Faq() {
   const [open, setOpen] = useState(() => new Set([defaultOpenFaq]));
   const toggle = (i: number) =>
@@ -32,15 +44,13 @@ export function Faq() {
         <Kicker>{faqCopy.kicker}</Kicker>
         <Heading className="mt-[20px]">{faqCopy.title}</Heading>
         <Text className="mt-[20px] max-w-[40ch]">{faqCopy.sub}</Text>
-        <CtaButton
+        <BookDemoButton
+          source="faq"
           variant="ghost"
           size="md"
           arrow
-          href="#cta"
           className="mt-[28px]"
-        >
-          {faqCopy.cta}
-        </CtaButton>
+        />
       </div>
       <div {...reveal(120)}>
         {faqs.map((faq, i) => {
@@ -61,7 +71,7 @@ export function Faq() {
                   onClick={() => toggle(i)}
                   className="flex w-full cursor-pointer items-center justify-between gap-[24px] py-[26px] text-left text-[20px] text-ink leading-[1.35] tracking-[-0.01em] transition-colors duration-200 hover:text-clay-deep md:text-[22px]"
                 >
-                  {faq.q}
+                  <span>{unbroken(faq.q)}</span>
                   <svg
                     viewBox="0 0 14 14"
                     aria-hidden="true"

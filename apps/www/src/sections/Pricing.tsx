@@ -1,154 +1,168 @@
-import { useState } from "react";
-import { flushSync } from "react-dom";
-import {
-  choosePlanLabel,
-  defaultPlanId,
-  plans,
-  pricingCopy,
-} from "../content/plans";
-import { CtaButton } from "../design/CtaButton";
+import { useId, useState } from "react";
+import { pilot } from "../content/pilot";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
+import { MonoLabel } from "../design/MonoLabel";
 import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
+import { BookDemoButton } from "../lib/bookingContext";
 import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
-import { CHECK, Icon, INFO } from "../visuals/Icon";
+import { BAR, CHECK, CHEVRON, Icon } from "../visuals/Icon";
 
-// Pricing — a centred head over three plan cards on the wash panel. Exactly one plan
-// is selected (default = funnel, the SSR pin): it takes the ink border and the
-// page's soft lift, fills its radio with clay and offers its own CTA. The others
-// offer "Choose plan", whose hit area stretches over the whole card (the radio reads
-// as clickable, so the card is). The outer <li> carries the data-plan /
-// data-selected hooks. Choosing a plan swaps that button for a link, so focus is
-// handed to the new CTA instead of dropping to <body>. On lg the cards share five
-// subgrid rows, so a blurb that wraps pushes every price and hairline down together.
-// In forced-colours mode (where borders and fills go system-colour) the selected
-// card keeps a heavier border and its radio dot a system-colour fill.
-const SUBGRID = "lg:row-span-5 lg:grid lg:grid-rows-subgrid";
-// The swapped-in CTA fades in — except under the page-wide pause, where a frozen
-// first keyframe would leave it (and the focus handed to it) invisible.
-const ENTER =
-  "animate-[ro-fade_400ms_var(--ease-soft)] [html[data-still]_&]:animate-none";
+// The pilot, on the wash panel: a centred head, then the four facts as paper
+// cards (2 × 2) beside how fees work — in words, no rates — on the card that
+// carries the page's decision look (ink border, the soft lift) and the one "Book a
+// demo" (source "pilot"). From lg the facts take two columns and the fees card the
+// third, its button pinned to the foot. The plan comparison stays secondary: a
+// ghost-pill "Compare plans" toggle (the FAQ's disclosure — the panel eases open
+// on grid rows and is `inert` while closed) over three plan cards in the plan-card
+// look, with no figures, no selection and no per-plan button. A check marks only
+// what exists today; roadmap items sit under "Planned", quieter and unchecked. On
+// lg the plan cards share four subgrid rows, so each hairline lines up.
+const CARD = "rounded-[24px] border bg-paper p-[28px]";
+const SUBGRID = "lg:row-span-4 lg:grid lg:grid-rows-subgrid";
+const ITEM = "flex items-start gap-[12px] text-[15px] leading-[1.5]";
 
 export function Pricing() {
-  const [selected, setSelected] = useState(defaultPlanId);
+  const { facts, fees, compare } = pilot;
+  const [open, setOpen] = useState(false);
+  const id = useId();
   return (
-    <SectionFrame id="pricing" tone="wash">
+    <SectionFrame id="pilot" tone="wash">
       <div {...reveal()} className="mx-auto max-w-[720px] text-center">
-        <Kicker className="justify-center">{pricingCopy.kicker}</Kicker>
-        <Heading className="mt-[20px]">{pricingCopy.title}</Heading>
+        <Kicker className="justify-center">{pilot.kicker}</Kicker>
+        <Heading className="mt-[20px]">{pilot.title}</Heading>
         <Text size="lede" className="mx-auto mt-[20px] max-w-[54ch]">
-          {pricingCopy.sub}
+          {pilot.intro}
         </Text>
       </div>
-      <ul className="mx-auto mt-[56px] grid max-w-[520px] gap-[20px] md:mt-[72px] lg:max-w-none lg:grid-cols-3 lg:gap-y-0">
-        {plans.map((plan, i) => {
-          const isSelected = plan.id === selected;
-          return (
+
+      <div className="mt-[56px] grid gap-[20px] md:mt-[72px] lg:grid-cols-3 lg:gap-[24px]">
+        <ul className="grid gap-[20px] md:grid-cols-2 lg:col-span-2 lg:gap-[24px]">
+          {facts.map((fact, i) => (
             <li
-              key={plan.id}
-              data-plan={plan.id}
-              data-selected={isSelected ? "true" : "false"}
+              key={fact.title}
               {...reveal(100 + i * 90)}
-              className={cx("flex", SUBGRID)}
+              className={cx(CARD, "border-line")}
             >
-              <article
-                className={cx(
-                  "relative flex flex-1 flex-col rounded-[24px] border bg-paper p-[28px] transition-[border-color,box-shadow] duration-300 ease-[var(--ease-soft)]",
-                  SUBGRID,
-                  isSelected
-                    ? "border-ink shadow-lift forced-colors:border-[3px]"
-                    : "border-line hover:border-ink/25",
-                )}
-              >
-                <div className="flex items-center justify-between gap-[16px]">
-                  <Heading as="h3">{plan.name}</Heading>
-                  <span
-                    aria-hidden="true"
+              <Heading as="h3">{fact.title}</Heading>
+              <Text className="mt-[12px]">{fact.body}</Text>
+            </li>
+          ))}
+        </ul>
+        <article
+          {...reveal(100 + facts.length * 90)}
+          className={cx(
+            CARD,
+            "flex flex-col border-ink shadow-lift forced-colors:border-[3px] md:flex-row md:items-end md:gap-[40px] lg:flex-col lg:items-stretch lg:gap-0",
+          )}
+        >
+          <div className="md:flex-1">
+            <Heading as="h3">{fees.title}</Heading>
+            <Text size="lede" className="mt-[16px]">
+              {fees.body}
+            </Text>
+          </div>
+          <div className="mt-auto pt-[36px] md:pt-0 lg:pt-[36px]">
+            <BookDemoButton
+              source="pilot"
+              size="lg"
+              arrow
+              className="w-full md:w-auto lg:w-full"
+            />
+          </div>
+        </article>
+      </div>
+
+      <div {...reveal(120)} className="mt-[48px] md:mt-[64px]">
+        <div className="flex justify-center">
+          <button
+            type="button"
+            id={`${id}b`}
+            aria-expanded={open}
+            aria-controls={`${id}p`}
+            onClick={() => setOpen((o) => !o)}
+            className="inline-flex h-[42px] cursor-pointer items-center gap-[8px] rounded-full border border-ink/15 px-[18px] font-medium text-[14.5px] text-ink transition-[background-color,border-color] duration-200 hover:border-ink/40 hover:bg-ink/[0.03]"
+          >
+            {compare.summary}
+            <Icon
+              d={CHEVRON}
+              className={cx(
+                "size-[16px] transition-transform duration-300 ease-[var(--ease-soft)]",
+                open && "rotate-180",
+              )}
+            />
+          </button>
+        </div>
+        <section
+          id={`${id}p`}
+          aria-labelledby={`${id}b`}
+          inert={!open}
+          className={cx(
+            "grid transition-[grid-template-rows,opacity] duration-[400ms] ease-[var(--ease-soft)]",
+            open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          )}
+        >
+          <div className="overflow-hidden">
+            <ul className="mx-auto grid max-w-[520px] gap-[20px] pt-[32px] lg:max-w-none lg:grid-cols-3 lg:gap-x-[24px] lg:gap-y-0">
+              {compare.plans.map((plan, i) => (
+                <li key={plan.name} className={cx("flex", SUBGRID)}>
+                  <article
                     className={cx(
-                      "grid size-[20px] shrink-0 place-items-center rounded-full border-[1.5px] transition-colors duration-300 ease-[var(--ease-soft)]",
-                      isSelected ? "border-ink" : "border-ink/20",
+                      CARD,
+                      "flex flex-1 flex-col border-line",
+                      SUBGRID,
                     )}
                   >
-                    <span
-                      className={cx(
-                        "size-[8px] rounded-full bg-clay transition-transform duration-300 ease-[var(--ease-soft)] forced-colors:bg-[CanvasText]",
-                        isSelected ? "scale-100" : "scale-0",
+                    <Heading as="h3">{plan.name}</Heading>
+                    <Text size="small" tone="muted" className="mt-[6px]">
+                      {plan.price}
+                    </Text>
+                    <ul className="mt-[28px] flex flex-col gap-[12px] border-line border-t pt-[24px]">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className={cx(ITEM, "text-ink-2")}>
+                          <Icon
+                            d={CHECK}
+                            className="mt-[3px] size-[16px] shrink-0 text-olive-deep"
+                          />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    <div>
+                      {plan.planned.length > 0 && (
+                        <>
+                          <MonoLabel
+                            id={`${id}n${i}`}
+                            className="mt-[28px] block text-[11px] text-stone uppercase tracking-[0.1em]"
+                          >
+                            {compare.plannedLabel}
+                          </MonoLabel>
+                          <ul
+                            aria-labelledby={`${id}n${i}`}
+                            className="mt-[14px] flex flex-col gap-[10px]"
+                          >
+                            {plan.planned.map((item) => (
+                              <li key={item} className={cx(ITEM, "text-stone")}>
+                                <Icon
+                                  d={BAR}
+                                  className="mt-[3px] size-[16px] shrink-0 text-mute"
+                                />
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
                       )}
-                    />
-                  </span>
-                  {isSelected ? (
-                    <span className="sr-only">{pricingCopy.selectedHint}</span>
-                  ) : null}
-                </div>
-                <Text size="small" tone="muted" className="mt-[6px]">
-                  {plan.blurb}
-                </Text>
-                <p className="mt-[28px] flex items-baseline gap-[8px]">
-                  <span className="font-serif text-[48px] leading-none tracking-[-0.03em]">
-                    {plan.price}
-                  </span>
-                  {plan.priceSub ? (
-                    <span className="text-[15px] text-stone">
-                      {plan.priceSub}
-                    </span>
-                  ) : null}
-                </p>
-                <ul className="mt-[28px] flex flex-col gap-[12px] border-line border-t pt-[24px]">
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="flex items-start gap-[12px] text-[15px] text-ink-2 leading-[1.5]"
-                    >
-                      <Icon
-                        d={CHECK}
-                        className="mt-[3px] size-[16px] shrink-0 text-olive-deep"
-                      />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-[36px]">
-                  {isSelected ? (
-                    <CtaButton
-                      variant="accent"
-                      arrow
-                      href="#cta"
-                      className={cx("w-full", ENTER)}
-                    >
-                      {plan.cta}
-                    </CtaButton>
-                  ) : (
-                    <CtaButton
-                      variant="ghost"
-                      className={cx(
-                        "w-full after:absolute after:inset-0 after:rounded-[24px]",
-                        ENTER,
-                      )}
-                      onClick={(e) => {
-                        const card = e.currentTarget.closest("article");
-                        flushSync(() => setSelected(plan.id));
-                        card?.querySelector("a")?.focus();
-                      }}
-                    >
-                      {choosePlanLabel}
-                      <span className="sr-only"> {plan.name}</span>
-                    </CtaButton>
-                  )}
-                </div>
-              </article>
-            </li>
-          );
-        })}
-      </ul>
-      <Text size="small" tone="muted" className="mt-[40px] text-center">
-        <Icon
-          d={INFO}
-          className="mr-[8px] inline-block size-[15px] align-[-3px]"
-        />
-        {pricingCopy.footnote}
-      </Text>
+                    </div>
+                  </article>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      </div>
     </SectionFrame>
   );
 }

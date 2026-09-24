@@ -8,6 +8,8 @@ export const PAUSE = "M5.5 3.5v9M10.5 3.5v9";
 export const PLAY = "M5 3.5v9l7.5-4.5Z";
 export const MENU = "M2.5 5.5h11M2.5 10.5h11";
 export const CLOSE = "M4 4l8 8M12 4l-8 8";
+export const CHEVRON = "M4 6l4 4 4-4";
+export const BAR = "M3 8h10";
 
 export function Icon({ d, className }: { d: string; className?: string }) {
   return (
