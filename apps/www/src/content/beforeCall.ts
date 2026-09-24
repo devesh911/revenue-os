@@ -1,16 +1,33 @@
-// "Before the call" — what Revenue OS does between an imported enquiry and the first
-// ring: it scores the buyer's intent from the enquiry's signals, then builds the call
-// brief, putting a question the brochure can't answer to the sales team. Both visuals
-// (IntentEvidence, CallBrief) read the SAME signals below, so their sums always
-// agree. ILLUSTRATIVE: intent scoring and questions to the sales team are planned
-// (pilot.ts lists intent scoring as planned), so the section carries the label on its
-// face. BeforeCall.tsx composes the head; the visuals compose the rest.
+// How it works, told as one enquiry in order — the page's middle. The intro, then
+// chapter 01 (before the call: the brief assembles, with the question the brochure
+// can't answer put to the sales team — CallBrief) and chapter 02 (who to call first:
+// the intent score, worked out from four signals — IntentEvidence). Chapter 03, the
+// call and after, is the engine panel (workflow.ts). Both visuals read the SAME
+// signals below, so their sums always agree. ILLUSTRATIVE: intent scoring and
+// questions to the sales team are planned (pilot.ts lists intent scoring as
+// planned), so chapters 01 and 02 carry the label on their face. HowItWorks.tsx
+// composes the heads; the visuals compose the rest.
 
-export const beforeCall = {
-  kicker: "Before the call",
-  title: "Your team answers once. Every call knows.",
-  sub: "When a buyer asks something the brochure doesn't cover, Revenue OS asks your sales team, saves the answer to the project, and every call after that gets it right.",
+export const howItWorks = {
+  kicker: "How it works",
+  title: "Follow one enquiry, from import to site visit.",
+  sub: "One evening, one buyer: what Revenue\u00a0OS does before it calls, how it decides who to call first, and what happens on the call and after.",
   illustrative: "Illustrative example",
+} as const;
+
+export const chapters = {
+  context: {
+    step: "01",
+    kicker: "Before the call",
+    title: "Your team answers once. Every call knows.",
+    sub: "When a buyer asks something the brochure doesn't cover, Revenue\u00a0OS asks your sales team, saves the answer to the project, and every call after that gets it right.",
+  },
+  intent: {
+    step: "02",
+    kicker: "Who to call first",
+    title: "Every score shows its working.",
+    sub: "Four signals from Rohan's enquiries add up to 78 out of 100. At 50 or more the agent calls tonight; below that, the buyer gets a follow-up plan.",
+  },
 } as const;
 
 export interface IntentSignal {

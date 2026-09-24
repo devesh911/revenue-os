@@ -4,10 +4,10 @@ import { DotList } from "./design/DotList";
 import { MonoLabel } from "./design/MonoLabel";
 import { BookingProvider } from "./lib/bookingContext";
 import { useReveal } from "./lib/reveal";
-import { BeforeCall } from "./sections/BeforeCall";
 import { Faq } from "./sections/Faq";
 import { FooterCta } from "./sections/FooterCta";
 import { Hero } from "./sections/Hero";
+import { HowItWorks } from "./sections/HowItWorks";
 import { Moats } from "./sections/Moats";
 import { Nav } from "./sections/Nav";
 import { Pricing } from "./sections/Pricing";
@@ -49,8 +49,8 @@ export function App() {
         <main id="main">
           <Hero />
           <Proof />
+          <HowItWorks />
           <StageGrid />
-          <BeforeCall />
           <Moats />
           <Pricing />
           <Faq />

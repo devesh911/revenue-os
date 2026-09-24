@@ -77,14 +77,14 @@ const EXAMPLES: ReactNode[] = [
 
 export function StageGrid() {
   return (
-    <SectionFrame id="how" tone="ink">
+    <SectionFrame id="the-call" tone="ink">
       <div
         {...reveal()}
         className="grid gap-[24px] lg:grid-cols-2 lg:items-end lg:gap-0"
       >
         <div>
           <Kicker tone="inverse" className="mb-[24px]">
-            {workflow.kicker}
+            {workflow.step} · {workflow.kicker}
           </Kicker>
           <Heading>{workflow.title}</Heading>
         </div>
