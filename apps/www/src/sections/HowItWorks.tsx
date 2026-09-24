@@ -10,8 +10,8 @@ import { CallBrief } from "../visuals/CallBrief";
 import { IntentEvidence } from "../visuals/IntentEvidence";
 
 // How it works, in the order one enquiry lives it: the intro, then chapter 01 —
-// before the call, the brief assembles (CallBrief) — and chapter 02 — who to call
-// first, the score worked out (IntentEvidence). Each chapter's message sits directly
+// before the call, the brief assembles (CallBrief) — and chapter 02 — call now or
+// follow up, the brief's Intent row opened up (IntentEvidence). Each chapter's message sits directly
 // above the visual that shows it. Chapter 03, the call and after, is the dark engine
 // panel that follows (StageGrid). Chapters 01 and 02 carry "Illustrative example":
 // intent scoring and questions to the sales team are planned.

@@ -18,7 +18,7 @@ const SIZES: Record<HeadingSize, string> = {
 
 type HeadingProps = ComponentProps<"h2"> & {
   level?: 1 | 2;
-  as?: "h3";
+  as?: "h3" | "h4";
   size?: HeadingSize;
   balance?: boolean;
 };

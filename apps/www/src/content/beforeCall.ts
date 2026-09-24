@@ -11,7 +11,7 @@
 export const howItWorks = {
   kicker: "How it works",
   title: "Follow one enquiry, from import to site visit.",
-  sub: "One evening, one buyer: what Revenue\u00a0OS does before it calls, how it decides to call now or follow up, and what happens on the call and after.",
+  sub: "One evening, one buyer: Rohan Mehta's enquiry arrives in your lead import (a CSV from your portal or CRM) at 7:12\u00a0PM. Here is what Revenue\u00a0OS does before it calls him, how it decides to call now or follow up, and what happens on the call and after.",
   illustrative: "Illustrative example",
 } as const;
 

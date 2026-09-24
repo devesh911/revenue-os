@@ -1,20 +1,22 @@
 // Copy + first-paint spec for the landing page, asserted on the SSR render of
 // <App/> — exactly what a visitor sees before any script runs or any animation
 // plays. Pins: the buyer-outcome copy, one "Book a demo" action, the hero's
-// listen button and its honesty note, the hero as study A3 (one finished call's
-// result card, one labelled image, on the drawing sheet with the floor plan drawn;
-// the old looping call card gone), the page told in order — hero, proof, How it
-// works (its intro, then "01 · Before the call" over the call brief and "02 · Who
-// to call first" over the intent evidence, each heading directly above its own
-// visual), "03 · The call and after" (the engine panel), examples, pilot, FAQ,
-// closing — both studies' final frame (the running total the score builds through,
-// Priya's reply docked in the finished brief, the sound switch), Rohan's one
-// evening (import, Priya's answer, call, WhatsApp confirmation, visit) told the
-// same in every section, the honest labelling of the proof and the plans, a score
-// out of 100 only in the two chapters labelled illustrative, the retired copy
-// staying retired, and the default UI state and accessible shape (pause switch,
-// FAQ, phone menu). Machine tests pin copy + state, never pixels — visual parity
-// needs a human eye.
+// listen button and its honesty note, the hero as study A3 (a plain mono eyebrow;
+// one finished call's result card, one labelled image with no clock time on its
+// face, on the drawing sheet with the floor plan drawn; the old looping call card
+// gone), the page told in order — hero, How it works (its intro, then "01 · Before
+// the call" over the call brief and "02 · Call now or follow up" over the intent
+// evidence, each heading directly above its own visual), "03 · The call and after"
+// (the engine panel, opening on the call at 7:14 PM, with no second set of step
+// numbers), examples, pilot, the pilot report, FAQ, closing — both studies' final
+// frame (the running total the score builds through, Priya's reply docked in the
+// finished brief, the sound switch), one call-now rule and one follow-up plan,
+// Rohan's one evening (import 7:12, Priya's answer 7:13, the call 7:14, WhatsApp
+// 7:16, the visit) told the same in every section, the honest labelling of the
+// pilot report and the plans, a score out of 100 only inside How it works, the
+// retired copy staying retired, and the default UI state and accessible shape
+// (pause switch, FAQ, phone menu). Machine tests pin copy + state, never pixels —
+// visual parity needs a human eye.
 //
 // App + react-dom/server load via try/catch so a broken tree fails as assertions,
 // never as an opaque import crash. App is imported directly (not main.tsx), so it
@@ -113,16 +115,20 @@ const card = () => around(figure(), "div", 'role="img"');
 const how = () => sectionAround(markup, ' id="how"');
 const chapter = (kicker: string) => sectionAround(how(), `>${kicker}<`);
 const context = () => chapter("01 · Before the call");
-const intent = () => chapter("02 · Who to call first");
+const intent = () => chapter("02 · Call now or follow up");
 // Chapter 01's visual, the call brief (it opens on its screen-reader summary)…
 const brief = () => around(context(), "div", '<p class="sr-only">');
 // …and chapter 02's, the intent evidence (one labelled image).
 const study = () => around(intent(), "div", 'role="img"');
 // Chapter 03, the call and after: the dark engine panel.
 const engine = () => sectionAround(markup, ' id="the-call"');
-// The pilot section, up to the FAQ that follows it.
-const pilotSection = () =>
-  markup.slice(markup.indexOf('id="pilot"'), markup.indexOf('id="faq"'));
+const examplesSection = () => sectionAround(markup, ' id="examples"');
+// The pilot section (its plans included), and the pilot report after it.
+const pilotSection = () => sectionAround(markup, ' id="pilot"');
+const report = () => sectionAround(markup, 'aria-labelledby="proof-title"');
+// A clock reading on the page: "7:14 PM", "7:13:40 PM", "11:00 AM".
+const CLOCK = /\b\d{1,2}:\d{2}(?::\d{2})?\s[AP]M\b/g;
+const clocks = (s: string) => [...s.matchAll(CLOCK)].map((m) => m[0]);
 // Every <li> whose own content carries `needle`.
 const itemsWith = (html: string, needle: string) =>
   [...html.matchAll(/<li\b(?:(?!<\/li>).)*<\/li>/gs)]
@@ -203,7 +209,7 @@ describe("copy — the buyer-outcome story", () => {
     ["proof metric", "Enquiries called the same day"],
     ["how it works", "Follow one enquiry, from import to site visit."],
     ["01 · before the call", "Your team answers once. Every call knows."],
-    ["02 · who to call first", "Every score shows its working."],
+    ["02 · call now or follow up", "Every score shows its working."],
     ["03 · the call and after", "The call, then the next step"],
     ["step 1", "Respond quickly"],
     ["step 1 body", "Call a new enquiry."],
@@ -212,10 +218,10 @@ describe("copy — the buyer-outcome story", () => {
     ["step 3", "Arrange the next step"],
     ["step 3 body", "Book a visit or continue following up."],
     ["follow-up branch", "Not ready to visit yet?"],
-    ["examples heading", "Built around how property sales actually work"],
+    ["examples heading", "What the buyer hears, and what your team gets"],
     ["example 1", "A natural Hinglish conversation"],
     ["example 2", "A summary your salesperson can use"],
-    ["example 3", "Site-visit confirmation and follow-up"],
+    ["example 3", "Site-visit confirmation and reminder"],
     ["pilot", "Start with a four-week pilot"],
     ["pilot — who", "Who it suits"],
     ["pilot — measured", "How success is measured"],
@@ -289,6 +295,19 @@ describe("copy — the buyer-outcome story", () => {
     "Summary for your team",
     "Ended 00:42",
     "Visit · Sat",
+    // the flow told once, in order: 02 is the brief's Intent row opened up (not a
+    // ranking of leads), 03 opens on the call (the clock doesn't go back to the
+    // import), the examples are that call up close (not a restart of the story),
+    // 01's sub tells the brief in the order it plays (no buyer asked anything),
+    // and the call-now line reads "50 or more" everywhere
+    "Who to call first",
+    "Enquiry imported",
+    "from your enquiry list",
+    "Every enquiry that gets a call goes through the same three steps",
+    "Built around how property sales actually work",
+    "One enquiry, followed from the call to the site visit",
+    "When a buyer asks something the brochure doesn't cover",
+    "over 50 means call now",
   ];
   for (const needle of RETIRED) {
     test(`no longer renders: ${needle}`, () => {
@@ -386,6 +405,15 @@ describe("the hero's listen button — the sample recording, played in place", (
 });
 
 describe("the hero — study A3: one finished call, on the drawing sheet", () => {
+  test("the eyebrow is plain mono type, as in the study (no kicker dot)", () => {
+    const band = heroBand();
+    const eyebrow = runs(band, "Voice AI for Indian real estate", true);
+    expect(eyebrow.length).toBe(1);
+    expect(eyebrow[0]?.at(-1)).toMatch(/^<span\b[^>]*\bfont-mono\b/);
+    const head = band.slice(band.indexOf("<section"), band.indexOf("<h1"));
+    expect(head, "no clay dot before the headline").not.toContain("bg-clay");
+  });
+
   test("the result card is one labelled image: an illustrative result of one call", () => {
     expect(figure().match(/\srole="img"/g)?.length, "one image").toBe(1);
     const tag = /^<div\b[^>]*>/.exec(card())?.[0] ?? "";
@@ -486,7 +514,6 @@ describe("the page, told in order — one enquiry from import to site visit", ()
   // Each mark, in the order a visitor scrolls to it; each is on the page once.
   const ORDER: Array<[string, string]> = [
     ["the hero", "<h1"],
-    ["the proof", 'aria-labelledby="proof-title"'],
     ["How it works", ' id="how"'],
     ["its intro", ">Follow one enquiry, from import to site visit.<"],
     ["01's kicker", ">01 · Before the call<"],
@@ -495,7 +522,7 @@ describe("the page, told in order — one enquiry from import to site visit", ()
       "01's visual, the call brief",
       ">A call brief for Rohan Mehta writes itself",
     ],
-    ["02's kicker", ">02 · Who to call first<"],
+    ["02's kicker", ">02 · Call now or follow up<"],
     ["02's heading", ">Every score shows its working.<"],
     [
       "02's visual, the intent evidence",
@@ -504,13 +531,20 @@ describe("the page, told in order — one enquiry from import to site visit", ()
     ["the engine panel", ' id="the-call"'],
     ["03's kicker", ">03 · The call and after<"],
     ["03's heading", ">The call, then the next step<"],
+    ["03's opening, the call", ">At 7:14 PM the agent calls Rohan."],
+    ["03's first step, the call started", ">Call started · 7:14 PM<"],
     ["the examples", ' id="examples"'],
+    ["their heading", ">What the buyer hears, and what your team gets<"],
     ["the pilot", ' id="pilot"'],
+    ["its heading", ">Start with a four-week pilot<"],
+    ["the pilot report", 'aria-labelledby="proof-title"'],
+    ["its kicker", ">Pilot report<"],
+    ["its heading", ">What your pilot report shows<"],
     ["the FAQ", ' id="faq"'],
     ["the closing", ' id="cta"'],
   ];
 
-  test("hero → proof → How it works (intro, 01, 02) → 03 the engine panel → examples → pilot → FAQ → closing", () => {
+  test("hero → How it works (intro, 01, 02) → 03 the engine panel → examples → pilot → pilot report → FAQ → closing", () => {
     const at = ORDER.map(([label, mark]) => {
       expect(
         markup.split(mark).length - 1,
@@ -530,8 +564,9 @@ describe("the page, told in order — one enquiry from import to site visit", ()
       ),
     );
     const intro = how().slice(0, how().indexOf("<section", 1));
+    // it promises the three chapters in the order they come
     expect(textOf(intro).trim()).toBe(
-      "How it works Follow one enquiry, from import to site visit. One evening, one buyer: what Revenue OS does before it calls, how it decides who to call first, and what happens on the call and after.",
+      "How it works Follow one enquiry, from import to site visit. One evening, one buyer: Rohan Mehta's enquiry arrives in your lead import (a CSV from your portal or CRM) at 7:12 PM. Here is what Revenue OS does before it calls him, how it decides to call now or follow up, and what happens on the call and after.",
     );
   });
 
@@ -549,7 +584,7 @@ describe("the page, told in order — one enquiry from import to site visit", ()
     ],
     [
       intent,
-      "02 · Who to call first",
+      "02 · Call now or follow up",
       "Every score shows its working.",
       chapters.intent.sub,
       study,
@@ -578,9 +613,41 @@ describe("the page, told in order — one enquiry from import to site visit", ()
     });
   }
 
-  test("03 · The call and after: the engine panel's heading comes before its flow", () => {
+  test("03 · The call and after: its heading, the call at 7:14 PM, then directly its flow", () => {
+    const id = /^<section\b[^>]*aria-labelledby="([^"]+)"/.exec(engine())?.[1];
+    expect(id, "the panel is labelled by its heading").toBeDefined();
+    expect(engine()).toMatch(
+      new RegExp(
+        `<h3\\b[^>]*id="${id}"[^>]*>The call, then the next step</h3>`,
+      ),
+    );
+    expect(workflow.intro).toStartWith("At 7:14 PM the agent calls Rohan.");
     expect(textOf(engine()).trim()).toStartWith(
-      `03 · The call and after The call, then the next step ${workflow.intro}`,
+      `03 · The call and after The call, then the next step ${workflow.intro} ${workflow.flow.entry}`,
+    );
+  });
+
+  test("one numbering — the chapters' 01 · 02 · 03 — and no step numbers inside them", () => {
+    // 03: its steps and the flow's nodes carry no 01 / 02 / 03 of their own
+    const panel = textOf(engine()).trim();
+    expect(panel).toStartWith("03 · ");
+    expect(
+      panel.slice("03 · ".length).replace(CLOCK, ""),
+      "no second 01–03 in the panel",
+    ).not.toMatch(/\b0\d\b/);
+    for (const s of workflow.steps) {
+      const [li = ""] = itemsWith(engine(), s.title);
+      expect(textOf(li).trim(), `${s.tag}: no number before it`).toStartWith(
+        `${s.tag} ${s.title} ${s.body}`,
+      );
+    }
+    // 02: the step strip names the six steps, unnumbered, at Intent · 7:13:40 PM
+    const { steps, at, time } = intentEvidence.story;
+    const strip = around(study(), "ol", `>${steps[0]}<`);
+    expect(textOf(strip).trim()).toBe(
+      oneSpace(
+        steps.map((s, i) => (i === at ? `${s} · ${time}` : s)).join(" "),
+      ),
     );
   });
 
@@ -632,7 +699,7 @@ describe("01 · before the call — the call brief's final frame on first paint"
       // the intent row and the rail's sum
       "78 / 100",
       "= 78 / 100",
-      "4 signals · over 50 means call now",
+      "4 signals · 50 or more means call now",
       // the call plan
       "Call plan",
       "6 steps · Hinglish",
@@ -666,6 +733,13 @@ describe("01 · before the call — the call brief's final frame on first paint"
     ])
       heldBack(brief(), s, true);
     heldBack(brief(), "Rohan Mehta, from tonight's import.");
+  });
+
+  test("the home loan 02 weighs is in his own enquiry, from the import", () => {
+    const [enquiry] = callBrief.rows;
+    expect(enquiry?.source).toBe("from import");
+    expect(enquiry?.note).toContain("loan bhi lena hai");
+    inView(brief(), "loan bhi lena hai");
   });
 
   test("the score builds from the signals: a running total 24, 46, 62, 78, then = 78 / 100", () => {
@@ -738,7 +812,38 @@ describe("01 · before the call — the call brief's final frame on first paint"
   });
 });
 
-describe("02 · who to call first — the intent evidence's final frame on first paint", () => {
+describe("02 · call now or follow up — the intent evidence's final frame on first paint", () => {
+  test("it opens up the Intent row of 01's brief: the same score, the same line", () => {
+    const { total, outOf, callNow } = intentScore;
+    const row = callBrief.intent;
+    expect(chapters.intent.sub).toStartWith(
+      `The ${row.label} row from Rohan's brief, opened up:`,
+    );
+    expect(chapters.intent.sub).toContain(`${total} out of ${outOf}`);
+    expect(chapters.intent.sub).toContain(`At ${callNow} or more`);
+    // the row it opens is on show in the finished brief above it
+    inView(brief(), row.label, true);
+    inView(brief(), row.score, true);
+    inView(brief(), row.note, true);
+  });
+
+  test("the call-now line reads the same everywhere: at or over 50 calls, under 50 follows up", () => {
+    const { callNow } = intentScore;
+    expect(callBrief.intent.note).toEndWith(
+      `${callNow} or more means call now`,
+    );
+    expect(intentEvidence.routing.note).toStartWith(
+      `${callNow} and over gets a call tonight. Under ${callNow} gets the follow-up plan.`,
+    );
+    expect(intentEvidence.callNow.kicker).toEndWith(`at ${callNow} and over`);
+    expect(intentEvidence.followUp.kicker).toEndWith(`under ${callNow}`);
+    // never "over 50" alone, which would leave a buyer at exactly 50 unrouted
+    const page = `${text()} ${decode(markup)}`;
+    expect(page).not.toMatch(
+      new RegExp(`\\b(?:over|above|more than)\\s+${callNow}\\b`),
+    );
+  });
+
   test("one labelled image that tells the story once", () => {
     const label = decode(
       /^<div\b[^>]*\brole="img" aria-label="([^"]*)"/.exec(study())?.[1] ?? "",
@@ -780,7 +885,6 @@ describe("02 · who to call first — the intent evidence's final frame on first
     expect(t).toContain(
       "50 and over gets a call tonight. Under 50 gets the follow-up plan. Weights and the line are examples.",
     );
-    expect(t).toContain("WhatsApp brochure today, re-call in 5 days");
     // the caption on show is the route, not the opening line
     inView(study(), "Calling him now, in Hinglish, at 7:14 PM.");
     heldBack(study(), "Before I call, I'll weigh what I found about Rohan.");
@@ -788,10 +892,70 @@ describe("02 · who to call first — the intent evidence's final frame on first
   });
 });
 
+// ── one follow-up plan: chapter 02's card and chapter 03's plan agree ─────────
+// Chapter 03's "Example follow-up plan" is the source (Today · Day 7 · Day 30);
+// chapter 02's "Follow-up plan" card tells the same steps in one line, in the same
+// order, and a screen reader hears the same plan — no second cadence anywhere.
+describe("one follow-up plan — chapter 02's card and chapter 03's plan agree", () => {
+  const { plan } = workflow.followUp;
+  const card = intentEvidence.followUp.body;
+  // one space, plain hyphens (a non-breaking one reads the same), lower case
+  const norm = (s: string) =>
+    oneSpace(s)
+      .replace(/\u2011/g, "-")
+      .toLowerCase();
+  // what each step does, in words both places use
+  const KINDS = ["floor plans", "check-in", "re-call"];
+  const kind = (s: string) => KINDS.find((k) => norm(s).includes(k));
+  const when = (s: string) => new RegExp(`\\b${esc(norm(s))}\\b`);
+
+  test("the same steps on the same days, in the same order", () => {
+    const clauses = norm(card).split(/,\s*/);
+    expect(clauses.length).toBe(plan.length);
+    plan.forEach((step, i) => {
+      const clause = clauses[i] ?? "";
+      expect(clause, `step ${i + 1}: ${step.when}`).toMatch(when(step.when));
+      expect(kind(step.what), `"${step.what}" is a known step`).toBeDefined();
+      expect(kind(clause), `step ${i + 1}: the same action`).toBe(
+        kind(step.what),
+      );
+    });
+  });
+
+  test("both are on show: 02's card under its name, 03's plan in the engine panel", () => {
+    expect(intentEvidence.followUp.title).toBe("Follow-up plan");
+    expect(textOf(study())).toContain(
+      `${intentEvidence.followUp.title} ${oneSpace(card)}`,
+    );
+    const panel = textOf(engine());
+    expect(panel).toContain(workflow.followUp.label);
+    for (const step of plan)
+      expect(panel).toContain(oneSpace(`${step.when} ${step.what}`));
+  });
+
+  test("a screen reader hears the same plan, and the page names no other cadence", () => {
+    // the intent study's one text alternative tells the follow-up route too
+    const spoken = norm(intentEvidence.summary);
+    const route = spoken.slice(spoken.indexOf("the follow-up plan"));
+    for (const step of plan)
+      expect(route, `the summary's plan names ${step.when}`).toMatch(
+        when(step.when),
+      );
+    // every "day N" / "N days" anywhere — text or attributes — is a plan day
+    const days = new Set(plan.flatMap((s) => /\d+/.exec(s.when) ?? []));
+    const named = [
+      ...norm(decode(markup)).matchAll(/\bday\s+(\d+)\b|\b(\d+)\s+days?\b/g),
+    ].map((m) => m[1] ?? m[2] ?? "");
+    expect(named.filter((d) => !days.has(d))).toEqual([]);
+  });
+});
+
 // ── Rohan's evening: one timeline, told the same in every section ──────────
-// The engine panel's import is the anchor (the hero's card shows no clock time,
-// as in study A3); every other time is read from the content modules and checked
-// against it, so a section can't drift to its own story.
+// The anchor is the call, where chapter 03 opens: its first step's example
+// ("Call started · 7:14 PM", "Called 2 min after import"), so the import is
+// 7:12 PM. The hero's card shows no clock time, as in study A3 (only its label
+// says 7:12 PM). Every other time is read from the content modules and checked
+// against the anchor, so a section can't drift to its own story.
 // A clock reading ("7:12 PM", "7:13:40 PM", "Thu 7:16 PM") in seconds after midnight…
 const clock = (s: string) => {
   const m = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP])M/.exec(s);
@@ -812,10 +976,11 @@ const toClock = (t: number) => {
 
 describe("Rohan's timeline — one evening, the same in every section", () => {
   const [first] = workflow.steps;
-  const imported = first.example.time;
+  const called = first.example.time;
   const after = Number(/(\d+)\s*min\b/.exec(first.example.delay)?.[1]);
-  const called = toClock(clock(imported) + after * 60);
+  const imported = toClock(clock(called) - after * 60);
   const calledAfter = `${first.example.delay} ${first.example.after}`;
+  const [confirmation] = examples.visit.messages;
   const between = (s: string) => {
     expect(clock(s), `${s} is after the import`).toBeGreaterThanOrEqual(
       clock(imported),
@@ -823,20 +988,41 @@ describe("Rohan's timeline — one evening, the same in every section", () => {
     expect(clock(s), `${s} is before the call`).toBeLessThan(clock(called));
   };
 
-  test("the anchor, in the engine panel: imported 7:12 PM, called 2 min after import (7:14 PM)", () => {
-    expect(imported).toBe("7:12 PM");
+  test("one evening: imported 7:12 PM, Priya answers 7:13 PM, called 7:14 PM, WhatsApp 7:16 PM", () => {
+    expect([
+      imported,
+      toClock(clock(callBrief.priya.time)),
+      called,
+      toClock(clock(confirmation.time)),
+    ]).toEqual(["7:12 PM", "7:13 PM", "7:14 PM", "7:16 PM"]);
     expect(calledAfter).toBe("2 min after import");
-    expect(called).toBe("7:14 PM");
-    const panel = textOf(engine());
-    expect(panel).toContain(`${first.example.label} · ${imported}`);
-    expect(panel).toContain(`${first.example.status} ${calledAfter}`);
   });
 
-  test("the hero's card is the same call: Rohan, imported 7:12 PM, called 2 min after import", () => {
+  test("the anchor — 03 opens on the call at 7:14 PM, and its clock never goes back to the import", () => {
+    const panel = textOf(engine());
+    expect(panel).toContain(`${first.example.label} · ${called}`);
+    expect(panel).toContain(`${first.example.status} ${calledAfter}`);
+    expect(workflow.intro).toStartWith(`At ${called} `);
+    const times = clocks(panel);
+    expect(times[0], "the first time on the panel is the call").toBe(called);
+    expect(times, "the import's time is 01's, not 03's").not.toContain(
+      imported,
+    );
+    for (const t of times.filter((t) => t.endsWith("PM")))
+      expect(clock(t), `${t} is not before the call`).toBeGreaterThanOrEqual(
+        clock(called),
+      );
+  });
+
+  test("the hero's card is the same call and shows no clock time; its label says imported at 7:12 PM", () => {
     expect(result.lead).toBe("Rohan Mehta");
     expect<string>(result.called).toBe(`Called ${calledAfter}`);
-    expect(oneSpace(result.aria)).toContain(`imported at ${imported}`);
-    expect(oneSpace(result.aria)).toContain(calledAfter);
+    const label = oneSpace(result.aria);
+    expect(label).toContain(`imported at ${imported}`);
+    expect(label).toContain(calledAfter);
+    // on its face, the only clock is the visit's slot
+    const slot = /Sat,?\s+(\d{1,2}:\d{2}\s[AP]M)/.exec(result.outcome)?.[1];
+    expect(clocks(textOf(card()))).toEqual([oneSpace(slot ?? "")]);
   });
 
   test("01 · Before the call: imported 7:12 PM, Priya answers at 7:13 PM, called 7:14 PM", () => {
@@ -847,12 +1033,12 @@ describe("Rohan's timeline — one evening, the same in every section", () => {
     expect(oneSpace(callBrief.rail.items[0]?.detail ?? "")).toEndWith(imported);
     expect(shown).toContain(oneSpace(callBrief.card.sub));
     // Priya's answer, in between
-    expect(toClock(clock(callBrief.priya.time))).toBe("7:13 PM");
     expect(shown).toContain(oneSpace(callBrief.question.source));
     // the call, everywhere the brief names it
     for (const s of [
       callBrief.footer.stamp,
       callBrief.captions.at(-1)?.text ?? "",
+      callBrief.summary,
     ])
       expect(oneSpace(s)).toContain(called);
     expect(shown).toContain(oneSpace(callBrief.footer.stamp));
@@ -868,30 +1054,27 @@ describe("Rohan's timeline — one evening, the same in every section", () => {
       between(s);
   });
 
-  test("02 · Who to call first: scored before the call, and calls at 7:14 PM", () => {
+  test("02 · Call now or follow up: scored before the call, and calls at 7:14 PM", () => {
     between(intentEvidence.story.time);
     for (const s of [
       intentEvidence.callNow.chip,
       intentEvidence.captions.route,
+      intentEvidence.summary,
     ])
       expect(oneSpace(s)).toContain(called);
     expect(textOf(intent())).toContain(oneSpace(intentEvidence.callNow.chip));
   });
 
-  test("the WhatsApp confirmation follows the call the same evening: Thu 7:16 PM", () => {
-    const [confirmation] = examples.visit.messages;
+  test("the examples are that call, up close: Rohan's, confirmed on WhatsApp at Thu 7:16 PM", () => {
+    expect(examples.intro).toStartWith("Rohan's call, up close:");
+    expect(examples.summary.lead).toBe(result.lead);
+    expect(examples.visit.contact).toBe(result.lead);
     expect(oneSpace(confirmation.time)).toBe("Thu 7:16 PM");
     expect(
       clock(confirmation.time),
       "sent once the call (the sample call's length) has ended",
     ).toBeGreaterThan(clock(called) + sampleCall.seconds);
-    const shown = textOf(
-      markup.slice(
-        markup.indexOf('id="examples"'),
-        markup.indexOf('id="pilot"'),
-      ),
-    );
-    expect(shown).toContain(oneSpace(confirmation.time));
+    expect(textOf(examplesSection())).toContain(oneSpace(confirmation.time));
   });
 
   test("the visit it books is one slot everywhere: Saturday, 11:00 AM", () => {
@@ -908,7 +1091,7 @@ describe("Rohan's timeline — one evening, the same in every section", () => {
   });
 });
 
-describe("a score out of 100 — only in the two chapters labelled illustrative", () => {
+describe("a score out of 100 — only inside How it works, in its two chapters labelled illustrative", () => {
   const SCORE = /\/\s*100\b|\b\d{1,3}\s+(?:out\s+)?of\s+100\b/;
 
   test("appears in How it works' chapters 01 and 02, each tagged “Illustrative example”", () => {
@@ -920,7 +1103,7 @@ describe("a score out of 100 — only in the two chapters labelled illustrative"
     }
   });
 
-  test("appears nowhere else: not the hero, the proof, the intro, the engine, the examples or the pilot", () => {
+  test("appears nowhere else: not the hero, the intro, the engine panel, the examples, the pilot or the pilot report", () => {
     const outside = markup.replace(context(), "").replace(intent(), "");
     expect(outside.length).toBe(
       markup.length - context().length - intent().length,
@@ -932,8 +1115,27 @@ describe("a score out of 100 — only in the two chapters labelled illustrative"
   });
 });
 
-describe("proof — an example, never a customer result", () => {
+describe("the pilot report — after the Pilot it reports on; an example, never a customer result", () => {
+  test("sits directly after the Pilot section, under its “Pilot report” kicker and an “Illustrative example” tag", () => {
+    const pilot = pilotSection();
+    const r = report();
+    expect(pilot.length, "the pilot section renders").toBeGreaterThan(0);
+    expect(r.length, "the pilot report renders").toBeGreaterThan(0);
+    expect(markup.indexOf(r), "nothing between them").toBe(
+      markup.indexOf(pilot) + pilot.length,
+    );
+    const head = r.slice(0, r.indexOf("</h2>"));
+    expect(textOf(head).trim()).toBe(
+      "Pilot report Illustrative example What your pilot report shows",
+    );
+    inView(head, "Pilot report", true);
+    inView(head, "Illustrative example", true);
+    for (const tags of runs(head, "Illustrative example"))
+      for (const tag of tags) expect(tag).not.toContain("aria-hidden");
+  });
+
   test("is labelled as an illustrative example throughout", () => {
+    const t = textOf(report());
     for (const s of [
       "Illustrative example",
       "Example project:",
@@ -941,7 +1143,7 @@ describe("proof — an example, never a customer result", () => {
       "Revenue OS (example)",
       "The figures are illustrative, not customer results.",
     ]) {
-      expect(text()).toContain(s);
+      expect(t).toContain(s);
     }
   });
 

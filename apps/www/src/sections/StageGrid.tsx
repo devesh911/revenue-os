@@ -20,8 +20,8 @@ import { IntentRouting } from "./IntentRouting";
 // figure; from lg they run as three equal columns on 56px gutters (a hairline
 // centred in each), tucked right under the flow's nodes — FunnelFlow shares that
 // geometry, so each node sits over its column's centre. Each step closes on a
-// small product example, one lead followed from import to a booked visit, in the
-// hero card's vocabulary (mono caps for machine data, serif for the outcome, clay
+// small product example, one lead followed from the 7:14 PM call to a booked visit,
+// in the page's product vocabulary (mono caps for machine data, serif for the outcome, clay
 // for the call and the visit). From lg the steps share two subgrid rows, so the
 // examples start level and end level however the copy wraps.
 const [respond, understand, arrange] = workflow.steps;
@@ -116,7 +116,7 @@ export function StageGrid() {
               <MonoLabel className="flex gap-[12px] whitespace-nowrap text-[11.5px] uppercase tracking-[0.12em]">
                 <span className="text-paper/60">{s.tag}</span>
               </MonoLabel>
-              <Heading as="h3" className="mt-[18px]">
+              <Heading as="h4" className="mt-[18px]">
                 {s.title}
               </Heading>
               <Text tone="inverse" className="mt-[12px]">

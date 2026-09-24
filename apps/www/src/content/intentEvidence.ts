@@ -1,5 +1,5 @@
-// Words for "Why he's a high-intent buyer" (visuals/IntentEvidence.tsx), the first
-// study in "Before the call". The evidence and every number in it come from
+// Words for chapter 02 of How it works, "Call now or follow up"
+// (visuals/IntentEvidence.tsx): the brief's Intent row opened up. The evidence and every number in it come from
 // beforeCall.ts (intentSignals, intentScore), so this study and the call brief
 // always agree; this module only holds the words around them: where the step sits
 // in the story, the agent's running captions (one per beat), the ledger and routing
@@ -12,7 +12,7 @@ const { total, outOf, callNow } = intentScore;
 export const intentEvidence = {
   // The six steps between import and the call; this study zooms into `at`.
   story: {
-    steps: ["Import", "Context", "Sales check", "Intent", "Brief", "Call"],
+    steps: ["Import", "Context", "Sales check", "Intent", "Call plan", "Call"],
     at: 3,
     time: "7:13:40\u00a0PM",
   },
@@ -31,8 +31,7 @@ export const intentEvidence = {
     crossed: "That takes him past the call-now line.",
     context: "He needs a home loan. That's context for the call, not a minus.",
     total: `${total} of ${outOf}. High intent.`,
-    route:
-      "Calling him now, in Hinglish, at 7:14\u00a0PM. No brochure-and-wait for Rohan.",
+    route: `Calling him now, in Hinglish, at 7:14\u00a0PM. The follow-up plan is for buyers under ${callNow}.`,
   },
   evidence: `Evidence · ${intentSignals.length} signals`,
   weight: "Weight",
@@ -65,6 +64,6 @@ export const intentEvidence = {
     `${intentSignals.map((s) => `${s.label.toLowerCase()}, plus ${s.weight}`).join("; ")}.`,
     "Needing a home loan is context for the call, not a minus.",
     `The total is ${total} out of ${outOf}, above the call-now line at ${callNow}, so the agent calls him tonight at 7:14\u00a0PM, in Hinglish, with the brief in hand.`,
-    `Buyers under ${callNow} get the follow-up plan instead: a WhatsApp brochure today and a re-call in 5\u00a0days.`,
+    `Buyers under ${callNow} get the follow-up plan instead: floor plans on WhatsApp today, a check-in on day\u00a07 and a re-call on day\u00a030.`,
   ].join(" "),
 } as const;

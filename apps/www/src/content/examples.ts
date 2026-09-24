@@ -1,4 +1,4 @@
-// "Built around how property sales actually work" — three demonstrations, each a
+// "What the buyer hears, and what your team gets" — Rohan's call up close: three demonstrations, each a
 // small product example and one short explanation. All names, places and times are
 // illustrative. In the summary, the last field is the outcome (the next step).
 // \u00a0 keeps a number with its unit (1,050 sq ft, 11:00 AM, Tower B) on one line.
@@ -49,7 +49,7 @@ export const examples = {
     plate: ["Budget", "Timeline", "Next step"],
   },
   visit: {
-    title: "Site-visit confirmation and follow-up",
+    title: "Site-visit confirmation and reminder",
     body: "The buyer gets the time, the address and a reminder on WhatsApp, without anyone on your team typing it.",
     contact: "Rohan Mehta",
     channel: "WhatsApp",

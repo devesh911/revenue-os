@@ -5,9 +5,10 @@ import { Text } from "../design/Text";
 import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
 
-// The route out of step 02 for buyers still exploring, closing the ink panel: the
-// olive follow-up loop, with its example plan. (The other route — ready buyers,
-// clay — is step 03's booked visit, so it needs no card of its own.) The glyph is
+// The route out of the Qualify step for buyers still exploring (and for buyers under
+// the call-now line, chapter 02), closing the ink panel: the olive follow-up loop,
+// with its example plan. (The other route — ready buyers, clay — is the Visit step's
+// booked visit, so it needs no card of its own.) The glyph is
 // drawn in the FunnelFlow vocabulary (the dotted loop with a lead on it), so the
 // card reads as the diagram's legend. The words sit left and the plan right from
 // md; they stack on phones. The olive label is lifted 8% toward paper (as is the
@@ -52,7 +53,7 @@ export function IntentRouting({ className }: { className?: string }) {
         </svg>
       </div>
       <div>
-        <Heading as="h3">{followUp.title}</Heading>
+        <Heading as="h4">{followUp.title}</Heading>
         <Text tone="inverse-strong" className="mt-[10px] max-w-[46ch]">
           {followUp.body}
         </Text>

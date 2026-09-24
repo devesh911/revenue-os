@@ -66,8 +66,8 @@ export const workflow = {
     arrow: loopArrow,
     tag: "Still exploring",
     title: "Not ready to visit yet?",
-    body: "Buyers who are still exploring get WhatsApp follow‑ups and a scheduled re‑call, so they keep hearing from you on a schedule you set.",
-    label: "Example follow-up plan",
+    body: "Buyers under 50, and buyers still exploring after the call, get the follow-up plan: WhatsApp follow‑ups and a scheduled re‑call, on a schedule you set.",
+    label: "The follow-up plan (example)",
     plan: [
       { when: "Today", what: "Floor plans and price sheet on WhatsApp" },
       { when: "Day 7", what: "WhatsApp check-in" },

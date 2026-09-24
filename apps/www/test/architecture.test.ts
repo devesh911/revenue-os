@@ -2,9 +2,10 @@
 // regex over SOURCE; no imports of app code, no DOM, no build). Pins the editorial
 // design system (the paper / ink / clay tokens, self-hosted Lora + IBM Plex Mono,
 // the motion floor, the page-wide pause switch, the one-shot scroll reveal, the
-// hero's floor plan that draws itself once), the file layout (the page in order,
-// the old looping call card gone), content separation, How it works reading its
-// four intent signals from one module, namespaced keyframes, the demo-booking
+// hero's floor plan that draws itself once), the file layout (the page in order —
+// the pilot report after the Pilot — the old looping call card gone, one set of
+// chapter numbers), content separation, How it works reading its four intent
+// signals from one module, namespaced keyframes, the demo-booking
 // wiring (one "Book a demo" label; the only external host is the booking API, in
 // one file) and the README.
 import { describe, expect, test } from "bun:test";
@@ -70,16 +71,17 @@ describe("architecture — vite entry wiring", () => {
   test("src/App.tsx exports App and composes the sections in page order", () => {
     const src = read(resolve(SRC_DIR, "App.tsx"));
     expect(exportsName(src, "App")).toBe(true);
-    // How it works tells chapters 01 and 02; StageGrid, the engine panel, is 03
+    // How it works tells chapters 01 and 02; StageGrid, the engine panel, is 03;
+    // the pilot report (Proof) follows the Pilot (Pricing) it reports on
     const ORDER = [
       "BookingProvider",
       "Nav",
       "Hero",
-      "Proof",
       "HowItWorks",
       "StageGrid",
       "Moats",
       "Pricing",
+      "Proof",
       "Faq",
       "FooterCta",
       "BookingDialog",
@@ -365,6 +367,21 @@ describe("architecture — component layout", () => {
     );
     expect(stale.map(rel)).toEqual([]);
   });
+
+  // The chapters are numbered 01 · 02 · 03 and nothing inside them starts a
+  // second count: chapter 03's steps and flow nodes, and chapter 02's step strip.
+  test("one numbering: no step numbers in the engine panel or the intent study's strip", () => {
+    expect(code(read(resolve(SRC_DIR, "content/workflow.ts")))).not.toMatch(
+      /\bnum\s*:/,
+    );
+    for (const file of ["sections/StageGrid.tsx", "visuals/FunnelFlow.tsx"])
+      expect(code(read(resolve(SRC_DIR, file))), file).not.toMatch(
+        /\.num\b|padStart\(/,
+      );
+    expect(
+      code(read(resolve(SRC_DIR, "visuals/IntentEvidence.tsx"))),
+    ).not.toMatch(/\{\s*i\s*\+\s*1\s*\}/);
+  });
 });
 
 // ── content: typed modules hold the copy; files import it, never inline it ──
@@ -384,7 +401,10 @@ describe("architecture — src/content/ holds the copy", () => {
         "Illustrative",
       ],
     ],
-    ["proof", ["Illustrative example", "Enquiries called the same day"]],
+    [
+      "proof",
+      ["Pilot report", "Illustrative example", "Enquiries called the same day"],
+    ],
     [
       "workflow",
       [
@@ -395,7 +415,7 @@ describe("architecture — src/content/ holds the copy", () => {
         "Arrange the next step",
       ],
     ],
-    ["examples", ["Built around how property sales actually work"]],
+    ["examples", ["What the buyer hears, and what your team gets"]],
     ["pilot", ["Start with a four-week pilot", "How fees work", "Planned"]],
     ["faqs", ["How natural does the voice sound?"]],
     [
@@ -409,7 +429,7 @@ describe("architecture — src/content/ holds the copy", () => {
         "Follow one enquiry, from import to site visit.",
         "Before the call",
         "Your team answers once. Every call knows.",
-        "Who to call first",
+        "Call now or follow up",
         "Every score shows its working.",
         "Illustrative example",
         "Repeat enquiry",
@@ -495,7 +515,11 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "sections/Proof",
       "proof",
-      ["What your pilot report shows", "Enquiries called the same day"],
+      [
+        "Pilot report",
+        "What your pilot report shows",
+        "Enquiries called the same day",
+      ],
     ],
     [
       "sections/StageGrid",
@@ -507,7 +531,7 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "sections/Moats",
       "examples",
-      ["Built around how property sales", "A natural Hinglish conversation"],
+      ["What the buyer hears", "A natural Hinglish conversation"],
     ],
     ["visuals/MoatArt", "examples", ["Kitna hai?", "Weekend pe?"]],
     [
@@ -526,7 +550,7 @@ describe("architecture — src/content/ holds the copy", () => {
         "Follow one enquiry",
         "Before the call",
         "Your team answers once",
-        "Who to call first",
+        "Call now or follow up",
         "Every score shows",
         "Illustrative example",
       ],
@@ -760,8 +784,9 @@ describe("architecture — README", () => {
       "## The hero",
       "sections/HowItWorks.tsx",
       "01 · Before the call",
-      "02 · Who to call first",
+      "02 · Call now or follow up",
       "03 · The call and after",
+      "Pilot report",
       "Illustrative example",
       "content/beforeCall.ts",
       "SurveyGround",
@@ -774,9 +799,16 @@ describe("architecture — README", () => {
     }
   });
 
-  test("no longer documents the old call card", () => {
+  test("no longer documents the old call card or the old order", () => {
     const r = readme();
-    for (const s of ["HeroCall", "calls[0]", "onPhase", "sections/BeforeCall"])
+    for (const s of [
+      "HeroCall",
+      "calls[0]",
+      "onPhase",
+      "sections/BeforeCall",
+      "Who to call first",
+      "hero · proof",
+    ])
       expect(r).not.toContain(s);
   });
 });

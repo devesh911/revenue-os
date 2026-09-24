@@ -29,7 +29,7 @@ export function Proof() {
   const { columns } = proof;
   return (
     <SectionFrame flush aria-labelledby="proof-title">
-      <div className="grid gap-[36px] border-line border-t pt-[48px] pb-[64px] md:gap-[48px] md:pt-[64px] md:pb-[88px] lg:grid-cols-12 lg:gap-x-[40px]">
+      <div className="grid gap-[36px] pt-[48px] pb-[64px] md:gap-[48px] md:pt-[64px] md:pb-[88px] lg:grid-cols-12 lg:gap-x-[40px]">
         <div {...reveal(200)} className="lg:col-span-5">
           <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px]">
             <Kicker>{proof.kicker}</Kicker>

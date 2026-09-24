@@ -77,15 +77,15 @@ filter (the `heard_sample` property on each completed booking gives the split).
 | `public/` | Static files served as-is — `favicon.svg` (the brand mark), `sample-call.m4a` (the synthetic sample call). |
 | `scripts/make-sample-call.ts` | Regenerates `public/sample-call.m4a` with the system text-to-speech voices (macOS). Afterwards, set `sampleCall.seconds` in `content/hero.ts` to the new length — the copy-parity suite checks it against the file. |
 | `src/main.tsx` | Boot entry — mounts `<App/>` into `#root`, owns the single stylesheet side-effect `import "./styles.css"` (so `App` stays SSR-safe), loads Plausible when configured, and calls `armChime()` so the visitor's first tap, click or key press unlocks the message chime (see **Sound**). |
-| `src/App.tsx` | Composes the page inside `BookingProvider`: skip link, sticky `header → nav`, `main` → the sections in page order (see **Page order**): hero · proof · How it works (`HowItWorks`: the intro, 01, 02) · the engine panel (`StageGrid`, 03) · examples · pilot · FAQ · closing, `footer` → the meta row, and the one `BookingDialog`. Calls `useReveal()` once and honours cold-load deep links (`/#pilot`; `/#book` opens the booking dialog). Imports no CSS. |
+| `src/App.tsx` | Composes the page inside `BookingProvider`: skip link, sticky `header → nav`, `main` → the sections in page order (see **Page order**): hero · How it works (`HowItWorks`: the intro, 01, 02) · the engine panel (`StageGrid`, 03) · examples · pilot · the pilot report (`Proof`) · FAQ · closing, `footer` → the meta row, and the one `BookingDialog`. Calls `useReveal()` once and honours cold-load deep links (`/#pilot`; `/#book` opens the booking dialog). Imports no CSS. |
 | `src/styles.css` | `@import "tailwindcss"` + the `@theme` tokens (paper / ink / clay palette, illustration plates, the `card` surface, the `lift` shadow, type families, the soft ease), the shared `ro-*` keyframes, one reserved block per visual for its own keyframes and utilities (`survey-*` for the hero's drawing sheet, `intent-*` for the intent study, `brief-*` for the call brief), the scroll-reveal, pause, and reduced-motion rules, the decorative `@utility` classes, and **every** `@font-face` block. The **only** place raw colour hex lives. |
 | `src/design/` | Reusable, tokens-only elements — `Heading` (display / section / card scale, `balance`), `Text` (lede / body / small sizes; default / muted / inverse tones), `Kicker` (section / hero / inverse / clay eyebrows), `MonoLabel`, `CtaButton` (accent / ghost pills; `busy` for a pending submit), `SectionFrame` (plain paper; wash / ink / clay inset panels; `flush`), `DotList` (a dot-separated run). `Heading`, `Text`, `Kicker`, `MonoLabel` and `SectionFrame` take `ref`, so `reveal()` spreads onto them. Named exports; no copy, no raw hex. |
-| `src/sections/` | One file per section — `Nav`, `Hero` (the kicker, the headline, the lede, the demo button, the listen button and its note, the pause switch, and the result card on the drawing sheet), `Proof` (the illustrative pilot report), `HowItWorks` (How it works, told as one enquiry: the intro, then "01 · Before the call" over `CallBrief` and "02 · Who to call first" over `IntentEvidence`, each tagged "Illustrative example"), `StageGrid` (the dark engine panel, "03 · The call and after": three steps, each with a small product example; hosts `FunnelFlow` and `IntentRouting`), `IntentRouting` (the follow-up route for buyers not ready to visit), `Moats` (the three examples), `Pricing` (the pilot, how fees work, and the "Compare plans" disclosure), `Faq`, `FooterCta` (the clay closing invitation). Each composes `design/` elements and imports its copy from `content/`. |
-| `src/visuals/` | `BrandMark` (the logo mark), `SampleAudio` (the hero's listen button: plays the sample recording in place, fetched on the first press), `FunnelFlow` (enquiries running the three steps, the not-yet-ready ones looping through follow-up), `MoatArt` (the example cards' line illustrations), `CallArt` (the closing panel's poster mark), `BookingDialog` (the booking flow), `Icon` (the 16px line glyphs), `SurveyGround` (the hero's drawing sheet, and `SurveyPlan`: the 2 BHK floor plan under the result card, which draws itself once), `IntentEvidence` (why the buyer is high intent: the four signals build his score to 78 and route him to "Call now"), `CallBrief` (the call brief writing itself before the call, with Priya's WhatsApp reply and its chime). SVG + CSS keyframes / SMIL; no animation library. |
+| `src/sections/` | One file per section — `Nav`, `Hero` (the plain mono eyebrow, the headline, the lede, the demo button, the listen button and its note, the pause switch, and the result card on the drawing sheet), `Proof` (the pilot report, after the pilot it reports on: a "Pilot report" kicker, an "Illustrative example" tag, example figures), `HowItWorks` (How it works, told as one enquiry: the intro, then "01 · Before the call" over `CallBrief` and "02 · Call now or follow up" over `IntentEvidence`, each tagged "Illustrative example"), `StageGrid` (the dark engine panel, "03 · The call and after": it opens on the call at 7:14 PM, then three unnumbered steps, each with a small product example; hosts `FunnelFlow` and `IntentRouting`), `IntentRouting` (the follow-up route for buyers not ready to visit, with the example follow-up plan), `Moats` (the examples: Rohan's call up close — the conversation, the summary, the WhatsApp confirmation), `Pricing` (the pilot, how fees work, and the "Compare plans" disclosure), `Faq`, `FooterCta` (the clay closing invitation). Each composes `design/` elements and imports its copy from `content/`. |
+| `src/visuals/` | `BrandMark` (the logo mark), `SampleAudio` (the hero's listen button: plays the sample recording in place, fetched on the first press), `FunnelFlow` (enquiries running the three steps, the not-yet-ready ones looping through follow-up), `MoatArt` (the example cards' line illustrations), `CallArt` (the closing panel's poster mark), `BookingDialog` (the booking flow), `Icon` (the 16px line glyphs), `SurveyGround` (the hero's drawing sheet, and `SurveyPlan`: the 2 BHK floor plan under the result card, which draws itself once), `IntentEvidence` (the brief's Intent row opened up: the four signals build his score to 78 and route him to "Call now"; under the line, the follow-up plan), `CallBrief` (the call brief writing itself before the call, with Priya's WhatsApp reply and its chime). SVG + CSS keyframes / SMIL; no animation library. |
 | `src/lib/` | `booking.ts` (the Cal.com client + preview adapter + form helpers), `analytics.ts` (`track()`), `bookingContext.tsx` (`BookingProvider`, `useBooking()`, `BookDemoButton`), `reveal.ts` (`reveal(delayMs)` props + `useReveal()`), `motion.ts` (the page-wide pause switch `useStill()` / `setStill()`, and `useLiveSvg()`, which runs an SVG's animations only while it is on screen and not paused), `sequence.ts` (`useSequence()`: steps a looping visual beat by beat while it is on screen), `chime.ts` (the message chime and its remembered sound switch), `cx.ts` (the one-line className joiner). |
-| `src/content/` | Every word on the page, as typed modules (`site`, `hero` — including `result`, the hero's card, and `survey`, the drawing sheet's labels — `proof`, `beforeCall` — How it works' intro and chapters 01 and 02 (`howItWorks`, `chapters`) and the four intent signals — `intentEvidence`, `callBrief`, `workflow` — chapter 03, the engine panel — `examples`, `pilot`, `faqs`, `closing`, `booking`). Sections and visuals import these and **inline nothing**. Where the design has a slot the copy doesn't fill (a kicker, a plate word, a diagram label), the fill is taken from the copy around it and lives in the same module. |
+| `src/content/` | Every word on the page, as typed modules (`site`, `hero` — including `result`, the hero's card, and `survey`, the drawing sheet's labels — `proof` — the pilot report — `beforeCall` — How it works' intro and chapters 01 and 02 (`howItWorks`, `chapters`) and the four intent signals — `intentEvidence`, `callBrief`, `workflow` — chapter 03, the engine panel, and the one follow-up plan — `examples`, `pilot`, `faqs`, `closing`, `booking`). Sections and visuals import these and **inline nothing**. Where the design has a slot the copy doesn't fill (a kicker, a plate word, a diagram label), the fill is taken from the copy around it and lives in the same module. |
 | `fonts/` | Self-hosted `.woff2` subsets (Lora 400 + italic, IBM Plex Mono 400). Referenced from `src/styles.css` as `../fonts/<file>.woff2`. |
-| `test/` | `copy-parity.test.tsx` (the SSR first paint: copy, one "Book a demo" action, the listen button and its disclosure, the hero's result card word for word and the old call card gone, the drawing sheet and the plan drawn, the page order with each chapter's heading directly above its own visual, chapters 01 and 02 labelled illustrative and showing their studies' final frame, the sound switch, Rohan's one evening told the same everywhere, a score out of 100 only in those two chapters, proof and plans labelled honestly, retired copy stays retired, default UI state and accessibility), `architecture.test.ts` (tokens, fonts, motion floor, pause switch, the plan drawing once, scroll reveal, file layout and page order, content separation, the four intent signals stated once, namespaced keyframes, external hosts, this README), `lib.test.ts` (booking client, analytics, `useSequence`'s first paint, the chime and its sound switch), `build.test.ts` (`vite build`). |
+| `test/` | `copy-parity.test.tsx` (the SSR first paint: copy, one "Book a demo" action, the listen button and its disclosure, the hero's plain eyebrow and its result card word for word with no clock time on its face, the old call card gone, the drawing sheet and the plan drawn, the page order heading by heading with each chapter's heading directly above its own visual, one numbering (no step numbers inside chapters 02 and 03), chapters 01 and 02 labelled illustrative and showing their studies' final frame, 02 opening 01's Intent row, one call-now rule and one follow-up plan, the sound switch, Rohan's one evening told the same everywhere with chapter 03 opening on the call, a score out of 100 only inside How it works, the pilot report after the pilot and labelled honestly, plans labelled honestly, retired copy stays retired, default UI state and accessibility), `architecture.test.ts` (tokens, fonts, motion floor, pause switch, the plan drawing once, scroll reveal, file layout and page order, one numbering, content separation, the four intent signals stated once, namespaced keyframes, external hosts, this README), `lib.test.ts` (booking client, analytics, `useSequence`'s first paint, the chime and its sound switch), `build.test.ts` (`vite build`). |
 
 ## Design language
 
@@ -115,27 +115,40 @@ scrolls:
 
 1. **Hero** (`sections/Hero.tsx`) — the promise, "Book a demo", the sample call,
    and one finished result: Rohan called 2 min after import, a site visit booked.
-2. **Proof** (`sections/Proof.tsx`) — what a pilot report shows (illustrative).
-3. **How it works** (`sections/HowItWorks.tsx`, `#how`, the nav's "How it
-   works") — the intro "Follow one enquiry, from import to site visit.", then:
+2. **How it works** (`sections/HowItWorks.tsx`, `#how`, the nav's "How it
+   works") — the intro "Follow one enquiry, from import to site visit.", which
+   promises the three chapters in the order they come, then:
    - **01 · Before the call** — "Your team answers once. Every call knows.",
-     directly above the call brief that shows it (`CallBrief`);
-   - **02 · Who to call first** — "Every score shows its working.", directly
-     above the intent evidence that shows it (`IntentEvidence`).
-4. **03 · The call and after** (`sections/StageGrid.tsx`, `#the-call`) — the dark
-   engine panel, "The call, then the next step": the three steps and the follow-up
-   route.
-5. **Examples**, **Pilot**, **FAQ**, then the **closing** invitation.
+     directly above the call brief that shows it (`CallBrief`), 7:12–7:14 PM;
+   - **02 · Call now or follow up** — "Every score shows its working.", directly
+     above the intent evidence that shows it (`IntentEvidence`): the brief's
+     Intent row, opened up.
+3. **03 · The call and after** (`sections/StageGrid.tsx`, `#the-call`) — the dark
+   engine panel, "The call, then the next step": it opens on the call at 7:14 PM,
+   then the three steps and the follow-up route.
+4. **Examples** (`sections/Moats.tsx`, `#examples`) — "What the buyer hears, and
+   what your team gets": Rohan's call up close, and the WhatsApp confirmation at
+   7:16 PM.
+5. **Pilot** (`sections/Pricing.tsx`, `#pilot`), then directly after it the
+   **pilot report** (`sections/Proof.tsx`) — the "Pilot report" kicker and an
+   "Illustrative example" tag: what the pilot's comparison looks like.
+6. **FAQ**, then the **closing** invitation.
 
 Each chapter's heading sits directly above its own visual, with nothing between
 but its one-line explanation, so a message never arrives before or after the
-picture that proves it. `App.tsx` composes the sections in this order and the
-copy-parity suite pins it, heading by heading.
+picture that proves it. The clock only moves forward as the visitor scrolls:
+chapter 02 zooms into a moment of chapter 01 (7:13:40 PM, the Intent row), and
+chapter 03 starts at the call, never back at the import. There is one numbering
+on the page — the chapters' 01 · 02 · 03 — so chapter 03's steps and flow, and
+chapter 02's step strip, carry none of their own (lists inside product cards, like
+the brief's call plan, keep their own). `App.tsx` composes the sections
+in this order and the copy-parity suite pins it, heading by heading.
 
 ## The hero
 
-The hero follows study A3 ("Surveyor's grid") from the hook-studies board. The
-copy column holds the kicker, the page's one headline, the lede, "Book a demo",
+The hero follows study A3 ("Surveyor's grid") from the hook-studies board, as it
+is. The copy column holds a plain mono eyebrow (no kicker dot, as in the study),
+the page's one headline, the lede, "Book a demo",
 "Hear a sample call 0:42" with its text-to-speech note, and under that the
 page-wide **Pause animations** switch (a real button, 44px touch target; hidden
 under reduced motion, where there is nothing to pause).
@@ -157,7 +170,8 @@ On the plan sits the **result card**, tilted, as in the study: "Rohan Mehta" ·
 "Within 12 months" / "Site visit booked · Sat 11:00 AM". Its words live in
 `content/hero.ts` as `result`. It is an illustration of one call's outcome, not a
 live call: to a screen reader it is one image (`role="img"`) whose label says so
-and tells the call in words that read aloud well. From 1024px the plan takes a
+and tells the call in words that read aloud well (only the label says the import
+was at 7:12 PM; the card's face shows no clock time but the visit's). From 1024px the plan takes a
 fixed right-hand column and the copy centres beside it; between 640px and 1023px
 the plan and card sit centred under the copy; below 640px the plan is hidden and
 the card follows the copy.
@@ -171,20 +185,39 @@ test suites keep it gone.
 `sections/HowItWorks.tsx` tells chapters 01 and 02; the engine panel after it is
 chapter 03. Chapters 01 and 02 each carry a visible **"Illustrative example"**
 tag, because intent scoring and questions to the sales team are planned, not
-built.
+built. Each chapter picks up where the one before it ends.
 
-1. **01 · Before the call** — "Your team answers once. Every call knows." The call
-   brief (`visuals/CallBrief.tsx`) writes itself, each fact with where it came
-   from. The one question the brochure can't answer goes to Priya Nair in sales;
-   her WhatsApp reply pops up in front of the brief (with the chime), then settles
+1. **01 · Before the call** — "Your team answers once. Every call knows." The sub
+   walks the brief in the order it plays. The call brief (`visuals/CallBrief.tsx`)
+   writes itself from 7:12 PM, each fact with where it came from — his own
+   enquiry note, loan included ("…budget 90 tak, loan bhi lena hai"). The one
+   question the brochure can't answer goes to Priya Nair in sales; her WhatsApp
+   reply (7:13 PM) pops up in front of the brief (with the chime), then settles
    into the row and the project's saved facts. The rail adds up the four signals
    under "Intent signals", the bar filling from zero to 78 and turning from clay
-   to olive, then the call plan writes itself and the call starts.
-2. **02 · Who to call first** — "Every score shows its working." The intent
-   evidence (`visuals/IntentEvidence.tsx`): four signals land one at a time with
+   to olive ("50 or more means call now"), then the call plan writes itself and
+   the brief ends "Ready · calling 7:14 PM".
+2. **02 · Call now or follow up** — "Every score shows its working." "The Intent
+   row from Rohan's brief, opened up": the intent evidence
+   (`visuals/IntentEvidence.tsx`) zooms into that moment (its step strip, with no
+   numbers, reads "Intent · 7:13:40 PM"). Four signals land one at a time with
    their weights, the score climbs past the call-now line to 78 / 100, the home
    loan lands as context (no weight), and the router lights "Call now" while the
    follow-up plan stays dim.
+3. **03 · The call and after** — the engine panel (`sections/StageGrid.tsx`):
+   "At 7:14 PM the agent calls Rohan. Every call runs the same three steps." The
+   first step's example is the call starting ("Call started · 7:14 PM", "Called
+   2 min after import"); the steps and the flow's nodes carry no numbers of their
+   own. Under them, the follow-up route (`IntentRouting`) shows the example
+   follow-up plan.
+
+**One call-now rule, one follow-up plan.** At or over 50 is a call tonight, under
+50 is the follow-up plan — the brief, the chapter 02 sub and the router all say it
+that way, never "over 50". The follow-up plan is chapter 03's "Example follow-up
+plan" (today: floor plans on WhatsApp; day 7: a WhatsApp check-in; day 30: a
+re-call); chapter 02's "Follow-up plan" card tells the same steps in one line, and
+the intent study's screen-reader summary must too. The copy-parity suite pins all
+of it.
 
 The intro and both chapters' words live in `content/beforeCall.ts` (`howItWorks`,
 `chapters`), as do the four signals and their weights (`intentSignals`, with
@@ -257,9 +290,10 @@ studies in How it works — and never decorates for its own sake.
   "Illustrative example" (intent scoring and questions to the sales team are
   planned, and the routing note says the weights and the line are examples); the
   copy-parity suite fails if a score out of 100 shows anywhere else — the hero,
-  the proof, the intro, the engine panel, the examples or the pilot. In the plans a check marks only what is built;
-  roadmap items sit under "Planned". Replace the illustrative proof with a real
-  project, period, comparison and attributed quote once a pilot has run.
+  the intro, the engine panel, the examples, the pilot or the pilot report. In
+  the plans a check marks only what is built; roadmap items sit under "Planned".
+  Replace the illustrative pilot report with a real project, period, comparison
+  and attributed quote once a pilot has run.
 - **Colours and fonts change in `src/styles.css` `@theme` and nowhere else.** It
   owns the only raw hex; components reference tokens through generated
   utilities (`bg-paper`, `text-ink`, `border-line`, `text-clay-deep`, `bg-ink/5`
