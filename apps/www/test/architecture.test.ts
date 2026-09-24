@@ -1,8 +1,9 @@
-// Architecture spec for the demo-first landing page (v2) — source-level, env-free
-// (pure fs + regex; no DOM, no build). Pins the file layout, the design-system
-// tokens and type ranking, content separation, motion discipline, and the
-// self-containment rules (self-hosted fonts; the only external host is the
-// booking API, in one file).
+// Architecture spec for the landing page — source-level, env-free (pure fs +
+// regex over SOURCE; no imports of app code, no DOM, no build). Pins the editorial
+// design system (the paper / ink / clay tokens, self-hosted Lora + IBM Plex Mono,
+// the motion floor, the page-wide pause switch, the one-shot scroll reveal), the
+// file layout, content separation, the demo-booking wiring (one "Book a demo"
+// label; the only external host is the booking API, in one file) and the README.
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -30,6 +31,10 @@ function walk(dir: string, exts: string[]): string[] {
 
 const rel = (f: string) => relative(SRC_DIR, f);
 const sources = () => walk(SRC_DIR, [".ts", ".tsx"]);
+// Source with whole-line `//` comments and `/* … */` blocks removed, so a pin on
+// what the code DOES isn't tripped by prose about it.
+const code = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 // A NAMED export of `name`: `export function|const|class Name`, or `export { Name }`.
 function exportsName(src: string, name: string): boolean {
@@ -49,34 +54,61 @@ describe("architecture — vite entry wiring", () => {
     expect(html).toContain('id="root"');
   });
 
-  test("src/main.tsx imports App and the stylesheet", () => {
+  test("src/main.tsx imports App and the stylesheet, and loads analytics from VITE_PLAUSIBLE_SRC", () => {
     const src = read(resolve(SRC_DIR, "main.tsx"));
+    // main.tsx owns the CSS side-effect import, keeping App SSR-safe.
     expect(/from\s+["']\.\/App["']/.test(src)).toBe(true);
     expect(/["']\.\/styles\.css["']/.test(src)).toBe(true);
+    expect(src).toMatch(
+      /initAnalytics\(\s*import\.meta\.env\.VITE_PLAUSIBLE_SRC/,
+    );
   });
 
-  test("src/App.tsx exports App", () => {
-    expect(exportsName(read(resolve(SRC_DIR, "App.tsx")), "App")).toBe(true);
+  test("src/App.tsx exports App and composes the sections in page order", () => {
+    const src = read(resolve(SRC_DIR, "App.tsx"));
+    expect(exportsName(src, "App")).toBe(true);
+    const ORDER = [
+      "BookingProvider",
+      "Nav",
+      "Hero",
+      "Proof",
+      "StageGrid",
+      "Moats",
+      "Pricing",
+      "Faq",
+      "FooterCta",
+      "BookingDialog",
+    ];
+    const at = ORDER.map((name) => {
+      const hits = src.match(new RegExp(`<${name}[\\s/>]`, "g")) ?? [];
+      expect(hits.length, `<${name}> must appear exactly once`).toBe(1);
+      return src.search(new RegExp(`<${name}[\\s/>]`));
+    });
+    expect(at).toEqual([...at].sort((a, b) => a - b));
   });
 });
 
-// ── the visual system: tokens (raw hex lives ONLY in styles.css) ─────────────
-describe("architecture — src/styles.css tokens", () => {
+// ── src/styles.css owns the @theme tokens (raw hex lives ONLY here) ──────────
+describe("architecture — src/styles.css @theme tokens", () => {
   test("imports tailwind and declares an @theme block", () => {
     const css = read(STYLES);
     expect(css).toContain('@import "tailwindcss"');
     expect(/@theme\b/.test(css)).toBe(true);
   });
 
+  // EXACT palette values (case-insensitive hex) — the warm paper / ink / clay
+  // system. Alpha tiers are Tailwind `/<alpha>` modifiers on these, not tokens.
   const TOKENS: Array<[string, string]> = [
-    ["paper", "#F7F6F2"],
-    ["wash", "#EFEDE7"],
-    ["surface", "#FFFFFF"],
-    ["line", "#E2E0D8"],
-    ["ink", "#191A17"],
-    ["ink-2", "#62645E"],
+    ["paper", "#FAF9F5"],
+    ["paper-2", "#F0EEE6"],
+    ["line", "#E8E6DC"],
+    ["ink", "#141413"],
     ["clay", "#D97757"],
     ["clay-deep", "#A9492A"],
+    ["olive", "#788C5D"],
+    // the text tiers the ≥4.5:1 contrast floor rests on
+    ["ink-2", "#3D3D3A"],
+    ["stone", "#6B6A64"],
     ["olive-deep", "#56663F"],
   ];
   for (const [name, hex] of TOKENS) {
@@ -87,51 +119,77 @@ describe("architecture — src/styles.css tokens", () => {
     });
   }
 
-  test("honours prefers-reduced-motion", () => {
+  for (const fam of ["Lora", "IBM Plex Mono"]) {
+    test(`declares font family ${fam}`, () => {
+      expect(read(STYLES)).toContain(fam);
+    });
+  }
+});
+
+// ── the motion floor, the pause switch and the one-shot scroll reveal ────────
+describe("architecture — motion floor, pause switch, scroll reveal", () => {
+  test("reduced motion ends every animation and removes the SMIL loops", () => {
+    const css = read(STYLES);
+    const reduce =
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/.exec(
+        css,
+      )?.[1] ?? "";
+    expect(reduce, "a prefers-reduced-motion: reduce block").not.toBe("");
+    expect(reduce).toMatch(/animation-iteration-count:\s*1/);
+    expect(reduce).toMatch(/\[data-motion-only\]\s*\{\s*display:\s*none/);
+  });
+
+  test("scroll reveal hides content only behind html[data-motion]", () => {
+    const css = read(STYLES);
+    const hides = [
+      ...css.matchAll(/([^{}]*\[data-reveal\][^{}]*)\{[^}]*opacity:\s*0\b/g),
+    ];
+    expect(hides.length).toBeGreaterThan(0);
+    for (const m of hides) expect(m[1]).toContain("html[data-motion]");
+    const lib = read(resolve(SRC_DIR, "lib/reveal.ts"));
+    expect(exportsName(lib, "reveal")).toBe(true);
+    expect(exportsName(lib, "useReveal")).toBe(true);
+    expect(read(resolve(SRC_DIR, "App.tsx"))).toMatch(/useReveal\(\)/);
+  });
+
+  test("the pause switch (html[data-still]) freezes every CSS animation", () => {
     expect(read(STYLES)).toMatch(
-      /@media\s*\(prefers-reduced-motion:\s*reduce\)/,
+      /html\[data-still\]\s*\*[^{]*\{[^}]*animation-play-state:\s*paused/,
     );
+    const lib = read(resolve(SRC_DIR, "lib/motion.ts"));
+    for (const name of ["setStill", "useStill", "useLiveSvg"])
+      expect(exportsName(lib, name), `lib/motion exports ${name}`).toBe(true);
+    const hero = read(resolve(SRC_DIR, "sections/Hero.tsx"));
+    expect(hero).toMatch(/setStill\(/);
+    expect(hero).toMatch(/from\s+["']\.\.\/content\/site["']/); // the switch's words
+  });
+
+  test("every SMIL loop pauses with the switch and drops under reduced motion", () => {
+    const smil = sources().filter((f) =>
+      /repeatCount\W{1,4}indefinite/.test(read(f)),
+    );
+    expect(smil.length).toBeGreaterThan(0);
+    for (const f of smil) {
+      expect(read(f), `${rel(f)} must call useLiveSvg`).toMatch(/useLiveSvg\(/);
+      expect(read(f), `${rel(f)} must mark data-motion-only`).toContain(
+        "data-motion-only",
+      );
+    }
+  });
+
+  test("the timer-driven demo call holds still when paused", () => {
+    const src = read(resolve(SRC_DIR, "visuals/HeroCall.tsx"));
+    expect(src).toMatch(/useStill\(\)/);
+    expect(src).toMatch(/prefers-reduced-motion:\s*reduce/);
   });
 });
 
-// ── type ranking + motion discipline (items 5 and 11) ────────────────────────
-describe("architecture — type ranking and motion discipline", () => {
-  test("serif appears only in design/Heading.tsx (hero + closing statement)", () => {
-    const offenders = sources()
-      .filter((f) => read(f).includes("font-serif"))
-      .map(rel)
-      .filter((f) => f !== "design/Heading.tsx");
-    expect(offenders, `font-serif outside Heading: ${offenders}`).toEqual([]);
-  });
-
-  test("no upper-case utility labels anywhere", () => {
-    const offenders = sources()
-      .filter((f) => /(?:^|[\s"'`])uppercase(?:[\s"'`]|$)/m.test(read(f)))
-      .map(rel);
-    expect(offenders, `uppercase in: ${offenders}`).toEqual([]);
-  });
-
-  test("looping animation lives only in the sample player", () => {
-    const offenders = sources()
-      .filter((f) => /infinite/.test(read(f)))
-      .map(rel)
-      .filter((f) => f !== "visuals/SampleCall.tsx");
-    expect(offenders, `infinite animation in: ${offenders}`).toEqual([]);
-  });
-
-  test("no scroll-reveal hiding: content is visible on first paint", () => {
-    const all = sources().map(read).join("\n") + read(STYLES);
-    expect(all).not.toContain("data-reveal");
-    expect(all).not.toContain("IntersectionObserver(");
-  });
-});
-
-// ── fonts are self-hosted ────────────────────────────────────────────────────
-describe("architecture — self-hosted fonts", () => {
+// ── self-hosted fonts: @font-face url()s stay local ─────────────────────────
+describe("architecture — @font-face self-hosting in src/styles.css", () => {
   const faceBlocks = (css: string): string[] =>
     [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1] ?? "");
 
-  test("Lora and IBM Plex Mono have @font-face rules", () => {
+  test("both self-hosted families have @font-face rules", () => {
     const blocks = faceBlocks(read(STYLES));
     expect(blocks.some((b) => b.includes("Lora"))).toBe(true);
     expect(blocks.some((b) => b.includes("IBM Plex Mono"))).toBe(true);
@@ -145,29 +203,46 @@ describe("architecture — self-hosted fonts", () => {
     for (const u of urls) {
       expect(u).toContain("fonts/");
       expect(/^https?:/i.test(u)).toBe(false);
+      // url()s in src/styles.css resolve relative to its dir (src/) → ../fonts/<f>.
       expect(existsSync(resolve(SRC_DIR, u)), `must resolve: ${u}`).toBe(true);
     }
   });
 });
 
-// ── file layout: design / sections / visuals / lib ───────────────────────────
+// ── file layout: design / visuals / sections / lib ───────────────────────────
 describe("architecture — component layout", () => {
   const LAYOUT: Array<[string, string[]]> = [
-    ["design", ["Heading", "Text", "Label", "Button", "Section", "Card"]],
+    [
+      "design",
+      ["Heading", "Text", "Kicker", "MonoLabel", "CtaButton", "SectionFrame"],
+    ],
+    [
+      "visuals",
+      [
+        "BrandMark",
+        "HeroCall",
+        "SampleAudio",
+        "FunnelFlow",
+        "MoatArt",
+        "CallArt",
+        "BookingDialog",
+        "Icon",
+      ],
+    ],
     [
       "sections",
       [
         "Nav",
         "Hero",
         "Proof",
-        "HowItWorks",
-        "Examples",
-        "Pilot",
+        "StageGrid",
+        "IntentRouting",
+        "Moats",
+        "Pricing",
         "Faq",
-        "ClosingCta",
+        "FooterCta",
       ],
     ],
-    ["visuals", ["BrandMark", "Icon", "SampleCall", "BookingDialog"]],
   ];
   for (const [dir, names] of LAYOUT) {
     for (const name of names) {
@@ -178,6 +253,12 @@ describe("architecture — component layout", () => {
       });
     }
   }
+
+  test("CtaButton declares accent + ghost variants", () => {
+    const src = read(resolve(SRC_DIR, "design", "CtaButton.tsx"));
+    expect(src).toContain("accent");
+    expect(src).toContain("ghost");
+  });
 
   test("lib exposes the booking client, analytics and the booking context", () => {
     expect(
@@ -193,18 +274,41 @@ describe("architecture — component layout", () => {
     expect(exportsName(ctx, "BookingProvider")).toBe(true);
     expect(exportsName(ctx, "BookDemoButton")).toBe(true);
   });
+
+  // The old copy's parking folder and the demo-first redesign's parallel files
+  // are gone, so there is one tree and one source for every word.
+  const RETIRED = [
+    "content/v1",
+    "design/Button.tsx",
+    "design/Label.tsx",
+    "design/Section.tsx",
+    "design/Card.tsx",
+    "sections/Logos.tsx",
+    "sections/HowItWorks.tsx",
+    "sections/Examples.tsx",
+    "sections/Pilot.tsx",
+    "sections/ClosingCta.tsx",
+    "visuals/SampleCall.tsx",
+  ];
+  for (const path of RETIRED) {
+    test(`src/${path} does not exist`, () => {
+      expect(existsSync(resolve(SRC_DIR, path))).toBe(false);
+    });
+  }
 });
 
 // ── content: typed modules hold the copy; files import it, never inline it ──
 describe("architecture — src/content/ holds the copy", () => {
   const CONTENT: Array<[string, string[]]> = [
-    ["site", ["Book a demo", "How it works"]],
+    ["site", ["Book a demo", "How it works", "Pause animations"]],
     [
       "hero",
       [
         "Turn property enquiries into qualified site visits.",
         "Hear a sample call",
-        "Namaste Rohan ji",
+        "/sample-call.m4a",
+        "Rohan Mehta",
+        "after import",
       ],
     ],
     ["proof", ["Illustrative example", "Enquiries called the same day"]],
@@ -213,11 +317,11 @@ describe("architecture — src/content/ holds the copy", () => {
       ["Respond quickly", "Understand the buyer", "Arrange the next step"],
     ],
     ["examples", ["Built around how property sales actually work"]],
-    ["pilot", ["Start with a four-week pilot", "How fees work"]],
+    ["pilot", ["Start with a four-week pilot", "How fees work", "Planned"]],
     ["faqs", ["How natural does the voice sound?"]],
     [
       "closing",
-      ["See how Revenue OS would handle your next property enquiry."],
+      ["See how Revenue\\u00a0OS would handle your next property enquiry."],
     ],
     ["booking", ["Choose a time", "Work email"]],
   ];
@@ -234,24 +338,68 @@ describe("architecture — src/content/ holds the copy", () => {
     });
   }
 
+  test("every content module is used by the page", () => {
+    const consumers = sources()
+      .filter((f) => !rel(f).startsWith("content/"))
+      .map(read)
+      .join("\n");
+    const mods = walk(resolve(SRC_DIR, "content"), [".ts"]);
+    expect(mods.length).toBe(CONTENT.length);
+    for (const f of mods) {
+      const mod = rel(f).replace(/^content\/|\.ts$/g, "");
+      expect(
+        new RegExp(`from\\s+["'][^"']*content/${mod}["']`).test(consumers),
+        `content/${mod} must be imported by a component`,
+      ).toBe(true);
+    }
+  });
+
+  // [file, content module, strings that MUST live in content — not the file]
   const SEPARATION: Array<[string, string, string[]]> = [
+    ["App", "site", ["Skip to content", "Built in India"]],
     ["sections/Nav", "site", ["How it works"]],
     [
       "sections/Hero",
       "hero",
-      ["Turn property enquiries", "Hear a sample call"],
+      ["Turn property enquiries", "Voice AI for Indian real estate"],
     ],
-    ["visuals/SampleCall", "hero", ["Namaste Rohan", "What the call captured"]],
-    ["sections/Proof", "proof", ["Enquiries called the same day"]],
+    ["sections/Hero", "site", ["Pause animations"]],
     [
-      "sections/HowItWorks",
-      "workflow",
-      ["Respond quickly", "Not ready to visit yet?"],
+      "visuals/SampleAudio",
+      "hero",
+      ["Hear a sample call", "/sample-call.m4a", "not the voice used"],
     ],
-    ["sections/Examples", "examples", ["A natural Hinglish conversation"]],
-    ["sections/Pilot", "pilot", ["How fees work", "Who it suits"]],
+    [
+      "visuals/HeroCall",
+      "hero",
+      [
+        "Rohan Mehta",
+        "Namaste Rohan",
+        "Site visit booked",
+        "2 min after import",
+      ],
+    ],
+    [
+      "sections/Proof",
+      "proof",
+      ["What your pilot report shows", "Enquiries called the same day"],
+    ],
+    ["sections/StageGrid", "workflow", ["From enquiry to site visit"]],
+    ["sections/IntentRouting", "workflow", ["Not ready to visit yet?"]],
+    ["visuals/FunnelFlow", "workflow", ["New enquiries"]],
+    [
+      "sections/Moats",
+      "examples",
+      ["Built around how property sales", "A natural Hinglish conversation"],
+    ],
+    ["visuals/MoatArt", "examples", ["Kitna hai?", "Weekend pe?"]],
+    [
+      "sections/Pricing",
+      "pilot",
+      ["Start with a four-week pilot", "How fees work", "Funnel Engine"],
+    ],
     ["sections/Faq", "faqs", ["How natural does the voice sound?"]],
-    ["sections/ClosingCta", "closing", ["See how Revenue OS would handle"]],
+    ["sections/FooterCta", "closing", ["See how Revenue OS would handle"]],
     ["visuals/BookingDialog", "booking", ["Work email", "Choose a time"]],
     ["lib/bookingContext", "site", []],
   ];
@@ -269,7 +417,7 @@ describe("architecture — src/content/ holds the copy", () => {
 
   test('"Book a demo" is defined once (content/site.ts) — every primary button shares it', () => {
     const holders = sources()
-      .filter((f) => read(f).includes("Book a demo"))
+      .filter((f) => code(read(f)).includes("Book a demo"))
       .map(rel);
     expect(holders).toEqual(["content/site.ts"]);
   });
@@ -308,7 +456,7 @@ describe("architecture — external hosts", () => {
   });
 });
 
-// ── README documents the layout ──────────────────────────────────────────────
+// ── README documents the layout, the booking + analytics setup ──────────────
 describe("architecture — README", () => {
   const readme = () => read(resolve(WWW_DIR, "README.md"));
   test("references the component structure and the booking + analytics setup", () => {
@@ -318,10 +466,12 @@ describe("architecture — README", () => {
       "src/design",
       "src/content",
       "VITE_CALCOM_USERNAME",
+      "VITE_CALCOM_EVENT_SLUG",
       "VITE_PLAUSIBLE_SRC",
     ]) {
       expect(r).toContain(s);
     }
+    expect(r.toLowerCase()).toContain("vite");
     expect(r.toLowerCase()).toContain("adding a page");
   });
 });

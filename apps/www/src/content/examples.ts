@@ -2,9 +2,16 @@
 // small product example and one short explanation. All names, places and times are
 // illustrative. In the summary, the last field is the outcome (the next step).
 // \u00a0 keeps a number with its unit (1,050 sq ft, 11:00 AM, Tower B) on one line.
+// `kicker`, `intro` and each `plate` are derived slot fills for the section's design:
+// the nav label, a lede built from the three titles plus the illustrative note, and
+// the words drawn on each card's illustration (MoatArt) — phrases lifted from the
+// conversation, the summary's own field labels, the visit's three moments.
 
 export const examples = {
+  kicker: "Examples",
   title: "Built around how property sales actually work",
+  intro:
+    "One enquiry, followed from the call to the site visit. Names, places and times are illustrative.",
   badge: "Example",
   conversation: {
     title: "A natural Hinglish conversation",
@@ -21,6 +28,10 @@ export const examples = {
       },
       { who: "Buyer", text: "Okay. Weekend pe dekh sakte hain?" },
     ],
+    plate: {
+      phrases: ["Kitna hai?", "Included hai", "Weekend pe?"],
+      stamp: "Hinglish",
+    },
   },
   summary: {
     title: "A summary your salesperson can use",
@@ -35,6 +46,7 @@ export const examples = {
       { label: "Asked about", value: "Possession date, loan partners" },
       { label: "Next step", value: "Site visit, Sat 11:00\u00a0AM" },
     ],
+    plate: ["Budget", "Timeline", "Next step"],
   },
   visit: {
     title: "Site-visit confirmation and follow-up",
@@ -51,5 +63,6 @@ export const examples = {
         text: "Reminder: your visit is tomorrow at 11:00\u00a0AM. Here is the location pin for Tower\u00a0B.",
       },
     ],
+    plate: ["Confirmed", "Reminder", "Site visit"],
   },
 } as const;

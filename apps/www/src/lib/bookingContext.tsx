@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { bookDemo } from "../content/site";
-import { Button } from "../design/Button";
+import { CtaButton } from "../design/CtaButton";
 import { track } from "./analytics";
 
 // The one booking flow every primary button opens. BookingProvider holds whether
@@ -65,17 +65,27 @@ export function useBooking(): BookingState {
   return ctx;
 }
 
-// The page's primary action. `source` names where it sits (nav, hero, pilot, …).
+// The page's primary action: the ink pill (`ghost` where a quieter one sits beside copy). `source` names where it sits (nav,
+// hero, pilot, closing); `size` and `arrow` follow the CtaButton it renders.
 export function BookDemoButton({
   source,
+  variant = "accent",
+  size,
+  arrow,
   className,
 }: {
   source: string;
+  variant?: "accent" | "ghost";
+  size?: "md" | "lg";
+  arrow?: boolean;
   className?: string;
 }) {
   const { open } = useBooking();
   return (
-    <Button
+    <CtaButton
+      variant={variant}
+      size={size}
+      arrow={arrow}
       onClick={() => {
         track("Demo click", { source });
         open(source);
@@ -83,6 +93,6 @@ export function BookDemoButton({
       className={className}
     >
       {bookDemo}
-    </Button>
+    </CtaButton>
   );
 }

@@ -1,6 +1,6 @@
 // Site chrome copy — the brand, the nav, the one call to action every primary
-// button carries, and the footer. Nav.tsx, App.tsx and lib/bookingContext.tsx
-// compose these and inline none.
+// button carries, the page-wide motion switch and the footer. Nav.tsx, Hero.tsx,
+// App.tsx and lib/bookingContext.tsx compose these and inline none.
 
 interface NavLink {
   label: string;
@@ -22,6 +22,12 @@ export const navLinks: NavLink[] = [
 export const bookDemo = "Book a demo";
 
 export const menuLabels = { open: "Menu", close: "Close" } as const;
+
+// The page-wide switch under the hero's call card (WCAG 2.2.2).
+export const motionToggle = {
+  pause: "Pause animations",
+  play: "Play animations",
+} as const;
 
 export const footerMeta = {
   copyright: "Revenue OS © 2026",

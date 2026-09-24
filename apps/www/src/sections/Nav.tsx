@@ -5,14 +5,15 @@ import { cx } from "../lib/cx";
 import { BrandMark } from "../visuals/BrandMark";
 import { CLOSE, Icon, MENU } from "../visuals/Icon";
 
-// The top bar: wordmark · section anchors · the demo button (the page's one primary action). App wraps it in
+// The top bar: wordmark · section anchors · the demo button. App wraps it in
 // the sticky <header>; once the page scrolls (or the menu opens) the bar turns
 // solid paper over a hairline — opaque, so no panel below ghosts through it.
 // Below md the anchors move into a disclosure menu: a 40px glyph button beside the
 // CTA (its glyph optically flush with the gutter, so all three fit one line at
 // 360px) drops a full-width panel under the bar — absolute, so the sticky header
-// never grows and nothing below shifts. It closes on any link or button (the bar's demo button
-// too), on a click outside the nav, on Escape (focus returns to the button), and
+// never grows and nothing below shifts. It closes on any link or button but its
+// own toggle (the demo button too, as the booking dialog opens over it), on a
+// click outside the nav, on Escape (focus returns to the button), and
 // when the viewport crosses md. Below 360px the
 // wordmark text steps back to the mark alone (still named for screen readers).
 const MD = "(min-width: 768px)";
@@ -70,13 +71,13 @@ export function Nav() {
           : "border-transparent bg-paper/0",
       )}
     >
-      <div className="mx-auto flex h-[64px] max-w-[1224px] items-center justify-between gap-[16px] px-[20px] md:px-[32px]">
+      <div className="mx-auto flex h-[64px] max-w-[1200px] items-center justify-between gap-[16px] px-[20px] md:px-[40px]">
         <a
           href="#top"
           className="flex items-center gap-[10px] whitespace-nowrap rounded-[6px] text-ink no-underline"
         >
           <BrandMark className="size-[26px] shrink-0" />
-          <span className="font-semibold text-[18px] tracking-[-0.015em] max-[360px]:sr-only">
+          <span className="font-serif text-[21px] tracking-[-0.02em] max-[360px]:sr-only">
             {brand}
           </span>
         </a>
@@ -93,7 +94,7 @@ export function Nav() {
           ))}
         </ul>
         <div className="flex items-center gap-[4px]">
-          <BookDemoButton source="nav" />
+          <BookDemoButton source="nav" size="md" />
           <button
             ref={button}
             type="button"
@@ -101,7 +102,7 @@ export function Nav() {
             aria-controls="nav-menu"
             aria-label={open ? menuLabels.close : menuLabels.open}
             onClick={() => setOpen(!open)}
-            className="-mr-[13px] grid size-[44px] shrink-0 cursor-pointer place-items-center rounded-full text-ink transition-colors duration-200 hover:bg-ink/[0.05] md:hidden"
+            className="-mr-[11px] grid size-[40px] shrink-0 cursor-pointer place-items-center rounded-full text-ink transition-colors duration-200 hover:bg-ink/[0.05] md:hidden"
           >
             <Icon d={open ? CLOSE : MENU} className="size-[18px]" />
           </button>
@@ -116,7 +117,7 @@ export function Nav() {
           <li key={link.href} className="border-line border-b last:border-b-0">
             <a
               href={link.href}
-              className="flex h-[56px] items-center rounded-[4px] font-medium text-[18px] text-ink no-underline"
+              className="flex h-[56px] items-center rounded-[4px] font-serif text-[20px] text-ink tracking-[-0.01em] no-underline"
             >
               {link.label}
             </a>

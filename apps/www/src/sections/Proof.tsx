@@ -1,125 +1,97 @@
 import { proof } from "../content/proof";
-import { Card } from "../design/Card";
 import { Heading } from "../design/Heading";
-import { Section } from "../design/Section";
+import { Kicker } from "../design/Kicker";
+import { MonoLabel } from "../design/MonoLabel";
+import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
 import { cx } from "../lib/cx";
+import { reveal } from "../lib/reveal";
+import { Icon, INFO } from "../visuals/Icon";
 
-// The proof under the hero: an EXAMPLE of the pilot report, set as a real <table>
-// the visitor can inspect. The badge, the caption and the intro all say it is
-// illustrative, so nothing reads as a customer result (the badge leads the caption,
-// so a screen reader hears the qualifier first). Revenue OS values are ink,
-// the current process ink-2 — emphasis by tone, no accent. Below sm each row
-// re-flows into a two-column grid (the measure on its own line, both values under
-// their column heads) so the report stays readable at 360px with no sideways scroll.
-// The two value columns keep one fixed width from sm up, and each head is capped
-// so it always breaks the same way — the process on one line, "(example)" under it
-// — at every width, leaving the measures room to stay on one line (even at lg's
-// narrowest card, 1024px).
-const MEASURE = "sm:px-[20px]";
-const NUMBER = "sm:pr-[20px] sm:pl-[12px]";
-const HEAD = "py-[10px] align-bottom";
-const HEAD_TEXT = "block max-w-[120px] text-balance";
-const ROW =
-  "max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-[16px] max-sm:px-[16px]";
-const VALUE = cx(
-  NUMBER,
-  "font-mono text-[15px] tabular-nums max-sm:pb-[14px] sm:py-[15px]",
-);
+// The proof band under the hero, in the trust row's hairlined slot: an EXAMPLE of
+// the pilot report, never a customer result. The eyebrow ("Illustrative example"),
+// the project line, both column heads and the footnote all say so. Head left and
+// the report card right from lg; stacked below. The card borrows the hero call
+// card's header (a serif line beside a mono pill) and the plan cards' hairlines;
+// figures are serif numerals — the current process in stone, Revenue OS in ink.
+// The comparison is a <dl> (one group per measure), so it survives the phone
+// reflow for screen readers: each value carries its column name, visually hidden;
+// the visible column heads are aria-hidden. From sm the two value columns keep
+// one fixed width, so both heads break the same way ("(example)" on its own line);
+// below sm each measure takes a full line with its two values under the heads.
+const COLS =
+  "grid grid-cols-2 gap-x-[16px] sm:grid-cols-[1fr_128px_128px] sm:gap-x-[24px]";
+const HEAD = "font-mono text-[11px] uppercase tracking-[0.1em]";
+const VALUE =
+  "font-serif text-[26px] leading-none tracking-[-0.02em] max-sm:mt-[12px] sm:text-right";
 
 export function Proof() {
   const { columns } = proof;
   return (
-    <Section
-      tone="wash"
-      aria-labelledby="proof-title"
-      className="grid gap-[28px] lg:grid-cols-12 lg:gap-[32px]"
-    >
-      <div className="max-w-[560px] lg:col-span-5 lg:pt-[20px]">
-        <Heading id="proof-title">{proof.title}</Heading>
-        <Text tone="muted" className="mt-[12px]">
-          {proof.intro}
-        </Text>
-      </div>
-
-      <div className="lg:col-span-7">
-        <Card tone="product">
-          <table className="w-full border-collapse text-left max-sm:block">
-            <caption className="px-[16px] pt-[20px] pb-[18px] text-left max-sm:block sm:px-[20px]">
-              <span className="flex flex-col items-start gap-[10px] sm:flex-row-reverse sm:justify-between sm:gap-[16px]">
-                <span className="inline-flex h-[24px] shrink-0 items-center rounded-full bg-ink/[0.06] px-[9px] font-medium text-[13px] text-ink">
-                  {proof.badge}
-                </span>
-                <span>
-                  <span className="block text-balance font-semibold text-[16px] text-ink leading-[1.4] tracking-[-0.01em]">
-                    {proof.project}
-                  </span>
-                  <span className="mt-[2px] block text-[14px] text-ink-2">
-                    {proof.period}
-                  </span>
-                </span>
-              </span>
-            </caption>
-            <thead className="max-sm:block">
-              <tr className={cx(ROW, "border-line border-y text-[13.5px]")}>
-                <th
-                  scope="col"
-                  className={cx(
-                    MEASURE,
-                    HEAD,
-                    "font-normal text-ink-2 max-sm:sr-only",
-                  )}
-                >
-                  {columns.metric}
-                </th>
-                <th
-                  scope="col"
-                  className={cx(
-                    NUMBER,
-                    HEAD,
-                    "font-normal text-ink-2 sm:w-[140px]",
-                  )}
-                >
-                  <span className={HEAD_TEXT}>{columns.before}</span>
-                </th>
-                <th
-                  scope="col"
-                  className={cx(
-                    NUMBER,
-                    HEAD,
-                    "font-medium text-ink sm:w-[140px]",
-                  )}
-                >
-                  <span className={HEAD_TEXT}>{columns.after}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="max-sm:block">
+    <SectionFrame flush aria-labelledby="proof-title">
+      <div className="grid gap-[36px] border-line border-t pt-[48px] pb-[64px] md:gap-[48px] md:pt-[64px] md:pb-[88px] lg:grid-cols-12 lg:gap-x-[40px]">
+        <div {...reveal(200)} className="lg:col-span-5">
+          <Kicker>{proof.badge}</Kicker>
+          <Heading id="proof-title" className="mt-[20px]">
+            {proof.title}
+          </Heading>
+          <Text className="mt-[20px] max-w-[52ch]">{proof.intro}</Text>
+        </div>
+        <div {...reveal(280)} className="lg:col-span-7">
+          <div className="rounded-[24px] bg-paper-2 p-[20px] sm:p-[28px]">
+            <div className="flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px]">
+              <p className="text-balance font-serif text-[18px] text-ink leading-[1.3] tracking-[-0.01em]">
+                {proof.project}
+              </p>
+              <MonoLabel className="flex h-[26px] items-center whitespace-nowrap rounded-full border border-line bg-paper px-[10px] text-[11px] text-ink-2">
+                {proof.period}
+              </MonoLabel>
+            </div>
+            <div
+              aria-hidden="true"
+              className={cx(
+                COLS,
+                HEAD,
+                "mt-[24px] items-end border-line border-b pb-[10px]",
+              )}
+            >
+              <span className="text-stone max-sm:hidden">{columns.metric}</span>
+              <span className="text-stone sm:text-right">{columns.before}</span>
+              <span className="text-ink sm:text-right">{columns.after}</span>
+            </div>
+            <dl>
               {proof.rows.map((row) => (
-                <tr
+                <div
                   key={row.metric}
-                  className={cx(ROW, "border-line border-b last:border-b-0")}
+                  className={cx(
+                    COLS,
+                    "items-baseline border-line border-b py-[16px] last:border-b-0 last:pb-0",
+                  )}
                 >
-                  <th
-                    scope="row"
-                    className={cx(
-                      MEASURE,
-                      "font-normal text-[15px] text-ink leading-[1.4] max-sm:col-span-2 max-sm:pt-[14px] max-sm:pb-[4px] sm:py-[15px]",
-                    )}
-                  >
+                  <dt className="col-span-2 text-pretty text-[15.5px] text-ink-2 leading-[1.4] sm:col-span-1">
                     {row.metric}
-                  </th>
-                  <td className={cx(VALUE, "text-ink-2")}>{row.before}</td>
-                  <td className={cx(VALUE, "text-ink")}>{row.after}</td>
-                </tr>
+                  </dt>
+                  <dd className={cx(VALUE, "text-stone")}>
+                    <span className="sr-only">{columns.before} </span>
+                    {row.before}
+                  </dd>
+                  <dd className={cx(VALUE, "text-ink")}>
+                    <span className="sr-only">{columns.after} </span>
+                    {row.after}
+                  </dd>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </Card>
-        <Text size="small" tone="muted" className="mt-[14px]">
-          {proof.footnote}
-        </Text>
+            </dl>
+          </div>
+          <Text size="small" tone="muted" className="mt-[16px]">
+            <Icon
+              d={INFO}
+              className="mr-[8px] inline-block size-[15px] align-[-3px]"
+            />
+            {proof.footnote}
+          </Text>
+        </div>
       </div>
-    </Section>
+    </SectionFrame>
   );
 }

@@ -2,8 +2,10 @@
 // weeks, what the customer provides, how success is measured, and how fees work —
 // in words, because rates are agreed per project (no published figures). The plan
 // comparison is secondary (a disclosure) and honest: checks only for what exists.
+// `kicker` is a derived slot fill (the nav label) for the eyebrow over the heading.
 
 export const pilot = {
+  kicker: "Pilot",
   title: "Start with a four-week pilot",
   intro: "We walk you through the pilot on the demo. This is what it involves.",
   facts: [

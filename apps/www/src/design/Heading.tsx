@@ -1,42 +1,46 @@
 import type { ComponentProps } from "react";
 import { cx } from "../lib/cx";
 
-// The heading ranks. Serif (Lora) is reserved for the two statements that carry
-// the page — the hero <h1> ("display") and the closing invitation ("statement");
-// every other heading is the UI sans: section heads (the default <h2>) and card /
-// example titles (`as="h3"`, size "card"). The one file allowed `font-serif`
-// (architecture test), so the ranking can't drift.
-type HeadingSize = "display" | "statement" | "section" | "card";
+// Serif display headings (Lora 400 — editorial, sentence case, tight tracking).
+// `level` picks the page-level tag: 1 = the single <h1> (hero), 2 = section heads;
+// `as="h3"` is a card / plan / FAQ title. `size` is the shared scale (defaults:
+// h1 display, h2 section, h3 card; "none" leaves sizing to className). Lines are
+// balanced unless `balance={false}` asks for the greedy wrap.
+type HeadingSize = "display" | "section" | "card" | "none";
 
 const SIZES: Record<HeadingSize, string> = {
   display:
-    "font-serif font-normal text-[38px] leading-[1.06] tracking-[-0.025em] min-[380px]:text-[40px] md:text-[54px] lg:text-[56px] xl:text-[62px]",
-  statement:
-    "font-serif font-normal text-[31px] leading-[1.12] tracking-[-0.02em] md:text-[44px]",
-  section:
-    "font-sans font-semibold text-[29px] leading-[1.15] tracking-[-0.022em] md:text-[36px]",
-  card: "font-sans font-semibold text-[18px] leading-[1.35] tracking-[-0.01em] md:text-[19px]",
+    "text-[clamp(42px,6.2vw,64px)] leading-[1.02] tracking-[-0.032em] lg:text-[clamp(50px,4.7vw,60px)]",
+  section: "text-[clamp(32px,3.6vw,46px)] leading-[1.08] tracking-[-0.022em]",
+  card: "text-[25px] leading-[1.2] tracking-[-0.014em]",
+  none: "",
 };
 
 type HeadingProps = ComponentProps<"h2"> & {
   level?: 1 | 2;
-  as?: "h2" | "h3";
+  as?: "h3";
   size?: HeadingSize;
+  balance?: boolean;
 };
 
 export function Heading({
   level = 2,
   as,
   size,
+  balance = true,
   className,
   ...rest
 }: HeadingProps) {
-  const Tag = level === 1 ? "h1" : (as ?? "h2");
-  const scale =
-    size ?? (level === 1 ? "display" : Tag === "h3" ? "card" : "section");
+  const Tag = as ?? (level === 1 ? "h1" : "h2");
+  const scale = size ?? (as ? "card" : level === 1 ? "display" : "section");
   return (
     <Tag
-      className={cx("text-balance text-ink", SIZES[scale], className)}
+      className={cx(
+        "font-normal font-serif",
+        balance && "text-balance",
+        SIZES[scale],
+        className,
+      )}
       {...rest}
     />
   );

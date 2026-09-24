@@ -12,9 +12,10 @@ import {
 import { flushSync } from "react-dom";
 import { bookingCopy as copy } from "../content/booking";
 import { closing } from "../content/closing";
-import { Button } from "../design/Button";
+import { CtaButton } from "../design/CtaButton";
 import { Heading } from "../design/Heading";
-import { Label } from "../design/Label";
+import { Kicker } from "../design/Kicker";
+import { MonoLabel } from "../design/MonoLabel";
 import { hasHeardSample, track } from "../lib/analytics";
 import {
   BookingError,
@@ -34,9 +35,11 @@ import { CHECK, CLOSE, Icon, INFO } from "./Icon";
 // each step's heading takes focus as it appears. Times come from lib/booking
 // (Cal.com, or the preview adapter, which the dialog always discloses — to screen
 // readers too, as the dialog's description) and read in the visitor's own zone.
-// From 640px up it is a 560px panel anchored near the top, so the header stays put
-// while steps change height; below, a full-height sheet. SSR renders it closed,
-// and window/document are only touched inside effects and handlers.
+// From 640px up it is a 560px paper card with the page's soft lift, anchored near
+// the top, so the header stays put while steps change height; below, a full-height
+// sheet. The look is the page's own: serif headings, mono for dates and times, ink
+// pills, paper-2 wells, stone for secondary text, clay-deep for errors. SSR renders
+// it closed, and window/document are only touched inside effects and handlers.
 const TITLE_ID = "booking-title";
 const NOTICE_ID = "booking-preview";
 const FALLBACK_ZONE = "Asia/Kolkata";
@@ -224,19 +227,19 @@ export function BookingDialog() {
       onClick={(e) => {
         if (!busy && pressedBackdrop.current && onBackdrop(e)) close();
       }}
-      className="m-0 h-dvh max-h-none w-full max-w-none scroll-pt-[116px] overflow-y-auto overscroll-contain border-0 bg-paper forced-colors:border p-0 text-ink transition-[opacity,translate] duration-200 ease-soft backdrop:transition-opacity backdrop:duration-200 starting:translate-y-[8px] starting:opacity-0 starting:backdrop:opacity-0 sm:mx-auto sm:mt-[min(9dvh,88px)] sm:scroll-pt-[132px] sm:h-fit sm:max-h-[calc(100dvh_-_min(9dvh,88px)_-_24px)] sm:w-[560px] sm:max-w-[calc(100vw_-_48px)] sm:rounded-[16px]"
+      className="m-0 h-dvh max-h-none w-full max-w-none scroll-pt-[132px] overflow-y-auto overscroll-contain border-0 bg-paper p-0 text-ink transition-[opacity,translate] duration-200 ease-[var(--ease-soft)] backdrop:bg-ink/20 backdrop:transition-opacity backdrop:duration-200 forced-colors:border starting:translate-y-[8px] starting:opacity-0 starting:backdrop:opacity-0 sm:mx-auto sm:mt-[min(9dvh,88px)] sm:h-fit sm:max-h-[calc(100dvh_-_min(9dvh,88px)_-_24px)] sm:w-[560px] sm:max-w-[calc(100vw_-_48px)] sm:scroll-pt-[148px] sm:rounded-[24px] sm:border sm:border-line sm:shadow-lift"
     >
       <div
         className={cx(
-          "sticky top-0 z-10 flex items-start justify-between gap-[16px] border-b bg-paper px-[20px] pt-[20px] pb-[16px] transition-[border-color] duration-150 sm:px-[32px] sm:pt-[28px] sm:pb-[20px]",
+          "sticky top-0 z-10 flex items-start justify-between gap-[16px] border-b bg-paper px-[20px] pt-[20px] pb-[16px] transition-[border-color] duration-200 sm:px-[32px] sm:pt-[28px] sm:pb-[20px]",
           scrolled ? "border-line" : "border-transparent",
         )}
       >
         <div>
-          <Heading id={TITLE_ID} size="card">
+          <Kicker>{copy.length}</Kicker>
+          <Heading id={TITLE_ID} size="card" className="mt-[12px]">
             {copy.title}
           </Heading>
-          <Label className="mt-[2px] block">{copy.length}</Label>
         </div>
         <button
           type="button"
@@ -246,10 +249,10 @@ export function BookingDialog() {
             if (!busy) close();
           }}
           className={cx(
-            "-mt-[8px] -mr-[12px] grid size-[44px] shrink-0 place-items-center rounded-full text-ink-2 transition-[background-color,color] duration-150",
+            "-mt-[12px] -mr-[12px] grid size-[44px] shrink-0 place-items-center rounded-full text-stone transition-[background-color,color] duration-200",
             busy
               ? "cursor-not-allowed opacity-40"
-              : "cursor-pointer hover:bg-ink/[0.06] hover:text-ink",
+              : "cursor-pointer hover:bg-ink/[0.05] hover:text-ink",
           )}
         >
           <Icon d={CLOSE} className="size-[18px]" />
@@ -259,9 +262,12 @@ export function BookingDialog() {
         {!booking.live && (
           <p
             id={NOTICE_ID}
-            className="mb-[24px] flex items-start gap-[10px] rounded-[10px] bg-wash px-[14px] py-[10px] text-[14px] text-ink-2 leading-[1.45]"
+            className="mb-[24px] flex items-start gap-[10px] rounded-[16px] bg-paper-2 px-[16px] py-[12px] text-[14px] text-ink-2 leading-[1.5]"
           >
-            <Icon d={INFO} className="mt-[2px] size-[16px] shrink-0" />
+            <Icon
+              d={INFO}
+              className="mt-[2px] size-[16px] shrink-0 text-stone"
+            />
             {copy.preview}
           </p>
         )}
@@ -461,29 +467,31 @@ const summaryOf = (iso: string, zone: string) => {
   return `${weekday}, ${date} · ${timeOf(iso, zone)}`;
 };
 
-// A step's heading: one rank below the dialog title, and the focus target.
+// A step's heading: serif, one rank below the dialog title, and the focus target.
 function StepHeading({ children }: { children: ReactNode }) {
   return (
-    <h3
+    <Heading
+      as="h3"
+      size="none"
       ref={focusOnMount}
       tabIndex={-1}
-      className="font-semibold text-[16px] text-ink leading-[1.4] tracking-[-0.005em] outline-none"
+      className="text-[21px] text-ink leading-[1.25] tracking-[-0.01em] outline-none"
     >
       {children}
-    </h3>
+    </Heading>
   );
 }
 
-// A selectable day or time: hairline on white, charcoal when chosen — and, in
-// Windows high contrast, the system's Highlight pair, since forced colours would
-// otherwise draw chosen and unchosen alike. Transitions here name their
-// properties: transition-colors would also fade the focus ring in from ink.
+// A selectable day or time: the ghost pill's hairline on the card shade, ink when
+// chosen — and, in Windows high contrast, the system's Highlight pair, since
+// forced colours would otherwise draw chosen and unchosen alike. Transitions here
+// name their properties: transition-colors would also fade the focus ring in.
 const choice = (pressed: boolean) =>
   cx(
-    "cursor-pointer rounded-[10px] border transition-[background-color,border-color,color] duration-150",
+    "cursor-pointer border transition-[background-color,border-color,color] duration-200",
     pressed
       ? "border-ink bg-ink text-paper forced-colors:border-[Highlight] forced-colors:bg-[Highlight] forced-colors:text-[HighlightText] forced-colors:[forced-color-adjust:none]"
-      : "border-line bg-surface text-ink hover:border-ink/35",
+      : "border-ink/15 bg-card text-ink hover:border-ink/40",
   );
 
 function TimeStep({
@@ -514,13 +522,13 @@ function TimeStep({
       {/* A retry remounts the heading, which takes focus as the "Try again"
           button it replaces disappears — focus never falls to the page. */}
       <StepHeading key={attempt}>{copy.steps.time}</StepHeading>
-      <Label className="mt-[2px] block">
+      <p className="mt-[4px] text-[14px] text-stone leading-[1.45]">
         {copy.timezone.replace("{zone}", zoneName(zone))}
-      </Label>
+      </p>
       {taken && (
         <p
           role="alert"
-          className="mt-[16px] rounded-[10px] bg-wash px-[14px] py-[10px] font-medium text-[15px] text-clay-deep leading-[1.45]"
+          className="mt-[16px] rounded-[16px] bg-paper-2 px-[16px] py-[12px] font-medium text-[15px] text-clay-deep leading-[1.45]"
         >
           {copy.slotTaken}
         </p>
@@ -528,7 +536,7 @@ function TimeStep({
       {slots.state === "loading" && (
         <p
           role="status"
-          className="mt-[20px] min-h-[200px] text-[15px] text-ink-2"
+          className="mt-[20px] min-h-[200px] text-[15px] text-stone"
         >
           {copy.loading}
         </p>
@@ -536,13 +544,18 @@ function TimeStep({
       {slots.state === "error" && (
         <div role="alert" className="mt-[20px] min-h-[200px]">
           <p className="text-[15px] text-ink">{copy.loadError}</p>
-          <Button variant="secondary" onClick={onRetry} className="mt-[12px]">
+          <CtaButton
+            variant="ghost"
+            size="md"
+            onClick={onRetry}
+            className="mt-[14px]"
+          >
             {copy.retry}
-          </Button>
+          </CtaButton>
         </div>
       )}
       {slots.state === "ready" && days.length === 0 && (
-        <p className="mt-[20px] min-h-[200px] text-[15px] text-ink-2">
+        <p className="mt-[20px] min-h-[200px] text-[15px] text-stone">
           {copy.empty}
         </p>
       )}
@@ -563,22 +576,22 @@ function TimeStep({
                   onClick={() => onDay(d.date)}
                   className={cx(
                     choice(pressed),
-                    "flex w-[72px] shrink-0 snap-start flex-col items-center py-[10px] sm:w-auto",
+                    "flex w-[72px] shrink-0 snap-start flex-col items-center gap-[4px] rounded-[16px] py-[11px] sm:w-auto",
                   )}
                 >
-                  <span
+                  <MonoLabel
                     className={cx(
-                      "text-[13px] leading-[1.3]",
+                      "text-[11px] uppercase leading-[1.3] tracking-[0.1em]",
                       pressed
                         ? "text-paper/70 forced-colors:text-[HighlightText]"
-                        : "text-ink-2",
+                        : "text-stone",
                     )}
                   >
                     {weekday}
-                  </span>{" "}
-                  <span className="whitespace-nowrap font-medium text-[15px] leading-[1.35]">
+                  </MonoLabel>{" "}
+                  <MonoLabel className="whitespace-nowrap text-[14px] leading-[1.35]">
                     {date}
-                  </span>
+                  </MonoLabel>
                 </button>
               );
             })}
@@ -592,7 +605,7 @@ function TimeStep({
                 onClick={() => onPick(iso)}
                 className={cx(
                   choice(iso === start),
-                  "h-[44px] font-mono text-[14px] tabular-nums",
+                  "h-[44px] rounded-full font-mono text-[14px] tabular-nums",
                 )}
               >
                 {timeOf(iso, zone)}
@@ -634,8 +647,11 @@ function DetailsStep({
   return (
     <>
       <StepHeading>{copy.steps.details}</StepHeading>
-      <div className="mt-[2px] flex items-baseline gap-[12px]">
-        <p id="booking-slot" className="text-[15px] text-ink leading-[1.45]">
+      <div className="mt-[16px] flex items-center justify-between gap-[12px] rounded-[16px] bg-paper-2 py-[6px] pr-[6px] pl-[16px]">
+        <p
+          id="booking-slot"
+          className="font-mono text-[14px] text-ink tabular-nums leading-[1.45]"
+        >
           {summary}
         </p>
         {/* Locked while booking, so the confirmation shows the time that was sent. */}
@@ -645,10 +661,10 @@ function DetailsStep({
           aria-disabled={pending || undefined}
           aria-describedby="booking-slot"
           className={cx(
-            "-my-[12px] -mx-[8px] h-[44px] shrink-0 rounded-[8px] px-[8px] text-[15px] text-ink-2 underline decoration-ink-2/40 underline-offset-[4px] transition-[color,text-decoration-color] duration-150",
+            "h-[40px] shrink-0 rounded-full border border-ink/15 bg-paper px-[16px] font-medium text-[14px] text-ink transition-[background-color,border-color] duration-200",
             pending
               ? "cursor-not-allowed opacity-60"
-              : "cursor-pointer hover:text-ink hover:decoration-ink",
+              : "cursor-pointer hover:border-ink/40",
           )}
         >
           {copy.change}
@@ -683,14 +699,14 @@ function DetailsStep({
             <div key={id}>
               <label
                 htmlFor={`booking-${id}`}
-                className="block font-medium text-[15px] text-ink leading-[1.4]"
+                className="block font-medium text-[14.5px] text-ink leading-[1.4]"
               >
                 {copy.fields[id]}
               </label>
               {hint && (
                 <p
                   id={`booking-${id}-hint`}
-                  className="mt-[2px] text-[14px] text-ink-2 leading-[1.45]"
+                  className="mt-[2px] text-[13.5px] text-stone leading-[1.45]"
                 >
                   {hint}
                 </p>
@@ -719,7 +735,7 @@ function DetailsStep({
                 }}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={describedBy || undefined}
-                className="mt-[8px] h-[48px] w-full rounded-[10px] border border-line-strong bg-surface px-[14px] text-[16px] text-ink outline-offset-[1px] transition-[border-color] duration-150 hover:border-ink-2 aria-[invalid=true]:border-clay-deep sm:h-[44px]"
+                className="mt-[8px] h-[48px] w-full rounded-[10px] border border-stone bg-card px-[14px] text-[16px] text-ink outline-offset-[1px] transition-[border-color] duration-200 hover:border-ink-2 aria-[invalid=true]:border-clay-deep sm:h-[44px]"
               />
               {error && (
                 <p
@@ -732,10 +748,15 @@ function DetailsStep({
             </div>
           );
         })}
-        <div className="mt-[4px]">
-          <Button type="submit" busy={pending} className="max-sm:w-full">
+        <div className="mt-[8px]">
+          <CtaButton
+            variant="accent"
+            type="submit"
+            busy={pending}
+            className="max-sm:w-full"
+          >
             {pending ? copy.submitting : copy.submit}
-          </Button>
+          </CtaButton>
           {/* The focused button's new label isn't reliably read out, so the wait
               is announced here too. */}
           <p role="status" className="sr-only">
@@ -782,12 +803,12 @@ function Confirmation({
       >
         {title}
       </Heading>
-      <p className="mt-[4px] text-[17px] text-ink leading-[1.5]">
+      <p className="mt-[8px] font-mono text-[15px] text-ink tabular-nums leading-[1.5]">
         {copy.confirmWhen
           .replace("{date}", `${weekday}, ${date}`)
           .replace("{time}", timeOf(start, zone))}
       </p>
-      <p className="mt-[8px] text-[15px] text-ink-2 leading-[1.55]">
+      <p className="mt-[10px] text-[15px] text-ink-2 leading-[1.6]">
         {beforeEmail}
         {/* The address (with the text after it) is one unit that moves down
             whole when it fits a line; only one longer than the line breaks,
@@ -807,20 +828,29 @@ function Confirmation({
         </span>
       </p>
       <div className="mt-[24px] border-line border-t pt-[20px]">
-        <p className="text-[14px] text-ink-2">{copy.confirmCovers}</p>
-        <ul className="mt-[8px] list-disc space-y-[4px] pl-[20px] text-[15px] text-ink leading-[1.5] marker:text-ink-2">
+        <p className="text-[14px] text-stone">{copy.confirmCovers}</p>
+        <ul className="mt-[12px] flex flex-col gap-[10px]">
           {closing.covers.map((item) => (
-            <li key={item}>{item}</li>
+            <li
+              key={item}
+              className="flex items-start gap-[12px] text-[15px] text-ink-2 leading-[1.5]"
+            >
+              <Icon
+                d={CHECK}
+                className="mt-[3px] size-[16px] shrink-0 text-olive-deep"
+              />
+              {item}
+            </li>
           ))}
         </ul>
       </div>
-      <Button
-        variant="secondary"
+      <CtaButton
+        variant="ghost"
         onClick={onClose}
         className="mt-[28px] max-sm:w-full"
       >
         {copy.close}
-      </Button>
+      </CtaButton>
     </>
   );
 }

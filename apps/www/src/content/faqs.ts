@@ -1,6 +1,8 @@
 // The short FAQ before the closing invitation: voice quality, existing sales
 // teams, integrations, onboarding, pricing — and how do-not-call rules are handled.
-// Answers describe what exists today; planned work is called planned.
+// Answers describe what exists today; planned work is called planned. Faq.tsx
+// composes it and inlines none of these strings. The kicker is the nav's own label
+// for the section.
 
 interface Faq {
   q: string;
@@ -8,6 +10,7 @@ interface Faq {
 }
 
 export const faqCopy = {
+  kicker: "FAQ",
   title: "Questions",
   sub: "Anything else, ask us on the demo.",
 } as const;

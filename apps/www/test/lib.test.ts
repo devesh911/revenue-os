@@ -301,7 +301,7 @@ describe("analytics", () => {
   });
 
   test("a sample play is remembered for the booking event", () => {
-    track("Sample play", { source: "player" });
+    track("Sample play", { source: "hero-link" });
     expect(hasHeardSample()).toBe(true);
   });
 

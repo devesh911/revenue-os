@@ -1,96 +1,116 @@
 import { useId, useState } from "react";
 import { defaultOpenFaq, faqCopy, faqs } from "../content/faqs";
 import { Heading } from "../design/Heading";
-import { Section } from "../design/Section";
+import { Kicker } from "../design/Kicker";
+import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
+import { BookDemoButton } from "../lib/bookingContext";
 import { cx } from "../lib/cx";
-import { BAR, Icon } from "../visuals/Icon";
+import { reveal } from "../lib/reveal";
 
-// The short FAQ: the head beside (lg, on the page's 5/7 split) or above the list,
-// and an accordion whose items open and close independently — one open on first
-// paint (defaultOpenFaq, the SSR pin), so opening a question never collapses the
-// one being read. Each item's outer element carries data-faq / data-open. Answers
-// are always rendered so they can ease open (grid rows 0fr → 1fr); closed ones are
-// `inert`, so keyboard and screen readers skip them. Panels stay plain blocks, not
-// regions — six named landmarks would crowd screen-reader navigation. The plus is
-// two bars: the vertical one turns flat to make the minus. Hairlines separate
-// items — no boxes.
+// FAQ — a sticky side head ("ask us on the demo", with a quiet Book a demo) beside an accordion whose items open and close independently
+// (default = item 0 alone, the SSR pin), so opening one never collapses another
+// and slides the tapped question away. Each item's outer element carries
+// the data-faq / data-open hooks. Answers are always rendered so their height can
+// ease open (grid-rows 0fr → 1fr); closed panels are `inert`, so keyboard and
+// assistive tech skip them. The plus folds into a minus as its vertical bar turns.
+// A hyphenated word ("do-not-call") stays whole when a question wraps.
+const unbroken = (text: string) =>
+  text.split(/(\S+-\S+)/).map((part, i) =>
+    i % 2 ? (
+      <span key={part} className="whitespace-nowrap">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+
 export function Faq() {
   const [open, setOpen] = useState(() => new Set([defaultOpenFaq]));
-  const id = useId();
   const toggle = (i: number) =>
     setOpen((prev) => {
       const next = new Set(prev);
       if (!next.delete(i)) next.add(i);
       return next;
     });
+  const id = useId();
   return (
-    <Section
+    <SectionFrame
       id="faq"
-      aria-labelledby="faq-title"
-      className="grid gap-[28px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-[64px]"
+      className="grid gap-[48px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-[80px]"
     >
-      <div>
-        <Heading id="faq-title">{faqCopy.title}</Heading>
-        <Text tone="muted" className="mt-[12px]">
-          {faqCopy.sub}
-        </Text>
+      <div {...reveal()} className="lg:sticky lg:top-[112px] lg:self-start">
+        <Kicker>{faqCopy.kicker}</Kicker>
+        <Heading className="mt-[20px]">{faqCopy.title}</Heading>
+        <Text className="mt-[20px] max-w-[40ch]">{faqCopy.sub}</Text>
+        <BookDemoButton
+          source="faq"
+          variant="ghost"
+          size="md"
+          arrow
+          className="mt-[28px]"
+        />
       </div>
-      <div>
+      <div {...reveal(120)}>
         {faqs.map((faq, i) => {
           const isOpen = open.has(i);
           return (
             <div
               key={faq.q}
               data-faq={i}
-              data-open={isOpen}
+              data-open={isOpen ? "true" : "false"}
               className="border-line border-b first:border-t"
             >
-              <Heading as="h3">
+              <Heading as="h3" size="none">
                 <button
                   type="button"
+                  id={`${id}q${i}`}
                   aria-expanded={isOpen}
                   aria-controls={`${id}a${i}`}
                   onClick={() => toggle(i)}
-                  className="group flex min-h-[64px] w-full cursor-pointer items-center justify-between gap-[24px] py-[18px] text-left text-pretty"
+                  className="flex w-full cursor-pointer items-center justify-between gap-[24px] py-[26px] text-left text-[20px] text-ink leading-[1.35] tracking-[-0.01em] transition-colors duration-200 hover:text-clay-deep md:text-[22px]"
                 >
-                  {faq.q}
-                  <span
+                  <span>{unbroken(faq.q)}</span>
+                  <svg
+                    viewBox="0 0 14 14"
                     aria-hidden="true"
-                    className="grid shrink-0 text-ink-2 transition-colors duration-150 group-hover:text-ink *:col-start-1 *:row-start-1"
+                    className="size-[14px] shrink-0"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
                   >
-                    <Icon d={BAR} className="size-[16px]" />
-                    <Icon
-                      d={BAR}
+                    <path d="M0 7h14" />
+                    <path
+                      d="M7 0v14"
                       className={cx(
-                        "size-[16px] transition-transform duration-200",
-                        !isOpen && "rotate-90",
+                        "origin-center transition-transform duration-300 ease-[var(--ease-soft)] [transform-box:fill-box]",
+                        isOpen && "rotate-90",
                       )}
                     />
-                  </span>
+                  </svg>
                 </button>
               </Heading>
-              <div
+              <section
                 id={`${id}a${i}`}
+                aria-labelledby={`${id}q${i}`}
                 inert={!isOpen}
                 className={cx(
-                  "grid transition-[grid-template-rows] duration-200",
-                  isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                  "grid transition-[grid-template-rows,opacity] duration-[400ms] ease-[var(--ease-soft)]",
+                  isOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0",
                 )}
               >
                 <div className="overflow-hidden">
-                  <Text
-                    tone="muted"
-                    className="max-w-[64ch] pb-[24px] md:pr-[40px]"
-                  >
+                  <Text className="max-w-[62ch] pr-[38px] pb-[36px]">
                     {faq.a}
                   </Text>
                 </div>
-              </div>
+              </section>
             </div>
           );
         })}
       </div>
-    </Section>
+    </SectionFrame>
   );
 }

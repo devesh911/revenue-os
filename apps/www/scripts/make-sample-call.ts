@@ -1,9 +1,9 @@
-// Regenerates the SYNTHETIC sample call (public/sample-call.m4a) and prints the
-// transcript cue times for src/content/hero.ts. macOS only: it uses the system
+// Regenerates the SYNTHETIC sample call (public/sample-call.m4a) and prints its
+// length for sampleCall.seconds in src/content/hero.ts. macOS only: it uses the system
 // text-to-speech voices (`say`) and `afconvert`. The agent speaks Hindi-script
 // text (Lekha, hi_IN) so Hindi words are pronounced natively; the buyer speaks
 // romanised Hinglish (Aman, en_IN). Replace the output with a real recording
-// (and its cue times) as soon as one exists.
+// as soon as one exists.
 //   bun apps/www/scripts/make-sample-call.ts
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -42,7 +42,6 @@ const LINES: Array<{ voice: "Lekha" | "Aman"; tts: string }> = [
 const dir = mkdtempSync(join(tmpdir(), "sample-call-"));
 const silence = (s: number) => Buffer.alloc(Math.round(s * RATE) * 2);
 const chunks: Buffer[] = [silence(LEAD_IN)];
-const cues: number[] = [];
 let t = LEAD_IN;
 for (const [i, line] of LINES.entries()) {
   const wav = join(dir, `${i}.wav`);
@@ -56,7 +55,6 @@ for (const [i, line] of LINES.entries()) {
   ]);
   const buf = readFileSync(wav);
   const pcm = buf.subarray(buf.indexOf("data") + 8); // WAVE: "data" + u32 size
-  cues.push(Math.round(t * 10) / 10);
   chunks.push(pcm, silence(GAP));
   t += pcm.length / 2 / RATE + GAP;
 }
@@ -93,4 +91,3 @@ rmSync(dir, { recursive: true });
 
 console.log(`wrote ${out}`);
 console.log(`duration: ${t.toFixed(1)}s`);
-console.log(`cues (seconds, one per line): ${JSON.stringify(cues)}`);
