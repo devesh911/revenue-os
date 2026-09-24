@@ -17,7 +17,8 @@ export const workflow = {
   step: "03", // chapter 03 of How it works (content/beforeCall.ts holds 01 and 02)
   kicker: "The call and after",
   title: "The call, then the next step",
-  intro: "Every enquiry that gets a call goes through the same three steps.",
+  intro:
+    "At 7:14 PM the agent calls Rohan. Every call runs the same three steps.",
   flow: {
     entry: "New enquiries",
     loop: "Follow-up",
@@ -26,21 +27,19 @@ export const workflow = {
   },
   steps: [
     {
-      num: "01",
       tag: "First call",
       title: "Respond quickly",
       body: "Call a new enquiry.",
       example: {
-        label: "Enquiry imported",
-        time: "7:12 PM",
-        line: "Rohan Mehta · from your enquiry list",
+        label: "Call started",
+        time: "7:14 PM",
+        line: "Rohan Mehta · in Hinglish",
         status: "Called",
         delay: "2 min",
         after: "after import",
       },
     },
     {
-      num: "02",
       tag: "Qualify",
       title: "Understand the buyer",
       body: "Capture budget, location, and timeline.",
@@ -53,7 +52,6 @@ export const workflow = {
       },
     },
     {
-      num: "03",
       tag: "Visit or follow-up",
       title: "Arrange the next step",
       body: "Book a visit or continue following up.",

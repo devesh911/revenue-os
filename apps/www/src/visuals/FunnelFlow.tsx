@@ -157,11 +157,11 @@ export function FunnelFlow({ className }: { className?: string }) {
       </svg>
       {steps.map((s, i) => (
         <span
-          key={s.num}
+          key={s.tag}
           className="absolute grid size-[34px] -translate-1/2 place-items-center rounded-full border border-paper/20 bg-grain bg-ink font-mono text-[11px] text-paper/70"
           style={{ left: pct(node(i), W), top: pct(Y, H) }}
         >
-          {s.num}
+          <span className="size-[6px] rounded-full bg-paper/50" />
         </span>
       ))}
       <span className={cx(label, "left-0 text-paper/50")} style={aboveTrack}>

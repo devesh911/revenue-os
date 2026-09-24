@@ -77,7 +77,7 @@ const EXAMPLES: ReactNode[] = [
 
 export function StageGrid() {
   return (
-    <SectionFrame id="the-call" tone="ink">
+    <SectionFrame id="the-call" tone="ink" aria-labelledby="the-call-title">
       <div
         {...reveal()}
         className="grid gap-[24px] lg:grid-cols-2 lg:items-end lg:gap-0"
@@ -86,7 +86,9 @@ export function StageGrid() {
           <Kicker tone="inverse" className="mb-[24px]">
             {workflow.step} · {workflow.kicker}
           </Kicker>
-          <Heading>{workflow.title}</Heading>
+          <Heading as="h3" size="section" id="the-call-title">
+            {workflow.title}
+          </Heading>
         </div>
         <Text size="lede" tone="inverse" className="max-w-[46ch] lg:pl-[28px]">
           {workflow.intro}
@@ -96,7 +98,7 @@ export function StageGrid() {
       <ol className="mt-[56px] grid gap-y-[40px] md:mt-[96px] md:grid-cols-2 md:gap-x-[56px] md:gap-y-[56px] lg:mt-[40px] lg:grid-cols-3">
         {workflow.steps.map((s, i) => (
           <li
-            key={s.num}
+            key={s.tag}
             {...reveal(120 + i * 90)}
             className="relative grid content-start gap-y-[24px] pl-[32px] before:absolute before:inset-y-0 before:-left-[28px] before:hidden before:w-px before:bg-paper/10 md:pl-0 md:even:before:block md:last:col-span-2 md:last:grid-cols-2 md:last:gap-x-[56px] lg:row-span-2 lg:grid-rows-subgrid lg:not-first:before:block lg:last:col-span-1 lg:last:grid-cols-1"
           >
@@ -112,8 +114,7 @@ export function StageGrid() {
             )}
             <div>
               <MonoLabel className="flex gap-[12px] whitespace-nowrap text-[11.5px] uppercase tracking-[0.12em]">
-                <span className="text-paper">{s.num}</span>
-                <span className="text-paper/50">{s.tag}</span>
+                <span className="text-paper/60">{s.tag}</span>
               </MonoLabel>
               <Heading as="h3" className="mt-[18px]">
                 {s.title}

@@ -48,11 +48,11 @@ export function App() {
         </header>
         <main id="main">
           <Hero />
-          <Proof />
           <HowItWorks />
           <StageGrid />
           <Moats />
           <Pricing />
+          <Proof />
           <Faq />
           <FooterCta />
         </main>

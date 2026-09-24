@@ -31,7 +31,7 @@
     var(--color-olive) 92%,
     var(--color-paper)
   ); /* olive for small text on the ink panel (≥5:1) */
-  --color-card: #fdfcfa; /* the hero call card, a shade above paper */
+  --color-card: #fdfcfa; /* product cards (the hero's result card, briefs), a shade above paper */
   --color-oat: #e3dacc; /* illustration plate */
   --color-cactus: #bcd1ca; /* illustration plate */
   --color-heather: #cbcadb; /* illustration plate */
@@ -145,10 +145,19 @@
   }
 }
 /* ── hero survey ground (visuals/SurveyGround.tsx): its keyframes and utilities ── */
-/* The drawing's inks, all mixed from the palette: graph paper (minor 8px, major
-   40px), the sheet's border and registration marks, the plan's walls, linework
-   and door swings. Set on the ground and on the plan. */
+/* The drawing's inks, all mixed from the palette: the sheet's margin, graph paper
+   (minor 8px, major 40px), the sheet's border and registration marks, the plan's
+   walls, linework and door swings — and the plan's width, which Hero's grid and the
+   sheet's clearing share: 432px, less on a short screen (never under 360px) so the
+   headline, both buttons and the card share a laptop's first screen. Set on the
+   hero's band. */
 @utility survey {
+  --survey-plan: min(432px, max(360px, calc((100svh - 236px) * 0.8)));
+  --survey-margin: color-mix(
+    in oklab,
+    var(--color-paper-2) 34%,
+    var(--color-paper)
+  );
   --survey-minor: color-mix(in oklab, var(--color-line) 54%, transparent);
   --survey-major: color-mix(in oklab, var(--color-mute) 22%, transparent);
   --survey-border: color-mix(
@@ -165,14 +174,15 @@
     var(--color-paper)
   );
 }
-/* The sheet: graph paper that clears behind the hero's copy (the minor lines fully,
-   the major ones to 35%) and fades out, border and all, before the band's foot.
-   Phones keep it to the top right; stacked, it clears round the copy on top; from
-   lg round the copy column (its centre: the column's left edge + half its 1.05fr;
-   47% down, where Hero seats the copy, a little above the card's middle). */
+/* The sheet: paper with a hairline border, ruled as graph paper that clears behind
+   the hero's copy (the minor lines fully, the major ones to 35%). Phones keep it
+   faint, toward the top right; stacked, it clears round the copy on top; from lg
+   round the copy column — its centre is the content's left edge plus half the
+   column left of the plan (the 1200px column less its 40px gutters, the plan and
+   the 48px gap), a little below the sheet's middle, where the copy sits. */
 @utility survey-sheet {
+  background: var(--color-paper);
   border: 1px solid var(--survey-border);
-  mask-image: linear-gradient(black 58%, transparent);
   --survey-clear: radial-gradient(
     130% 720px at 100% 0%,
     black,
@@ -209,43 +219,26 @@
   }
   @media (width >= 64rem) {
     --survey-clear: radial-gradient(
-      ellipse 540px 440px at
+      ellipse 520px 400px at
         calc(
           max(50% - 580px, 0px) +
           20px +
-          (min(100%, 1160px) - 104px) *
-          0.2625
+          (min(100%, 1160px) - 88px - var(--survey-plan)) /
+          2
         )
-        47%,
+        calc(50% + 14px),
       transparent 45%,
       black 100%
     );
   }
 }
-/* The plan's box, round the call card's figure: bands above (--survey-top: the
-   front door and its swing, the living room and kitchen) and below (--survey-foot,
-   under the caption row: the bedrooms) and slim margins either side — from lg,
-   32px into the gutter and up to 32px toward the sheet's edge, as the viewport allows. */
-@utility survey-plan {
-  --survey-top: 48px;
-  --survey-foot: 48px;
-  position: absolute;
-  inset: calc(-1 * var(--survey-top)) -6px calc(-1 * var(--survey-foot));
-  @media (width >= 48rem) {
-    inset-inline: -8px;
-  }
-  @media (width >= 64rem) {
-    left: -32px;
-    right: calc(-1 * clamp(8px, max((100vw - 1200px) / 2, 0px) + 6px, 32px));
-  }
-}
-/* the plot: the walls wipe in left to right; the dimension line draws out */
+/* the plot, once: the plan wipes in left to right; the dimension line draws out */
 @keyframes survey-wipe {
   from {
-    clip-path: inset(0 100% 0 0);
+    clip-path: inset(-3% 103% -3% -3%);
   }
   to {
-    clip-path: inset(0);
+    clip-path: inset(-3%);
   }
 }
 @keyframes survey-grow {

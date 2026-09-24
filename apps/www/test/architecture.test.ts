@@ -1,11 +1,12 @@
 // Architecture spec for the landing page — source-level, env-free (pure fs +
 // regex over SOURCE; no imports of app code, no DOM, no build). Pins the editorial
 // design system (the paper / ink / clay tokens, self-hosted Lora + IBM Plex Mono,
-// the motion floor, the page-wide pause switch, the one-shot scroll reveal), the
-// file layout, content separation, "Before the call" reading its four intent
-// signals from one module, namespaced keyframes, the demo-booking wiring (one
-// "Book a demo" label; the only external host is the booking API, in one file)
-// and the README.
+// the motion floor, the page-wide pause switch, the one-shot scroll reveal, the
+// hero's floor plan that draws itself once), the file layout (the page in order,
+// the old looping call card gone), content separation, How it works reading its
+// four intent signals from one module, namespaced keyframes, the demo-booking
+// wiring (one "Book a demo" label; the only external host is the booking API, in
+// one file) and the README.
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -69,13 +70,14 @@ describe("architecture — vite entry wiring", () => {
   test("src/App.tsx exports App and composes the sections in page order", () => {
     const src = read(resolve(SRC_DIR, "App.tsx"));
     expect(exportsName(src, "App")).toBe(true);
+    // How it works tells chapters 01 and 02; StageGrid, the engine panel, is 03
     const ORDER = [
       "BookingProvider",
       "Nav",
       "Hero",
       "Proof",
+      "HowItWorks",
       "StageGrid",
-      "BeforeCall",
       "Moats",
       "Pricing",
       "Faq",
@@ -180,13 +182,16 @@ describe("architecture — motion floor, pause switch, scroll reveal", () => {
     }
   });
 
-  test("the timer-driven demo call holds still when paused", () => {
-    const src = read(resolve(SRC_DIR, "visuals/HeroCall.tsx"));
-    expect(src).toMatch(/useStill\(\)/);
-    expect(src).toMatch(/prefers-reduced-motion:\s*reduce/);
+  test("the hero's floor plan draws itself once: no timer, no loop, and Pause finishes it", () => {
+    const src = code(read(resolve(SRC_DIR, "visuals/SurveyGround.tsx")));
+    expect(src).not.toMatch(
+      /\b(?:setTimeout|setInterval|requestAnimationFrame)\(|repeatCount|infinite/,
+    );
+    // paused mid-plot, the drawing completes rather than freezing half-drawn
+    expect(src).toMatch(/data-plot=\{\s*still\s*\?\s*["']done["']/);
   });
 
-  test("the loop runner (lib/sequence) and the live floor plan honour pause and reduced motion", () => {
+  test("the loop runner (lib/sequence) and the self-drawing floor plan honour pause and reduced motion", () => {
     for (const file of ["lib/sequence.ts", "visuals/SurveyGround.tsx"]) {
       const src = code(read(resolve(SRC_DIR, file)));
       expect(src, `${file} reads the pause switch`).toMatch(/useStill\(\)/);
@@ -272,7 +277,6 @@ describe("architecture — component layout", () => {
       "visuals",
       [
         "BrandMark",
-        "HeroCall",
         "SampleAudio",
         "FunnelFlow",
         "MoatArt",
@@ -292,7 +296,7 @@ describe("architecture — component layout", () => {
         "Proof",
         "StageGrid",
         "IntentRouting",
-        "BeforeCall",
+        "HowItWorks",
         "Moats",
         "Pricing",
         "Faq",
@@ -340,17 +344,27 @@ describe("architecture — component layout", () => {
     "design/Section.tsx",
     "design/Card.tsx",
     "sections/Logos.tsx",
-    "sections/HowItWorks.tsx",
     "sections/Examples.tsx",
     "sections/Pilot.tsx",
     "sections/ClosingCta.tsx",
     "visuals/SampleCall.tsx",
+    // the old looping call card, and "Before the call" as its own section (now
+    // chapter 01 of How it works)
+    "visuals/HeroCall.tsx",
+    "sections/BeforeCall.tsx",
   ];
   for (const path of RETIRED) {
     test(`src/${path} does not exist`, () => {
       expect(existsSync(resolve(SRC_DIR, path))).toBe(false);
     });
   }
+
+  test("nothing still names the old call card or its scenarios", () => {
+    const stale = sources().filter((f) =>
+      /\bHeroCall\b|\bCallScenario\b|\bcallLabels\b|\bcalls\[/.test(read(f)),
+    );
+    expect(stale.map(rel)).toEqual([]);
+  });
 });
 
 // ── content: typed modules hold the copy; files import it, never inline it ──
@@ -365,14 +379,21 @@ describe("architecture — src/content/ holds the copy", () => {
         "/sample-call.m4a",
         "Rohan Mehta",
         "after import",
+        "Site visit booked",
         "Meridian Greens · Tower B",
-        "Balcony",
+        "Illustrative",
       ],
     ],
     ["proof", ["Illustrative example", "Enquiries called the same day"]],
     [
       "workflow",
-      ["Respond quickly", "Understand the buyer", "Arrange the next step"],
+      [
+        "The call and after",
+        "The call, then the next step",
+        "Respond quickly",
+        "Understand the buyer",
+        "Arrange the next step",
+      ],
     ],
     ["examples", ["Built around how property sales actually work"]],
     ["pilot", ["Start with a four-week pilot", "How fees work", "Planned"]],
@@ -385,8 +406,11 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "beforeCall",
       [
+        "Follow one enquiry, from import to site visit.",
         "Before the call",
         "Your team answers once. Every call knows.",
+        "Who to call first",
+        "Every score shows its working.",
         "Illustrative example",
         "Repeat enquiry",
       ],
@@ -409,6 +433,25 @@ describe("architecture — src/content/ holds the copy", () => {
       for (const s of strings) expect(src).toContain(s);
     });
   }
+
+  test("content/beforeCall.ts holds How it works: its intro, chapters 01 and 02, the signals", () => {
+    const src = read(resolve(SRC_DIR, "content/beforeCall.ts"));
+    for (const name of [
+      "howItWorks",
+      "chapters",
+      "intentSignals",
+      "intentScore",
+    ])
+      expect(exportsName(src, name), `exports ${name}`).toBe(true);
+    const section = code(read(resolve(SRC_DIR, "sections/HowItWorks.tsx")));
+    expect(section).toMatch(
+      /import\s*\{[^}]*\bchapters\b[^}]*\bhowItWorks\b[^}]*\}\s*from\s*["']\.\.\/content\/beforeCall["']/,
+    );
+    // the chapters in story order, each heading directly above its own visual
+    expect(section).toMatch(
+      /chapters\.context\b[\s\S]*?<CallBrief\s*\/>[\s\S]*?chapters\.intent\b[\s\S]*?<IntentEvidence\s*\/>/,
+    );
+  });
 
   test("every content module is used by the page", () => {
     const consumers = sources()
@@ -433,7 +476,15 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "sections/Hero",
       "hero",
-      ["Turn property enquiries", "Voice AI for Indian real estate"],
+      [
+        "Turn property enquiries",
+        "Voice AI for Indian real estate",
+        "Rohan Mehta",
+        "after import",
+        "Captured",
+        "Site visit booked",
+        "Illustrative result",
+      ],
     ],
     ["sections/Hero", "site", ["Pause animations"]],
     [
@@ -442,21 +493,15 @@ describe("architecture — src/content/ holds the copy", () => {
       ["Hear a sample call", "/sample-call.m4a", "not the voice used"],
     ],
     [
-      "visuals/HeroCall",
-      "hero",
-      [
-        "Rohan Mehta",
-        "Namaste Rohan",
-        "Site visit booked",
-        "2 min after import",
-      ],
-    ],
-    [
       "sections/Proof",
       "proof",
       ["What your pilot report shows", "Enquiries called the same day"],
     ],
-    ["sections/StageGrid", "workflow", ["From enquiry to site visit"]],
+    [
+      "sections/StageGrid",
+      "workflow",
+      ["The call and after", "The call, then the next step"],
+    ],
     ["sections/IntentRouting", "workflow", ["Not ready to visit yet?"]],
     ["visuals/FunnelFlow", "workflow", ["New enquiries"]],
     [
@@ -475,9 +520,16 @@ describe("architecture — src/content/ holds the copy", () => {
     ["visuals/BookingDialog", "booking", ["Work email", "Choose a time"]],
     ["lib/bookingContext", "site", []],
     [
-      "sections/BeforeCall",
+      "sections/HowItWorks",
       "beforeCall",
-      ["Before the call", "Your team answers once", "Illustrative example"],
+      [
+        "Follow one enquiry",
+        "Before the call",
+        "Your team answers once",
+        "Who to call first",
+        "Every score shows",
+        "Illustrative example",
+      ],
     ],
     [
       "visuals/IntentEvidence",
@@ -510,16 +562,7 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "visuals/SurveyGround",
       "hero",
-      [
-        "Meridian Greens",
-        "Illustrative",
-        "Bed",
-        "Balcony",
-        "Living",
-        "Kitchen",
-        "9.75",
-        "Visit ·",
-      ],
+      ["Meridian Greens", "Illustrative", "9.75"],
     ],
   ];
   for (const [file, mod, strings] of SEPARATION) {
@@ -542,11 +585,11 @@ describe("architecture — src/content/ holds the copy", () => {
   });
 });
 
-// ── "Before the call": the four intent signals are stated once ──────────────
+// ── How it works: the four intent signals are stated once ───────────────────
 // content/beforeCall.ts holds the signals and their weights and sums them; both
 // studies and their copy modules read them from there, so the evidence, the brief
 // and the score can never disagree.
-describe("architecture — before the call reads one set of signals", () => {
+describe("architecture — How it works reads one set of signals", () => {
   const BEFORE = read(resolve(SRC_DIR, "content/beforeCall.ts"));
   const WEIGHTS = [...BEFORE.matchAll(/\bweight:\s*(\d+)/g)].map((m) =>
     Number(m[1]),
@@ -710,18 +753,30 @@ describe("architecture — README", () => {
     expect(r.toLowerCase()).toContain("adding a page");
   });
 
-  test("documents Before the call, the live survey ground and the chime", () => {
+  test("documents the page order, the hero's drawing sheet and result card, How it works and the chime", () => {
     const r = readme();
     for (const s of [
-      "Before the call",
+      "## Page order",
+      "## The hero",
+      "sections/HowItWorks.tsx",
+      "01 · Before the call",
+      "02 · Who to call first",
+      "03 · The call and after",
       "Illustrative example",
       "content/beforeCall.ts",
       "SurveyGround",
+      "result",
       "lib/sequence.ts",
       "lib/chime.ts",
       "armChime",
     ]) {
       expect(r).toContain(s);
     }
+  });
+
+  test("no longer documents the old call card", () => {
+    const r = readme();
+    for (const s of ["HeroCall", "calls[0]", "onPhase", "sections/BeforeCall"])
+      expect(r).not.toContain(s);
   });
 });

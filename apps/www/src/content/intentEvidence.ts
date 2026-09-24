@@ -52,7 +52,7 @@ export const intentEvidence = {
   followUp: {
     kicker: `For buyers under ${callNow}`,
     title: "Follow-up plan",
-    body: "WhatsApp brochure today, re-call in 5\u00a0days",
+    body: "Floor plans on WhatsApp today, a check-in on day\u00a07, a re-call on day\u00a030",
   },
   callNow: {
     kicker: `For buyers at ${callNow} and over`,

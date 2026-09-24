@@ -9,9 +9,9 @@
 
 export const examples = {
   kicker: "Examples",
-  title: "Built around how property sales actually work",
+  title: "What the buyer hears, and what your team gets",
   intro:
-    "One enquiry, followed from the call to the site visit. Names, places and times are illustrative.",
+    "Rohan's call, up close: the conversation in Hinglish, the summary your salesperson receives, and the WhatsApp confirmation that follows. Names, places and times are illustrative.",
   badge: "Example",
   conversation: {
     title: "A natural Hinglish conversation",

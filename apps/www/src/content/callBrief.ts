@@ -29,7 +29,7 @@ const rows: BriefRow[] = [
   {
     label: "Enquiry",
     value: "2\u00a0BHK in Whitefield, budget up to ₹90\u00a0L",
-    note: "\u201c2bhk chahiye whitefield, budget 90 tak\u201d",
+    note: "\u201c2bhk chahiye whitefield, budget 90 tak, loan bhi lena hai\u201d",
     quote: true,
     source: "from import",
   },
@@ -162,7 +162,7 @@ export const callBrief = {
     label: "Intent",
     level: "High",
     score,
-    note: `${signals} · over ${callNow} means call now`,
+    note: `${signals} · ${callNow} or more means call now`,
     source: "scored · 7:13\u00a0PM",
   },
   plan: {

@@ -125,7 +125,6 @@ export function IntentEvidence() {
                   {i > 0 && (
                     <span className="mx-[9px] h-px w-[14px] bg-mute max-lg:hidden" />
                   )}
-                  <span className="mr-[6px] text-stone lg:hidden">{i + 1}</span>
                   {here && (
                     <span className="mr-[7px] size-[6px] rounded-full bg-clay" />
                   )}
