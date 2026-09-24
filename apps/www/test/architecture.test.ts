@@ -2,8 +2,10 @@
 // regex over SOURCE; no imports of app code, no DOM, no build). Pins the editorial
 // design system (the paper / ink / clay tokens, self-hosted Lora + IBM Plex Mono,
 // the motion floor, the page-wide pause switch, the one-shot scroll reveal), the
-// file layout, content separation, the demo-booking wiring (one "Book a demo"
-// label; the only external host is the booking API, in one file) and the README.
+// file layout, content separation, "Before the call" reading its four intent
+// signals from one module, namespaced keyframes, the demo-booking wiring (one
+// "Book a demo" label; the only external host is the booking API, in one file)
+// and the README.
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -73,6 +75,7 @@ describe("architecture — vite entry wiring", () => {
       "Hero",
       "Proof",
       "StageGrid",
+      "BeforeCall",
       "Moats",
       "Pricing",
       "Faq",
@@ -182,6 +185,55 @@ describe("architecture — motion floor, pause switch, scroll reveal", () => {
     expect(src).toMatch(/useStill\(\)/);
     expect(src).toMatch(/prefers-reduced-motion:\s*reduce/);
   });
+
+  test("the loop runner (lib/sequence) and the live floor plan honour pause and reduced motion", () => {
+    for (const file of ["lib/sequence.ts", "visuals/SurveyGround.tsx"]) {
+      const src = code(read(resolve(SRC_DIR, file)));
+      expect(src, `${file} reads the pause switch`).toMatch(/useStill\(\)/);
+      expect(src, `${file} checks reduced motion`).toMatch(
+        /prefers-reduced-motion:\s*reduce/,
+      );
+    }
+    expect(
+      exportsName(read(resolve(SRC_DIR, "lib/sequence.ts")), "useSequence"),
+    ).toBe(true);
+  });
+
+  test("the before-the-call studies step through useSequence, with no timers of their own", () => {
+    for (const file of [
+      "visuals/IntentEvidence.tsx",
+      "visuals/CallBrief.tsx",
+    ]) {
+      const src = code(read(resolve(SRC_DIR, file)));
+      expect(src, `${file} uses useSequence`).toMatch(/useSequence\(/);
+      expect(src, `${file} runs no timer`).not.toMatch(
+        /\b(?:setTimeout|setInterval|requestAnimationFrame)\(/,
+      );
+    }
+  });
+
+  test("the chime is armed at boot and only sounds while the brief plays", () => {
+    const lib = read(resolve(SRC_DIR, "lib/chime.ts"));
+    for (const name of [
+      "chime",
+      "armChime",
+      "unlockSound",
+      "setSound",
+      "useSound",
+      "useSoundReady",
+    ])
+      expect(exportsName(lib, name), `lib/chime exports ${name}`).toBe(true);
+    expect(code(read(resolve(SRC_DIR, "main.tsx")))).toMatch(/armChime\(\)/);
+    const brief = code(read(resolve(SRC_DIR, "visuals/CallBrief.tsx")));
+    expect(brief).toMatch(/from\s+["']\.\.\/lib\/chime["']/);
+    expect(brief, "chime() only while the sequence is playing").toMatch(
+      /\bplaying\s*&&[^;{}]*\bchime\(\)/,
+    );
+    // The Sound switch reads "on" only once audio can really play, and its own
+    // press (a real gesture) unlocks it.
+    expect(brief).toMatch(/useSoundReady\(\)/);
+    expect(brief).toMatch(/onClick=\{[^}]*\bunlockSound\(\)/);
+  });
 });
 
 // ── self-hosted fonts: @font-face url()s stay local ─────────────────────────
@@ -227,6 +279,9 @@ describe("architecture — component layout", () => {
         "CallArt",
         "BookingDialog",
         "Icon",
+        "SurveyGround",
+        "IntentEvidence",
+        "CallBrief",
       ],
     ],
     [
@@ -237,6 +292,7 @@ describe("architecture — component layout", () => {
         "Proof",
         "StageGrid",
         "IntentRouting",
+        "BeforeCall",
         "Moats",
         "Pricing",
         "Faq",
@@ -309,6 +365,8 @@ describe("architecture — src/content/ holds the copy", () => {
         "/sample-call.m4a",
         "Rohan Mehta",
         "after import",
+        "Meridian Greens · Tower B",
+        "Balcony",
       ],
     ],
     ["proof", ["Illustrative example", "Enquiries called the same day"]],
@@ -324,6 +382,20 @@ describe("architecture — src/content/ holds the copy", () => {
       ["See how Revenue\\u00a0OS would handle your next property enquiry."],
     ],
     ["booking", ["Choose a time", "Work email"]],
+    [
+      "beforeCall",
+      [
+        "Before the call",
+        "Your team answers once. Every call knows.",
+        "Illustrative example",
+        "Repeat enquiry",
+      ],
+    ],
+    ["intentEvidence", ["Call now", "Follow-up plan", "call-now line"]],
+    [
+      "callBrief",
+      ["Priya Nair", "What the agent looked at", "Open question", "Call plan"],
+    ],
   ];
   for (const [mod, strings] of CONTENT) {
     test(`src/content/${mod}.ts is typed and holds its copy`, () => {
@@ -402,10 +474,57 @@ describe("architecture — src/content/ holds the copy", () => {
     ["sections/FooterCta", "closing", ["See how Revenue OS would handle"]],
     ["visuals/BookingDialog", "booking", ["Work email", "Choose a time"]],
     ["lib/bookingContext", "site", []],
+    [
+      "sections/BeforeCall",
+      "beforeCall",
+      ["Before the call", "Your team answers once", "Illustrative example"],
+    ],
+    [
+      "visuals/IntentEvidence",
+      "intentEvidence",
+      [
+        "Call now",
+        "Follow-up plan",
+        "call-now line",
+        "Needs a home loan",
+        "Calling Rohan",
+        "Routing",
+      ],
+    ],
+    ["visuals/IntentEvidence", "beforeCall", ["Repeat enquiry", "Budget fits"]],
+    [
+      "visuals/CallBrief",
+      "callBrief",
+      [
+        "Priya Nair",
+        "Call brief",
+        "Open question",
+        "What the agent looked at",
+        "Saved to Meridian Greens",
+        "one covered spot",
+        "Greet in Hinglish",
+        "Ready ·",
+      ],
+    ],
+    ["visuals/CallBrief", "beforeCall", ["Repeat enquiry", "Budget fits"]],
+    [
+      "visuals/SurveyGround",
+      "hero",
+      [
+        "Meridian Greens",
+        "Illustrative",
+        "Bed",
+        "Balcony",
+        "Living",
+        "Kitchen",
+        "9.75",
+        "Visit ·",
+      ],
+    ],
   ];
   for (const [file, mod, strings] of SEPARATION) {
     test(`${file} imports content/${mod} and inlines none of it`, () => {
-      const src = read(resolve(SRC_DIR, `${file}.tsx`));
+      const src = code(read(resolve(SRC_DIR, `${file}.tsx`)));
       expect(
         new RegExp(`from\\s+["'][^"']*content/${mod}["']`).test(src),
         `${file} must import content/${mod}`,
@@ -423,12 +542,128 @@ describe("architecture — src/content/ holds the copy", () => {
   });
 });
 
-// ── raw colour hex lives ONLY in src/styles.css ─────────────────────────────
-describe("architecture — raw hex only in src/styles.css", () => {
-  test("no raw colour hex in any src/**/*.{ts,tsx}", () => {
-    const offenders = sources()
-      .filter((f) => /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/.test(read(f)))
-      .map(rel);
+// ── "Before the call": the four intent signals are stated once ──────────────
+// content/beforeCall.ts holds the signals and their weights and sums them; both
+// studies and their copy modules read them from there, so the evidence, the brief
+// and the score can never disagree.
+describe("architecture — before the call reads one set of signals", () => {
+  const BEFORE = read(resolve(SRC_DIR, "content/beforeCall.ts"));
+  const WEIGHTS = [...BEFORE.matchAll(/\bweight:\s*(\d+)/g)].map((m) =>
+    Number(m[1]),
+  );
+  const TOTAL = WEIGHTS.reduce((sum, w) => sum + w, 0);
+
+  test("content/beforeCall.ts states four weights and derives the total", () => {
+    expect(WEIGHTS.length).toBe(4);
+    expect(code(BEFORE)).toMatch(/\btotal:\s*intentSignals\.reduce\(/);
+  });
+
+  // A source's string literals, and the rest of its code with them (and its
+  // comments) blanked out.
+  const split = (src: string) => {
+    const strings: string[] = [];
+    const rest = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|\s)\/\/.*$/gm, "$1")
+      .replace(
+        /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g,
+        (lit) => {
+          strings.push(lit);
+          return '""';
+        },
+      );
+    return { strings, rest };
+  };
+  // A weight written as a chip ("+24") or the total as a figure ("78 / 100").
+  const RESTATED = new RegExp(
+    `\\+\\s*(?:${[...new Set(WEIGHTS)].join("|")})\\b|(?<![\\w.])${TOTAL}(?![\\w.%])`,
+  );
+
+  for (const file of [
+    "visuals/IntentEvidence.tsx",
+    "visuals/CallBrief.tsx",
+    "content/intentEvidence.ts",
+    "content/callBrief.ts",
+  ]) {
+    test(`${file} reads intentSignals from content/beforeCall and restates no weight or total`, () => {
+      const src = read(resolve(SRC_DIR, file));
+      expect(src).toMatch(
+        /import\s*\{[^}]*\bintentSignals\b[^}]*\}\s*from\s*["'](?:\.\.\/content\/|\.\/)beforeCall["']/,
+      );
+      const { strings, rest } = split(src);
+      expect(strings.filter((lit) => RESTATED.test(lit))).toEqual([]);
+      expect(rest).not.toMatch(/\bweight\s*:\s*\d/);
+      expect(rest).not.toMatch(new RegExp(`(?<![\\w.])${TOTAL}(?![\\w.])`));
+      expect(rest).not.toMatch(new RegExp(WEIGHTS.join("\\s*,\\s*")));
+    });
+  }
+});
+
+// ── keyframes and utilities are namespaced ──────────────────────────────────
+// Shared keyframes are ro-*; each visual that needs its own keeps them (and its
+// @utility classes) in its reserved block of styles.css, under its own prefix.
+describe("architecture — namespaced keyframes", () => {
+  const css = () => read(STYLES);
+  const names = (src: string, at: string) =>
+    [...src.matchAll(new RegExp(`@${at}\\s+([\\w-]+)`, "g"))].map(
+      (m) => m[1] ?? "",
+    );
+  const used = (src: string) =>
+    [...code(src).matchAll(/animate-\[([\w-]+?)_/g)].map((m) => m[1] ?? "");
+
+  test("every @keyframes is ro- (shared) or a visual's own prefix", () => {
+    const stray = names(css(), "keyframes").filter(
+      (n) => !/^(?:ro|survey|intent|brief)-/.test(n),
+    );
+    expect(stray).toEqual([]);
+  });
+
+  test("every animation a component names is defined in styles.css", () => {
+    const defined = new Set(names(css(), "keyframes"));
+    const missing = sources().flatMap((f) =>
+      used(read(f))
+        .filter((n) => !defined.has(n))
+        .map((n) => `${rel(f)}: ${n}`),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  // [visual, its styles.css block, its prefix]
+  const AREAS: Array<[string, string, string]> = [
+    ["visuals/SurveyGround", "hero survey ground", "survey"],
+    ["visuals/IntentEvidence", "intent evidence", "intent"],
+    ["visuals/CallBrief", "call brief", "brief"],
+  ];
+  for (const [file, title, prefix] of AREAS) {
+    test(`${file}: its keyframes and utilities are ${prefix}-*, in its own block`, () => {
+      const all = css();
+      const from = all.indexOf(`/* ── ${title} (`);
+      expect(from, `styles.css has the "${title}" block`).toBeGreaterThan(0);
+      const block = all.slice(from, all.indexOf("/* ── ", from + 1));
+      const own = [...names(block, "keyframes"), ...names(block, "utility")];
+      for (const n of own)
+        expect(n === prefix || n.startsWith(`${prefix}-`), n).toBe(true);
+      for (const n of used(read(resolve(SRC_DIR, `${file}.tsx`))))
+        expect(n.startsWith("ro-") || n.startsWith(`${prefix}-`), n).toBe(true);
+    });
+  }
+});
+
+// ── raw colour lives ONLY in src/styles.css ─────────────────────────────────
+// Components reach colour through the tokens (bg-ink, var(--color-ink), color-mix()
+// over them). A hex literal (3, 4, 6 or 8 digits) or a colour function typed out by
+// hand — rgb()/rgba()/hsl()/hsla(), or hwb/lab/lch/oklab/oklch() — is a raw colour,
+// even inside a Tailwind arbitrary value like shadow-[0_1px_2px_rgba(…)] (so no \b
+// before the name: "_" is a word character). color-mix(in oklab, …) only NAMES a
+// colour space, with no "(" after it, so it passes.
+describe("architecture — raw colour only in src/styles.css", () => {
+  const RAW =
+    /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b|(?<![A-Za-z0-9])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/g;
+
+  test("no raw colour hex, rgb() or hsl() in any src/**/*.{ts,tsx}", () => {
+    const offenders = sources().flatMap((f) =>
+      [...read(f).matchAll(RAW)].map((m) => `${rel(f)}: ${m[0]}`),
+    );
     expect(offenders).toEqual([]);
   });
 });
@@ -473,5 +708,20 @@ describe("architecture — README", () => {
     }
     expect(r.toLowerCase()).toContain("vite");
     expect(r.toLowerCase()).toContain("adding a page");
+  });
+
+  test("documents Before the call, the live survey ground and the chime", () => {
+    const r = readme();
+    for (const s of [
+      "Before the call",
+      "Illustrative example",
+      "content/beforeCall.ts",
+      "SurveyGround",
+      "lib/sequence.ts",
+      "lib/chime.ts",
+      "armChime",
+    ]) {
+      expect(r).toContain(s);
+    }
   });
 });

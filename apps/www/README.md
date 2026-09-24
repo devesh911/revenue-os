@@ -76,16 +76,16 @@ filter (the `heard_sample` property on each completed booking gives the split).
 | `index.html` | The Vite entry: a `#root` div + `<script type="module" src="/src/main.tsx">`, plus the head meta (title, description, Open Graph, `theme-color`, `color-scheme: only light` so forced-dark browsers leave the page alone) and the favicon link. The title and description repeat the hero copy — update them together. |
 | `public/` | Static files served as-is — `favicon.svg` (the brand mark), `sample-call.m4a` (the synthetic sample call). |
 | `scripts/make-sample-call.ts` | Regenerates `public/sample-call.m4a` with the system text-to-speech voices (macOS). Afterwards, set `sampleCall.seconds` in `content/hero.ts` to the new length — the copy-parity suite checks it against the file. |
-| `src/main.tsx` | Boot entry — mounts `<App/>` into `#root`, owns the single stylesheet side-effect `import "./styles.css"` (so `App` stays SSR-safe), and loads Plausible when configured. |
-| `src/App.tsx` | Composes the page inside `BookingProvider`: skip link, sticky `header → nav`, `main` → hero · proof · how it works · examples · pilot · FAQ · closing, `footer` → the meta row, and the one `BookingDialog`. Calls `useReveal()` once and honours cold-load deep links (`/#pilot`; `/#book` opens the booking dialog). Imports no CSS. |
-| `src/styles.css` | `@import "tailwindcss"` + the `@theme` tokens (paper / ink / clay palette, illustration plates, the `card` surface, the `lift` shadow, type families, the soft ease), the `ro-*` keyframes, the scroll-reveal, pause, and reduced-motion rules, the decorative `@utility` classes, and **every** `@font-face` block. The **only** place raw colour hex lives. |
+| `src/main.tsx` | Boot entry — mounts `<App/>` into `#root`, owns the single stylesheet side-effect `import "./styles.css"` (so `App` stays SSR-safe), loads Plausible when configured, and calls `armChime()` so the visitor's first tap, click or key press unlocks the message chime (see **Sound**). |
+| `src/App.tsx` | Composes the page inside `BookingProvider`: skip link, sticky `header → nav`, `main` → hero · proof · how it works · before the call · examples · pilot · FAQ · closing, `footer` → the meta row, and the one `BookingDialog`. Calls `useReveal()` once and honours cold-load deep links (`/#pilot`; `/#book` opens the booking dialog). Imports no CSS. |
+| `src/styles.css` | `@import "tailwindcss"` + the `@theme` tokens (paper / ink / clay palette, illustration plates, the `card` surface, the `lift` shadow, type families, the soft ease), the shared `ro-*` keyframes, one reserved block per visual for its own keyframes and utilities (`survey-*` for the hero's drawing sheet, `intent-*` for the intent study, `brief-*` for the call brief), the scroll-reveal, pause, and reduced-motion rules, the decorative `@utility` classes, and **every** `@font-face` block. The **only** place raw colour hex lives. |
 | `src/design/` | Reusable, tokens-only elements — `Heading` (display / section / card scale, `balance`), `Text` (lede / body / small sizes; default / muted / inverse tones), `Kicker` (section / hero / inverse / clay eyebrows), `MonoLabel`, `CtaButton` (accent / ghost pills; `busy` for a pending submit), `SectionFrame` (plain paper; wash / ink / clay inset panels; `flush`), `DotList` (a dot-separated run). `Heading`, `Text`, `Kicker`, `MonoLabel` and `SectionFrame` take `ref`, so `reveal()` spreads onto them. Named exports; no copy, no raw hex. |
-| `src/sections/` | One file per section — `Nav`, `Hero` (headline, the demo button, the listen button, the demo call and the pause switch), `Proof` (the illustrative pilot report), `StageGrid` (the dark "how it works" panel: three steps, each with a small product example; hosts `FunnelFlow` and `IntentRouting`), `IntentRouting` (the follow-up route for buyers not ready to visit), `Moats` (the three examples), `Pricing` (the pilot, how fees work, and the "Compare plans" disclosure), `Faq`, `FooterCta` (the clay closing invitation). Each composes `design/` elements and imports its copy from `content/`. |
-| `src/visuals/` | `BrandMark` (the logo mark), `HeroCall` (the looping demo call: an imported enquiry is rung, qualified in Hinglish, its readiness gauged, and either booked for a site visit or sent WhatsApp follow-ups), `SampleAudio` (the hero's listen button: plays the sample recording in place, fetched on the first press), `FunnelFlow` (enquiries running the three steps, the not-yet-ready ones looping through follow-up), `MoatArt` (the example cards' line illustrations), `CallArt` (the closing panel's poster mark), `BookingDialog` (the booking flow), `Icon` (the 16px line glyphs). SVG + CSS keyframes / SMIL; no animation library. |
-| `src/lib/` | `booking.ts` (the Cal.com client + preview adapter + form helpers), `analytics.ts` (`track()`), `bookingContext.tsx` (`BookingProvider`, `useBooking()`, `BookDemoButton`), `reveal.ts` (`reveal(delayMs)` props + `useReveal()`), `motion.ts` (the page-wide pause switch `useStill()` / `setStill()`, and `useLiveSvg()`, which runs an SVG's animations only while it is on screen and not paused), `cx.ts` (the one-line className joiner). |
-| `src/content/` | Every word on the page, as typed modules (`site`, `hero`, `proof`, `workflow`, `examples`, `pilot`, `faqs`, `closing`, `booking`). Sections and visuals import these and **inline nothing**. Where the design has a slot the copy doesn't fill (a kicker, a plate word, a diagram label), the fill is taken from the copy around it and lives in the same module. |
+| `src/sections/` | One file per section — `Nav`, `Hero` (headline, the demo button, the listen button, the demo call and the pause switch, on the survey ground), `Proof` (the illustrative pilot report), `StageGrid` (the dark "how it works" panel: three steps, each with a small product example; hosts `FunnelFlow` and `IntentRouting`), `IntentRouting` (the follow-up route for buyers not ready to visit), `BeforeCall` ("Before the call": its head with the "Illustrative example" tag, then `IntentEvidence` and `CallBrief`), `Moats` (the three examples), `Pricing` (the pilot, how fees work, and the "Compare plans" disclosure), `Faq`, `FooterCta` (the clay closing invitation). Each composes `design/` elements and imports its copy from `content/`. |
+| `src/visuals/` | `BrandMark` (the logo mark), `HeroCall` (the looping demo call: an imported enquiry is rung, qualified in Hinglish, its readiness gauged, and either booked for a site visit or sent WhatsApp follow-ups), `SampleAudio` (the hero's listen button: plays the sample recording in place, fetched on the first press), `FunnelFlow` (enquiries running the three steps, the not-yet-ready ones looping through follow-up), `MoatArt` (the example cards' line illustrations), `CallArt` (the closing panel's poster mark), `BookingDialog` (the booking flow), `Icon` (the 16px line glyphs), `SurveyGround` (the hero's drawing sheet, and `SurveyPlan`: the 2 BHK floor plan under the call card that draws itself and lights up with the call), `IntentEvidence` (why the buyer is high intent: the four signals build his score to 78 and route him to "Call now"), `CallBrief` (the call brief writing itself before the call, with Priya's WhatsApp reply and its chime). SVG + CSS keyframes / SMIL; no animation library. |
+| `src/lib/` | `booking.ts` (the Cal.com client + preview adapter + form helpers), `analytics.ts` (`track()`), `bookingContext.tsx` (`BookingProvider`, `useBooking()`, `BookDemoButton`), `reveal.ts` (`reveal(delayMs)` props + `useReveal()`), `motion.ts` (the page-wide pause switch `useStill()` / `setStill()`, and `useLiveSvg()`, which runs an SVG's animations only while it is on screen and not paused), `sequence.ts` (`useSequence()`: steps a looping visual beat by beat while it is on screen), `chime.ts` (the message chime and its remembered sound switch), `cx.ts` (the one-line className joiner). |
+| `src/content/` | Every word on the page, as typed modules (`site`, `hero` — including `survey`, the floor plan's labels — `proof`, `workflow`, `beforeCall`, `intentEvidence`, `callBrief`, `examples`, `pilot`, `faqs`, `closing`, `booking`). Sections and visuals import these and **inline nothing**. Where the design has a slot the copy doesn't fill (a kicker, a plate word, a diagram label), the fill is taken from the copy around it and lives in the same module. |
 | `fonts/` | Self-hosted `.woff2` subsets (Lora 400 + italic, IBM Plex Mono 400). Referenced from `src/styles.css` as `../fonts/<file>.woff2`. |
-| `test/` | `copy-parity.test.tsx` (the SSR first paint: copy, one "Book a demo" action, the listen button and its disclosure, the demo call's honest sample lead, proof and plans labelled honestly, retired copy stays retired, default UI state and accessibility), `architecture.test.ts` (tokens, fonts, motion floor, pause switch, scroll reveal, file layout, content separation, external hosts, this README), `lib.test.ts` (booking client and analytics), `build.test.ts` (`vite build`). |
+| `test/` | `copy-parity.test.tsx` (the SSR first paint: copy, one "Book a demo" action, the listen button and its disclosure, the demo call's honest sample lead, the survey ground and floor plan drawn and lit, "Before the call" labelled illustrative and showing both studies' final frame, the sound switch, a score out of 100 only in that section, proof and plans labelled honestly, retired copy stays retired, default UI state and accessibility), `architecture.test.ts` (tokens, fonts, motion floor, pause switch, scroll reveal, file layout, content separation, the four intent signals stated once, namespaced keyframes, external hosts, this README), `lib.test.ts` (booking client, analytics, `useSequence`'s first paint, the chime and its sound switch), `build.test.ts` (`vite build`). |
 
 ## Design language
 
@@ -106,6 +106,66 @@ instead of boxes, gradients, or glows.
   panels pace the paper page: the dark ink panel (how it works), the paper-2
   panel (the pilot), and the clay panel (the closing invitation).
 
+## The hero's survey ground
+
+The hero sits on an architect's drawing sheet (`visuals/SurveyGround.tsx`): graph
+paper that clears behind the headline, registration marks at the corners, and a
+title strip — north point, "Meridian Greens · Tower B · Typical 2 BHK",
+"Illustrative". Under the call card lies the floor plan of that flat
+(`SurveyPlan`). It draws itself once, the first time it comes on screen (walls,
+then windows and the door, then the width), and then follows the demo call:
+`HeroCall` reports which call is showing and how far it has got (`onPhase`), and
+as the ready buyer's call captures his budget the "₹90 L" tag pins, as it captures
+"2 BHK · Whitefield" the rooms light, and when the visit is booked a pin lands at
+the front door. The exploring buyer's call leaves the plan as plain linework. The
+two captured fields that light it are single constants in `content/hero.ts`,
+shared by the call and `survey.cues`, so they cannot drift apart. The sheet and
+the plan are decorative (`aria-hidden`): the call card's own label tells the
+story. Phones under 640px keep a faint corner of the grid and hide the plan. The
+server render and reduced motion show the plan drawn and lit for the booked call;
+the Pause switch finishes the drawing and holds its lights where the call is.
+
+## Before the call
+
+A section after "How it works" (`sections/BeforeCall.tsx`) that zooms into what
+Revenue OS does between an imported enquiry and the first ring. Its head is the
+kicker "Before the call", the heading "Your team answers once. Every call knows."
+and a visible **"Illustrative example"** tag. Then two studies, in story order:
+
+1. **Why he's a high-intent buyer** (`visuals/IntentEvidence.tsx`) — four signals
+   land one at a time with their weights, the score climbs past the call-now line
+   to 78 / 100, the home loan lands as context (no weight), and the router lights
+   "Call now" while the follow-up plan stays dim.
+2. **The call brief** (`visuals/CallBrief.tsx`) — the brief writes itself, each fact
+   with where it came from. The one question the brochure can't answer goes to
+   Priya Nair in sales; her WhatsApp reply pops up in front of the brief (with the
+   chime), then settles into the row and the project's saved facts. The rail adds
+   up the four signals under "Intent signals", the bar filling from zero to 78 and
+   turning from clay to olive, then the call plan writes itself and the call starts.
+
+The four signals and their weights live **once**, in `content/beforeCall.ts`
+(`intentSignals`, with `intentScore` summing them); both studies and their copy
+modules read them from there and restate no number — the architecture suite fails
+if they do. Both are driven by `useSequence()` (see **Motion rules**), so the
+server render and reduced motion show the finished frame: all four signals, 78 /
+100, "Call now", the saved answer, the plan and "Ready". Screen readers get each
+study once: the intent study is one labelled image, the brief has a visually
+hidden summary that includes Priya's reply.
+
+## Sound (the message chime)
+
+When Priya's reply pops up, the brief plays a soft two-note chime, synthesised
+with Web Audio in `lib/chime.ts` (no audio file). Browsers only allow a page to
+play sound after the visitor has interacted with it, so `armChime()` (called once
+in `main.tsx`) creates the audio on the first tap, click or key press; until then
+`chime()` is silent. The brief carries its own **Sound** switch — a real button
+with `aria-pressed`, a 44px touch target — which reads "off" until audio can
+actually play (pressing it is itself the gesture that unlocks sound). The choice is
+remembered in this browser (`localStorage`, key `ro-sound`; a blocked store just
+forgets it). The chime only sounds while the brief is actually playing: never
+when it is off screen, paused, or under reduced motion (where the switch is
+hidden and the brief stands still).
+
 ## Motion rules
 
 Motion explains the product — the demo call, the lead flow, the loops — and never
@@ -113,7 +173,16 @@ decorates for its own sake.
 
 - **CSS first.** Keyframes (`ro-rise`, `ro-fade`, `ro-ring`, `ro-wave`,
   `ro-blink`, `ro-draw`, `ro-float` …) live in `src/styles.css`; components apply
-  them with Tailwind arbitrary animations. SVG loops may use SMIL.
+  them with Tailwind arbitrary animations. SVG loops may use SMIL. A visual's own
+  keyframes take its prefix (`survey-`, `intent-`, `brief-`) and sit in its
+  reserved block; the architecture suite checks every animation a component names
+  exists.
+- **Step-by-step loops use `useSequence()`** (`lib/sequence.ts`): give it when
+  each beat starts and how long to hold the end, and it steps the visual only
+  while at least a third of it is on screen in a visible tab and the page isn't
+  paused (`playing` says so — the chime keys off it). The server render, reduced
+  motion and a browser without `IntersectionObserver` get the final beat, so
+  nothing on the page depends on it running.
 - **Scroll reveal** — spread `{...reveal(delayMs)}` on a block for a one-shot
   fade-and-rise. Content is only hidden once `useReveal()` has opted the document
   in (`html[data-motion]`), so a failed script never hides anything.
@@ -123,7 +192,8 @@ decorates for its own sake.
   SVGs pause too.
 - **Reduced motion is the floor.** Under `prefers-reduced-motion: reduce` every
   keyframe and transition ends immediately, SMIL groups marked `data-motion-only`
-  are removed, and JS sequences (the demo call) render their final static state.
+  are removed, and JS sequences (the demo call, the before-the-call studies, the
+  floor plan) render their final static state.
 - **SSR-safe and accessible.** No `window` / `document` / `Audio` at render or
   module scope; timers and observers are cleaned up and pause off-screen.
   Decorative visuals are `aria-hidden`; the demo call is a single `role="img"`
@@ -137,7 +207,12 @@ decorates for its own sake.
   Claims match what exists today: English + Hindi/Hinglish; leads arrive by CSV
   import, so speed reads "called 2 min after import" — never a seconds-to-call
   claim or a lead portal as a live source; CRM connectors and intent scoring are
-  planned; no published rates. In the plans a check marks only what is built;
+  planned; no published rates. An intent score out of 100 ("78 / 100") appears
+  **only** in "Before the call", whose head carries "Illustrative example" (intent
+  scoring and questions to the sales team are planned, and its routing note says
+  the weights and the line are examples); the copy-parity suite fails if a score
+  out of 100 shows anywhere else — the hero, how it works, the examples or the
+  pilot. In the plans a check marks only what is built;
   roadmap items sit under "Planned". Replace the illustrative proof with a real
   project, period, comparison and attributed quote once a pilot has run.
 - **Colours and fonts change in `src/styles.css` `@theme` and nowhere else.** It

@@ -55,7 +55,7 @@ export const examples = {
     channel: "WhatsApp",
     messages: [
       {
-        time: "Thu 11:48\u00a0AM",
+        time: "Thu 7:16\u00a0PM",
         text: "Hi Rohan, your site visit to Meridian Greens, Tower\u00a0B is confirmed for Saturday at 11:00\u00a0AM. We'll share the location pin before the visit.",
       },
       {

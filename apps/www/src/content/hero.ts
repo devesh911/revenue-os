@@ -1,10 +1,11 @@
 // The hero's copy, the sample recording its listen button plays in place, and the
 // two example calls HeroCall loops — a buyer ready to visit (the sample call's own
 // conversation in four lines: the agent's possession answer carries the visit ask)
-// and one still exploring, routed into follow-ups.
-// Hero, SampleAudio and HeroCall compose these and inline none. The recording is
-// SYNTHETIC (apps/www/scripts/make-sample-call.ts). Names, places and figures are
-// illustrative. \u00a0 keeps a number with its unit; \u2011 is a non-breaking hyphen.
+// and one still exploring, routed into follow-ups — and the floor plan under the
+// card. Hero, SampleAudio, HeroCall and SurveyGround compose these and inline none.
+// The recording is SYNTHETIC (apps/www/scripts/make-sample-call.ts). Names, places
+// and figures are illustrative. \u00a0 keeps a number with its unit; \u2011 is a
+// non-breaking hyphen.
 
 const ILLUSTRATIVE = "Names and figures are illustrative.";
 
@@ -42,6 +43,10 @@ export const callLabels = {
   readiness: "Readiness",
 } as const;
 
+// The two fields of the ready call that light the hero's floor plan (survey.cues).
+const BUDGET = "Budget ₹90\u00a0L";
+const CONFIG = "2\u00a0BHK · Whitefield";
+
 export type Intent = "high" | "low";
 
 export interface CallScenario {
@@ -61,7 +66,7 @@ export interface CallScenario {
 export const calls: CallScenario[] = [
   {
     intent: "high",
-    time: "11:42 AM",
+    time: "7:12 PM",
     lead: "Rohan Mehta",
     source: "Imported enquiry · 2 BHK · Whitefield",
     calledAfter: "2 min after import",
@@ -81,12 +86,7 @@ export const calls: CallScenario[] = [
       },
       { who: "lead", text: "Saturday, 11 baje theek rahega." },
     ],
-    captured: [
-      "Budget ₹90\u00a0L",
-      "2\u00a0BHK · Whitefield",
-      "Within 12 months",
-      "Visit Sat",
-    ],
+    captured: [BUDGET, CONFIG, "Within 12 months", "Visit Sat"],
     score: 86,
     verdict: "Ready to visit",
     outcome: {
@@ -126,3 +126,24 @@ export const calls: CallScenario[] = [
     },
   },
 ];
+
+// The hero's ground (visuals/SurveyGround): a drawing sheet with the plan of the
+// flat the ready buyer asks about, lit by his call as it captures the cues. The
+// project, the flat and its width are illustrative, and the title strip says so.
+export const survey = {
+  title: "Meridian Greens · Tower B · Typical 2\u00a0BHK",
+  illustrative: "Illustrative",
+  width: "9.75\u00a0m",
+  rooms: {
+    bed1: "Bed\u00a01",
+    balcony: "Balcony",
+    bed2: "Bed\u00a02",
+    living: "Living",
+    kitchen: "Kitchen",
+  },
+  budget: "₹90\u00a0L",
+  visit: "Visit · Sat 11:00\u00a0AM",
+  // the captured fields that light the plan: the budget pins its tag, the
+  // configuration lights the rooms (the visit pin waits for the booking)
+  cues: { budget: BUDGET, rooms: CONFIG },
+} as const;

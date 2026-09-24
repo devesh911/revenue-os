@@ -17,6 +17,8 @@ import { CHECK, Icon, RECALL } from "./Icon";
 // visible and the page-wide pause switch is off. The card speaks as one labelled
 // image, so each call's own markup is hidden from assistive tech. On phones the
 // "Called … after import" chip takes its own row under the source line.
+// `onPhase` reports which call is showing and how far it has got (the hero's floor
+// plan follows it); it fires only when that changes, a few times per call.
 
 const TICK = 250;
 const LEAD_IN = 1; // first play only: the ring holds while the card rises in
@@ -70,6 +72,35 @@ for (const c of calls) PLANS.push(plan(c, PLANS.at(-1)?.end ?? 0));
 const CYCLE = PLANS.at(-1)?.end ?? 1;
 const STILL = PLANS[0]?.outcome ?? 0; // the first call, finished
 
+export type CallStage = "ringing" | "talking" | "ended" | "outcome" | "leaving";
+export interface CallPhase {
+  call: number; // index into `calls`
+  stage: CallStage;
+  captured: number; // fields landed in the summary so far
+}
+
+function phaseAt(t: number): CallPhase {
+  const call = Math.max(
+    PLANS.findIndex((p) => t >= p.start && t < p.end),
+    0,
+  );
+  const p = PLANS[call];
+  if (!p) return { call, stage: "ringing", captured: 0 };
+  const stage: CallStage =
+    t < p.connect
+      ? "ringing"
+      : t < p.hangup
+        ? "talking"
+        : t < p.outcome
+          ? "ended"
+          : t < p.fade
+            ? "outcome"
+            : "leaving";
+  return { call, stage, captured: p.captured.filter((c) => t >= c.at).length };
+}
+// What SSR, reduced motion and the first paint show: the ready call, finished.
+export const FINISHED: CallPhase = phaseAt(STILL);
+
 const TONES = {
   high: {
     avatar: "bg-oat",
@@ -104,7 +135,13 @@ function Dots() {
   ));
 }
 
-export function HeroCall({ className }: { className?: string }) {
+export function HeroCall({
+  className,
+  onPhase,
+}: {
+  className?: string;
+  onPhase?: (phase: CallPhase) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [motion] = useState(
     () =>
@@ -148,6 +185,11 @@ export function HeroCall({ className }: { className?: string }) {
   }, [live, still, tick]);
 
   const now = Math.max(tick, 0); // the lead-in rests on beat 0
+  const { call, stage, captured } = phaseAt(now);
+  useEffect(() => {
+    onPhase?.({ call, stage, captured });
+  }, [onPhase, call, stage, captured]);
+
   return (
     <div
       ref={ref}

@@ -32,7 +32,7 @@ export const workflow = {
       body: "Call a new enquiry.",
       example: {
         label: "Enquiry imported",
-        time: "11:42 AM",
+        time: "7:12 PM",
         line: "Rohan Mehta · from your enquiry list",
         status: "Called",
         delay: "2 min",

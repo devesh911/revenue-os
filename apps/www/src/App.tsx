@@ -4,6 +4,7 @@ import { DotList } from "./design/DotList";
 import { MonoLabel } from "./design/MonoLabel";
 import { BookingProvider } from "./lib/bookingContext";
 import { useReveal } from "./lib/reveal";
+import { BeforeCall } from "./sections/BeforeCall";
 import { Faq } from "./sections/Faq";
 import { FooterCta } from "./sections/FooterCta";
 import { Hero } from "./sections/Hero";
@@ -49,6 +50,7 @@ export function App() {
           <Hero />
           <Proof />
           <StageGrid />
+          <BeforeCall />
           <Moats />
           <Pricing />
           <Faq />
