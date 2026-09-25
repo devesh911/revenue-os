@@ -177,7 +177,7 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
   barrel). Env-free gates green (typecheck/lint/tools/full-harness/wiring-unit); m2-replay/
   scheduler/wiring-jobs suites are CI-owned. @b00d0f2 + @bae1f37.
 - **Staging worker first boot (2026-07-23, tunnel stopgap — no PR pipeline, ops only):** worker
-  container runs on the VPS (168.144.147.90), source rsync'd to `~/app` (provisioning skipped the
+  container runs on the VPS (address in the password manager), source rsync'd to `~/app` (provisioning skipped the
   clone), via `docker compose` + a tunnel override (8080→box localhost only, Caddy not started).
   HTTPS = Cloudflare QUICK TUNNEL in tmux (https://expense-reveal-founder-vip.trycloudflare.com) —
   EPHEMERAL (dies on cloudflared restart, needs Pages VITE_API_URL re-set + console rebuild after)
@@ -197,7 +197,7 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - **Autonomy v2.1 is live**: ruleset = PR + green `checks`, zero human approvals (Devesh flipped it);
   repo has allow_auto_merge + delete_branch_on_merge ON; agent sessions may create PRs, resolve
   conflicts, and merge on green (named grant, 2026-07-11). Guard loosening stays Devesh-only.
-- **Infra (2026-07-12):** VPS `168.144.147.90` hardened per runbook §2–§3 (deploy user, key-only
+- **Infra (2026-07-12):** the VPS (address in the password manager) hardened per runbook §2–§3 (deploy user, key-only
   sshd, ufw 443/22-limit, fail2ban, Docker, 2GB swap, resized to 1vCPU/2GB/48GB). **Console is
   LIVE on Cloudflare Pages**: https://revenue-os-console.pages.dev (push-to-deploy on main; build
   env SKIP_DEPENDENCY_INSTALL=1 + BUN_VERSION=1.3.11 in BOTH prod+preview; VITE_ vars → staging
@@ -289,7 +289,7 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - **CI deploy credentials** (classifier-blocked for agents; needed for task 14b image ship, not
   for migrations): generate + wire the staging SSH key,
   either by naming the action to an agent session or yourself:
-  `ssh deploy@168.144.147.90 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
+  `ssh "$VPS_HOST" 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
 - **Landing page go-live inputs (apps/www):** (1) a Cal.com account + a demo event type with a
   required short-text booking question whose identifier is `company`, then `VITE_CALCOM_USERNAME` +
   `VITE_CALCOM_EVENT_SLUG` in the Pages build env; (2) a Plausible site → `VITE_PLAUSIBLE_SRC` + the
