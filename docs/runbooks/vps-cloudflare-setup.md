@@ -24,6 +24,17 @@ Cloudflare — IP allowlist AND header check, S3.3); the **console/www are stati
 (nothing to hack on our origin, deploys need zero GitHub secrets); **state lives in Supabase**
 (the VPS is stateless — destroy and rebuild it any time without data loss).
 
+**Step zero — before the `api` DNS record exists (S4.1):**
+1. **Rotate to a new VPS IP.** The first box's address was committed to this public repo (removed
+   2026-09-25, still in git history), so it is burned: the lockdown assumes nobody knows where the
+   origin is. Move to a new instance or a reserved IP and release the old address. The new
+   address lives in the password manager ONLY — never in this repo, STATE.md, or a script
+   (scripts read `VPS_HOST`; an `~/.ssh/config` alias is the easy way).
+2. **Provider firewall, not ufw:** in the PROVIDER's firewall (Vultr/DO), allow 443 only from
+   Cloudflare's published ranges (cloudflare.com/ips, IPv4 + IPv6) and 22 only from your IP.
+   ufw cannot police this: Docker writes its own iptables rules for published ports, so
+   `ports: ["443:443"]` is open to the world whatever ufw says.
+
 ## 1 · VPS: what to buy (exact)
 
 | Item | Choice | Why |
@@ -58,17 +69,19 @@ fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
-Port 80 stays CLOSED at the firewall: Cloudflare terminates browsers' TLS at the edge and speaks
-443 to origin; Caddy's cert flow uses the TLS-ALPN challenge on 443. (If Let's Encrypt issuance
-ever fights you, temporarily allow 80 from Cloudflare ranges only.)
+Port 80 stays CLOSED and is not published by compose: Cloudflare terminates browsers' TLS at the
+edge and speaks 443 to origin, and Caddy serves a Cloudflare Origin CA certificate (§3), so no
+Let's Encrypt challenge ever needs to reach the box (behind the proxy it could not validate
+anyway). ufw's 443 rule is hygiene only — Docker-published ports bypass it (step zero).
 
 ## 3 · Deploy layout on the box (S3.7)
 
 As `deploy`:
 
 ```bash
-mkdir -p ~/app && cd ~/app        # gets docker/Caddyfile + docker-compose.yml (deploy.yml ships them)
-# .env — mode 0600, owner deploy — values typed from the password manager, NEVER from a repo:
+mkdir -p ~/app && cd ~/app        # gets the repo tree: compose + Caddyfile at ~/app/docker/
+# .env — mode 0600, owner deploy — values typed from the password manager, NEVER from a repo
+# (scripts/provision-staging.sh writes the first five; it REWRITES the file, so re-add the rest):
 #   DATABASE_URL=            (Supabase Mumbai, app_service — session pooler URL)
 #   SUPABASE_URL=
 #   VAPI_WEBHOOK_SECRET=     (same value as the Vapi assistant server.secret)
@@ -76,10 +89,27 @@ mkdir -p ~/app && cd ~/app        # gets docker/Caddyfile + docker-compose.yml (
 #                             Transform Rule in §5; this is the S3.3 header handshake)
 #   CORS_ORIGINS=https://console.<domain>   (PR #31 — without this the console's API calls die
 #                             in the browser exactly like the localhost bug we fixed)
+#   API_HOST=api.<domain>    (Caddy's site address — the Caddyfile reads {$API_HOST}; nothing to edit)
+#   READY_TOKEN=             (openssl rand -hex 32 — /ready's own bearer token, S5.9; the same
+#                             value goes in the deploy gate + uptime monitor)
 chmod 600 .env
 ```
 
-Edit `Caddyfile`: replace `api.example.com` with `api.<domain>`. Then `docker compose up -d`.
+**Origin certificate** (created in §4 step 3 — do §4 steps 1–3 first): Cloudflare shows the
+certificate and its private key ONCE. Put them on the box, never in the repo (`docker/certs/` is
+gitignored), and keep a copy of the key in the password manager:
+
+```bash
+mkdir -p ~/app/docker/certs && chmod 700 ~/app/docker/certs
+nano ~/app/docker/certs/origin.pem   # paste "Origin Certificate"
+nano ~/app/docker/certs/origin.key   # paste "Private Key"
+chmod 600 ~/app/docker/certs/origin.*
+cd ~/app/docker && docker compose --env-file ../.env up -d
+```
+
+`--env-file ../.env` on EVERY compose command here (`alias dc='docker compose --env-file ../.env'`):
+it is how compose hands API_HOST + EDGE_SHARED_SECRET to Caddy, and without it compose refuses to
+start — by design, since a blank secret would let an empty `X-Edge-Auth` header through.
 Verify from your laptop: `curl https://api.<domain>/health` → `{"ok":true}` **via Cloudflare**,
 and `curl https://<VPS_IP>/health -k` → connection refused/403 (the wall works).
 
@@ -93,12 +123,15 @@ host with its own GitHub integration — serves console/www and needs no VPS at 
    registrar transfer-lock on the domain.
 2. **Add the zone:** Cloudflare → Add site → `<domain>` → Free plan is fine → it lists two
    nameservers → set exactly those at your registrar → wait for "Active" (minutes to hours).
-3. **SSL/TLS app:** mode **Full (strict)** (edge↔origin encrypted AND cert-verified — Caddy's
-   Let's Encrypt cert satisfies it) · "Always Use HTTPS" ON · minimum TLS 1.2.
+3. **SSL/TLS app:** mode **Full (strict)** (edge↔origin encrypted AND cert-verified) · "Always
+   Use HTTPS" ON · minimum TLS 1.2. Then **SSL/TLS → Origin Server → Create Certificate**
+   (Cloudflare generates the key; hostnames `api.<domain>`; 15 years) and install it per §3.
+   Why not Let's Encrypt: port 80 is closed and Cloudflare terminates TLS in front of the box, so
+   no ACME challenge can reach Caddy — issuance fails and Full (strict) answers error 526.
 4. **DNS records (all orange-cloud/proxied — S4.1):**
    | Type | Name | Target | Note |
    |---|---|---|---|
-   | A | `api` | VPS IP | the only record that touches the VPS |
+   | A | `api` | the NEW VPS IP (step zero) | the only record that touches the VPS |
    | CNAME | `console` | `<console-project>.pages.dev` | added via Pages "Custom domains" (it creates this for you) |
    | CNAME | `www` + apex | `<www-project>.pages.dev` | when apps/www exists (D26) |
    One-time check: search DNS-history sites for `<domain>` — if the VPS IP ever appeared
@@ -107,10 +140,11 @@ host with its own GitHub integration — serves console/www and needs no VPS at 
    if hostname == `api.<domain>` → **set static header `X-Edge-Auth` = <the same
    openssl-rand value as the VPS .env EDGE_SHARED_SECRET>**. This is what makes "only
    Cloudflare" true even if someone finds the IP: firewall says only-CF-ranges, header says
-   only-our-zone (another CF customer can't fake it).
-6. **Cloud firewall (S3.3, the IP half):** in the PROVIDER's firewall (Vultr/DO, in front of
-   ufw), restrict 443 to Cloudflare's published ranges (cloudflare.com/ips — they change rarely;
-   re-check on the weekly cadence).
+   only-our-zone (another CF customer can't fake it). It does NOT say "internal": the rule
+   stamps EVERY forwarded request, strangers' included — hence /ready's own READY_TOKEN (S5.9).
+6. **Cloud firewall (S3.3, the IP half):** already set in step zero (PROVIDER firewall, 443 from
+   Cloudflare's published ranges only) — confirm it before the `api` record goes live, and
+   re-check cloudflare.com/ips on the weekly cadence (the ranges change rarely).
 7. **WAF (S4.2):** Security → WAF → Managed rules ON (free tier: Cloudflare Managed Ruleset).
    Rate-limiting rule: path starts `/webhooks/` → generous (e.g. 300 req/10s per IP) — coarse
    DDoS insurance only; real limiting is app-level (S5.4). Leave `/auth/*` alone (Supabase's).
@@ -133,7 +167,7 @@ to exactly this repo):
 | Build output directory | `apps/console/dist` |
 | Root directory | `/` (repo root — the workspace needs it) |
 | Watch paths | `apps/console/**`, `packages/shared/**` |
-| Env vars (build-time, PUBLIC by design) | `VITE_SUPABASE_URL` = cloud project URL · `VITE_SUPABASE_ANON_KEY` = cloud anon key (designed-public, S7.3) · `VITE_API_URL` = `https://api.<domain>` |
+| Env vars (build-time, PUBLIC by design) | `VITE_SUPABASE_URL` = cloud project URL · `VITE_SUPABASE_ANON_KEY` = cloud anon key (designed-public, S7.3) · `VITE_API_URL` = `https://` + the box's `API_HOST` (§3) |
 
 First deploy lands on `<project>.pages.dev` — verify login there BEFORE any DNS. Then Pages →
 Custom domains → add `console.<domain>` (it creates the proxied CNAME itself). The www/Astro
@@ -141,7 +175,7 @@ project is the same flow later: build `bun run --filter www build`, output `apps
 watch `apps/www/**`.
 
 **The worker deploys the OTHER way** (for contrast, task 14 arms it): GitHub Actions builds the
-Docker image in CI → ships it over SSH → `docker compose up -d` on the VPS → health-gate before
+Docker image in CI → ships it over SSH → `docker compose --env-file ../.env up -d` on the VPS → health-gate before
 finishing. GitHub holds an SSH deploy key; Cloudflare is not involved in worker deploys at all.
 
 ## 6 · Smoke checklist (15 minutes, proves every wall)
@@ -149,13 +183,13 @@ finishing. GitHub holds an SSH deploy key; Cloudflare is not involved in worker 
 - [ ] `curl https://api.<domain>/health` → 200 `{"ok":true}` (edge → Caddy → worker)
 - [ ] `curl https://<VPS_IP>/health -k` → refused/timeout (provider firewall) — and if you
       temporarily open 443, Caddy answers 403 (header check holds by itself)
-- [ ] `curl https://api.<domain>/ready` → 403/401 without the header (S5.9 — /ready is
-      edge-internal; only /health is public)
+- [ ] `curl https://api.<domain>/ready` → 401 (Cloudflare's X-Edge-Auth alone is not enough),
+      and 200 with `-H "Authorization: Bearer <READY_TOKEN>"` (S5.9 — only /health is public)
 - [ ] Console at `https://console.<domain>`: login works, org switcher populates (proves
       CORS_ORIGINS + VITE_API_URL are right)
 - [ ] Vapi assistant `server.url` → `https://api.<domain>/webhooks/vapi/<orgId>` + shared secret
       set → test event lands as a `webhook_events` row (the task-8 REMOTE spike criteria)
-- [ ] `docker compose logs worker | tail` shows pg-boss started, no error lines
+- [ ] `docker compose --env-file ../.env logs worker | tail` shows pg-boss started, no error lines
 
 ## 7 · What this unblocks (STATE.md NEXT)
 

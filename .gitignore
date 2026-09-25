@@ -8,3 +8,4 @@ test-results
 orchestrator/
 .env.local
 .claude/worktrees/
+docker/certs/

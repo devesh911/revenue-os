@@ -48,7 +48,7 @@ the cloud bootstrap you already ran).
 
 ## 5 · Monitoring — "every step watched" starts here, before traffic
 
-- [ ] Uptime monitor on `https://<worker>/health` AND `/ready` (both must go red independently).
+- [ ] Uptime monitor on `https://<worker>/health` AND `/ready` (both must go red independently; /ready needs `Authorization: Bearer <READY_TOKEN>`).
 - [ ] Log drain for the worker container (pino JSON → your chosen sink); alert on `level>=50`.
 - [ ] Supabase advisors: run security + performance advisors; schedule a weekly pass.
 - [ ] GitHub: Dependabot alerts on; `bun audit` already in CI — add failure notifications to

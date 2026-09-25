@@ -4,9 +4,18 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
+Updated: 2026-09-25 (fix: VPS address out of the public repo; Cloudflare origin cert; /ready token)
 
 ## NOW (verified facts, not hopes)
+- **VPS address out of the public repo; origin locked to Cloudflare's cert (2026-09-25, this PR):**
+  domain due diligence found the VPS's public IPv4 committed in `scripts/provision-staging.sh` and
+  here, against S4.1 — removed (the script now reads `VPS_HOST`), but it stays in git history, so
+  that address is burned (WAITING). Caddy now serves a Cloudflare Origin CA certificate for
+  `{$API_HOST}` (Let's Encrypt cannot validate behind the proxy with port 80 closed → Full (strict)
+  would 526); compose publishes 443 only, mounts `./certs` read-only, and refuses to start on a
+  blank API_HOST / EDGE_SHARED_SECRET (proven: a blank secret admits an empty `X-Edge-Auth`
+  header). `/ready` now needs its own bearer `READY_TOKEN` (401 when unset) because the Transform
+  Rule stamps X-Edge-Auth on every forwarded request. Runbook §0 (step zero) + §2–§6 updated.
 - **Landing page reads as one enquiry, in order; hero = board study A3 (apps/www, 2026-09-24, stacked on
   the editorial-design PR):** from Devesh's picks on the hook-studies board and his follow-up ("A3 … as it
   is, remove the older call card … make sure the user gets correct and systematic information as they
@@ -177,8 +186,8 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
   barrel). Env-free gates green (typecheck/lint/tools/full-harness/wiring-unit); m2-replay/
   scheduler/wiring-jobs suites are CI-owned. @b00d0f2 + @bae1f37.
 - **Staging worker first boot (2026-07-23, tunnel stopgap — no PR pipeline, ops only):** worker
-  container runs on the VPS (168.144.147.90), source rsync'd to `~/app` (provisioning skipped the
-  clone), via `docker compose` + a tunnel override (8080→box localhost only, Caddy not started).
+  container runs on the VPS (address in the password manager), source rsync'd to `~/app`
+  (provisioning skipped the clone), via `docker compose` + a tunnel override (8080→box localhost only, Caddy not started).
   HTTPS = Cloudflare QUICK TUNNEL in tmux (https://expense-reveal-founder-vip.trycloudflare.com) —
   EPHEMERAL (dies on cloudflared restart, needs Pages VITE_API_URL re-set + console rebuild after)
   and bypasses edge lockdown (X-Edge-Auth), demo-only. Pages VITE_API_URL is now SET + console
@@ -197,8 +206,8 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - **Autonomy v2.1 is live**: ruleset = PR + green `checks`, zero human approvals (Devesh flipped it);
   repo has allow_auto_merge + delete_branch_on_merge ON; agent sessions may create PRs, resolve
   conflicts, and merge on green (named grant, 2026-07-11). Guard loosening stays Devesh-only.
-- **Infra (2026-07-12):** VPS `168.144.147.90` hardened per runbook §2–§3 (deploy user, key-only
-  sshd, ufw 443/22-limit, fail2ban, Docker, 2GB swap, resized to 1vCPU/2GB/48GB). **Console is
+- **Infra (2026-07-12):** the VPS (address in the password manager) hardened per runbook §2–§3
+  (deploy user, key-only sshd, ufw 443/22-limit, fail2ban, Docker, 2GB swap, resized to 1vCPU/2GB/48GB). **Console is
   LIVE on Cloudflare Pages**: https://revenue-os-console.pages.dev (push-to-deploy on main; build
   env SKIP_DEPENDENCY_INSTALL=1 + BUN_VERSION=1.3.11 in BOTH prod+preview; VITE_ vars → staging
   Supabase `ajtfillmkjhoffxllqja`, Mumbai).
@@ -266,7 +275,8 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
    handle/document `start === end` as a no-op window. (Surfaced by code-review on #57.)~~ — DONE in
    this PR (task-56).
 4. Staging deploy per runbook (task 14): GitHub side is ready (env + secrets verified); still
-   needs the VPS box + Cloudflare Pages connect (WAITING) before arming deploy.yml.
+   needs the VPS box on a fresh IP + Cloudflare Pages connect (WAITING) before arming deploy.yml;
+   the deploy gate must send `Authorization: Bearer $READY_TOKEN` to /ready.
 5. Vapi spike REMOTE half (needs VPS public URL): real webhook delivery (S6.2 x-vapi-secret header
    confirm), real call, recorded payloads replace synthetic fixtures, India number decision (BYO SIP
    trunk — Exotel/Plivo; account has 0 numbers/credentials).
@@ -282,14 +292,23 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 (nothing in flight — task-14b is gated, see WAITING)
 
 ## WAITING ON DEVESH
+- **VPS IP is burned (2026-09-25):** the current box's address was committed to this PUBLIC repo; it is
+  gone from the tree but stays in git history. Move to a new instance or a reserved IP (release the
+  old one) BEFORE any `api.<domain>` DNS record exists, keep the new address in the password manager
+  only, and set the PROVIDER firewall (443 from Cloudflare ranges only — ufw cannot police Docker
+  ports). Runbook §0 step zero. Also yours: create the Cloudflare origin certificate (§4 step 3) and
+  decide whether the repo should stay public.
+- **`.env.example` keys** (agents are deny-listed from `.env.*`): append empty `API_HOST=`,
+  `CORS_ORIGINS=` and `READY_TOKEN=` lines.
 - **Domain purchase** — the ONLY blocker left for the PERMANENT worker deploy: Cloudflare zone (api DNS,
-  Transform Rule, origin lockdown), Pages custom domain, Caddy cert, `docker compose up`, and the
+  Transform Rule, origin lockdown), Pages custom domain, origin certificate, `docker compose up`, and the
   Vapi remote spike all execute the day it exists (runbook §4–§6). Tunnel stopgap is live meanwhile
   (ephemeral URL; Pages re-pairing needed on every cloudflared restart).
 - **CI deploy credentials** (classifier-blocked for agents; needed for task 14b image ship, not
   for migrations): generate + wire the staging SSH key,
-  either by naming the action to an agent session or yourself:
-  `ssh deploy@168.144.147.90 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
+  either by naming the action to an agent session or yourself, on the NEW box (VPS_HOST = the VPS,
+  address in the password manager):
+  `ssh "$VPS_HOST" 'ssh-keygen -q -t ed25519 -f ~/.ssh/ci_deploy -N "" && cat ~/.ssh/ci_deploy.pub >> ~/.ssh/authorized_keys && cat ~/.ssh/ci_deploy'` → `gh secret set STAGING_SSH_KEY --env staging` → delete `~/.ssh/ci_deploy` from the box.
 - **Landing page go-live inputs (apps/www):** (1) a Cal.com account + a demo event type with a
   required short-text booking question whose identifier is `company`, then `VITE_CALCOM_USERNAME` +
   `VITE_CALCOM_EVENT_SLUG` in the Pages build env; (2) a Plausible site → `VITE_PLAUSIBLE_SRC` + the
@@ -306,6 +325,13 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **/ready has its own bearer token (2026-09-25):** `READY_TOKEN` (≥32 chars, constant-time compare,
+  401 for everyone when unset) replaces S5.9's "requires the shared edge header" — the Cloudflare
+  Transform Rule stamps X-Edge-Auth on EVERY forwarded request, so it proves "came via our zone",
+  not "internal". Guarded in the worker, so it also holds on paths that skip Caddy (the tunnel).
+- **Origin TLS = Cloudflare Origin CA certificate (2026-09-25):** replaces S3.6's "TLS via Let's
+  Encrypt" — with port 80 closed and 443 proxied, no ACME challenge reaches Caddy. Upgrade path
+  unchanged: Authenticated Origin Pulls (mTLS) post-pilot (S3.3).
 - **apps/www How it works chapters 01–02 are illustrative (2026-09-24, Devesh chose the label):** the numeric intent
   score and questions to the sales team aren't built yet, so the section carries "Illustrative
   example" and the RETIRED "/100" pin is scoped: allowed only inside How it works (id "how"). Build either, then
@@ -466,6 +492,7 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) VPS address removed from the public repo (`VPS_HOST`), Caddy on a Cloudflare origin cert for `{$API_HOST}`, compose 443-only + blank-value refusal, `/ready` bearer token — worker health suite 5/0 (edge-header repro red on main), Caddy proven live in the pinned image — 2026-09-25
 - (this PR) apps/www page told as one enquiry in order (How it works 01 brief → 02 score → 03 call), hero = board study A3 (call card removed), pilot report after Pilot — www 309/0 — 2026-09-24
 - (this PR) apps/www demo-first copy + Cal.com booking dialog + Plausible funnel events, inside the restored #98 editorial design (the demo-first restyle was rejected) — www 208/0, repo-wide 782/0 — 2026-09-24
 - #98 console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23
