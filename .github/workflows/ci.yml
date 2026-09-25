@@ -36,7 +36,7 @@ jobs:
 
       - run: bun run typecheck
 
-      - name: Console build (dummy env) + S1.2/S7.3 guards # task 11
+      - name: Console build (dummy env) + S1.2/S4.1/S7.3 guards # task 11
         run: |
           VITE_SUPABASE_URL="https://dummy.invalid" VITE_SUPABASE_ANON_KEY="dummy-not-a-key" \
             bun run --filter console build

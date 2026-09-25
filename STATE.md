@@ -4,9 +4,16 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
+Updated: 2026-09-25 (CI guard S4.1: no public IPv4 address in any tracked file)
 
 ## NOW (verified facts, not hopes)
+- **CI now fails on any public IPv4 address in a tracked file (guard S4.1, 2026-09-25):** follow-up to
+  the VPS-address incident (lessons 2026-09-25; gitleaks hunts credentials, not addresses).
+  `scripts/guards.sh` runs `git grep -P` over tracked files; loopback, 0.0.0.0, private, link-local and
+  the documentation ranges pass; hits print as file:line only, never the address; a git grep that
+  cannot run fails the guard. One path is excused (the SVG icon in `IntentEvidence.tsx`). On main
+  today it flags the four lines PR #103 removes, so this goes green after #103 merges.
+  `scripts/guards.test.ts` 4/0 (RED 0/4 against the old script).
 - **Landing page reads as one enquiry, in order; hero = board study A3 (apps/www, 2026-09-24, stacked on
   the editorial-design PR):** from Devesh's picks on the hook-studies board and his follow-up ("A3 … as it
   is, remove the older call card … make sure the user gets correct and systematic information as they
@@ -464,8 +471,10 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - T8: scheduler tick scheduled as a durable pg-boss cron (pgboss.schedule) over a per-process setInterval — survives restarts; cadence 1 min (pg-boss cron min granularity) vs the plan's 30s, acceptable for day-scale runs.
 - T8: live-telephony senders + call-outcome port + confirmation-send seam + no-key LLM provider are throwing stubs (fail loud, boot green); T9 swaps in the real/Fake adapters.
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
+- S4.1 guard (2026-09-25): the SVG icon file `apps/www/src/visuals/IntentEvidence.tsx` is excused by path — its compact path numbers read exactly like an address and no regex can tell them apart; the test pins the list at that one file (the alternative, respacing the SVG path, stays open).
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) guard S4.1 — CI fails on a public IPv4 literal in any tracked file, file:line only — guards.test 4/0 — 2026-09-25
 - (this PR) apps/www page told as one enquiry in order (How it works 01 brief → 02 score → 03 call), hero = board study A3 (call card removed), pilot report after Pilot — www 309/0 — 2026-09-24
 - (this PR) apps/www demo-first copy + Cal.com booking dialog + Plausible funnel events, inside the restored #98 editorial design (the demo-first restyle was rejected) — www 208/0, repo-wide 782/0 — 2026-09-24
 - #98 console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23
