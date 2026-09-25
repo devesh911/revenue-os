@@ -8,7 +8,7 @@ the same PR. Decisions are added newest first; Waiting items are ticked when Dev
 History lives in `git log`; the previous long version of this file is
 `docs/archive/STATE-until-2026-09-25.md`.
 
-Updated: 2026-09-25 (VPS address out of the public repo; origin certificate; /ready token)
+Updated: 2026-09-25 (VPS address out of the public repo; origin certificate; /ready token; CI check: no public IPv4 address in any committed file)
 Current slice: **Slice 0: One source of truth** (see `ROADMAP.md`)
 
 ## What works today
@@ -42,6 +42,7 @@ use it) · **Missing** (not built).
 | Console | Screens: home, tasks, conversations, contacts, transcript, dashboard, agents, settings | Partial | Read-only except the guardrail settings form |
 | Console | Dashboard numbers are right | Partial | Counts outcome labels the engine never writes, so real bookings would show 0 |
 | Quality | Automated tests and CI | Works | .github/workflows/ci.yml; green CI does not mean a customer-facing feature works |
+| Quality | CI fails when a committed file contains a public IPv4 address (the server's address must never be published) | Works | scripts/guards.sh (run by `bun run guards` in CI); hits print as file:line only, never the address |
 | Quality | Agent evals and an eval gate before a version goes live | Partial | `bun run evals` exists; nothing activates an agent or checks its evals |
 | Ops | Metering and cost per lead | Partial | Token counts recorded; provider labelled "fake"; cost always 0 |
 | Ops | Deployment | Partial | Staging migrations deploy on every push to main; the worker runs only by hand behind a temporary tunnel; production is off. Caddy is set up for a Cloudflare origin certificate on `API_HOST` with only 443 published (docker/), but the server's address leaked and must change before the api DNS record exists |
@@ -68,6 +69,7 @@ use it) · **Missing** (not built).
 
 Newest first. One line each; the reason goes in the PR that made the decision.
 
+- 2026-09-25 · **The public-address check excuses one file by path**: `apps/www/src/visuals/IntentEvidence.tsx`, whose SVG icon numbers look exactly like an address; a test holds the list to that one file.
 - 2026-09-25 · **/ready has its own bearer token (READY_TOKEN)**, refused for everyone when unset: Cloudflare adds X-Edge-Auth to every request it forwards, so that header proves "came through our zone", not "internal". Replaces security.md S5.9's "requires the shared edge header".
 - 2026-09-25 · **The origin server uses a Cloudflare Origin CA certificate**, not Let's Encrypt: port 80 is closed and Cloudflare proxies 443, so Let's Encrypt cannot check the box. Replaces security.md S3.6.
 - 2026-09-25 · **Server addresses never go in the repo**: scripts read `VPS_HOST`; the address lives in the password manager.
