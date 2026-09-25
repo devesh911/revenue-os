@@ -3,7 +3,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { ZodError } from "zod";
-import { type AuthEnv, requireAuth } from "./auth";
+import { type AuthEnv, requireAuth, requireReadyToken } from "./auth";
 import { env } from "./env";
 import { startJobs } from "./jobs";
 import { logger } from "./logger";
@@ -29,7 +29,7 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ ok: true })); // S5.9: information-free
-app.get("/ready", (c) =>
+app.get("/ready", requireReadyToken(env.READY_TOKEN), (c) =>
   c.json({ ok: true, todo: "db + pgboss checks (task 1)" }),
 );
 

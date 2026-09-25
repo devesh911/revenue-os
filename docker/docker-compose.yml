@@ -7,7 +7,12 @@ services:
   caddy:
     image: caddy:2.11.4 # G2: exact pin (was caddy:2 — the one floating tag in the stack)
     restart: unless-stopped
-    ports: ["443:443", "80:80"]
-    volumes: [ "./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data" ]
-    environment: [ "EDGE_SHARED_SECRET=${EDGE_SHARED_SECRET}" ]
+    # 443 only. Docker-published ports bypass ufw, so the PROVIDER firewall (Cloudflare ranges
+    # only, runbook §0) is the wall. No 80: the origin cert means no ACME challenge to answer.
+    ports: ["443:443"]
+    volumes: [ "./Caddyfile:/etc/caddy/Caddyfile:ro", "./certs:/etc/caddy/certs:ro", "caddy_data:/data" ]
+    # :? = refuse to start on a blank value (a blank secret would admit an empty X-Edge-Auth header).
+    environment:
+      - "API_HOST=${API_HOST:?run compose with --env-file ../.env}"
+      - "EDGE_SHARED_SECRET=${EDGE_SHARED_SECRET:?run compose with --env-file ../.env}"
 volumes: { caddy_data: {} }

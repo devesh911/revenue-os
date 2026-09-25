@@ -1,4 +1,7 @@
-api.example.com {
+{$API_HOST} {
+  # Cloudflare Origin CA cert (runbook §3): port 80 is closed and Cloudflare proxies 443, so
+  # Let's Encrypt can never validate this box; Full (strict) trusts the origin cert instead.
+  tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
   @not_edge not header X-Edge-Auth {env.EDGE_SHARED_SECRET}
   respond @not_edge 403           # S3.3: only Cloudflare (which injects the header) gets through
   header {
