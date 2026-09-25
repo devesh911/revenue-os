@@ -8,7 +8,7 @@ the same PR. Decisions are added newest first; Waiting items are ticked when Dev
 History lives in `git log`; the previous long version of this file is
 `docs/archive/STATE-until-2026-09-25.md`.
 
-Updated: 2026-09-25 (VPS address out of the public repo; origin certificate; /ready token; CI check: no public IPv4 address in any committed file)
+Updated: 2026-09-25 (console sign-in: email and password, lands on the first workspace; before it: VPS address out of the public repo, origin certificate, /ready token, CI check for public IPv4 addresses)
 Current slice: **Slice 0: One source of truth** (see `ROADMAP.md`)
 
 ## What works today
@@ -21,7 +21,8 @@ use it) · **Missing** (not built).
 | Area | Capability | Status | Where / why |
 |---|---|---|---|
 | Data | Tenant isolation: each company sees only its own rows; every API call checks the user's role | Works | packages/db/src/client.ts withOrg; RLS on all 33 tables (tests/rls_coverage.sql). Rows can still link across companies: Slice 1 |
-| Data | Create a company, add members, sign in | Partial | API only (services/worker/src/routes/orgs.ts); no console screen to create a company or invite |
+| Data | Create a company and add members | Partial | API only (services/worker/src/routes/orgs.ts); members are added by raw user id: no invite, no console screen |
+| Console | Sign in with email and password, land on your first workspace, sign out | Works | apps/console/src/app/session: public /login with a safe return-to, a signed-in gate on every other page, a membership gate with a no-access page, cached data wiped on sign-out. Accounts are invite-only (no sign-up screen). Phone code, Google and admin authenticator codes are not built |
 | Data | Import contacts from CSV with phone normalisation and dedupe | Partial | API only (routes/contacts.ts); no console screen; import does not enrol anyone |
 | Intake | New leads arrive by themselves (lead ads, portals, website, inbound call) | Missing | No intake webhook exists |
 | Engine | Enrol a lead into a sales sequence | Tests only | startRun (services/worker/src/runs.ts) is called only by scripts/demo.ts |
@@ -63,12 +64,17 @@ use it) · **Missing** (not built).
 - [ ] **Deploy key in GitHub** (STAGING_SSH_KEY) so new code reaches the test server automatically; agents are not allowed to create it (needed for the permanent deploy, Slice 6)
 - [ ] **Recording-consent wording** for each pilot's calls (needed before Slice 6)
 - [ ] **Landing page go-live inputs**: Cal.com account and event, Plausible site, pilot-guarantee wording, the AI self-identification line, one consented call recording, a readable transcript for accessibility
+- [ ] **Phone sign-in**: an SMS provider account plus DLT registration of the sender name and the sign-in code message (can take weeks)
+- [ ] **Google sign-in**: a Google Cloud OAuth client and consent screen for the console
+- [ ] **Email provider** for invites and password resets (Resend, Postmark or SES) with a verified sending address on the domain; staging's sign-in settings (site address, allowed redirects, email confirmation, password length) are then set in the Supabase dashboard
 - [ ] Optional: delete seven stale remote branches (agents cannot delete remote branches)
 
 ## Decisions in force
 
 Newest first. One line each; the reason goes in the PR that made the decision.
 
+- 2026-09-25 · **Console sign-in** (Devesh): accounts are invite-only (we create each customer's company and invite its first admin); sign-in by email and password now, phone code and Google next; admins must use an authenticator-app code. Agent defaults: "Sign out" signs out this device only; invites are our own table, because Supabase's built-in invite needs the service-role key; company single sign-on later through Supabase's own SAML, so the worker trusts one token issuer; the browser sign-in test runs inside the required `checks` job.
+- 2026-09-25 · **Local settings come from `bun run local <cmd>`** (read from the running local Supabase stack, never printed, never `.env` files); `bun run db:seed` creates the local dev login `dev@local.test`; fixed dev ports: console 5173, console preview 4173, marketing site 5174.
 - 2026-09-25 · **The public-address check excuses one file by path**: `apps/www/src/visuals/IntentEvidence.tsx`, whose SVG icon numbers look exactly like an address; a test holds the list to that one file.
 - 2026-09-25 · **/ready has its own bearer token (READY_TOKEN)**, refused for everyone when unset: Cloudflare adds X-Edge-Auth to every request it forwards, so that header proves "came through our zone", not "internal". Replaces security.md S5.9's "requires the shared edge header".
 - 2026-09-25 · **The origin server uses a Cloudflare Origin CA certificate**, not Let's Encrypt: port 80 is closed and Cloudflare proxies 443, so Let's Encrypt cannot check the box. Replaces security.md S3.6.

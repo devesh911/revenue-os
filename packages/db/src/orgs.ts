@@ -1,4 +1,5 @@
-// Org bootstrap + membership helpers — the only sanctioned queries for these flows (D21).
+// Org bootstrap + membership helpers — the only sanctioned queries for these flows (AGENTS.md: DB
+// access only via packages/db).
 // G1: runtime-agnostic.
 import type {
   AddMember,
@@ -44,7 +45,7 @@ export async function createOrgWithAdmin(
   return { id };
 }
 
-/** Sample audited mutation (task 6): rename an org — before/after captured atomically. */
+/** Sample audited mutation: rename an org — before/after captured atomically. */
 export async function updateOrg(
   pool: pg.Pool,
   orgId: string,
@@ -74,7 +75,10 @@ export async function updateOrg(
   });
 }
 
-/** The caller's effective role in an org, honoring support-access expiry (D28). */
+/**
+ * The caller's effective role in an org, honoring support-access expiry (docs/db-design.md
+ * section 14.1).
+ */
 export async function memberRole(
   pool: pg.Pool,
   orgId: string,
@@ -104,13 +108,14 @@ export async function addMember(
 }
 
 /** Cross-org by nature (login → org switcher): served by the app.user_orgs SECURITY DEFINER
- *  function, granted to app_service only. userId MUST be a jose-verified JWT sub. */
+ *  function, granted to app_service only. userId MUST be a jose-verified JWT sub. Ordered by name
+ *  (then id) so "the first workspace" the console's / landing opens is a defined rule. */
 export async function userOrgs(
   pool: pg.Pool,
   userId: string,
 ): Promise<OrgRow[]> {
   const r = await pool.query(
-    `select org_id as id, name, slug, role from app.user_orgs($1)`,
+    `select org_id as id, name, slug, role from app.user_orgs($1) order by name, org_id`,
     [userId],
   );
   return r.rows as OrgRow[];

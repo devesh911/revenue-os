@@ -88,7 +88,8 @@ record one line in `STATE.md → Decisions in force`, keep moving.
 - `docs/patterns/` holds the style to imitate: its rules bind; its examples are illustrations.
 
 ## Commands (scripts are the interface)
-`bun run gates` (typecheck + lint + test + RLS check) · `bun run dev` · `bun run db:reset`
+`bun run gates` (typecheck + lint + test + RLS check) · `bun run local <cmd>` (any command with the
+running local stack's settings) · `bun run dev` · `bun run db:reset`
 (local only) · `bun run db:seed <pack>` · `bun run demo` · `bun run evals` · `bun run guards`
 
 ## Conventions

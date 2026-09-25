@@ -1,23 +1,11 @@
-// Connected user chip for the sidebar footer. Lives in app/ (not ui/) because it talks
-// to supabase for the signed-in email — ui/ stays pure vocabulary. Renders through the
-// lazy getSupabase() getter only inside the effect (import-safe at module scope).
-import { useEffect, useState } from "react";
-import { getSupabase } from "../lib/supabase";
+// Connected user chip for the sidebar footer. Lives in app/ (not ui/) because it reads the
+// signed-in email from the session context — ui/ stays pure vocabulary.
 import { Avatar } from "../ui/primitives";
+import { useSession } from "./session/SessionProvider";
 
 export function UserChip() {
-  const [email, setEmail] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    getSupabase()
-      .auth.getSession()
-      .then(({ data }) => {
-        if (alive) setEmail(data.session?.user.email ?? null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const { state } = useSession();
+  const email = state.status === "signedIn" ? state.email : null;
   return (
     <div className="flex items-center gap-2.5 px-2 py-1.5">
       <Avatar name={email ?? "?"} size="sm" />

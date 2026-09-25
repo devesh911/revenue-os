@@ -8,10 +8,12 @@ import { getSupabase } from "./supabase";
 // falls back too — API_URL is never "", which would render "Can't reach the API at .".
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
+// `signal` is TanStack Query's cancellation: pass the queryFn's signal so an abandoned query
+// aborts its request.
 export async function api<T>(
   path: string,
   schema: z.ZodType<T>,
-  opts: { method?: string; body?: unknown } = {},
+  opts: { method?: string; body?: unknown; signal?: AbortSignal } = {},
 ): Promise<T> {
   const { data } = await getSupabase().auth.getSession();
   return apiFetch(API_URL, path, schema, {

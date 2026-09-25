@@ -46,6 +46,7 @@ Seen by Devesh: —
 - [ ] A new sequence uses the lead's own time zone (agent)
 - [ ] Staff profiles (names, phone numbers) are visible only to people in the same company (agent)
 - [ ] Every screen and API route checks the user's role (admin, operator, viewer) through one shared check, proven by a test (agent)
+- [ ] Every API route requires sign-in unless it is on a short public list, and expired or forged sign-in tokens are proven rejected (agent)
 - [ ] `bun run demo --keep` leaves its demo company in place so the result can be looked at in the console (agent)
 
 ## Slice 2: First real WhatsApp message
@@ -101,7 +102,12 @@ Proof: Without developer help, Devesh creates a test company, invites a teammate
 Blocked by: Slice 3
 Seen by Devesh: —
 
+- [x] Sign in to the console with email and password and land on your first workspace (agent) · evidence: [#101](https://github.com/devesh911/revenue-os/pull/101), the browser sign-in test passed 6 of 6 against the real local stack in CI, plus screenshots of the login, first-workspace, no-workspace and no-access pages
 - [ ] Create a company and invite the team (agent)
+- [ ] Forgot-password email link that works from any device (agent)
+- [ ] Sign in with a phone code or with Google (agent)
+- [ ] Admins confirm sign-in with an authenticator-app code, and again before destructive admin actions (agent)
+- [ ] Console security headers (content security policy, no framing), 12-character passwords and email confirmation (agent)
 - [ ] CSV import screen that enrols the imported leads (agent)
 - [ ] Set goal, rules and prompt; a new agent version goes live only after it passes the test conversations (agent)
 - [ ] Task queue: claim, complete, dismiss (agent)

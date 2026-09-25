@@ -1,4 +1,5 @@
-// ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (tech-stack T5/T7/T8, harness T26)
+// ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (docs/tech-stack.md
+// T5/T7/T8; the agent harness is T26).
 // Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (G1).
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -18,17 +19,18 @@ import { vapiWebhook } from "./vapi/receive";
 const app = new Hono<AuthEnv>();
 
 // CORS before EVERYTHING: browser preflights (OPTIONS) carry no Authorization, so this
-// must answer them before requireAuth. Explicit origin allowlist (S3/S4) — never "*".
+// must answer them before requireAuth. Explicit origin allowlist, never "*" (docs/security.md
+// S3/S4).
 app.use(
   "*",
   cors({
     origin: (origin) => (env.CORS_ORIGINS.includes(origin) ? origin : null),
     allowHeaders: ["authorization", "content-type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   }),
 );
 
-app.get("/health", (c) => c.json({ ok: true })); // S5.9: information-free
+app.get("/health", (c) => c.json({ ok: true })); // information-free (docs/security.md S5.9)
 app.get("/ready", requireReadyToken(env.READY_TOKEN), (c) =>
   c.json({ ok: true, todo: "db + pgboss checks (task 1)" }),
 );
@@ -41,9 +43,9 @@ app.route("/", contacts);
 app.route("/", conversations);
 app.route("/", screens);
 app.route("/", guardrailPolicies);
-app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (S6.2)
+app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (docs/security.md S6.2)
 
-// S5.8: clients get clean statuses, never internals; detail goes to the log.
+// Clients get clean statuses, never internals; detail goes to the log (docs/security.md S5.8).
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: "invalid_request" }, 400);
   if (
@@ -57,7 +59,7 @@ app.onError((err, c) => {
   return c.json({ error: "internal" }, 500);
 });
 
-// TODO task 7: mount packages/harness loop consumers
+// TODO: mount packages/harness loop consumers
 // pg-boss consumers boot with the server, never on test import (import.meta.main is
 // false under bun test). Half-configured boot = refuse to run, same posture as env.ts.
 if (import.meta.main) {
@@ -67,4 +69,4 @@ if (import.meta.main) {
   });
 }
 
-export default { port: 8080, fetch: app.fetch };
+export default { port: env.PORT, fetch: app.fetch };
