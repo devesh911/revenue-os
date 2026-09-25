@@ -2,6 +2,7 @@
 // HS-downgrade rejected by construction), iss, aud, exp, clock skew ≤ 60s.
 // jose caches the remote JWK set and refetches on unknown kid (key rotation safe).
 import type { MiddlewareHandler } from "hono";
+import { bearerAuth } from "hono/bearer-auth";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { env } from "./env";
 
@@ -35,3 +36,13 @@ export const requireAuth: MiddlewareHandler<AuthEnv> = async (c, next) => {
     return c.json({ error: "unauthorized" }, 401);
   }
 };
+
+// S5.9: /ready carries its OWN token. X-Edge-Auth cannot gate it — Cloudflare's Transform Rule
+// stamps that header on EVERY forwarded request, strangers' included. No token = fail closed.
+// bearerAuth compares in constant time.
+export const requireReadyToken = (
+  token: string | undefined,
+): MiddlewareHandler =>
+  token
+    ? bearerAuth({ token })
+    : async (c) => c.json({ error: "unauthorized" }, 401);

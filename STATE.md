@@ -8,7 +8,7 @@ the same PR. Decisions are added newest first; Waiting items are ticked when Dev
 History lives in `git log`; the previous long version of this file is
 `docs/archive/STATE-until-2026-09-25.md`.
 
-Updated: 2026-09-25 (console sign-in: email and password, lands on the first workspace)
+Updated: 2026-09-25 (console sign-in: email and password, lands on the first workspace; before it: VPS address out of the public repo, origin certificate, /ready token, CI check for public IPv4 addresses)
 Current slice: **Slice 0: One source of truth** (see `ROADMAP.md`)
 
 ## What works today
@@ -43,20 +43,24 @@ use it) · **Missing** (not built).
 | Console | Screens: home, tasks, conversations, contacts, transcript, dashboard, agents, settings | Partial | Read-only except the guardrail settings form |
 | Console | Dashboard numbers are right | Partial | Counts outcome labels the engine never writes, so real bookings would show 0 |
 | Quality | Automated tests and CI | Works | .github/workflows/ci.yml; green CI does not mean a customer-facing feature works |
+| Quality | CI fails when a committed file contains a public IPv4 address (the server's address must never be published) | Works | scripts/guards.sh (run by `bun run guards` in CI); hits print as file:line only, never the address |
 | Quality | Agent evals and an eval gate before a version goes live | Partial | `bun run evals` exists; nothing activates an agent or checks its evals |
 | Ops | Metering and cost per lead | Partial | Token counts recorded; provider labelled "fake"; cost always 0 |
-| Ops | Deployment | Partial | Staging migrations deploy on every push to main; the worker runs only by hand behind a temporary tunnel; production is off |
-| Ops | Monitoring and readiness checks | Partial | Structured logs; /ready returns ok without checking anything |
+| Ops | Deployment | Partial | Staging migrations deploy on every push to main; the worker runs only by hand behind a temporary tunnel; production is off. Caddy is set up for a Cloudflare origin certificate on `API_HOST` with only 443 published (docker/), but the server's address leaked and must change before the api DNS record exists |
+| Ops | Monitoring and readiness checks | Partial | Structured logs; /ready needs its own bearer token (READY_TOKEN, refused when unset) but still returns ok without checking anything |
 | Marketing | Landing page with demo booking and analytics | Partial | Runs in preview mode until Cal.com and Plausible are set up |
 
 ## Waiting on Devesh
 
+- [ ] **Move the VPS to a new IP address**: the current address was committed to this public repo (removed 2026-09-25, still in git history), so it is burned. Move to a new instance or a reserved IP and release the old one BEFORE any `api.<domain>` DNS record exists; keep the new address in the password manager only; in the provider's firewall allow 443 only from Cloudflare's ranges (ufw cannot police Docker's ports). docs/runbooks/vps-cloudflare-setup.md §0
+- [ ] **Decide whether the repo stays public**: the old address and earlier infrastructure notes stay in its history either way
+- [ ] **Add three empty keys to `.env.example`**: `API_HOST=`, `CORS_ORIGINS=`, `READY_TOKEN=` (agents are not allowed to write `.env.*` files)
 - [ ] **Meta WhatsApp Business**: a test number, access token and one approved message template (unblocks Slice 2)
 - [ ] **Anthropic key on the test server** (ANTHROPIC_API_KEY in the staging worker's environment): the AI model's password (unblocks Slice 3). Also confirm VAPI_WEBHOOK_SECRET is still set there: scripts/provision-staging.sh installed it on 2026-07-12
 - [ ] **Indian telephony for Vapi**: pick Exotel or Plivo, open the account, get a number, and ask what registration Indian sales calls need (DLT, 140-series numbers). Approval can take weeks, so start now (unblocks Slice 4)
 - [ ] **Confirm the first market**: NORTH-STAR and all current work assume Indian real estate; the July spec said ceramic B2B. Reply "real estate" to close this, or "switch"
 - [ ] **Sign the pilot customer** with the derived-data clause, and agree their baseline and one success metric in writing (unblocks Slice 6)
-- [ ] **Domain purchase**: needed for the permanent worker deploy and fixed webhook addresses before the pilot (Slice 6); Slices 2 and 4 can be tested through a temporary tunnel
+- [ ] **Domain purchase**: needed for the permanent worker deploy and fixed webhook addresses before the pilot (Slice 6); Slices 2 and 4 can be tested through a temporary tunnel. On domain day also create the Cloudflare origin certificate (runbook §3 and §4 step 3)
 - [ ] **Deploy key in GitHub** (STAGING_SSH_KEY) so new code reaches the test server automatically; agents are not allowed to create it (needed for the permanent deploy, Slice 6)
 - [ ] **Recording-consent wording** for each pilot's calls (needed before Slice 6)
 - [ ] **Landing page go-live inputs**: Cal.com account and event, Plausible site, pilot-guarantee wording, the AI self-identification line, one consented call recording, a readable transcript for accessibility
@@ -71,6 +75,10 @@ Newest first. One line each; the reason goes in the PR that made the decision.
 
 - 2026-09-25 · **Console sign-in** (Devesh): accounts are invite-only (we create each customer's company and invite its first admin); sign-in by email and password now, phone code and Google next; admins must use an authenticator-app code. Agent defaults: "Sign out" signs out this device only; invites are our own table, because Supabase's built-in invite needs the service-role key; company single sign-on later through Supabase's own SAML, so the worker trusts one token issuer; the browser sign-in test runs inside the required `checks` job.
 - 2026-09-25 · **Local settings come from `bun run local <cmd>`** (read from the running local Supabase stack, never printed, never `.env` files); `bun run db:seed` creates the local dev login `dev@local.test`; fixed dev ports: console 5173, console preview 4173, marketing site 5174.
+- 2026-09-25 · **The public-address check excuses one file by path**: `apps/www/src/visuals/IntentEvidence.tsx`, whose SVG icon numbers look exactly like an address; a test holds the list to that one file.
+- 2026-09-25 · **/ready has its own bearer token (READY_TOKEN)**, refused for everyone when unset: Cloudflare adds X-Edge-Auth to every request it forwards, so that header proves "came through our zone", not "internal". Replaces security.md S5.9's "requires the shared edge header".
+- 2026-09-25 · **The origin server uses a Cloudflare Origin CA certificate**, not Let's Encrypt: port 80 is closed and Cloudflare proxies 443, so Let's Encrypt cannot check the box. Replaces security.md S3.6.
+- 2026-09-25 · **Server addresses never go in the repo**: scripts read `VPS_HOST`; the address lives in the password manager.
 - 2026-09-25 · **Docs have four law files**: AGENTS.md (how we work), docs/NORTH-STAR.md (what and why), ROADMAP.md (what next and what done means), STATE.md (what works, what waits, what we decided). Everything else in docs/ is reference or archive. docs/sdlc.md is retired; git log is the history.
 - 2026-09-25 · **Done means seen working** (AGENTS.md → Definition of done). A slice is done only when Devesh has watched its proof.
 - 2026-09-25 · **The next step is decided by an AI planner inside the operator's rules** (Slice 3). The fixed step map stays only until then.

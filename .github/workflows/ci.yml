@@ -36,7 +36,7 @@ jobs:
 
       - run: bun run typecheck
 
-      - name: Console build (dummy env) + secret guards # docs/security.md S1.2 and S7.3
+      - name: Console build (dummy env) + secret and public-address guards # docs/security.md S1.2, S4.1 and S7.3
         run: |
           VITE_SUPABASE_URL="https://dummy.invalid" VITE_SUPABASE_ANON_KEY="dummy-not-a-key" \
             bun run --filter console build

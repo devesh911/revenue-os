@@ -20,13 +20,15 @@ set -euo pipefail
 
 PROJECT_REF="ajtfillmkjhoffxllqja"
 POOLER_HOST="aws-1-ap-south-1.pooler.supabase.com" # from the dashboard Connect dialog — never guess pooler hosts (aws-0 vs aws-1 differs per project)
-VPS="deploy@168.144.147.90"
+VPS="${VPS_HOST:-}" # ssh target: an ~/.ssh/config alias or deploy@<address>. The address lives in the
+                    # password manager, NEVER in this public repo (S4.1: origin IP never published).
 SUPABASE_URL="https://${PROJECT_REF}.supabase.co"
 CORS_ORIGINS="https://revenue-os-console.pages.dev"
 
 say() { printf '\033[1m%s\033[0m\n' "$*"; }
 die() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
+[ -n "$VPS" ] || die "VPS_HOST is unset. export VPS_HOST=<ssh target> (an ~/.ssh/config alias, or deploy@<address from the password manager>)"
 command -v psql >/dev/null || die "psql not found (brew install libpq && brew link --force libpq)"
 command -v openssl >/dev/null || die "openssl not found"
 ssh -o BatchMode=yes -o ConnectTimeout=8 "$VPS" true 2>/dev/null || die "SSH to $VPS failed — is the key in your agent? (ssh-add --apple-load-keychain)"
@@ -85,4 +87,5 @@ say "   · Domain day → Cloudflare Transform Rule X-Edge-Auth = the EDGE_SHARE
 say "     (read it then with: ssh $VPS 'grep EDGE ~/app/.env')"
 say "   · Vapi assistant server.secret = the VAPI_WEBHOOK_SECRET (same grep trick), set"
 say "     together with server.url once the api domain exists."
-say "   · Do NOT 'docker compose up' before the domain exists (Caddy needs a hostname)."
+say "   · Do NOT 'docker compose up' before the domain exists (Caddy needs API_HOST + the origin"
+say "     certificate, runbook §3). Re-running THIS script rewrites ~/app/.env: re-add API_HOST + READY_TOKEN after."
