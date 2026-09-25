@@ -1,4 +1,4 @@
-// Console sign-in front door — RED spec for sign-in routing (AC-C1). The router serves the public
+// Console sign-in front door — RED spec for sign-in routing. The router serves the public
 // /login page OUTSIDE the session gate and every other page INSIDE it:
 //   - a signed-out visitor is sent to /login, carrying where they were going as `next`;
 //   - a signed-in visitor on /login is sent on to `next` — but only a safe, same-site one;
@@ -91,31 +91,31 @@ const expectNoProtectedContent = (visibleText: string) => {
   for (const marker of PROTECTED) expect(visibleText).not.toContain(marker);
 };
 
-describe("sign-in routing (AC-C1)", () => {
-  // AC-C1 — signed out on a protected page → /login with the full original location as `next`.
-  it("AC-C1: signed out at /o/abc/home?tab=x → redirect to /login?next=%2Fo%2Fabc%2Fhome%3Ftab%3Dx", async () => {
+describe("sign-in routing", () => {
+  // Signed out on a protected page → /login with the full original location as `next`.
+  it("signed out at /o/abc/home?tab=x → redirect to /login?next=%2Fo%2Fabc%2Fhome%3Ftab%3Dx", async () => {
     const out = await renderAt("/o/abc/home?tab=x", SIGNED_OUT);
     expect(out.redirectTo).toBe("/login?next=%2Fo%2Fabc%2Fhome%3Ftab%3Dx");
     expectNoProtectedContent(out.text);
   });
 
-  // AC-C1 — signed out on /login → the sign-in form renders, no redirect.
-  it("AC-C1: signed out at /login → renders the sign-in form", async () => {
+  // Signed out on /login → the sign-in form renders, no redirect.
+  it("signed out at /login → renders the sign-in form", async () => {
     const out = await renderAt("/login", SIGNED_OUT);
     expect(out.redirectTo).toBeUndefined();
     expect(out.text).toContain(HEADING);
     expectNoProtectedContent(out.text);
   });
 
-  // AC-C1 — signed in on /login with a same-site `next` → sent on to it.
-  it("AC-C1: signed in at /login?next=%2Fo%2Fabc%2Fcontacts → redirect to /o/abc/contacts", async () => {
+  // Signed in on /login with a same-site `next` → sent on to it.
+  it("signed in at /login?next=%2Fo%2Fabc%2Fcontacts → redirect to /o/abc/contacts", async () => {
     const out = await renderAt("/login?next=%2Fo%2Fabc%2Fcontacts", SIGNED_IN);
     expect(out.redirectTo).toBe("/o/abc/contacts");
     expect(out.text).not.toContain(HEADING);
   });
 
-  // AC-C1 — signed in on /login with an off-site `next` (or none) → sent to "/", never off-site.
-  it("AC-C1: signed in at /login?next=%2F%2Fevil.com → redirect to / (and no next → /)", async () => {
+  // Signed in on /login with an off-site `next` (or none) → sent to "/", never off-site.
+  it("signed in at /login?next=%2F%2Fevil.com → redirect to / (and no next → /)", async () => {
     const evil = await renderAt("/login?next=%2F%2Fevil.com", SIGNED_IN);
     expect(evil.redirectTo).toBe("/");
     expect(evil.text).not.toContain(HEADING);
@@ -123,8 +123,8 @@ describe("sign-in routing (AC-C1)", () => {
     expect(bare.redirectTo).toBe("/");
   });
 
-  // AC-C1 — session still loading → neither the form nor protected content, and no redirect yet.
-  it("AC-C1: loading renders neither the sign-in form nor protected content (on /login or a protected page)", async () => {
+  // Session still loading → neither the form nor protected content, and no redirect yet.
+  it("loading renders neither the sign-in form nor protected content (on /login or a protected page)", async () => {
     for (const url of ["/o/abc/home", "/login"]) {
       const out = await renderAt(url, LOADING);
       expect(out.redirectTo).toBeUndefined();

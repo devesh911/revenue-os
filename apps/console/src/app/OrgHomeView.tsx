@@ -1,4 +1,4 @@
-// Pure presentational view for the landing after sign-in (task-16 AC3, AC-C9) — also the org
+// Pure presentational view for the landing after sign-in — also the org
 // shell's state while the workspace list isn't in hand. Every non-happy state is honest and offers
 // a way forward: the API unreachable (names the API base — a dead backend must NOT masquerade as an
 // empty account), any other failure, and no workspace yet (invite-only: ask your admin). No list

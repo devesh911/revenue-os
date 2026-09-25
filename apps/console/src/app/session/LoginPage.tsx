@@ -1,7 +1,7 @@
-// The public /login route (AC-C1/C3), outside the session gate. Signed in → on to a safe `next`;
-// session still unknown → neutral; signed out → the form. The SDK does the sign-in (S7.2): it
-// stores the session and emits SIGNED_IN, which moves the session state on. Failures show only
-// the fixed copy from signInErrorMessage, never the provider's message. The credentials are read
+// The public /login route, outside the session gate. Signed in → on to a safe `next`;
+// session still unknown → neutral; signed out → the form. The SDK does the sign-in
+// (docs/security.md S7.2): it stores the session and emits SIGNED_IN, which moves the session
+// state on. Failures show only the fixed copy from signInErrorMessage, never the provider's message. The credentials are read
 // from the closure, never passed as mutation variables, so no password lingers in the MutationCache.
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";

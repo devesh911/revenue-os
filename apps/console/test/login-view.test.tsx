@@ -1,4 +1,4 @@
-// Console sign-in front door — RED spec for the sign-in form's markup (AC-C4). LoginView is pure
+// Console sign-in front door — RED spec for the sign-in form's markup. LoginView is pure
 // (all state comes in as props), so its accessibility and browser-autofill contract is checked on
 // SSR markup: real <label>s tied to the inputs (screen readers + click-to-focus), the attributes
 // password managers key on (name, autocomplete, required, input type), a submit button that is
@@ -84,16 +84,16 @@ function submitButton(
   return undefined;
 }
 
-describe("LoginView — sign-in form markup (AC-C4)", () => {
-  // AC-C4 — heading, and a <form> to submit.
-  it("AC-C4: renders the 'Sign in to Revenue OS' heading inside a form page", async () => {
+describe("LoginView — sign-in form markup", () => {
+  // Heading, and a <form> to submit.
+  it("renders the 'Sign in to Revenue OS' heading inside a form page", async () => {
     const html = await renderLogin();
     expect(html).toMatch(/<h[12]\b[^>]*>\s*Sign in to Revenue OS\s*<\/h[12]>/);
     expect(html).toContain("<form");
   });
 
-  // AC-C4 — Email: a real label tied to an email input with name, required, autocomplete="email".
-  it("AC-C4: 'Email' label is tied to an email input with name, required and autocomplete=email", async () => {
+  // Email: a real label tied to an email input with name, required, autocomplete="email".
+  it("'Email' label is tied to an email input with name, required and autocomplete=email", async () => {
     const input = inputForLabel(await renderLogin(), "Email");
     expect(input).toBeDefined();
     expect(input?.type).toBe("email");
@@ -103,8 +103,8 @@ describe("LoginView — sign-in form markup (AC-C4)", () => {
     expect(input?.value).toBe("dev@local.test"); // controlled by the email prop
   });
 
-  // AC-C4 — Password: a real label tied to a password input with autocomplete="current-password".
-  it("AC-C4: 'Password' label is tied to a password input with name, required and autocomplete=current-password", async () => {
+  // Password: a real label tied to a password input with autocomplete="current-password".
+  it("'Password' label is tied to a password input with name, required and autocomplete=current-password", async () => {
     const html = await renderLogin();
     const input = inputForLabel(html, "Password");
     expect(input).toBeDefined();
@@ -115,22 +115,22 @@ describe("LoginView — sign-in form markup (AC-C4)", () => {
     expect(input?.name).not.toBe(inputForLabel(html, "Email")?.name); // two distinct fields
   });
 
-  // AC-C4 — idle: an enabled "Sign in" submit button.
-  it("AC-C4: idle → an enabled submit button reading 'Sign in'", async () => {
+  // idle: an enabled "Sign in" submit button.
+  it("idle → an enabled submit button reading 'Sign in'", async () => {
     const button = submitButton(await renderLogin());
     expect(button?.label).toBe("Sign in");
     expect(button?.attrs).not.toHaveProperty("disabled");
   });
 
-  // AC-C4 — pending: the submit button is disabled and reads "Signing in…".
-  it("AC-C4: pending → the submit button is disabled and reads 'Signing in…'", async () => {
+  // pending: the submit button is disabled and reads "Signing in…".
+  it("pending → the submit button is disabled and reads 'Signing in…'", async () => {
     const button = submitButton(await renderLogin({ pending: true }));
     expect(button?.label).toBe("Signing in…");
     expect(button?.attrs).toHaveProperty("disabled");
   });
 
-  // AC-C4 — an error is announced in an element with role="alert"; no error, no message.
-  it("AC-C4: an error renders inside a role=alert element", async () => {
+  // An error is announced in an element with role="alert"; no error, no message.
+  it("an error renders inside a role=alert element", async () => {
     const message = "Email or password is incorrect.";
     const html = await renderLogin({ error: message });
     const alert = html.match(

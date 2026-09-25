@@ -1,4 +1,4 @@
-// Console sign-in front door — RED spec for the app's query client (AC-C6). Two rules:
+// Console sign-in front door — RED spec for the app's query client. Two rules:
 //   shouldRetry        retry only what can succeed on a second try: server errors (5xx) and
 //                      "no answer" (status 0: offline / timeout), at most twice; never a 4xx —
 //                      retrying "not signed in" / "forbidden" / "not found" only delays the truth;
@@ -23,17 +23,17 @@ async function apiError(status: number): Promise<unknown> {
   return err;
 }
 
-describe("shouldRetry (AC-C6)", () => {
-  // AC-C6 — client errors are final: 400/401/403/404 are never retried.
-  it("AC-C6: never retries an ApiError 400/401/403/404", async () => {
+describe("shouldRetry", () => {
+  // Client errors are final: 400/401/403/404 are never retried.
+  it("never retries an ApiError 400/401/403/404", async () => {
     const { shouldRetry } = await loadQuery();
     for (const status of [400, 401, 403, 404]) {
       expect(shouldRetry(0, await apiError(status))).toBe(false);
     }
   });
 
-  // AC-C6 — server errors and no-answer (status 0) retry while failureCount < 2, then stop.
-  it("AC-C6: retries ApiError 500 and status 0 while failureCount < 2, never at >= 2", async () => {
+  // Server errors and no-answer (status 0) retry while failureCount < 2, then stop.
+  it("retries ApiError 500 and status 0 while failureCount < 2, never at >= 2", async () => {
     const { shouldRetry } = await loadQuery();
     for (const status of [500, 0]) {
       const err = await apiError(status);
@@ -45,9 +45,9 @@ describe("shouldRetry (AC-C6)", () => {
   });
 });
 
-describe("createQueryClient — 401 signs the user out (AC-C6)", () => {
-  // AC-C6 — a query failing with 401 calls onUnauthorized exactly once.
-  it("AC-C6: a query rejecting with ApiError 401 calls onUnauthorized once", async () => {
+describe("createQueryClient — 401 signs the user out", () => {
+  // A query failing with 401 calls onUnauthorized exactly once.
+  it("a query rejecting with ApiError 401 calls onUnauthorized once", async () => {
     const { createQueryClient } = await loadQuery();
     const onUnauthorized = mock(() => {});
     const qc = createQueryClient({ onUnauthorized });
@@ -62,8 +62,8 @@ describe("createQueryClient — 401 signs the user out (AC-C6)", () => {
     qc.clear();
   });
 
-  // AC-C6 — a 500 is an outage, not a lost session: onUnauthorized is not called.
-  it("AC-C6: a query rejecting with ApiError 500 does not call onUnauthorized", async () => {
+  // A 500 is an outage, not a lost session: onUnauthorized is not called.
+  it("a query rejecting with ApiError 500 does not call onUnauthorized", async () => {
     const { createQueryClient } = await loadQuery();
     const onUnauthorized = mock(() => {});
     const qc = createQueryClient({ onUnauthorized });
@@ -79,8 +79,8 @@ describe("createQueryClient — 401 signs the user out (AC-C6)", () => {
     qc.clear();
   });
 
-  // AC-C6 — a mutation failing with 401 calls onUnauthorized exactly once too.
-  it("AC-C6: a mutation rejecting with ApiError 401 calls onUnauthorized once", async () => {
+  // A mutation failing with 401 calls onUnauthorized exactly once too.
+  it("a mutation rejecting with ApiError 401 calls onUnauthorized once", async () => {
     const { createQueryClient } = await loadQuery();
     const onUnauthorized = mock(() => {});
     const qc = createQueryClient({ onUnauthorized });

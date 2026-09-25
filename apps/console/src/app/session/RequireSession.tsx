@@ -1,5 +1,5 @@
-// The session gate (S7.5) around every page but /login. Signed out → /login, carrying where the
-// visitor was going as `next` — unless they signed out on purpose (then plain /login). Keyed by
+// The session gate (docs/security.md S7.5) around every page but /login. Signed out → /login,
+// carrying where the visitor was going as `next` — unless they signed out on purpose (then plain /login). Keyed by
 // user, so a different user signing in (e.g. in another tab) remounts the tree on the wiped cache.
 // UI only: the API checks the token on every call.
 import { Fragment, type ReactNode } from "react";

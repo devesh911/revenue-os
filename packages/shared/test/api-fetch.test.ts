@@ -1,4 +1,4 @@
-// Task 10 RED — the ~30-line typed fetch wrapper (T24: ours, axios rejected).
+// RED spec for the ~30-line typed fetch wrapper (ours, axios rejected: docs/tech-stack.md T24).
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { ApiError, apiFetch } from "../src";

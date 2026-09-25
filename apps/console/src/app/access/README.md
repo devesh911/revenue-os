@@ -2,7 +2,7 @@
 
 The membership check for org-scoped URLs (`/o/:orgId/…`), decided from the signed-in person's own
 workspace list (`useOrgsQuery`). It is a UI courtesy, not access control: the API checks membership
-on every call (S7.5).
+on every call (`docs/security.md` S7.5).
 
 - `org-access.ts` — pure `orgAccess(orgId, orgs, isLoading)` → `loading` · `member` · `no-access`.
   A malformed (non-uuid) id is never a workspace; no list in hand yet reads as `loading`.

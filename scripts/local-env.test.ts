@@ -16,7 +16,8 @@ type LocalEnvModule = {
 const load = async () =>
   (await import("./local-env")) as unknown as LocalEnvModule;
 
-// The privileged key's name is assembled at runtime (S1.2 guard: the literal never appears here).
+// The privileged key's name is assembled at runtime (the docs/security.md S1.2 guard: the literal
+// never appears here).
 const PRIV_NAME = ["SERVICE", "ROLE", "KEY"].join("_");
 const FAKE = {
   api: "http://127.0.0.1:54321",
@@ -74,20 +75,20 @@ const EXPECTED_DEFAULTS: Record<string, string> = {
 };
 
 describe("buildLocalEnv — local stack status → app env (pure)", () => {
-  // AC-L1: LOCAL_ENV_KEYS is exactly the ten keys the wrapper may set, nothing more.
-  it("AC-L1: exports LOCAL_ENV_KEYS as exactly the ten allowed keys", async () => {
+  // LOCAL_ENV_KEYS is exactly the ten keys the wrapper may set, nothing more.
+  it("exports LOCAL_ENV_KEYS as exactly the ten allowed keys", async () => {
     const { LOCAL_ENV_KEYS } = await load();
     expect([...LOCAL_ENV_KEYS].sort()).toEqual([...EXPECTED_KEYS].sort());
   });
 
-  // AC-L1: with nothing preset, the result is exactly the ten keys with the documented values.
-  it("AC-L1: fills every allowed key from the status text and local defaults", async () => {
+  // With nothing preset, the result is exactly the ten keys with the documented values.
+  it("fills every allowed key from the status text and local defaults", async () => {
     const { buildLocalEnv } = await load();
     expect(buildLocalEnv(status(), {})).toEqual(EXPECTED_DEFAULTS);
   });
 
-  // AC-L1: every other status line is ignored — the privileged key, JWT secret and secret keys never leak.
-  it("AC-L1: never carries the privileged key or any other status secret, by name or value", async () => {
+  // Every other status line is ignored — the privileged key, JWT secret and secret keys never leak.
+  it("never carries the privileged key or any other status secret, by name or value", async () => {
     const { buildLocalEnv } = await load();
     const result = buildLocalEnv(status(), {});
     const dump = JSON.stringify(result);
@@ -107,8 +108,8 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     }
   });
 
-  // AC-L1: a non-empty key already in `current` is never overridden (merge the result over current).
-  it("AC-L1: never overrides a key that is already set", async () => {
+  // A non-empty key already in `current` is never overridden (merge the result over current).
+  it("never overrides a key that is already set", async () => {
     const { buildLocalEnv } = await load();
     const current = Object.freeze({
       SUPABASE_URL: "http://127.0.0.1:60001",
@@ -129,8 +130,8 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     );
   });
 
-  // AC-L1: when PORT is preset, VITE_API_URL follows it instead of the 8080 default.
-  it("AC-L1: VITE_API_URL follows a preset PORT", async () => {
+  // When PORT is preset, VITE_API_URL follows it instead of the 8080 default.
+  it("VITE_API_URL follows a preset PORT", async () => {
     const { buildLocalEnv } = await load();
     const current = { PORT: "9090" };
     const merged = { ...current, ...buildLocalEnv(status(), current) };
@@ -138,8 +139,8 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     expect(merged.VITE_API_URL).toBe("http://localhost:9090");
   });
 
-  // AC-L1: an empty-string value counts as unset ("already set (non-empty)"), so it gets filled.
-  it("AC-L1: treats an empty preset value as unset", async () => {
+  // An empty-string value counts as unset ("already set (non-empty)"), so it gets filled.
+  it("treats an empty preset value as unset", async () => {
     const { buildLocalEnv } = await load();
     const result = buildLocalEnv(status(), { SUPABASE_URL: "", PORT: "" });
     expect(result.SUPABASE_URL).toBe(FAKE.api);
@@ -147,8 +148,8 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     expect(result.VITE_API_URL).toBe("http://localhost:8080");
   });
 
-  // AC-L1: pure — the answer depends only on its arguments, never on the process environment.
-  it("AC-L1: reads `current`, not process.env", async () => {
+  // Pure — the answer depends only on its arguments, never on the process environment.
+  it("reads `current`, not process.env", async () => {
     const { buildLocalEnv } = await load();
     const saved = process.env.PORT;
     process.env.PORT = "7777";
@@ -160,8 +161,8 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     }
   });
 
-  // AC-L1: accepts the localhost spelling of the local API URL too.
-  it("AC-L1: accepts a localhost API_URL", async () => {
+  // Accepts the localhost spelling of the local API URL too.
+  it("accepts a localhost API_URL", async () => {
     const { buildLocalEnv } = await load();
     const result = buildLocalEnv(
       status({ API_URL: "http://localhost:54321" }),
@@ -171,16 +172,16 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     expect(result.VITE_SUPABASE_URL).toBe("http://localhost:54321");
   });
 
-  // AC-L1: refuses a hosted (non-local) API_URL — this wrapper only ever targets the local stack.
-  it("AC-L1: refuses a non-local API_URL", async () => {
+  // Refuses a hosted (non-local) API_URL — this wrapper only ever targets the local stack.
+  it("refuses a non-local API_URL", async () => {
     const { buildLocalEnv } = await load();
     expect(() =>
       buildLocalEnv(status({ API_URL: "https://abcdefgh.supabase.co" }), {}),
     ).toThrow(/local/i);
   });
 
-  // AC-L1: "a 127.0.0.1/localhost URL" means the HOST is local — look-alike hostnames are refused.
-  it("AC-L1: refuses look-alike hosts that merely contain 127.0.0.1 or localhost", async () => {
+  // "a 127.0.0.1/localhost URL" means the HOST is local — look-alike hostnames are refused.
+  it("refuses look-alike hosts that merely contain 127.0.0.1 or localhost", async () => {
     const { buildLocalEnv } = await load();
     for (const api of [
       "http://127.0.0.1.evil.example:54321",
@@ -192,24 +193,24 @@ describe("buildLocalEnv — local stack status → app env (pure)", () => {
     }
   });
 
-  // AC-L1: a missing API_URL tells the developer to run `supabase start`.
-  it("AC-L1: missing API_URL throws a message naming `supabase start`", async () => {
+  // A missing API_URL tells the developer to run `supabase start`.
+  it("missing API_URL throws a message naming `supabase start`", async () => {
     const { buildLocalEnv } = await load();
     expect(() => buildLocalEnv(status({ API_URL: null }), {})).toThrow(
       /supabase start/,
     );
   });
 
-  // AC-L1: a missing ANON_KEY tells the developer to run `supabase start`.
-  it("AC-L1: missing ANON_KEY throws a message naming `supabase start`", async () => {
+  // A missing ANON_KEY tells the developer to run `supabase start`.
+  it("missing ANON_KEY throws a message naming `supabase start`", async () => {
     const { buildLocalEnv } = await load();
     expect(() => buildLocalEnv(status({ ANON_KEY: null }), {})).toThrow(
       /supabase start/,
     );
   });
 
-  // AC-L1: empty status output (stack not running) also points at `supabase start`.
-  it("AC-L1: empty status text throws a message naming `supabase start`", async () => {
+  // Empty status output (stack not running) also points at `supabase start`.
+  it("empty status text throws a message naming `supabase start`", async () => {
     const { buildLocalEnv } = await load();
     expect(() => buildLocalEnv("", {})).toThrow(/supabase start/);
   });
@@ -221,21 +222,21 @@ describe("`bun run local <cmd>` wiring (root package.json)", () => {
       scripts: Record<string, string>;
     };
 
-  // AC-L7: `bun run local <cmd>` wraps any command in the local env.
-  it('AC-L7: package.json has "local": "bun scripts/local-env.ts"', async () => {
+  // `bun run local <cmd>` wraps any command in the local env.
+  it('package.json has "local": "bun scripts/local-env.ts"', async () => {
     expect((await pkg()).scripts.local).toBe("bun scripts/local-env.ts");
   });
 
-  // AC-L7: db:seed runs through the wrapper so the seed CLI sees the local Supabase URL and anon key.
-  it('AC-L7: "db:seed" runs through the wrapper', async () => {
+  // db:seed runs through the wrapper so the seed CLI sees the local Supabase URL and anon key.
+  it('"db:seed" runs through the wrapper', async () => {
     expect((await pkg()).scripts["db:seed"]).toBe(
       "bun scripts/local-env.ts bun scripts/seed.ts",
     );
   });
 
-  // AC-L7: the wrapper actually wraps a command — injects the local env, leaks no privileged key,
+  // The wrapper actually wraps a command — injects the local env, leaks no privileged key,
   // and hands back the child's exit code untouched (a wrapper that swallows exit codes breaks gates).
-  it("AC-L7: `bun scripts/local-env.ts <cmd>` runs the command with the local env and its exit code", () => {
+  it("`bun scripts/local-env.ts <cmd>` runs the command with the local env and its exit code", () => {
     const base: Record<string, string | undefined> = { ...process.env };
     for (const k of [
       "PORT",

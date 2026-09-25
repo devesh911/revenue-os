@@ -16,32 +16,32 @@ const parsePort = async (extra: Record<string, unknown>) => {
 };
 
 describe("worker env PORT", () => {
-  // AC-L3: a string PORT (how process.env delivers it) is coerced to an integer.
-  it('AC-L3: PORT "8787" parses to the number 8787', async () => {
+  // A string PORT (how process.env delivers it) is coerced to an integer.
+  it('PORT "8787" parses to the number 8787', async () => {
     expect(await parsePort({ PORT: "8787" })).toBe(8787);
   });
 
-  // AC-L3: a numeric PORT is accepted as-is.
-  it("AC-L3: PORT 8787 (number) parses to 8787", async () => {
+  // A numeric PORT is accepted as-is.
+  it("PORT 8787 (number) parses to 8787", async () => {
     expect(await parsePort({ PORT: 8787 })).toBe(8787);
   });
 
-  // AC-L3: absent PORT defaults to 8080.
-  it("AC-L3: absent PORT defaults to 8080", async () => {
+  // Absent PORT defaults to 8080.
+  it("absent PORT defaults to 8080", async () => {
     expect(await parsePort({})).toBe(8080);
   });
 
-  // AC-L3: "coerced to int" — garbage or fractional ports are refused (the worker refuses to boot
+  // "coerced to int" — garbage or fractional ports are refused (the worker refuses to boot
   // half-configured), never silently NaN.
-  it("AC-L3: a non-integer PORT is rejected", async () => {
+  it("a non-integer PORT is rejected", async () => {
     const { EnvSchema } = await import("../src/env");
     for (const PORT of ["not-a-port", "80.5"]) {
       expect(() => EnvSchema.parse({ ...REQUIRED, PORT })).toThrow();
     }
   });
 
-  // AC-L3: the worker's default export listens on env.PORT — run in a child process with PORT=8787.
-  it("AC-L3: the worker default export's port follows PORT from the environment", () => {
+  // The worker's default export listens on env.PORT — run in a child process with PORT=8787.
+  it("the worker default export's port follows PORT from the environment", () => {
     const entry = join(import.meta.dir, "../src/index.ts");
     const r = Bun.spawnSync(
       [

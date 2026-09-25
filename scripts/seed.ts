@@ -1,5 +1,6 @@
-// Task 5: load supabase/seeds/<pack>.sql into the LOCAL stack. Refuses non-local URLs by
-// design (S13.3 / S11.5 — staging seeding goes through CI, never this script pointed at prod).
+// Load supabase/seeds/<pack>.sql into the LOCAL stack. Refuses non-local URLs by design
+// (docs/security.md S13.3 / S11.5 — staging seeding goes through CI, never this script pointed at
+// prod).
 // Seeds run as the migration owner (RLS-exempt bootstrap tooling); org context is passed to
 // the pack via set_config('seed.org_id', …) inside one transaction.
 import { readFileSync } from "node:fs";

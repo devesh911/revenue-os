@@ -1,7 +1,7 @@
-// Is /o/:orgId one of the person's own workspaces (AC-C8)? Decided from their own workspace list;
+// Is /o/:orgId one of the person's own workspaces? Decided from their own workspace list;
 // a malformed (non-uuid) id is never a workspace, so it needs no list. No list in hand yet (still
 // loading, paused offline, or failed) → "loading": the caller shows that state honestly.
-// UI only — the API checks membership on every call (S7.5).
+// UI only — the API checks membership on every call (docs/security.md S7.5).
 import { OrgIdSchema } from "@revenue-os/shared";
 
 export type OrgAccess = "loading" | "member" | "no-access";

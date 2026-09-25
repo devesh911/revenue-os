@@ -1,4 +1,4 @@
-// The sign-in form (AC-C4), pure: all state comes in as props. Real <label>s tied to the inputs
+// The sign-in form, pure: all state comes in as props. Real <label>s tied to the inputs
 // (screen readers + click-to-focus), the attributes password managers key on, a submit that is
 // disabled and says so while a request is in flight (no double submits), and errors announced
 // through role="alert". Invite-only accounts: no sign-up link.

@@ -1,6 +1,7 @@
-// Playwright e2e for the console (spec §12b · tech-stack T12 layer 6 / T22).
-// PER-APP config (mirrors apps/console/tsconfig.json) — the repo-root slot stays free for apps/www's
-// own e2e someday (tech-stack T15). Driven from root via `bun run e2e` (scripts are the interface):
+// Playwright e2e for the console — the end-to-end test layer (docs/tech-stack.md T12, with the
+// environments in T22). PER-APP config (mirrors apps/console/tsconfig.json) — the repo-root slot
+// stays free for the marketing site's own e2e someday (docs/tech-stack.md T15). Driven from root
+// via `bun run e2e` (scripts are the interface):
 // the script passes `-c apps/console/playwright.config.ts`, and testDir "e2e" resolves beside this
 // file → apps/console/e2e.
 //
@@ -50,7 +51,7 @@ export default defineConfig({
       : []),
     // `vite build` inlines VITE_ env (process.env passes through, VITE_API_URL included), so this
     // build carries the real local anon key: it goes to dist-e2e (git- and biome-ignored), never
-    // dist/, which CI's S7.3 guard scans for JWT shapes.
+    // dist/, which CI's no-secrets-in-the-build guard (docs/security.md S7.3) scans for JWT shapes.
     {
       name: "console",
       command:

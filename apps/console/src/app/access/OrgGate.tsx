@@ -1,4 +1,4 @@
-// The org-scoped shell's membership gate (AC-C8): members of /o/:orgId get the shell; anyone else
+// The org-scoped shell's membership gate: members of /o/:orgId get the shell; anyone else
 // gets the no-access page. With no workspace list in hand yet, the landing's honest loading /
 // error states show instead — never the shell, never a false "no access".
 import type { ReactNode } from "react";

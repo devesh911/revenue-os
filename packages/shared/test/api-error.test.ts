@@ -1,4 +1,4 @@
-// Console sign-in front door — RED spec for the typed API error (AC-C5). apiFetch must throw an
+// Console sign-in front door — RED spec for the typed API error. apiFetch must throw an
 // ApiError that says WHAT failed (status, method, path, and the server's JSON `error` code when it
 // sends one), so the console can tell "signed out" (401) from "forbidden" from "server broke" from
 // "offline"; a hung request must be cut off after timeoutMs; and a caller's AbortSignal (TanStack
@@ -81,8 +81,8 @@ function hangingFetch(): {
 }
 
 describe("apiFetch → ApiError (console sign-in front door)", () => {
-  // AC-C5 — non-2xx with a JSON {error} body → ApiError carrying status, method, path and code.
-  it("AC-C5: a non-2xx JSON error body becomes an ApiError with status, method, path and code", async () => {
+  // Non-2xx with a JSON {error} body → ApiError carrying status, method, path and code.
+  it("a non-2xx JSON error body becomes an ApiError with status, method, path and code", async () => {
     const { ApiError, apiFetch } = await load();
     const fetchImpl = (async () =>
       Response.json(
@@ -106,8 +106,8 @@ describe("apiFetch → ApiError (console sign-in front door)", () => {
     });
   });
 
-  // AC-C5 — a non-JSON (or code-less JSON) error body still yields an ApiError, with code undefined.
-  it("AC-C5: a non-JSON or code-less error body still gives an ApiError with code undefined", async () => {
+  // A non-JSON (or code-less JSON) error body still yields an ApiError, with code undefined.
+  it("a non-JSON or code-less error body still gives an ApiError with code undefined", async () => {
     const { ApiError, apiFetch } = await load();
     const html = (async () =>
       new Response("<html>bad gateway</html>", {
@@ -137,8 +137,8 @@ describe("apiFetch → ApiError (console sign-in front door)", () => {
     expect((noCodeErr as ApiErrorShape).code).toBeUndefined();
   });
 
-  // AC-C5 — a server that never answers is aborted after timeoutMs → ApiError status 0, code "timeout".
-  it("AC-C5: a request that never answers is aborted after timeoutMs → ApiError status 0 code 'timeout'", async () => {
+  // A server that never answers is aborted after timeoutMs → ApiError status 0, code "timeout".
+  it("a request that never answers is aborted after timeoutMs → ApiError status 0 code 'timeout'", async () => {
     const { ApiError, apiFetch } = await load();
     const hang = hangingFetch();
     const err = await rejectionOf(
@@ -157,8 +157,8 @@ describe("apiFetch → ApiError (console sign-in front door)", () => {
     expect(hang.signal()?.aborted).toBe(true); // the request itself was cancelled, not just abandoned
   });
 
-  // AC-C5 — a rejected fetch (offline / DNS / CORS: TypeError) → ApiError status 0, code "network".
-  it("AC-C5: a rejected fetch (TypeError) becomes ApiError status 0 code 'network'", async () => {
+  // A rejected fetch (offline / DNS / CORS: TypeError) → ApiError status 0, code "network".
+  it("a rejected fetch (TypeError) becomes ApiError status 0 code 'network'", async () => {
     const { ApiError, apiFetch } = await load();
     const offline = (async () => {
       throw new TypeError("Failed to fetch");
@@ -175,8 +175,8 @@ describe("apiFetch → ApiError (console sign-in front door)", () => {
     });
   });
 
-  // AC-C5 — the caller's opts.signal aborting (e.g. TanStack Query cancelling) aborts the request.
-  it("AC-C5: an external opts.signal abort also aborts the request (and is not reported as a timeout)", async () => {
+  // The caller's opts.signal aborting (e.g. TanStack Query cancelling) aborts the request.
+  it("an external opts.signal abort also aborts the request (and is not reported as a timeout)", async () => {
     const { apiFetch } = await load();
     const hang = hangingFetch();
     const controller = new AbortController();
@@ -190,9 +190,9 @@ describe("apiFetch → ApiError (console sign-in front door)", () => {
     expect((err as { code?: unknown }).code).not.toBe("timeout"); // default 15s timer never fired
   });
 
-  // AC-C5 — the success path still schema-parses when the new options are in play (a guard: green
+  // The success path still schema-parses when the new options are in play (a guard: green
   // today, must stay green through the change).
-  it("AC-C5: success still returns the schema-parsed body (with timeoutMs and signal set)", async () => {
+  it("success still returns the schema-parsed body (with timeoutMs and signal set)", async () => {
     const { apiFetch } = (await import("../src")) as Shared;
     const ok = (async () =>
       Response.json({ ok: true, extra: "dropped" })) as unknown as typeof fetch;

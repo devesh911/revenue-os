@@ -1,4 +1,4 @@
-// AC-L2 follow-up to the RED dev-login suite (kept in its own file so scripts/dev-login.test.ts stays
+// A follow-up to the RED dev-login suite (kept in its own file so scripts/dev-login.test.ts stays
 // exactly as reviewed): "ensure" means the documented credentials always work on the local stack —
 // an existing dev user whose password was changed signs in with DEV_LOGIN_PASSWORD again afterwards.
 // DB-backed: real local GoTrue + Postgres.
@@ -32,7 +32,7 @@ const grantStatus = async (password: string) =>
     })
   ).status;
 
-it("AC-L2: resets a changed dev user password so DEV_LOGIN_PASSWORD signs in again", async () => {
+it("resets a changed dev user password so DEV_LOGIN_PASSWORD signs in again", async () => {
   const opts = {
     supabaseUrl: SUPABASE_URL,
     anonKey: ANON_KEY,

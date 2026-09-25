@@ -1,5 +1,6 @@
-// R2: ALL server state through TanStack Query hooks in features/*/api.ts, keys from the
-// queryKeys factory. Shapes come from packages/shared — never re-declared (R6).
+// ALL server state through TanStack Query hooks in features/*/api.ts, keys from the queryKeys
+// factory (docs/patterns/tanstack-query.md). Shapes come from packages/shared — never re-declared
+// (docs/patterns/zod-boundary.md).
 import { OrgIdSchema, OrgRoleSchema } from "@revenue-os/shared";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";

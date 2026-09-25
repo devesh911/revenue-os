@@ -1,7 +1,7 @@
 // wouter routes. /login is public, OUTSIDE the session gate; every other route sits behind it
-// (S7.5), and the org-scoped shell additionally behind the membership gate (AC-C8). Org context
-// lives in the URL (R7). The route table is src/routes.tsx — the Switch below AND the AppShell
-// sidebar both read it, so pages register once. Sign-out stays HERE (not in ui/) so ui/ stays
+// (docs/security.md S7.5), and the org-scoped shell additionally behind the membership gate. Org
+// context lives in the URL, not a global store. The route table is src/routes.tsx — the Switch
+// below AND the AppShell sidebar both read it, so pages register once. Sign-out stays HERE (not in ui/) so ui/ stays
 // Supabase-free.
 import type { ReactNode } from "react";
 import { Redirect, Route, Switch } from "wouter";

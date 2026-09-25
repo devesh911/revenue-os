@@ -1,4 +1,4 @@
-// Shown when /o/:orgId is not one of the person's workspaces (AC-C8): says so plainly, links to
+// Shown when /o/:orgId is not one of the person's workspaces: says so plainly, links to
 // the workspaces they do have, and offers sign-out (they may be in the wrong account). Pure.
 import { Link } from "wouter";
 import type { OrgListItem } from "../../features/orgs/api";

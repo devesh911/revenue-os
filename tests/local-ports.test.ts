@@ -31,22 +31,22 @@ const authConfig = async () => {
 };
 
 describe("fixed dev ports (vite)", () => {
-  // AC-L5: the console dev server is pinned to 5173 and fails loudly instead of hopping ports.
-  it("AC-L5: console dev server is 5173 with strictPort", async () => {
+  // The console dev server is pinned to 5173 and fails loudly instead of hopping ports.
+  it("console dev server is 5173 with strictPort", async () => {
     const { server } = await consoleConfig();
     expect(server?.port).toBe(5173);
     expect(server?.strictPort).toBe(true);
   });
 
-  // AC-L5: the console preview server is pinned to 4173 with strictPort.
-  it("AC-L5: console preview server is 4173 with strictPort", async () => {
+  // The console preview server is pinned to 4173 with strictPort.
+  it("console preview server is 4173 with strictPort", async () => {
     const { preview } = await consoleConfig();
     expect(preview?.port).toBe(4173);
     expect(preview?.strictPort).toBe(true);
   });
 
-  // AC-L5: the marketing site's dev server is pinned to 5174 so it never takes the console's 5173.
-  it("AC-L5: www dev server is 5174 with strictPort", async () => {
+  // The marketing site's dev server is pinned to 5174 so it never takes the console's 5173.
+  it("www dev server is 5174 with strictPort", async () => {
     const { server } = await wwwConfig();
     expect(server?.port).toBe(5174);
     expect(server?.strictPort).toBe(true);
@@ -54,20 +54,20 @@ describe("fixed dev ports (vite)", () => {
 });
 
 describe("local Supabase auth redirects (supabase/config.toml)", () => {
-  // AC-L6: auth's site URL is the console dev origin.
-  it('AC-L6: [auth] site_url is "http://localhost:5173"', async () => {
+  // Auth's site URL is the console dev origin.
+  it('[auth] site_url is "http://localhost:5173"', async () => {
     expect((await authConfig()).site_url).toBe("http://localhost:5173");
   });
 
-  // AC-L6: auth may redirect back to the console dev and preview origins.
-  it("AC-L6: additional_redirect_urls allow the console dev and preview origins", async () => {
+  // Auth may redirect back to the console dev and preview origins.
+  it("additional_redirect_urls allow the console dev and preview origins", async () => {
     const urls = (await authConfig()).additional_redirect_urls as string[];
     expect(urls).toContain("http://localhost:5173/**");
     expect(urls).toContain("http://localhost:4173/**");
   });
 
-  // AC-L6: nothing on the Supabase template's :3000 default survives.
-  it("AC-L6: no auth redirect URL points at port 3000", async () => {
+  // Nothing on the Supabase template's :3000 default survives.
+  it("no auth redirect URL points at port 3000", async () => {
     const auth = await authConfig();
     const urls = (auth.additional_redirect_urls as string[] | undefined) ?? [];
     for (const u of [...urls, String(auth.site_url)]) {

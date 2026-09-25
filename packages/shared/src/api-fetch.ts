@@ -1,5 +1,6 @@
-// The ~30-line typed fetch wrapper (T24: platform fetch + Zod, axios rejected).
-// Every response is schema-parsed — the console never trusts wire shapes (R6/T11).
+// The ~30-line typed fetch wrapper (platform fetch + Zod, axios rejected: docs/tech-stack.md T24).
+// Every response is schema-parsed — the console never trusts wire shapes (Zod at every boundary:
+// docs/tech-stack.md T11).
 // Failures throw ApiError, so callers can tell signed-out (401) from forbidden from a server fault
 // from no answer at all (status 0: code "timeout" or "network"). A caller's own abort (TanStack
 // Query cancelling) is rethrown as-is — it is not a failure to report.

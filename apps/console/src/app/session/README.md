@@ -1,7 +1,8 @@
 # session — who is signed in, and the sign-in front door
 
 Accounts are invite-only (no sign-up UI); sign-in is email + password through the Supabase SDK,
-which owns the tokens (S7.2). This folder mirrors the session and gates the app on it:
+which owns the tokens (`docs/security.md` S7.2). This folder mirrors the session and gates the app
+on it:
 
 - `SessionProvider.tsx` — the session context (`useSession()` → `{ state, signedOutByUser, signOut }`).
   Subscribes to `onAuthStateChange` in an effect (its first event, `INITIAL_SESSION`, replaces a

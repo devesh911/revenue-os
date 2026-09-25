@@ -2,7 +2,7 @@
 // fetches the worker at :8080 cross-origin. The browser preflight (OPTIONS + Origin,
 // no Authorization — preflights never carry credentials) hit requireAuth → 401 → every
 // API call from the console died. The worker must answer preflights BEFORE auth, with
-// an explicit origin allowlist (S3/S4 posture: never "*").
+// an explicit origin allowlist (docs/security.md S3/S4: never "*").
 import { describe, expect, it } from "bun:test";
 import app from "../src/index";
 
@@ -46,7 +46,7 @@ describe("worker CORS (console at :5173 → worker at :8080)", () => {
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 
-  // AC-L4: every method the console sends preflights cleanly — PUT included (the Settings guardrail
+  // Every method the console sends preflights cleanly — PUT included (the Settings guardrail
   // save uses PUT, which the allowlist lacked, so the browser blocked the save before it left).
   it.each([
     "GET",
@@ -54,7 +54,7 @@ describe("worker CORS (console at :5173 → worker at :8080)", () => {
     "PATCH",
     "PUT",
     "DELETE",
-  ])("AC-L4: an allowlisted preflight requesting %s gets 204 and that method allowed", async (method) => {
+  ])("an allowlisted preflight requesting %s gets 204 and that method allowed", async (method) => {
     const res = await preflight("/orgs", DEV_ORIGIN, method);
     expect(res.status).toBe(204);
     const allowed = (res.headers.get("access-control-allow-methods") ?? "")

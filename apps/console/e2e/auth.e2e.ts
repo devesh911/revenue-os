@@ -1,4 +1,4 @@
-// Console sign-in front door — browser spec (AC-C11). Runs against the REAL local stack (console +
+// Console sign-in front door — browser spec. Runs against the REAL local stack (console +
 // worker API + local Supabase), so it proves what the SSR unit suites cannot: a real GoTrue password
 // sign-in lands on the first workspace page, a deep link survives the detour through /login, a
 // user switch leaves nothing of the previous user's workspace on screen, a foreign workspace URL is
@@ -60,8 +60,8 @@ async function signIn(page: Page, who: Credentials): Promise<void> {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
-// AC-C11 (1) — dev login from /login lands on its workspace home, with the workspace named on screen.
-test("AC-C11: the dev login signs in from /login and lands on /o/<org>/home", async ({
+// Dev login from /login lands on its workspace home, with the workspace named on screen.
+test("the dev login signs in from /login and lands on /o/<org>/home", async ({
   page,
 }) => {
   const orgId = env("E2E_ORG_ID");
@@ -71,8 +71,8 @@ test("AC-C11: the dev login signs in from /login and lands on /o/<org>/home", as
   await expect(page.locator("body")).toContainText(env("E2E_ORG_NAME"));
 });
 
-// AC-C11 (2) — a signed-out deep link goes to /login?next=… and comes back to it after sign-in.
-test("AC-C11: a signed-out deep link detours through /login with next and returns to it", async ({
+// A signed-out deep link goes to /login?next=… and comes back to it after sign-in.
+test("a signed-out deep link detours through /login with next and returns to it", async ({
   page,
 }) => {
   const target = `/o/${env("E2E_ORG_ID")}/contacts`;
@@ -84,9 +84,9 @@ test("AC-C11: a signed-out deep link detours through /login with next and return
   await expect(page).toHaveURL(new RegExp(`${target}$`));
 });
 
-// AC-C11 (3) — sign out → plain /login; a zero-workspace user then sees the empty state and nothing
+// Sign out → plain /login; a zero-workspace user then sees the empty state and nothing
 // of the previous user's workspace (the query cache was wiped on the user switch).
-test("AC-C11: after sign-out, a zero-workspace user sees the empty state and none of the previous workspace", async ({
+test("after sign-out, a zero-workspace user sees the empty state and none of the previous workspace", async ({
   page,
   request,
 }) => {
@@ -110,8 +110,8 @@ test("AC-C11: after sign-out, a zero-workspace user sees the empty state and non
   expect(await page.content()).not.toContain(orgName); // not even in attributes / hidden nodes
 });
 
-// AC-C11 (4) — a workspace the dev login is not in → the no-access page, with a way back to its own.
-test("AC-C11: the dev login opening a workspace it is not in sees the no-access page", async ({
+// A workspace the dev login is not in → the no-access page, with a way back to its own.
+test("the dev login opening a workspace it is not in sees the no-access page", async ({
   page,
 }) => {
   const orgId = env("E2E_ORG_ID");
@@ -128,8 +128,8 @@ test("AC-C11: the dev login opening a workspace it is not in sees the no-access 
   ).toBeVisible();
 });
 
-// AC-C11 (5) — a wrong password gets the honest message and stays on /login.
-test("AC-C11: a wrong password shows 'Email or password is incorrect.' and stays on /login", async ({
+// A wrong password gets the honest message and stays on /login.
+test("a wrong password shows 'Email or password is incorrect.' and stays on /login", async ({
   page,
 }) => {
   const dev = await devLogin();

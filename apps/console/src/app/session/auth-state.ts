@@ -1,4 +1,4 @@
-// The session state machine fed by Supabase auth events (AC-C7). The session each event carries
+// The session state machine fed by Supabase auth events. The session each event carries
 // is the truth — the event name only says why it changed. The query cache is wiped whenever a
 // signed-in user goes away (sign-out, or a different user signing in over them), so one person
 // never sees another's data; the first session, token refreshes and profile updates keep it.

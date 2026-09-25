@@ -1,4 +1,4 @@
-// task-28 ui-foundation-v2 · shared test helpers (not a test itself — no `.test` suffix, so the
+// Shared test helpers (not a test itself — no `.test` suffix, so the
 // runner skips it). One home for what the suites each hand-rolled: the strip-tags text extractor,
 // the barrel cast, and the leak-proof module mock — plus the sign-in suites' decoded-text, button
 // and real-ApiError helpers. Env-free by construction.

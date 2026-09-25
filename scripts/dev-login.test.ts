@@ -77,8 +77,8 @@ const urlOf = (input: unknown) =>
       : (input as Request).url;
 
 describe("dev login constants", () => {
-  // AC-L2: the fixed local dev credentials the console sign-in screen and docs point at.
-  it("AC-L2: exports DEV_LOGIN_EMAIL and DEV_LOGIN_PASSWORD", async () => {
+  // The fixed local dev credentials the console sign-in screen and docs point at.
+  it("exports DEV_LOGIN_EMAIL and DEV_LOGIN_PASSWORD", async () => {
     const { DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD } = await load();
     expect(DEV_LOGIN_EMAIL).toBe("dev@local.test");
     expect(DEV_LOGIN_PASSWORD).toBe("revenue-os-local-dev");
@@ -100,8 +100,8 @@ describe("ensureDevLogin refuses non-local targets before any I/O", () => {
     },
   ];
   for (const { label, opts } of cases) {
-    // AC-L2: a non-local supabaseUrl or dbUrl is refused before any network or database call.
-    it(`AC-L2: refuses a ${label} with no fetch and no DB connection`, async () => {
+    // A non-local supabaseUrl or dbUrl is refused before any network or database call.
+    it(`refuses a ${label} with no fetch and no DB connection`, async () => {
       const { ensureDevLogin } = await load();
       const fetchSpy = spyOn(globalThis, "fetch").mockImplementation((() =>
         Promise.reject(
@@ -123,10 +123,10 @@ describe("ensureDevLogin refuses non-local targets before any I/O", () => {
 });
 
 describe("ensureDevLogin against the local stack", () => {
-  // AC-L2: when absent, the user is created through GoTrue's sign-up endpoint with the ANON key —
+  // When absent, the user is created through GoTrue's sign-up endpoint with the ANON key —
   // never an admin endpoint or a privileged key.
   it.skipIf(devUserPreexisted)(
-    "AC-L2: creates the dev user via /auth/v1/signup with the anon key when absent",
+    "creates the dev user via /auth/v1/signup with the anon key when absent",
     async () => {
       const { ensureDevLogin, DEV_LOGIN_EMAIL } = await load();
       const { orgId } = await seed("real_estate");
@@ -156,9 +156,9 @@ describe("ensureDevLogin against the local stack", () => {
     20_000,
   );
 
-  // AC-L2: after seed + ensureDevLogin, the dev credentials sign in and the worker lists every
+  // After seed + ensureDevLogin, the dev credentials sign in and the worker lists every
   // seeded org with role admin — the exact path the console takes after sign-in.
-  it("AC-L2: dev credentials sign in and GET /orgs lists every seeded org as admin", async () => {
+  it("dev credentials sign in and GET /orgs lists every seeded org as admin", async () => {
     const { ensureDevLogin, DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD } =
       await load();
     const re = await seed("real_estate");
@@ -189,8 +189,8 @@ describe("ensureDevLogin against the local stack", () => {
     expect(orgs.find((o) => o.id === b2b.orgId)?.role).toBe("admin");
   }, 20_000);
 
-  // AC-L2: idempotent — a second run reuses the same user and leaves exactly one membership row.
-  it("AC-L2: a second ensureDevLogin succeeds, reuses the user, and keeps one membership row", async () => {
+  // Idempotent — a second run reuses the same user and leaves exactly one membership row.
+  it("a second ensureDevLogin succeeds, reuses the user, and keeps one membership row", async () => {
     const { ensureDevLogin } = await load();
     const { orgId } = await seed("real_estate");
     const first = await ensureDevLogin({ ...LOCAL_OPTS, orgIds: [orgId] });
@@ -199,8 +199,8 @@ describe("ensureDevLogin against the local stack", () => {
     expect(await membership(orgId, second.userId)).toEqual([{ role: "admin" }]);
   }, 20_000);
 
-  // AC-L2: "makes the user role 'admin'" — a membership that drifted to a lower role is put back.
-  it("AC-L2: restores admin when the dev user's membership drifted to a lower role", async () => {
+  // "makes the user role 'admin'" — a membership that drifted to a lower role is put back.
+  it("restores admin when the dev user's membership drifted to a lower role", async () => {
     const { ensureDevLogin } = await load();
     const { orgId } = await seed("real_estate");
     const { userId } = await ensureDevLogin({ ...LOCAL_OPTS, orgIds: [orgId] });
@@ -214,9 +214,9 @@ describe("ensureDevLogin against the local stack", () => {
 });
 
 describe("db:seed CLI creates the dev login", () => {
-  // AC-L2 (narrow source assertion): the seed CLI block imports from ./dev-login, calls
+  // Narrow source assertion: the seed CLI block imports from ./dev-login, calls
   // ensureDevLogin, and prints DEV_LOGIN_EMAIL so the developer knows what to sign in with.
-  it("AC-L2: scripts/seed.ts CLI path calls ensureDevLogin and prints DEV_LOGIN_EMAIL", async () => {
+  it("scripts/seed.ts CLI path calls ensureDevLogin and prints DEV_LOGIN_EMAIL", async () => {
     const src = await Bun.file(join(import.meta.dir, "seed.ts")).text();
     expect(src).toMatch(/(from\s+|import\s*\(\s*)["']\.\/dev-login["']/);
     const at = src.indexOf("if (import.meta.main)");

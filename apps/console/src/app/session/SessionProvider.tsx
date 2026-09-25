@@ -1,7 +1,7 @@
-// Who is signed in, for the whole tree (S7.2: the Supabase SDK owns the tokens — this only mirrors
-// the session). Fed by onAuthStateChange, which emits INITIAL_SESSION on subscribe, so there is no
-// separate getSession call; the client is resolved inside the effect, never at module scope (boot
-// honesty). reduceAuth decides when the query cache is wiped. signOut signs out THIS device only
+// Who is signed in, for the whole tree (docs/security.md S7.2: the Supabase SDK owns the tokens —
+// this only mirrors the session). Fed by onAuthStateChange, which emits INITIAL_SESSION on
+// subscribe, so there is no separate getSession call; the client is resolved inside the effect,
+// never at module scope (boot honesty). reduceAuth decides when the query cache is wiped. signOut signs out THIS device only
 // and marks the sign-out deliberate, so the session gate sends it to plain /login — a session lost
 // any other way (a 401, expiry, another tab) returns with `next`.
 import type { SupabaseClient } from "@supabase/supabase-js";

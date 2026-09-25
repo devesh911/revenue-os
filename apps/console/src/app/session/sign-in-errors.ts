@@ -1,4 +1,4 @@
-// The ONLY words a failed sign-in may show (AC-C3): fixed copy keyed on the auth error's code,
+// The ONLY words a failed sign-in may show: fixed copy keyed on the auth error's code,
 // status and name. The provider's raw message never reaches the screen — it can leak whether an
 // account exists. Duck-typed: no runtime import from @supabase/supabase-js outside lib/supabase.ts.
 export function signInErrorMessage(err: unknown): string {

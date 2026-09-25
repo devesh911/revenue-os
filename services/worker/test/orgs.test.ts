@@ -1,4 +1,4 @@
-// Task 4 acceptance (project-spec §12): two tenants isolated (M0 check) — exercised at the
+// Two tenants stay isolated (the cross-tenant denial test AGENTS.md requires) — exercised at the
 // API surface: real local GoTrue users, jose-verified JWTs, app_service DB path underneath.
 import { beforeAll, describe, expect, it } from "bun:test";
 import app from "../src/index";
@@ -40,7 +40,7 @@ beforeAll(async () => {
   userB = await signup("tenant-b");
 });
 
-describe("auth gate (S1.5)", () => {
+describe("auth gate — JWT verification (docs/security.md S1.5)", () => {
   it("rejects requests with no token", async () => {
     const res = await api("/orgs", null);
     expect(res.status).toBe(401);
@@ -52,7 +52,7 @@ describe("auth gate (S1.5)", () => {
   });
 });
 
-describe("org bootstrap + M0 isolation", () => {
+describe("org bootstrap + tenant isolation", () => {
   it("user A creates an org and becomes its admin", async () => {
     const res = await api("/orgs", userA.token, {
       method: "POST",
@@ -121,7 +121,7 @@ describe("org bootstrap + M0 isolation", () => {
     expect(membership?.role).toBe("viewer");
   });
 
-  it("a viewer cannot invite members (S1.7 role gate)", async () => {
+  it("a viewer cannot invite members (role gate, docs/security.md S1.7)", async () => {
     const other = await signup("outsider");
     const res = await api(`/orgs/${orgA}/members`, userB.token, {
       method: "POST",
@@ -130,7 +130,7 @@ describe("org bootstrap + M0 isolation", () => {
     expect(res.status).toBe(403);
   });
 
-  it("rejects an unknown-shape body before any logic (S5.1)", async () => {
+  it("rejects an unknown-shape body before any logic (docs/security.md S5.1)", async () => {
     const res = await api("/orgs", userA.token, {
       method: "POST",
       body: JSON.stringify({

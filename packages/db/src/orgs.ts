@@ -1,4 +1,5 @@
-// Org bootstrap + membership helpers — the only sanctioned queries for these flows (D21).
+// Org bootstrap + membership helpers — the only sanctioned queries for these flows (AGENTS.md: DB
+// access only via packages/db).
 // G1: runtime-agnostic.
 import type {
   AddMember,
@@ -44,7 +45,7 @@ export async function createOrgWithAdmin(
   return { id };
 }
 
-/** Sample audited mutation (task 6): rename an org — before/after captured atomically. */
+/** Sample audited mutation: rename an org — before/after captured atomically. */
 export async function updateOrg(
   pool: pg.Pool,
   orgId: string,
@@ -74,7 +75,10 @@ export async function updateOrg(
   });
 }
 
-/** The caller's effective role in an org, honoring support-access expiry (D28). */
+/**
+ * The caller's effective role in an org, honoring support-access expiry (docs/db-design.md
+ * section 14.1).
+ */
 export async function memberRole(
   pool: pg.Pool,
   orgId: string,

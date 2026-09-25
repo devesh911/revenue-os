@@ -1,6 +1,7 @@
-// Boot-honesty smoke for the console (spec §12b · dev-workflow R9 · tech-stack T12 layer 6).
-// Asserts ONLY the three things true of BOTH the current boot path AND task-16's rework: the page
-// serves, the SPA mounts a non-empty #root (no white screen), and the document title is present.
+// Boot-honesty smoke for the console (the end-to-end smoke layer, docs/tech-stack.md T12).
+// Asserts ONLY the three things true of BOTH the current boot path AND the boot-honesty rework
+// (#49): the page serves, the SPA mounts a non-empty #root (no white screen), and the document
+// title is present.
 // Deliberately NOT asserted: any authenticated flow — that is auth.e2e.ts; login is out of scope for
 // a boot smoke, which keeps this spec stable across sibling task changes and runnable with no stack.
 //

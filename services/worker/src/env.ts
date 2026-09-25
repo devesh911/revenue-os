@@ -1,4 +1,4 @@
-// Zod-parsed process env (T11) — the worker refuses to boot half-configured.
+// Zod-parsed process env (docs/tech-stack.md T11) — the worker refuses to boot half-configured.
 import { z } from "zod";
 
 export const EnvSchema = z.object({
@@ -8,8 +8,8 @@ export const EnvSchema = z.object({
   SUPABASE_URL: z.string().url(),
   // Listen port — one number shared with the console's VITE_API_URL (the local wrapper sets both).
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
-  // Comma-separated browser origins allowed to call this API (S3/S4: explicit
-  // allowlist, never "*"). Default = the local console; staging/prod set their own.
+  // Comma-separated browser origins allowed to call this API (docs/security.md S3/S4:
+  // explicit allowlist, never "*"). Default = the local console; staging/prod set their own.
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:5173")

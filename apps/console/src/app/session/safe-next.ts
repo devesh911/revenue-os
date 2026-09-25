@@ -1,4 +1,4 @@
-// Where to send someone after sign-in (AC-C2): only a same-site path, never another site (an open
+// Where to send someone after sign-in: only a same-site path, never another site (an open
 // redirect) and never /login itself (a loop). The browser's own URL parser decides, so whatever
 // it would strip or reinterpret ("\" as "/", tabs, newlines, leading spaces) is judged as the
 // browser would read it; anything off-site or unparseable falls back to "/". A path that is still
