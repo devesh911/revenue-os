@@ -4,9 +4,21 @@ PHASE: SETUP  <!-- D36: SETUP = speed (agents merge on green); LIVE = full force
 
 Overwrite, don't append. Update in the same PR as the work. Fresh sessions start here.
 Task-level history + backlog live in **docs/sdlc.md** (the ledger; update it in the same PR too).
-Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
+Updated: 2026-09-25 (console sign-in front door: local sign-in lands on the first workspace; e2e armed in CI)
 
 ## NOW (verified facts, not hopes)
+- **Console sign-in front door (apps/console, 2026-09-25):** a developer on a fresh local stack signs in
+  to the operator console and lands on `/o/<first workspace>/home`. Accounts are invite-only (no
+  sign-up UI); email + password now, phone OTP + Google and admin MFA later. `bun run db:seed <pack>`
+  also ensures the dev login (`dev@local.test` / `revenue-os-local-dev`, local stack only) and makes it
+  admin of the seeded org. `bun run local <cmd>` runs any command with the local stack's env (no
+  hand-copied keys, the privileged key never passed on). The console: public `/login` (safe return-to
+  `next`, never off-site or back to /login; fixed error copy, never the provider's text), a session
+  gate on every other route, a membership gate on `/o/:orgId` (members get the shell, anyone else a
+  no-access page), honest landing states (loading · API unreachable · no workspace yet · error), the
+  query cache wiped on sign-out / user switch, and 401 → signed out. "First workspace" = GET /orgs
+  ordered by name, then id (packages/db `userOrgs`). API errors are typed (`ApiError`: status, code,
+  status 0 = timeout / network, including a stalled response body).
 - **Landing page reads as one enquiry, in order; hero = board study A3 (apps/www, 2026-09-24, stacked on
   the editorial-design PR):** from Devesh's picks on the hook-studies board and his follow-up ("A3 … as it
   is, remove the older call card … make sure the user gets correct and systematic information as they
@@ -221,10 +233,12 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
   the parseConsoleEnv→ConfigErrorScreen gate and lazy `getSupabase()` are unchanged. **Task 24:**
   `VITE_API_URL` — the one still-unvalidated var #53's review flagged — is now required as a
   valid URL in PROD (optional in dev) via `parseConsoleEnv`; VITE_SUPABASE_* rules unchanged.
-- **§12b Playwright-smoke obligation (2026-07-17):** harness skeleton scaffolded — config
-  (`apps/console/playwright.config.ts`) + boot-honesty smoke (`apps/console/e2e/smoke.e2e.ts`),
-  wiring proven by `bun run e2e -- --list`; full four-screen runtime smoke still deferred to P3;
-  runtime run needs only `bunx playwright install` locally, CI arming is the follow-up.
+- **§12b Playwright (armed in CI 2026-09-25):** the sign-in spec (`apps/console/e2e/auth.e2e.ts`) and
+  the boot-honesty smoke run in CI's "Console e2e (real local stack)" step via `bun run local bun run
+  e2e`: the worker API + a console build against the local stack (`dist-e2e`, never the guarded
+  `dist/`); `e2e/global-setup.ts` seeds real_estate and exports the dev login's first workspace. Plain
+  `bun run e2e` (no stack env) runs only the smoke; `-- --list` stays the syntax gate. The full
+  four-screen runtime smoke is still P3.
 - **Quiet-hours guardrail hook (task 25, #57):** The quiet-hours hook is implemented and wired
   into `defaultPipeline`; it gates any send that carries a `channel`. BUT the current send path
   (`runTurn` in `packages/harness/src/loop.ts`) does not yet populate `action.channel`, so the gate
@@ -247,6 +261,24 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - Local stack: `supabase start`; imgproxy + pooler containers stopped is normal (unused locally).
 
 ## NEXT (top = take it; one task, one branch, one PR)
+00. **Console sign-in, the remaining PRs (Devesh 2026-09-25; in order, one PR each):** (a) worker auth
+   hardening — sign-in required on every route by default (explicit public list: /health, /ready,
+   /webhooks/*), one `orgScope(minRole)` middleware replacing the 12 hand-copied `memberRole()` checks,
+   request ids + a logged reason on every 401 (503 when Supabase's key server is unreachable), negative
+   token tests (expired, wrong issuer/audience, HS256, alg none, anonymous), refuse to boot unless
+   connected as `app_service`; (b) invites + email links — app-owned `org_invites` (RLS + cross-tenant
+   denial test), invite / accept / change role / remove with audit and last-admin protection, a
+   `before_user_created` hook refusing sign-ups with no pending invite, `/auth/confirm` (token_hash +
+   verifyOtp, works across devices), forgot/reset password; (c) phone OTP + Google sign-in (build and
+   test locally with Supabase's test OTP numbers; real use waits on WAITING accounts); (d) security
+   baseline — CSP + anti-framing `_headers` on Pages, profiles cross-tenant read fix, zero table
+   grants for anon/authenticated pinned by migration + rls gate, 12-char passwords + email
+   confirmation, role-aware UI from one shared permission table; (e) admin MFA (authenticator app) +
+   re-check before destructive admin actions. Cheap follow-ups from the front-door PR: upload the
+   Playwright report/trace on CI failure (actions/upload-artifact pinned to a verified SHA) and cache
+   the Chromium download; clean up the throwaway `e2e-noorg-<uuid>@local.test` users each auth run
+   leaves on the local stack; `scripts/db-reset.ts` still has its own looser regex local-URL check —
+   switch it to `scripts/local-url.ts`.
 0. **Package 3 + loose ends (hole audit, cheap, independent):** loop.ts nextSeq → atomic
    insert-with-on-conflict (process.ts:65-67 is the pattern; loop.ts is the lone outlier) ·
    attempt-cap stamping on the tool-loop send path (the Wave-C pair — must land BEFORE wiring
@@ -300,12 +332,29 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
   consented call recording and measured pilot results to replace the synthetic sample and the
   illustrative report; (6) whether the sample recording gets a readable transcript on the page (WCAG
   1.2.1 — the hero shows 4 of its 7 lines; the old player's transcript went with the revert).
+- **Console sign-in outside accounts (2026-09-25):** (1) an SMS provider for phone sign-in, plus India
+  DLT registration of the sender ID and OTP template (days to weeks, needs business details, money);
+  (2) a Google Cloud OAuth client + consent screen for Google sign-in; (3) a transactional email
+  provider (Resend / Postmark / SES) with a verified sending domain for invites and password reset —
+  gated on the domain; (4) staging Supabase auth settings live only in the dashboard: when those PRs
+  land, set Site URL + redirect list to the console origin, confirmations on, 12-char minimum (or
+  approve `supabase config push` in CI). Local changes to `supabase/config.toml` apply on the next
+  `supabase stop && supabase start`.
 - Vapi India telephony decision inputs: Exotel vs Plivo SIP trunk account (spec risk #4).
 - Stale merged branches: agents are classifier-blocked from `git push origin --delete`; run flip-kit
   item 5 (orchestrator/state/FLIP-KIT-2026-07-11.md) or leave them.
 - Optional: bot PAT for unattended orchestrator runs; interactive loops don't need it.
 
 ## DECISIONS (open forks; the noted default is what we build toward)
+- **Console auth model (2026-09-25, Devesh):** invite-only accounts — no public sign-up; we create each
+  customer's workspace and invite its first admin, admins invite their team. Sign-in: email + password,
+  phone OTP, Google. Authenticator-app MFA required for admins, optional for everyone else. Agent
+  worktrees get local stack env through `bun run local` (never `.env` files). Boring defaults taken by
+  the agent: "Sign out" = this device only; tokens stay in supabase-js browser storage, hardened by a
+  strict CSP (next PRs); invites are app-owned because Supabase's admin invite needs the banned
+  privileged key; SSO later through Supabase's own SAML so the worker keeps one token issuer; the
+  console sign-in e2e runs inside the required `checks` job; dev ports console 5173 / preview 4173 /
+  www 5174, all strictPort.
 - **apps/www How it works chapters 01–02 are illustrative (2026-09-24, Devesh chose the label):** the numeric intent
   score and questions to the sales team aren't built yet, so the section carries "Illustrative
   example" and the RETIRED "/100" pin is scoped: allowed only inside How it works (id "how"). Build either, then
@@ -466,6 +515,7 @@ Updated: 2026-09-24 (apps/www: one-enquiry page order + hero as board study A3)
 - T8: cross-tenant tick org discovery is RLS-ceilinged (a bare pool read returns nothing under app_service) — production-hardening deferred to CLEANUP-LEDGER T8-H; the M2 replay drives tick() per-org directly.
 
 ## RECENT (last 5 landings, newest first)
+- (this PR) console sign-in front door: dev login seeded by `db:seed`, `bun run local` env wrapper, /login + session / membership gates, typed API errors, GET /orgs ordered by name, Playwright sign-in spec armed in CI — 2026-09-25
 - (this PR) apps/www page told as one enquiry in order (How it works 01 brief → 02 score → 03 call), hero = board study A3 (call card removed), pilot report after Pilot — www 309/0 — 2026-09-24
 - (this PR) apps/www demo-first copy + Cal.com booking dialog + Plausible funnel events, inside the restored #98 editorial design (the demo-first restyle was rejected) — www 208/0, repo-wide 782/0 — 2026-09-24
 - #98 console tests made order-independent: every `mock.module` in apps/console/test now goes through `mockModule` (test-utils) — fakes laid over a snapshot of the real exports, the real module re-mocked in afterAll (Bun 1.3's `mock.restore()` does not undo `mock.module`). CI's new Linux file order had run the home/dashboard suite first, whose bare factory dropped `useTasksQuery`/`useContactsQuery` for every later file (8 CI failures). Proven: the same `--randomize --seed=1` order fails 9 on the old code, 0 of them on the new; full `bun test` 691/0 with CI env — 2026-09-23

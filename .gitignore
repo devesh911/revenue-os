@@ -1,6 +1,7 @@
 node_modules
 .env
 dist
+dist-e2e
 .DS_Store
 supabase/.temp
 playwright-report

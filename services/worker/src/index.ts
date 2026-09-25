@@ -24,7 +24,7 @@ app.use(
   cors({
     origin: (origin) => (env.CORS_ORIGINS.includes(origin) ? origin : null),
     allowHeaders: ["authorization", "content-type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   }),
 );
 
@@ -67,4 +67,4 @@ if (import.meta.main) {
   });
 }
 
-export default { port: 8080, fetch: app.fetch };
+export default { port: env.PORT, fetch: app.fetch };

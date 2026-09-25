@@ -18,7 +18,7 @@ Component and unit tests for this app, env-free by construction (`bun test` +
   pending + error states), `session-rules.test.ts` (safe `next`, fixed sign-in error copy, the auth
   state machine and when it wipes the cache), `query-client.test.ts` (retry rule; 401 → sign out),
   `org-access.test.tsx` (workspace membership check, no-access page, landing empty/error states).
-  The browser half is `../e2e/auth.e2e.ts` (real local stack, run by `bun run e2e`).
+  The browser half is `../e2e/auth.e2e.ts` (real local stack, run by `bun run local bun run e2e`).
 - `test-utils.ts` — shared helpers the suites import (`visible()` / decoded `text()`, `buttons()`,
   `apiErrorFor()` real API errors, `asPrimitivesMap()` barrel cast, `mockModule()`); not a test.
 - `router.tsx` — a static SSR Router harness the leaf tests render inside (not a test itself).

@@ -1,7 +1,7 @@
 // Task 10 RED — the ~30-line typed fetch wrapper (T24: ours, axios rejected).
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { apiFetch } from "../src";
+import { ApiError, apiFetch } from "../src";
 
 const echoFetch: typeof fetch = async (input, init) => {
   const req = new Request(input, init);
@@ -44,5 +44,33 @@ describe("apiFetch", () => {
         fetchImpl: failFetch,
       }),
     ).rejects.toThrow(/500/);
+  });
+
+  // The timeout covers the body too: 200 headers then a stalled body is "timeout", not a DOMException.
+  it("reports a body that stalls past timeoutMs as ApiError 0 timeout", async () => {
+    const stallFetch = (async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const signal = init?.signal as AbortSignal;
+      const body = new ReadableStream({
+        start(c) {
+          c.enqueue(new TextEncoder().encode("["));
+          signal.addEventListener("abort", () => c.error(signal.reason));
+        },
+      });
+      return new Response(body, { status: 200 });
+    }) as typeof fetch;
+    const err = await apiFetch(
+      "https://api.example.com",
+      "/orgs",
+      z.unknown(),
+      {
+        fetchImpl: stallFetch,
+        timeoutMs: 20,
+      },
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 0, code: "timeout" });
   });
 });

@@ -104,13 +104,14 @@ export async function addMember(
 }
 
 /** Cross-org by nature (login → org switcher): served by the app.user_orgs SECURITY DEFINER
- *  function, granted to app_service only. userId MUST be a jose-verified JWT sub. */
+ *  function, granted to app_service only. userId MUST be a jose-verified JWT sub. Ordered by name
+ *  (then id) so "the first workspace" the console's / landing opens is a defined rule. */
 export async function userOrgs(
   pool: pg.Pool,
   userId: string,
 ): Promise<OrgRow[]> {
   const r = await pool.query(
-    `select org_id as id, name, slug, role from app.user_orgs($1)`,
+    `select org_id as id, name, slug, role from app.user_orgs($1) order by name, org_id`,
     [userId],
   );
   return r.rows as OrgRow[];

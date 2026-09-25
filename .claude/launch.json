@@ -4,8 +4,20 @@
     {
       "name": "console",
       "runtimeExecutable": "/Users/deveshlakwal/.bun/bin/bun",
-      "runtimeArgs": ["run", "dev:console"],
+      "runtimeArgs": ["run", "local", "bun", "run", "dev:console"],
       "port": 5173
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "/Users/deveshlakwal/.bun/bin/bun",
+      "runtimeArgs": [
+        "run",
+        "local",
+        "bun",
+        "--watch",
+        "services/worker/src/index.ts"
+      ],
+      "port": 8080
     },
     {
       "name": "www",

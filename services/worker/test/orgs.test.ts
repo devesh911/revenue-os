@@ -78,6 +78,28 @@ describe("org bootstrap + M0 isolation", () => {
     expect(orgsB.some((o) => o.id === orgA)).toBe(false);
   });
 
+  // The console's / landing opens the FIRST workspace, so GET /orgs must have a defined order: by name.
+  it("GET /orgs lists a user's workspaces by name", async () => {
+    for (const name of ["Zulu Org", "Alpha Org"]) {
+      const res = await api("/orgs", userA.token, {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          slug: `${name[0]}-${Date.now()}`.toLowerCase(),
+        }),
+      });
+      expect(res.status).toBe(201);
+    }
+    const orgs = (await (await api("/orgs", userA.token)).json()) as Array<{
+      name: string;
+    }>;
+    expect(orgs.map((o) => o.name)).toEqual([
+      "Alpha Org",
+      "Tenant A",
+      "Zulu Org",
+    ]);
+  });
+
   it("a non-member cannot add themselves to another tenant's org", async () => {
     const res = await api(`/orgs/${orgA}/members`, userB.token, {
       method: "POST",

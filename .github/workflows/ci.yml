@@ -64,6 +64,13 @@ jobs:
 
       - run: bun test
 
+      # Console sign-in e2e against the real local stack: the wrapper exports the stack env, Playwright
+      # starts the worker + a console build (dist-e2e, never the guarded dist/), and the spec seeds its own data.
+      - name: Console e2e (real local stack)
+        run: |
+          bunx playwright install --with-deps chromium
+          bun run local bun run e2e
+
       - run: bun run rls:check
         env:
           LOCAL_DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres"

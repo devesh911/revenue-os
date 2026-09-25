@@ -16,5 +16,9 @@ export default defineConfig(({ command, mode }) => {
       "\n[www] VITE_CALCOM_USERNAME / VITE_CALCOM_EVENT_SLUG are not set: the booking flow ships in PREVIEW mode and books nothing.\n",
     );
   }
-  return { plugins: [react(), tailwindcss()] };
+  // 5174, strict: 5173 belongs to the console (auth redirects and CORS name it).
+  return {
+    plugins: [react(), tailwindcss()],
+    server: { port: 5174, strictPort: true },
+  };
 });
