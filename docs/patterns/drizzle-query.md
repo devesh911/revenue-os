@@ -1,4 +1,18 @@
-# Pattern: Drizzle query (org-scoped, typed, raw where clearer)
+# Pattern: org-scoped SQL query (what the code actually does)
+> The file name is historical: **Drizzle is installed but no query uses it.** Every query is parameterised SQL through `tx.query` inside `withOrg`. Adopting Drizzle for new code would be a recorded decision in `STATE.md`. The Drizzle example further down is kept only for that discussion.
+
+```ts
+// the real idiom (e.g. packages/db/src/audit.ts, packages/harness/src/tools/book-appointment.ts)
+const rows = await withOrg(pool, orgId, (tx) =>
+  tx.query(
+    `select id, title from tasks where org_id = $1 and status = $2 order by priority desc limit 50`,
+    [orgId, "open"],
+  ),
+);
+```
+Rules: org_id in EVERY where (RLS is the net, not the query plan) · values only through `$n` parameters, no string concatenation, ever.
+
+## Historical Drizzle example (not used in this codebase)
 ```ts
 // typed builder for the common shape
 const hot = await db.select().from(tasks)

@@ -1,5 +1,7 @@
 # Lessons — append-only field notes
-(Format: date · task · finding · suggested doc change)
+> History, not rules. On 2026-09-25 every still-true rule and gotcha below was lifted into `AGENTS.md`. Keep appending one factual line per genuine surprise (the skills search this file); never treat an entry as law.
+
+(Format: date · what happened · the finding)
 
 - 2026-07-10 · task 2 · `supabase/migrations/README.md` says "copy db-design §3–§8 + §14" but the
   numbering 000–009 only works with §13 included (db-design itself names `008_prospect_candidates.sql`).

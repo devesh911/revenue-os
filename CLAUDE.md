@@ -1,8 +1,10 @@
 # Revenue OS
 
-The operating contract lives in **AGENTS.md** — one page, harness-agnostic (Claude, Codex, human).
+How we work is in **AGENTS.md** — one page for Claude, Codex and humans alike.
 
 @AGENTS.md
 
-Where we are and what's next: **STATE.md** (single source of truth; update it in the same PR as the work).
-docs/ is reference material — project-spec §12 (roadmap) and docs/patterns/ (style to imitate) stay load-bearing.
+Start every session with the four law files: **AGENTS.md** (how we work), **docs/NORTH-STAR.md**
+(what we are building), **ROADMAP.md** (what's next and what counts as done), **STATE.md** (what
+works today, what waits on Devesh, decisions in force). Update ROADMAP.md and STATE.md in the same
+PR as the work. Everything else in docs/ is reference; docs/archive/ is history.
