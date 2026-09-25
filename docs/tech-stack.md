@@ -1,8 +1,8 @@
 # Tech Stack & SDLC Decisions — v2
 
-> **Status:** Locked for V1 unless amended via the decision protocol (dev-workflow.md §13). v2 supersedes v1 after Devesh's sheet-6 review (8 challenges answered; BOM, security, and full-SDLC coverage added).
-> **Consumers:** Devesh + Claude Code. **Authoritative companions:** `project-spec.md` (product decisions + §0 ID registry), `db-design.md` (schema), `security.md` (security controls — S-ids).
-> **ID prefix:** T = tech decision. Registry of all prefixes: `project-spec.md` §0.
+> **Reference, not rules.** Why each part of the stack was chosen. Much of Part I·b (T26, the agent harness) describes a design that is only partly built — check `STATE.md → What works today` before relying on any of it. Rules live in `AGENTS.md`; what exists today is in `STATE.md`; the plan is `ROADMAP.md`. Where this file and the code disagree, the code is right.
+> **Companions:** `docs/db-design.md` (schema intent), `docs/security.md` (security controls — S-ids). The old ID registry lives in `docs/archive/project-spec.md` §0.
+> **ID prefix:** T = tech decision (historical; no new prefixes are added — see `AGENTS.md → Docs`).
 > **Numbering policy:** ids are append-only citations — assigned in creation order, never renumbered or reused, even when the document is reorganized (the RFC/CVE/ADR discipline: stable identity beats pretty sequence). Sections are placed thematically, ascending within each part. **Index:** Part I core = T1–T11 · Part I·b harness = T26 · Part II data = T16–T19 · Part III delivery = T12–T15 + T20–T25.
 
 ---
@@ -30,7 +30,7 @@
 **Guardrails (revised — the old "Node CI test lane" was incoherent because `bun:test` files can't run on Node; Devesh caught it):**
 - **G1 — runtime-agnostic packages, lint-enforced.** No `bun:*` imports and no `Bun.` globals in `packages/*` (Bun-specific code lives only in app entrypoints). Enforced by Biome's restricted-imports rule — or a 20-line CI grep script if the rule tier shifts. This is what keeps the base-image fallback a one-day job instead of a rewrite.
 - **G2 — version pinning.** Exact Bun version in `package.json` `engines`, CI, and Dockerfile. Upgrades are deliberate PRs, never automatic.
-- **G3 — the fallback is documented and rehearsed.** `docs/runbooks/node-fallback.md`: swap base image, replace `Bun.serve` entrypoint with the Hono Node adapter, redeploy. Rehearsed once in P2 so it's a fact, not a theory.
+- **G3 — the fallback is documented, not yet rehearsed.** `docs/archive/runbooks/node-fallback.md`: swap base image, replace `Bun.serve` entrypoint with the Hono Node adapter, redeploy. The planned rehearsal never happened.
 
 **Straight answer to "can we afford it / only benefits?":** We can afford it. Nothing "only benefits"; Bun's net is strongly positive for this team (single toolchain, faster loop, fewer deps), and its one material risk is the `pg` driver under sustained pg-boss load — settled by the P2 load test, insured by G1+G3.
 
@@ -407,4 +407,4 @@ Security is a first-class document, not a section — per Devesh's priority. It 
 
 ## Appendix B — Naming
 
-All ID prefixes (T, D, P, M, G, S, L, Q, VQG) are defined once in **`project-spec.md` §0 — ID Registry**. New prefix classes must be registered there before use.
+The old ID prefixes (T, D, P, M, G, S, L, Q, VQG) are defined in `docs/archive/project-spec.md` §0. No new prefixes are added (`AGENTS.md → Docs`).

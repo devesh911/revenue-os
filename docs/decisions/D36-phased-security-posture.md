@@ -1,6 +1,6 @@
 # D36 — Phased security posture: SETUP → LIVE (one explicit switch, no ambient contradictions)
 
-**Status:** merged on green under the SETUP grant (Devesh's 2026-07-12 deep-clean commission; option "I merge on green" chosen explicitly).
+**Status:** In force. Its rules are restated in `AGENTS.md` (hard rail 7) and `STATE.md` (PHASE line and Decisions in force); this file keeps the reasoning.
 
 ## Context
 

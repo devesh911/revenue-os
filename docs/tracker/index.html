@@ -1,0 +1,321 @@
+<title>Revenue OS Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Renders ROADMAP.md and STATE.md, which are published next to this page. Those two files are
+   the source of truth; this page only reads them. Republish after they change on main. */
+:root{
+  --ground:#EEF1F5; --surface:#FFFFFF; --surface-2:#F6F8FB; --ink:#16202E; --muted:#5B6678; --line:#D6DCE5; --line-soft:#E6EAF0;
+  --accent:#3B5BDB; --accent-soft:#E3E9FB; --accent-ink:#FFFFFF;
+  --works:#1B7A43; --works-bg:#DDF2E5; --tests:#6B45C2; --tests-bg:#ECE6FA; --partial:#9A6100; --partial-bg:#FCEFD3;
+  --stub:#B4381F; --stub-bg:#FBE4DF; --missing:#5B6678; --missing-bg:#E8ECF1;
+  --sans:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#0E131B; --surface:#151C27; --surface-2:#1A2230; --ink:#E4E9F1; --muted:#96A2B5; --line:#283345; --line-soft:#1F2837;
+    --accent:#8EA6F5; --accent-soft:#1E2A48; --accent-ink:#0E131B;
+    --works:#86D5A4; --works-bg:#15301F; --tests:#B9A1F2; --tests-bg:#261E3F; --partial:#F0C16B; --partial-bg:#372A10;
+    --stub:#F29A86; --stub-bg:#3B1C16; --missing:#A4AEBD; --missing-bg:#222B38;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#0E131B; --surface:#151C27; --surface-2:#1A2230; --ink:#E4E9F1; --muted:#96A2B5; --line:#283345; --line-soft:#1F2837;
+  --accent:#8EA6F5; --accent-soft:#1E2A48; --accent-ink:#0E131B;
+  --works:#86D5A4; --works-bg:#15301F; --tests:#B9A1F2; --tests-bg:#261E3F; --partial:#F0C16B; --partial-bg:#372A10;
+  --stub:#F29A86; --stub-bg:#3B1C16; --missing:#A4AEBD; --missing-bg:#222B38;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;padding-inline:clamp(16px,3vw,40px);padding-block:28px 64px}
+.wrap{max-width:1180px;margin-inline:auto;display:grid;gap:26px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(26px,3.2vw,34px);font-weight:700}
+h2{font-size:20px;font-weight:700}
+h3{font-size:16px;font-weight:650}
+p{margin:0}
+code{font-family:var(--mono);font-size:.86em;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:4px;padding:0 4px}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+section{display:grid;gap:12px}
+header{display:grid;gap:8px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:1px 9px;white-space:nowrap}
+.pill.phase{background:var(--accent-soft);color:var(--accent)}
+.s-done{background:var(--works-bg);color:var(--works)}
+.s-proof{background:var(--tests-bg);color:var(--tests)}
+.s-progress{background:var(--partial-bg);color:var(--partial)}
+.s-not{background:var(--missing-bg);color:var(--missing)}
+.st-works{background:var(--works-bg);color:var(--works)}
+.st-tests{background:var(--tests-bg);color:var(--tests)}
+.st-partial{background:var(--partial-bg);color:var(--partial)}
+.st-stub{background:var(--stub-bg);color:var(--stub)}
+.st-missing{background:var(--missing-bg);color:var(--missing)}
+
+/* summary */
+.summary{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.summary{grid-template-columns:1fr}}
+.now{display:grid;gap:10px;border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.bar{height:8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line-soft);overflow:hidden}
+.bar > span{display:block;height:100%;background:var(--accent)}
+.stack{display:flex;height:12px;border-radius:999px;overflow:hidden;border:1px solid var(--line-soft)}
+.stack span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+.legend b{font-family:var(--mono);font-weight:600}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* slices */
+.slices{display:grid;gap:10px}
+.slice{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.slice > summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 16px}
+.slice > summary::-webkit-details-marker{display:none}
+.slice > summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.num{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-weight:600;background:var(--surface-2);border:1px solid var(--line)}
+.slice.current .num{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.slice.done .num{background:var(--works-bg);border-color:var(--works);color:var(--works)}
+.slice .ttl{display:grid;gap:4px;min-width:0}
+.slice .ttl .goal{font-size:13.5px;color:var(--muted)}
+.slice .right{display:grid;gap:6px;justify-items:end;min-width:120px}
+.slice .count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.slice .bar{width:120px}
+.slice .body{border-top:1px solid var(--line-soft);padding:14px 16px 16px 72px;display:grid;gap:12px}
+@media (max-width:640px){.slice .body{padding-left:16px}.slice > summary{grid-template-columns:40px minmax(0,1fr)}.slice .right{grid-column:2;justify-items:start}}
+.facts{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:14px}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0}
+@media (max-width:640px){.facts{grid-template-columns:1fr}.facts dt{margin-top:4px}}
+.seen-no{color:var(--muted)}
+.seen-yes{color:var(--works);font-weight:600}
+ul.items{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+ul.items li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:start;font-size:14px}
+.box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:12px;margin-top:2px}
+li.done .box{background:var(--works);border-color:var(--works);color:var(--surface)}
+li.done .txt{color:var(--muted)}
+.owner{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:0 6px;white-space:nowrap;margin-top:3px}
+.owner.agent{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-soft)}
+.owner.devesh{background:var(--partial-bg);color:var(--partial)}
+.ev{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+
+/* works table */
+.filters{display:flex;flex-wrap:wrap;gap:6px;border:0;margin:0;padding:0;min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fbtn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 11px;cursor:pointer}
+.fbtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.fbtn:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);background:var(--surface-2);padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.area{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+td.where{font-size:13px;color:var(--muted);min-width:260px}
+
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start}
+ul.plain{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+ul.plain li{font-size:14px;display:grid;grid-template-columns:22px 1fr;gap:8px}
+details.fold > summary{cursor:pointer;font-weight:600;color:var(--accent)}
+details.fold ul.plain{margin-top:10px}
+.err{border-color:var(--stub);background:var(--stub-bg);color:var(--stub)}
+.foot{font-size:13px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Rendered from ROADMAP.md and STATE.md</div>
+    <h1>Revenue OS tracker</h1>
+    <div class="meta" id="meta">Loading…</div>
+  </header>
+
+  <div id="error" class="panel err" hidden></div>
+
+  <section class="summary">
+    <div class="panel now" id="now" aria-live="polite"></div>
+    <div class="panel" style="display:grid;gap:12px">
+      <div class="eyebrow">What works today</div>
+      <div class="stack" id="stack" aria-hidden="true"></div>
+      <div class="legend" id="legend"></div>
+      <p class="muted" style="font-size:13px">"Works" means it runs from a real entry point. "Tests only" means it is proven with fakes and nothing real calls it.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Roadmap</h2>
+    <p class="muted" style="max-width:80ch">Each slice ends in a proof Devesh watches happen. A slice is done only when its "Seen by Devesh" line carries his date.</p>
+    <div class="slices" id="slices"></div>
+  </section>
+
+  <section>
+    <h2>What works today</h2>
+    <fieldset class="filters" id="filters"><legend class="sr">Filter by status</legend></fieldset>
+    <div class="scroll"><table><thead><tr><th scope="col">Area</th><th scope="col">Capability</th><th scope="col">Status</th><th scope="col">Where / why</th></tr></thead><tbody id="works"></tbody></table></div>
+  </section>
+
+  <section class="two">
+    <div class="panel" style="display:grid;gap:10px">
+      <h2>Waiting on Devesh</h2>
+      <ul class="plain" id="waiting"></ul>
+    </div>
+    <div class="panel" style="display:grid;gap:10px">
+      <h2>Decisions in force</h2>
+      <details class="fold"><summary id="decsum">Show decisions</summary><ul class="plain" id="decisions"></ul></details>
+    </div>
+  </section>
+
+  <p class="foot">To change anything on this page, edit <code>ROADMAP.md</code> or <code>STATE.md</code> in a pull request. After it merges, republish this page with the new files. This page never holds its own data.</p>
+</div>
+
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+  .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+const seenOk = v => /^\d{4}-\d{2}-\d{2}/.test(v || "");
+
+async function load(name){
+  for (const p of [name, `../../${name}`]) {
+    try { const r = await fetch(p, {cache:"no-store"}); if (r.ok) return await r.text(); } catch {}
+  }
+  throw new Error(`Could not load ${name}. Publish it next to this page.`);
+}
+function sections(md){
+  const out = {}; let cur = null;
+  for (const line of md.split("\n")) {
+    const h = line.match(/^## (.+)$/);
+    if (h) { cur = h[1].trim(); out[cur] = []; continue; }
+    if (cur) out[cur].push(line);
+  }
+  return out;
+}
+
+function parseRoadmap(md){
+  const slices = []; const problems = [];
+  const parts = md.split(/^## /m).slice(1).filter(p => p.startsWith("Slice "));
+  for (const part of parts) {
+    const lines = part.split("\n");
+    const head = lines[0].match(/^Slice (\d+):\s*(.+)$/);
+    if (!head) { problems.push(`Bad slice heading: "${lines[0]}"`); continue; }
+    const s = { n:+head[1], title:head[2].trim(), items:[] };
+    for (const l of lines.slice(1)) {
+      const f = l.match(/^(Status|Goal|Proof|Blocked by|Seen by Devesh):\s*(.*)$/);
+      if (f) { s[f[1]] = f[2].trim(); continue; }
+      const it = l.match(/^- \[([ x])\] (.+?) \((agent|Devesh)\)(?: · evidence: (.+))?\s*$/);
+      if (it) {
+        s.items.push({ done: it[1] === "x", text: it[2], owner: it[3], evidence: it[4] || "" });
+        if (it[1] === "x" && !it[4]) problems.push(`Slice ${s.n}: "${it[2]}" is ticked without evidence`);
+        continue;
+      }
+      if (/^- \[/.test(l)) problems.push(`Slice ${s.n}: checklist line not in the expected shape: "${l.trim()}"`);
+      else if (l.trim()) problems.push(`Slice ${s.n}: line not understood (fields and items must each stay on one line): "${l.trim()}"`);
+    }
+    for (const k of ["Status","Goal","Proof","Blocked by","Seen by Devesh"]) if (!(k in s)) problems.push(`Slice ${s.n} is missing its "${k}:" line`);
+    if (s.Status && !["not started","in progress","proof ready","done"].includes(s.Status)) problems.push(`Slice ${s.n} has an unknown status "${s.Status}"`);
+    if (s.Status === "done" && !seenOk(s["Seen by Devesh"])) problems.push(`Slice ${s.n} says done but "Seen by Devesh" has no date`);
+    slices.push(s);
+  }
+  if (!slices.length) problems.push("No slices found in ROADMAP.md");
+  return { slices, problems };
+}
+
+const STATUS = [
+  { key:"Works", cls:"st-works", color:"var(--works)" },
+  { key:"Tests only", cls:"st-tests", color:"var(--tests)" },
+  { key:"Partial", cls:"st-partial", color:"var(--partial)" },
+  { key:"Stub", cls:"st-stub", color:"var(--stub)" },
+  { key:"Missing", cls:"st-missing", color:"var(--missing)" },
+];
+function parseState(md){
+  const phase = (md.match(/^PHASE:\s*(\w+)/m) || [])[1] || "?";
+  const updated = (md.match(/^Updated:\s*(.+)$/m) || [])[1] || "";
+  const sec = sections(md); const problems = [];
+  const table = (sec["What works today"] || []).filter(l => /^\|/.test(l)).map(l => l.split(/(?<!\\)\|/).slice(1,-1).map(c => c.trim().replace(/\\\|/g, "|")));
+  table.forEach(c => { if (c.length !== 4) problems.push(`STATE.md: a table row has ${c.length} columns, expected 4: "${c.join(" | ")}"`); });
+  const rows = table.filter(c => c.length === 4 && c[0] !== "Area" && !/^-+$/.test(c[0].replace(/:/g,"")));
+  for (const h of ["What works today", "Waiting on Devesh", "Decisions in force"]) if (!(h in sec)) problems.push(`STATE.md: missing the "## ${h}" heading (exact wording)`);
+  rows.forEach(r => { if (!STATUS.some(s => s.key === r[2])) problems.push(`STATE.md: unknown status "${r[2]}" for "${r[1]}"`); });
+  const checks = l => { const m = l.match(/^- \[([ x])\] (.+)$/); return m ? { done: m[1] === "x", text: m[2] } : null; };
+  const waiting = (sec["Waiting on Devesh"] || []).map(checks).filter(Boolean);
+  const decisions = (sec["Decisions in force"] || []).filter(l => /^- /.test(l)).map(l => l.slice(2));
+  if (!rows.length) problems.push('STATE.md: the "What works today" table is empty or missing');
+  return { phase, updated, rows, waiting, decisions, problems };
+}
+
+const sCls = st => ({ "done":"s-done", "proof ready":"s-proof", "in progress":"s-progress" }[st] || "s-not");
+let filter = "All", R, S;
+
+function render(){
+  // Current slice: lowest not done and not waiting for Devesh to watch its proof (AGENTS.md → The loop).
+  const current = R.slices.find(s => s.Status !== "done" && s.Status !== "proof ready") || R.slices.find(s => s.Status !== "done");
+  document.getElementById("meta").innerHTML =
+    `<span class="pill phase">Phase: ${esc(S.phase)}</span><span>State updated ${esc(S.updated)}</span>` +
+    `<span>${R.slices.filter(s => s.Status === "done").length} of ${R.slices.length} slices done</span>`;
+
+  if (current) {
+    const done = current.items.filter(i => i.done).length, total = current.items.length;
+    const seen = current["Seen by Devesh"];
+    document.getElementById("now").innerHTML =
+      `<div class="eyebrow">Current slice</div>
+       <h2>Slice ${current.n}: ${inline(current.title)} <span class="pill ${sCls(current.Status)}">${esc(current.Status)}</span></h2>
+       <div class="bar" aria-hidden="true"><span style="width:${total ? Math.round(100*done/total) : 0}%"></span></div>
+       <dl class="facts"><dt>Items</dt><dd>${done} of ${total} done</dd>
+       <dt>Proof</dt><dd>${inline(current.Proof || "")}</dd>
+       <dt>Blocked by</dt><dd>${inline(current["Blocked by"] || "")}</dd>
+       <dt>Seen by Devesh</dt><dd class="${seenOk(seen) ? "seen-yes" : "seen-no"}">${inline(seenOk(seen) ? seen : "not yet")}</dd></dl>`;
+  } else {
+    document.getElementById("now").innerHTML = `<div class="eyebrow">Current slice</div><h2>Every slice is done</h2>`;
+  }
+
+  const counts = STATUS.map(s => ({ ...s, n: S.rows.filter(r => r[2] === s.key).length }));
+  const tot = S.rows.length || 1;
+  document.getElementById("stack").innerHTML = counts.filter(c => c.n).map(c => `<span style="width:${100*c.n/tot}%;background:${c.color}" title="${c.key}: ${c.n}"></span>`).join("");
+  document.getElementById("legend").innerHTML = counts.map(c => `<span><span class="dot" style="background:${c.color}"></span>${esc(c.key)} <b>${c.n}</b></span>`).join("");
+
+  document.getElementById("slices").innerHTML = R.slices.map(s => {
+    const done = s.items.filter(i => i.done).length, total = s.items.length;
+    const isCur = current && s.n === current.n, seen = s["Seen by Devesh"];
+    return `<details class="slice ${isCur ? "current" : ""} ${s.Status === "done" ? "done" : ""}" ${isCur ? "open" : ""}>
+      <summary><span class="num">${s.Status === "done" ? "✓" : s.n}</span>
+        <span class="ttl"><h3>Slice ${s.n}: ${inline(s.title)}</h3><span class="goal">${inline(s.Goal || "")}</span></span>
+        <span class="right"><span class="pill ${sCls(s.Status)}">${esc(s.Status || "?")}</span>
+          <span class="bar" aria-hidden="true"><span style="width:${total ? Math.round(100*done/total) : 0}%"></span></span>
+          <span class="count">${done}/${total} items</span></span></summary>
+      <div class="body">
+        <dl class="facts"><dt>Proof</dt><dd>${inline(s.Proof || "")}</dd><dt>Blocked by</dt><dd>${inline(s["Blocked by"] || "")}</dd>
+          <dt>Seen by Devesh</dt><dd class="${seenOk(seen) ? "seen-yes" : "seen-no"}">${inline(seenOk(seen) ? seen : "not yet")}</dd></dl>
+        <ul class="items">${s.items.map(i => `<li class="${i.done ? "done" : ""}"><span class="box" aria-hidden="true">${i.done ? "✓" : ""}</span>
+          <span class="txt">${inline(i.text)}${i.evidence ? `<span class="ev">Evidence: ${inline(i.evidence)}</span>` : ""}</span>
+          <span class="owner ${i.owner.toLowerCase()}">${esc(i.owner)}</span></li>`).join("")}</ul>
+      </div></details>`;
+  }).join("");
+
+  const opts = ["All", ...STATUS.map(s => s.key)];
+  document.getElementById("filters").innerHTML = `<legend class="sr">Filter by status</legend>` + opts.map(o => `<button class="fbtn" type="button" aria-pressed="${o === filter}" data-f="${esc(o)}">${esc(o)}${o === "All" ? "" : ` · ${counts.find(c => c.key === o).n}`}</button>`).join("");
+  const rows = S.rows.filter(r => filter === "All" || r[2] === filter);
+  document.getElementById("works").innerHTML = rows.map(r => {
+    const st = STATUS.find(s => s.key === r[2]);
+    return `<tr><td class="area">${inline(r[0])}</td><td>${inline(r[1])}</td><td><span class="pill ${st ? st.cls : "st-missing"}">${esc(r[2])}</span></td><td class="where">${inline(r[3])}</td></tr>`;
+  }).join("") || `<tr><td colspan="4" class="muted">Nothing with this status.</td></tr>`;
+
+  document.getElementById("waiting").innerHTML = S.waiting.map(w => `<li><span class="box" style="${w.done ? "background:var(--works);border-color:var(--works);color:var(--surface)" : ""}">${w.done ? "✓" : ""}</span><span>${inline(w.text)}</span></li>`).join("") || `<li class="muted">Nothing is waiting.</li>`;
+  document.getElementById("decsum").textContent = `Show ${S.decisions.length} decisions`;
+  document.getElementById("decisions").innerHTML = S.decisions.map(d => `<li><span class="muted">·</span><span>${inline(d)}</span></li>`).join("");
+
+  const problems = [...R.problems, ...S.problems], err = document.getElementById("error");
+  err.hidden = !problems.length;
+  if (problems.length) err.innerHTML = `<b>These files don't match the expected format, so parts of this page may be wrong:</b><ul>${problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul>`;
+}
+
+document.getElementById("filters").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b) { filter = b.dataset.f; render(); } });
+
+(async () => {
+  try {
+    const [roadmap, state] = await Promise.all([load("ROADMAP.md"), load("STATE.md")]);
+    R = parseRoadmap(roadmap); S = parseState(state); render();
+  } catch (e) {
+    document.getElementById("meta").textContent = "";
+    const err = document.getElementById("error"); err.hidden = false; err.textContent = e.message;
+  }
+})();
+</script>

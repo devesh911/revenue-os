@@ -1,54 +1,46 @@
 ---
 name: task-loop
-description: Use when running the per-task build loop — a /goal Mode B cycle or any session implementing a spec §12 task. The branch→RED→GREEN→gates→PR→verify-CI procedure, WIP cap, sentinels, residual protocol, and merge discipline.
+description: Use when building a roadmap item — any session implementing the next unchecked item of the current slice in ROADMAP.md. The branch → failing test → implementation → gates → PR → observed-green CI → evidence → roadmap/state update procedure, the WIP cap, and merge discipline.
 ---
 
-# task-loop — thin router (skills advise, docs rule — CLAUDE.md)
+# task-loop — the per-item build loop (AGENTS.md is the rulebook; this is the checklist)
 
 ## Read first, in this order
-1. `docs/dev-workflow.md` §4B — the loop + roles (test-authorship rule for security/RLS/migration/guard-critical work) · §5 TDD mechanics · §6 DoD (goes in the PR body).
-2. `docs/project-spec.md` §12 — your task + the acceptance-criteria protocol (agent-verifiable vs human-gated, D34) · §12b — the obligation/residual table.
-3. `docs/dev-workflow.md` §3 — stack maintenance + solo-mode merge (D32).
-4. `orchestrator/state/HANDOFF.md` — **USER NOTES first, every cycle** (Devesh's steering channel).
+1. `AGENTS.md` — hard rails, **Definition of done**, the loop, merge rule.
+2. `ROADMAP.md` — the current slice (lowest-numbered not done): its goal, its proof, your item.
+3. `STATE.md` — line 1 PHASE, **What works today** (is the thing you touch a Stub? a Tests-only?),
+   **Decisions in force**.
+4. `docs/NORTH-STAR.md` if the item touches what the product does for a customer.
 
-## The loop (D32-amended; every step blocking)
-1. **WIP cap before anything:** ≥3 open unmerged task PRs ⇒ stop, emit `NEED_HUMAN: stack full — review bottom-up`.
-2. Branch `feat/task-NN-slug` off up-to-date `origin/main` — **independent, never stacked** (the 2026-07-10 merge race is why); one PR at a time through merge.
-3. **RED before GREEN** — failing tests from the acceptance criteria. **Dispatch, don't do (routing
-   v2, 2026-07-13):** ALL RED goes to `tester` (opus 4.8, max effort) — for security/RLS/migration/
-   guard-critical RED the orchestrator reviews the returned tests line-by-line BEFORE any GREEN
-   dispatch (test-is-spec review supersedes §4B self-authorship). GREEN to `worker` (opus 4.8, max);
-   its DOCS DELTA goes to `scribe` (sonnet, max) for PR body/STATE.md/ledger prose; recon to `scout`
-   (haiku). The main thread assigns, reads the docs, reviews, and prompts to finish — it implements
-   nothing; if no defined agent fits, it may summon a new class (Agent tool, explicit model, hard
-   rails inherited) and record it in HANDOFF. **Mechanical steps** (run a command, watch CI, collect
-   logs, git mechanics; scoped file/prose edits) route to the tool-capped drone shells — `drone-sh`
-   @ haiku (Bash+read) or `drone-edit` @ sonnet (Read/Edit/Write) — with a ROLE CARD per dispatch and
-   the model chosen per invocation; never a drone for code/tests.
-4. Gates: `bun test` · `bun run lint` · `bun run typecheck` · `bun run rls:check` when the DB is touched.
-5. Push · `gh pr create` with the §6 checklist + a **⚠ residuals block** for human-gated criteria (D34).
-6. **Verify the pipeline RAN:** `gh pr checks <N>` must show the required `checks` run concluded green **on GitHub**. An absent or red check is a stop signal — fix it or emit `NEED_HUMAN` (S13.7/D32). Local gate output never substitutes.
-7. Update HANDOFF (incl. ESCALATIONS mirroring any `lessons.md` append) · checkpoint the orchestrator repo · take the next task or emit the sentinel. Never idle; never exceed the cap.
+## The loop (every step blocking)
+1. **WIP cap:** three or more open task PRs ⇒ stop and tell Devesh.
+2. **Check the item against current main** — it may already be done or overtaken.
+3. Branch `feat/…` or `fix/…` off up-to-date `origin/main` — independent, never stacked.
+4. **Failing test first**, at the layer you touch. For security, RLS, migration or guard work,
+   review the failing tests line by line before writing the implementation.
+5. Implement **with its production caller** — a capability nothing real calls is not done.
+6. `bun run gates` run bare (never piped). Env-dependent suites: CI is the verdict.
+7. Show it working: run it from a real entry point (API call, script against the local stack,
+   browser) and capture the evidence.
+8. PR body: what / why / evidence. `gh pr checks <n> --watch` — the required `checks` must be
+   observed green on GitHub; absent or red means stop.
+9. Same PR: tick the item in `ROADMAP.md` with `· evidence: …`; update `STATE.md → What works
+   today` if reality changed; add a `Decisions in force` line for any decision.
+10. Merge per PHASE (STATE.md line 1): SETUP = squash-merge one PR at a time after confirming
+    `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge.
+11. After merge, republish the tracker page (see AGENTS.md → The loop, step 6).
+12. If the last item of the slice landed, set the slice to `proof ready` and ask Devesh to watch
+    the proof. Never fill in `Seen by Devesh:` yourself.
 
-## Never (structural, not advisory — dev-workflow §12, S13; phase-independent)
-Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a T24 BOM row · mutate an active agent/workflow version · approve a PR (in any phase) · edit `docs/**`/`CLAUDE.md` outside a commissioned or §13 ADR PR · merge anything while `STATE.md` says `PHASE: LIVE` (D36 — LIVE merges are ruleset-enforced human acts).
+## Never (any phase)
+Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a
+justification line · mutate an active agent/workflow version · approve a PR · call a stubbed or
+caller-less capability "done" · merge while `STATE.md` says `PHASE: LIVE`.
 
-## Merge discipline (phase-aware — D36; check STATE.md line 1 first)
-SETUP phase: agents merge — observed-green required `checks` + tested evidence + base==main confirmed (`gh pr view N --json baseRefName`) + ONE PR at a time, from the repo root. Branches are **independent off `origin/main`** and squash-merge — never stacked (D32; stacking caused the 2026-07-10 race). Never loop `gh pr merge` (lessons.md, 2026-07-10). LIVE phase: no agent merges, period.
+## Parallel waves (optional, when items are file-disjoint)
+One worktree per item under `.claude/worktrees/` (never in lint scope); worktrees verify env-free and
+CI decides; landing stays serial, base == main each time; at most one migration-writing item per wave.
 
-## Waves (Step-2 parallel — optional, when tasks are file-disjoint)
-Builds, tests, and reviews may run in PARALLEL, one git worktree per task under `.claude/worktrees/`
-(gitignored + biome-excluded — a worktree must never enter lint scope). Worktree branches verify
-**env-free** locally (typecheck · lint · the unit-test paths the brief names — fresh worktrees have no
-`.env`, by rail); CI `checks` is their verdict (S13.7). Landing stays serial: one PR at a time,
-base==main re-confirmed each, WIP cap 3 (D32) — parallel builds, serial merges. **≤1 migration-minting
-task per wave** (migrations are an append-only global sequence). `STATE.md` · `docs/sdlc.md` ·
-`lessons.md` are exempt-shared (every PR touches them) — give each task a distinct insertion target;
-their drain conflicts are expected and resolved "keep both, chronological", never grounds to serialize
-builds. Product file surfaces MUST be disjoint. Full protocol: `orchestrator/.claude/commands/goal.md`.
-
-## Learned since this router was written (dynamic — run it, don't skip)
-`grep -inE 'gates|CI|pipe|worktree|queue|exit code' lessons.md` and read `STATE.md → DECISIONS`.
-Findings there outrank this file's snapshot; on contradiction follow the lesson and note that this skill
-needs a refresh. Standing examples this stanza would have caught: gates run BARE, pipes swallow exit
-codes · diff queued/NEXT items against current main before executing (the #28 duplicate).
+## Learned since this skill was written (run it, don't skip)
+`grep -inE 'gates|CI|pipe|worktree|queue|exit code' lessons.md` and read `STATE.md → Decisions in force`.
+A newer lesson or decision outranks this file.

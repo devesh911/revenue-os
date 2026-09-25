@@ -1,6 +1,6 @@
 # Security Baseline — Voice-Led Agentic Revenue OS (V1)
 
-> **Status:** Authoritative security document (D27). Every control has an S-id and a checkbox — this file doubles as the pre-pilot audit checklist. Claude Code: treat unchecked boxes in a deployed environment as bugs.
+> **Reference, not rules.** The security baseline and the pre-pilot audit checklist; the code-level controls agents must follow on every PR are restated in `AGENTS.md`. Control IDs (S1.1 and so on) are cited across the code, so they never change. None of the boxes has been audited yet: that happens in Slice 6 of the roadmap. Rules live in `AGENTS.md`; what exists today is in `STATE.md`; the plan is `ROADMAP.md`. Where this file and the code disagree, the code is right.
 > **Threat framing:** the failure Devesh fears — "enterprise hardware, wrong config, whole database exposed" — is almost never an exotic exploit. It is a **default left on**: a public Data API, a password-auth SSH port, a service key in client code, an origin reachable by IP. This document is the list of defaults we turn off, in order of blast radius.
 > **Prime directive:** the database is the moat. Every control below exists to protect tenant isolation, the outcome corpus, and the consent lineage — in that order.
 
@@ -90,7 +90,7 @@ Threat: **every caller and every uploaded KB document is untrusted input that ge
 - [ ] **S9.2** Stores: GitHub Environments (CI) · VPS `.env` 0600 · Supabase Vault (per-tenant integration creds — db-design). Nothing else. No secrets in Cloudflare/Pages env except public DSNs.
 - [ ] **S9.3** gitleaks in CI on every PR + a one-time full-history scan at repo creation.
 - [ ] **S9.4** pino `redact` paths cover authorization headers, tokens, phone-shaped strings in error contexts.
-- [ ] **S9.5** Rotation calendar (quarterly + on any suspicion): checklist in `docs/runbooks/rotation.md`; every key's owner and rotation date tracked in that file.
+- [ ] **S9.5** Rotation calendar (quarterly + on any suspicion): checklist in `docs/archive/runbooks/rotation.md` (never filled in; the go-live runbook's rotation step is the live checklist).
 - [ ] **S9.6** Repo hygiene from commit zero (D32): env-file ignore patterns (`.env*`) ship in the repo's FIRST commit; `git add -A` is forbidden in fix commits touching branches whose `.gitignore` predates current ignore rules (the 2026-07-10 near-miss: a stale-snapshot stack branch committed `.env.local`); gitleaks allowlists are **commit- or fingerprint-scoped, never bare paths** — a path allowlist blinds the scanner to future real secrets at that path.
 
 ## S10 · Data protection, backups, DPDP
