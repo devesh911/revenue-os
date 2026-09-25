@@ -8,13 +8,13 @@ import app from "../src/index";
 
 const DEV_ORIGIN = "http://localhost:5173";
 
-function preflight(path: string, origin: string) {
+function preflight(path: string, origin: string, method = "GET") {
   return app.fetch(
     new Request(`http://localhost${path}`, {
       method: "OPTIONS",
       headers: new Headers({
         origin,
-        "access-control-request-method": "GET",
+        "access-control-request-method": method,
         "access-control-request-headers": "authorization",
       }),
     }),
@@ -44,5 +44,22 @@ describe("worker CORS (console at :5173 → worker at :8080)", () => {
   it("never reflects a foreign origin (explicit allowlist, not *)", async () => {
     const res = await preflight("/orgs", "https://evil.example");
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  // AC-L4: every method the console sends preflights cleanly — PUT included (the Settings guardrail
+  // save uses PUT, which the allowlist lacked, so the browser blocked the save before it left).
+  it.each([
+    "GET",
+    "POST",
+    "PATCH",
+    "PUT",
+    "DELETE",
+  ])("AC-L4: an allowlisted preflight requesting %s gets 204 and that method allowed", async (method) => {
+    const res = await preflight("/orgs", DEV_ORIGIN, method);
+    expect(res.status).toBe(204);
+    const allowed = (res.headers.get("access-control-allow-methods") ?? "")
+      .split(",")
+      .map((m) => m.trim().toUpperCase());
+    expect(allowed).toContain(method);
   });
 });
