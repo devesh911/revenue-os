@@ -1,4 +1,4 @@
-# G2: pin exact versions. G3 fallback: swap base to node:22-slim + Hono node adapter (docs/runbooks/node-fallback.md)
+# G2: pin exact versions. G3 fallback: swap base to node:22-slim + Hono node adapter (docs/archive/runbooks/node-fallback.md)
 FROM oven/bun:1.3.11 AS base
 WORKDIR /app
 # Manifests first, sources after: code edits must not bust the install layer cache.

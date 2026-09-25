@@ -1,8 +1,8 @@
 # Database Design — Vertical-Agnostic Revenue OS (V1)
 
-> **Status:** Locked for V1 unless amended via the decision protocol (dev-workflow.md §13). This file is the single source of truth for the data layer.
+> **Reference, not rules.** The design intent and conventions of the data layer. The migrations in `supabase/migrations/` are the real schema; several tables described here have no code using them yet. Rules live in `AGENTS.md`; what exists today is in `STATE.md`; the plan is `ROADMAP.md`. Where this file and the code disagree, the code is right.
 > **Consumer:** Claude Code. Migrations should be generated from the DDL in this file, in order, via `supabase migration new <name>`. **Numbering truth (D33):** the V1 baseline `000`–`009` spans **§3–§8 + §13 + §14** — one file per `-- NNN_name.sql` marker; later migrations (`010`+) extend the baseline and are annotated inline where they amend it.
-> **Companion doc:** `project-spec.md` (holistic decisions, architecture, build order).
+> **Companion doc:** `docs/NORTH-STAR.md` (what we are building). The old product spec is archived at `docs/archive/project-spec.md`.
 
 ---
 

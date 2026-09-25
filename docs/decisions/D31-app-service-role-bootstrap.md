@@ -1,6 +1,6 @@
 # D31 — app_service role bootstrap (DRAFT — awaiting Devesh's merge per dev-workflow §13)
 
-**Status:** Draft, written by the implementing session for task 3. Not law until merged by Devesh.
+**Status:** Implemented and still true (reference). Migration 010 and scripts/db-reset.ts cite this file by path, so it stays here.
 
 ## Context
 db-design §1 mandates that the backend connects as an RLS-bound `app_service` role, but no migration
