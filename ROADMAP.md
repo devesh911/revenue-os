@@ -26,7 +26,7 @@ Seen by Devesh: —
 - [x] Collapse the docs into four law files plus reference and archive (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102)
 - [x] Rewrite AGENTS.md around a definition of done that means "seen working" (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102)
 - [x] Tracker page that renders ROADMAP.md and STATE.md and flags format mistakes (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102), parsers run against both files with zero problems
-- [ ] Keep agents on the plan: every agent session starts with the current slice and item, and every prompt carries a one-line reminder (agent)
+- [x] Keep agents on the plan: every agent session starts with the current slice and item, and every prompt carries a one-line reminder (agent) · evidence: [#105](https://github.com/devesh911/revenue-os/pull/105), the exact hook commands printed the banner and the one-line reminder from an unrelated folder with bun off the PATH; 11 hook tests pass
 - [ ] Every PR names its roadmap item (or says off-roadmap, replan or side track), and CI refuses one that does not (agent)
 - [ ] Rewrite the examples in docs/patterns from real code (agent)
 
