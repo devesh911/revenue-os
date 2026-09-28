@@ -8,8 +8,8 @@ the same PR. Decisions are added newest first; Waiting items are ticked when Dev
 History lives in `git log`; the previous long version of this file is
 `docs/archive/STATE-until-2026-09-25.md`.
 
-Updated: 2026-09-25 (console sign-in: email and password, lands on the first workspace; before it: VPS address out of the public repo, origin certificate, /ready token, CI check for public IPv4 addresses)
-Current slice: **Slice 0: One source of truth** (see `ROADMAP.md`)
+Updated: 2026-09-28 (agents are shown the current slice and item at every session start and prompt; before it: console sign-in, VPS address out of the public repo, origin certificate, /ready token, CI check for public IPv4 addresses)
+The current slice is worked out from `ROADMAP.md` (`bun run cycle --banner`), never copied here.
 
 ## What works today
 
@@ -43,6 +43,7 @@ use it) · **Missing** (not built).
 | Console | Screens: home, tasks, conversations, contacts, transcript, dashboard, agents, settings | Partial | Read-only except the guardrail settings form |
 | Console | Dashboard numbers are right | Partial | Counts outcome labels the engine never writes, so real bookings would show 0 |
 | Quality | Automated tests and CI | Works | .github/workflows/ci.yml; green CI does not mean a customer-facing feature works |
+| Quality | Agents are shown the current slice and item at every session start and on every prompt, so an off-topic prompt, /clear or compaction does not lose the plan | Works | Claude Code hooks in .claude/settings.json run scripts/cycle-hook.sh, which prints scripts/cycle.ts output read from ROADMAP.md on origin/main. Codex has the same hooks in .codex/hooks.json but runs them only after Devesh trusts them. Nothing refuses an off-roadmap PR yet (next Slice 0 item) |
 | Quality | CI fails when a committed file contains a public IPv4 address (the server's address must never be published) | Works | scripts/guards.sh (run by `bun run guards` in CI); hits print as file:line only, never the address |
 | Quality | Agent evals and an eval gate before a version goes live | Partial | `bun run evals` exists; nothing activates an agent or checks its evals |
 | Ops | Metering and cost per lead | Partial | Token counts recorded; provider labelled "fake"; cost always 0 |
@@ -67,12 +68,14 @@ use it) · **Missing** (not built).
 - [ ] **Phone sign-in**: an SMS provider account plus DLT registration of the sender name and the sign-in code message (can take weeks)
 - [ ] **Google sign-in**: a Google Cloud OAuth client and consent screen for the console
 - [ ] **Email provider** for invites and password resets (Resend, Postmark or SES) with a verified sending address on the domain; staging's sign-in settings (site address, allowed redirects, email confirmation, password length) are then set in the Supabase dashboard
+- [ ] **Trust the Codex hooks** (only if you use Codex): open Codex in the repo, run `/hooks` and trust the two hooks. Codex skips them until then, and again after any change to `.codex/hooks.json`
 - [ ] Optional: delete seven stale remote branches (agents cannot delete remote branches)
 
 ## Decisions in force
 
 Newest first. One line each; the reason goes in the PR that made the decision.
 
+- 2026-09-28 · **The plan lives in the repo, not in the chat**: hooks show every agent session the current slice and item (scripts/cycle.ts, read from ROADMAP.md on origin/main). A slice is blocked unless its line reads exactly `Blocked by: nothing`. A new ask mid-cycle is a question (answer only), marketing-site work (the Side track, one open PR) or a build ask that waits for Devesh to say "off-roadmap" (one open at a time) or "replan" (the item is added to a slice in the same PR that builds it). A build branch records its item with `git config branch.<name>.description`.
 - 2026-09-25 · **Console sign-in** (Devesh): accounts are invite-only (we create each customer's company and invite its first admin); sign-in by email and password now, phone code and Google next; admins must use an authenticator-app code. Agent defaults: "Sign out" signs out this device only; invites are our own table, because Supabase's built-in invite needs the service-role key; company single sign-on later through Supabase's own SAML, so the worker trusts one token issuer; the browser sign-in test runs inside the required `checks` job.
 - 2026-09-25 · **Local settings come from `bun run local <cmd>`** (read from the running local Supabase stack, never printed, never `.env` files); `bun run db:seed` creates the local dev login `dev@local.test`; fixed dev ports: console 5173, console preview 4173, marketing site 5174.
 - 2026-09-25 · **The public-address check excuses one file by path**: `apps/www/src/visuals/IntentEvidence.tsx`, whose SVG icon numbers look exactly like an address; a test holds the list to that one file.

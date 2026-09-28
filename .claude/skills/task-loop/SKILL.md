@@ -7,7 +7,8 @@ description: Use when building a roadmap item — any session implementing the n
 
 ## Read first, in this order
 1. `AGENTS.md` — hard rails, **Definition of done**, the loop, merge rule.
-2. `ROADMAP.md` — the current slice (lowest-numbered not done): its goal, its proof, your item.
+2. `ROADMAP.md` — the current slice (`bun run cycle --banner` prints it; the rule is at the top of
+   ROADMAP.md): its goal, its proof, your item.
 3. `STATE.md` — line 1 PHASE, **What works today** (is the thing you touch a Stub? a Tests-only?),
    **Decisions in force**.
 4. `docs/NORTH-STAR.md` if the item touches what the product does for a customer.
@@ -15,7 +16,8 @@ description: Use when building a roadmap item — any session implementing the n
 ## The loop (every step blocking)
 1. **WIP cap:** three or more open task PRs ⇒ stop and tell Devesh.
 2. **Check the item against current main** — it may already be done or overtaken.
-3. Branch `feat/…` or `fix/…` off up-to-date `origin/main` — independent, never stacked.
+3. Branch `feat/…` or `fix/…` off up-to-date `origin/main` — independent, never stacked — and record
+   the item: `git config branch.<name>.description "<item text>"` (the hooks show it on every prompt).
 4. **Failing test first**, at the layer you touch. For security, RLS, migration or guard work,
    review the failing tests line by line before writing the implementation.
 5. Implement **with its production caller** — a capability nothing real calls is not done.
@@ -35,7 +37,8 @@ description: Use when building a roadmap item — any session implementing the n
 ## Never (any phase)
 Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a
 justification line · mutate an active agent/workflow version · approve a PR · call a stubbed or
-caller-less capability "done" · merge while `STATE.md` says `PHASE: LIVE`.
+caller-less capability "done" · merge while `STATE.md` says `PHASE: LIVE` · drop the current item
+for a new ask without Devesh saying "off-roadmap" or "replan" (AGENTS.md → The loop, step 1).
 
 ## Parallel waves (optional, when items are file-disjoint)
 One worktree per item under `.claude/worktrees/` (never in lint scope); worktrees verify env-free and

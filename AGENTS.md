@@ -34,7 +34,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 7. **main is PR-only with CI green** (required check: `checks`). Merge authority follows the
    PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge independent PRs one at a
    time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. Loosening any guard or deny-list is Devesh-only in both phases.
+   only humans merge. Loosening any guard, hook or deny-list is Devesh-only in both phases.
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
@@ -51,13 +51,20 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 - When time slips, cut console polish — never guardrails, consent or metering.
 
 ## The loop
-1. Take the next unchecked item in the **current slice** of `ROADMAP.md` (the lowest-numbered
-   slice that is not `done`, not `proof ready`, and not blocked by anything unfinished), or
-   Devesh's explicit ask. Check it against current main first — it may already be done. One
-   item, one branch, one PR.
-2. Branch `feat/…` or `fix/…` off up-to-date main — independent, never stacked. Tests at the
-   layer you touch; integration tests run against the real local Supabase stack and real
-   pg-boss — never mock the database; a bug fix starts from a failing reproduction.
+1. Take the next unchecked item in the **current slice** of `ROADMAP.md` (the rule is at the top
+   of that file; `bun run cycle --banner` prints it, and the agent hooks show it at every
+   session start and on every prompt). Check it against current main first — it may already be
+   done. One item, one branch, one PR. When Devesh asks for something else mid-cycle:
+   - a question or look-up: answer it; no branch switch, no code;
+   - marketing-site work (`apps/www`): the **Side track** in `ROADMAP.md`, one open PR at most;
+   - any other build ask: reply "That is off the current slice: build it as an off-roadmap PR,
+     or replan (add it to a slice)?" and build nothing until Devesh picks. A replan adds the
+     item to a slice in the same PR that builds it. At most one off-roadmap PR is open at a
+     time. A message that starts with "off-roadmap" or "replan" has already picked.
+2. Branch `feat/…` or `fix/…` off up-to-date main — independent, never stacked — and record the
+   item on it: `git config branch.<name>.description "<item text>"`. Tests at the layer you
+   touch; integration tests run against the real local Supabase stack and real pg-boss — never
+   mock the database; a bug fix starts from a failing reproduction.
 3. `bun run gates` green locally, run bare — never pipe a gate through anything that can
    swallow its exit code. CI also runs gitleaks, `bun audit`, the console build, `bun run
    guards` and a Docker build; CI is the verdict, especially for env-dependent suites
@@ -70,7 +77,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    reality changed, and adds a line to `STATE.md → Decisions in force` for any decision made.
    A genuine surprise gets one factual line in `lessons.md`. After ROADMAP.md or STATE.md change
    on main, republish the tracker page (Claude: Artifact publish of `docs/tracker/index.html`
-   with files `ROADMAP.md` and `STATE.md`, `url` = the tracker link above).
+   with files `ROADMAP.md`, `STATE.md` and `parse.js` from `docs/tracker/parse.js`, `url` = the
+   tracker link above).
 
 ## Escalate to Devesh only for
 Credentials · money · external accounts · irreversible or outward-facing actions · genuine
@@ -88,7 +96,8 @@ record one line in `STATE.md → Decisions in force`, keep moving.
 - `docs/patterns/` holds the style to imitate: its rules bind; its examples are illustrations.
 
 ## Commands (scripts are the interface)
-`bun run gates` (typecheck + lint + test + RLS check) · `bun run local <cmd>` (any command with the
+`bun run gates` (typecheck + lint + test + RLS check) · `bun run cycle --banner` (where we are:
+current slice, next item, this branch's item) · `bun run local <cmd>` (any command with the
 running local stack's settings) · `bun run dev` · `bun run db:reset`
 (local only) · `bun run db:seed <pack>` · `bun run demo` · `bun run evals` · `bun run guards`
 

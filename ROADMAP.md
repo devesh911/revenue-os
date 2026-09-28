@@ -2,27 +2,32 @@
 
 The plan, as vertical slices. Each slice ends in a **proof**: something real that Devesh can
 watch happen. The **current slice** is the lowest-numbered slice that is not `done`, not
-`proof ready`, and not blocked by anything unfinished. While a slice waits on Devesh — to watch
-its proof or to supply something — agents move to the next unblocked slice. How items and
-slices get marked done is in `AGENTS.md → Definition of done`.
+`proof ready`, and not blocked; `bun run cycle --banner` prints it. A slice counts as blocked
+unless its line reads exactly `Blocked by: nothing`: the PR that clears its last blocker (a
+slice finishing, or Devesh delivering a Waiting item) sets the line to `nothing`. While a slice
+waits on Devesh — to watch its proof or to supply something — agents move to the next unblocked
+slice. How items and slices get marked done is in `AGENTS.md → Definition of done`.
 
 Format (the tracker page reads this file, so keep it exact and keep every field and item on one
 line): `## Slice N: title`, then the lines `Status:`, `Goal:`, `Proof:`, `Blocked by:`,
 `Seen by Devesh:`, then checklist items `- [ ] text (agent)` or `(Devesh)`. A finished item
 becomes `- [x] text (owner) · evidence: [#PR](link) and how it was seen working`.
 Status is one of: `not started` · `in progress` · `proof ready` · `done`. Only Devesh writes a
-date (YYYY-MM-DD) after `Seen by Devesh:`.
+date (YYYY-MM-DD) after `Seen by Devesh:`. A `## Side track:` section holds standing work
+outside the slices; the tracker page skips it.
 
 ## Slice 0: One source of truth
 Status: in progress
 Goal: Anyone can tell in five minutes what the product is, what works, what is next and what is blocked.
-Proof: Devesh opens NORTH-STAR, ROADMAP, STATE and the tracker page and can answer those four questions without asking anyone.
+Proof: Devesh opens NORTH-STAR, ROADMAP, STATE and the tracker page and can answer those four questions without asking anyone. In a fresh agent session, the agent names the current slice and item without being told, answers an off-topic question without leaving the item, and replies to "add a pricing page" by asking "off-roadmap or replan?".
 Blocked by: nothing
 Seen by Devesh: —
 
 - [x] Collapse the docs into four law files plus reference and archive (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102)
 - [x] Rewrite AGENTS.md around a definition of done that means "seen working" (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102)
 - [x] Tracker page that renders ROADMAP.md and STATE.md and flags format mistakes (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102), parsers run against both files with zero problems
+- [ ] Keep agents on the plan: every agent session starts with the current slice and item, and every prompt carries a one-line reminder (agent)
+- [ ] Every PR names its roadmap item (or says off-roadmap, replan or side track), and CI refuses one that does not (agent)
 - [ ] Rewrite the examples in docs/patterns from real code (agent)
 
 ## Slice 1: Foundations the agent will stand on
@@ -127,3 +132,6 @@ Seen by Devesh: —
 - [ ] Cost per lead recorded for every AI call, call minute and message (agent)
 - [ ] Baseline conversion captured and one success metric agreed in writing (Devesh)
 - [ ] Replace every password and key created during setup, then switch the repo to human-only merges (PHASE: LIVE) using docs/runbooks/go-live.md (Devesh)
+
+## Side track: marketing site
+The landing page (`apps/www`) is built beside the slices and never counts toward one. A marketing-site ask needs no replan. At most one side-track PR is open at a time, and its description says `Track: marketing site`.
