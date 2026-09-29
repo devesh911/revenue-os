@@ -28,6 +28,15 @@
             "timeout": 20
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -37,6 +46,54 @@
             "type": "command",
             "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/cycle-hook.sh\" --pin",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "timeout": 3600,
+            "statusMessage": "Done gate: checking the change"
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "timeout": 3600,
+            "statusMessage": "Done gate: checking the teammate's change"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "verifier",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "verifier",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "timeout": 30
           }
         ]
       }

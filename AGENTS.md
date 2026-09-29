@@ -49,6 +49,24 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 - **A slice is done** only when Devesh has watched its proof. Agents set a slice to
   `proof ready` and ask him to look; only Devesh fills in `Seen by Devesh:` with a date.
 - Passing tests are required and never sufficient. Tests with fakes prove logic, not the product.
+- **The done gate enforces this, so nobody has to remember it.** Whenever a Claude agent stops,
+  `scripts/done-gate.ts` checks its change: first the rules against fake-done (throwing stubs, exports
+  nothing calls, silenced checks, skipped tests, tests that read source code), then every check on
+  the exact code, then, if product code changed, a ruling from the verifier agent
+  (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words: PASS,
+  or CANNOT_VERIFY naming what only Devesh can provide (a real phone number, an account, a key),
+  which reaches him marked NOT verified. Until then the agent is sent back to work, and Devesh sees
+  each verdict. Codex runs the same gate when a turn ends (`.codex/hooks.json`, once trusted in
+  Codex's `/hooks`) but has no verifier agent, so a green product change stops once, marked NOT
+  independently verified: ask Claude to run the verifier, or check it yourself. Humans run `bun run gate`.
+- CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
+  agent and human.
+- Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
+  reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
+  `scripts/done-gate.ts` lists it with why.
+- Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
+- The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
+  any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.
 - When time slips, cut console polish — never guardrails, consent or metering.
 
 ## The loop
@@ -82,13 +100,15 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    off-roadmap PR. Tests at the layer you touch; integration tests run against the real local
    Supabase stack and real pg-boss — never mock the database; a bug fix starts from a failing
    reproduction.
-3. `bun run gates` green locally, run bare — never pipe a gate through anything that can
-   swallow its exit code. CI also runs gitleaks, `bun audit`, the console build, `bun run
-   guards` and a Docker build; CI is the verdict, especially for env-dependent suites
-   (fresh worktrees have no `.env`).
-4. PR body: the first line is `Roadmap: Slice N — <item>`, `Roadmap: Side track — <what>` or
-   `Roadmap: off-roadmap — <what>`; then what / why / evidence (gate output and how the result
-   was seen working). Watch CI: `gh pr checks <n> --watch`. Green means observed green on GitHub.
+3. `bun run gate` green, run bare — never pipe a gate through anything that can swallow its exit
+   code. It runs typecheck, lint, guards, every test and the RLS check against the real local stack,
+   and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
+   gitleaks, `bun audit` and a Docker build; CI is the verdict.
+4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
+   verifier agent with Devesh's request word for word. PR body: the first line is `Roadmap: Slice N —
+   <item>`, `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`; then what / why /
+   evidence (the gate's line, the verifier's ruling, how the result was seen working). Watch CI:
+   `gh pr checks <n> --watch`. Green means observed green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
    three or more open task PRs, stop taking new work.
 6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
@@ -98,6 +118,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    on main, republish the tracker page (Claude: Artifact publish of `docs/tracker/index.html`
    with files `ROADMAP.md`, `STATE.md` and `parse.js` from `docs/tracker/parse.js`, `url` = the
    tracker link above).
+
+## When Devesh corrects you
+Fix it, then turn that kind of mistake into a check so it can't come back: the prevent-repeat skill
+(`.claude/skills/prevent-repeat/SKILL.md`) says how. A correction that only becomes a note will be
+made again.
 
 ## Escalate to Devesh only for
 Credentials · money · external accounts · irreversible or outward-facing actions · genuine
@@ -115,9 +140,10 @@ record one line in `STATE.md → Decisions in force`, keep moving.
 - `docs/patterns/` holds the style to imitate: its rules bind; its examples are illustrations.
 
 ## Commands (scripts are the interface)
-`bun run gates` (typecheck + lint + test + RLS check) · `bun run cycle --banner` (where we are:
-current slice, next item, this branch's item) · `bun run local <cmd>` (any command with the
-running local stack's settings) · `bun run dev` · `bun run db:reset`
+`bun run gate` (every check, plus the done rules) · `bun run see <console path>` (screenshot and
+errors as the dev login) · `bun run cycle --banner` (where we are: current slice, next item,
+this branch's item) · `bun run local <cmd>` (any command with the running local stack's
+settings) · `bun run dev` · `bun run db:reset`
 (local only) · `bun run db:seed <pack>` · `bun run demo` · `bun run evals` · `bun run guards`
 
 ## Conventions

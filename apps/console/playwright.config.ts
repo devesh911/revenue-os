@@ -25,6 +25,8 @@ export default defineConfig({
   testDir: "e2e",
   // *.e2e.ts (not .spec./.test.) keeps bun's repo-wide test glob from running this outside Playwright.
   testMatch: "**/*.e2e.ts",
+  // see.e2e.ts is a tool, not a check: it runs only for `bun run see <paths>` (scripts/done-gate.ts).
+  testIgnore: process.env.SEE_PATHS ? [] : ["**/see.e2e.ts"],
   globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI, // fail CI if a stray test.only was committed

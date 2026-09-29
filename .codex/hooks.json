@@ -1,5 +1,5 @@
 {
-  "description": "Shows every Codex session the current roadmap slice and item (scripts/cycle.ts). Codex runs these only after they are trusted in /hooks.",
+  "description": "Shows every Codex session the current roadmap slice and item (scripts/cycle.ts). Codex runs these only after they are trusted in /hooks; and runs the done gate (scripts/done-gate.ts) when a turn ends.",
   "hooks": {
     "SessionStart": [
       {
@@ -11,6 +11,15 @@
             "statusMessage": "Loading the current cycle"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -20,6 +29,18 @@
             "type": "command",
             "command": "sh \"$(git rev-parse --show-toplevel)/scripts/cycle-hook.sh\" --pin",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
+            "timeout": 3600,
+            "statusMessage": "Done gate: checking the change"
           }
         ]
       }

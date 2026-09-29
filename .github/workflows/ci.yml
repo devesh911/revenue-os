@@ -34,6 +34,14 @@ jobs:
 
       - run: bun run lint # includes G1 restricted-imports
 
+      # The done rules (no throwing stubs, no export nothing calls, no skipped test...) on this PR's whole
+      # change, so they bind every agent and human, not only agents whose stop hook runs them.
+      # fetch-depth 0 above fetches every branch, so origin/<base> exists.
+      - name: Done rules (scripts/done-gate.ts)
+        env:
+          BASE: origin/${{ github.base_ref || 'main' }}
+        run: bun run gate rules --base "$BASE"
+
       - run: bun run typecheck
 
       - name: Console build (dummy env) + secret and public-address guards # docs/security.md S1.2, S4.1 and S7.3
@@ -62,14 +70,15 @@ jobs:
             echo "VAPI_WEBHOOK_SECRET=local-test-secret"
           } >> "$GITHUB_ENV"
 
-      - run: bun test
+      # Every test must run: a skipped or todo test fails, however it was switched off (scripts/done-gate.ts, MAY_SKIP).
+      - run: bun run gate tests
 
       # Console sign-in e2e against the real local stack: the wrapper exports the stack env, Playwright
       # starts the worker + a console build (dist-e2e, never the guarded dist/), and the spec seeds its own data.
       - name: Console e2e (real local stack)
         run: |
           bunx playwright install --with-deps chromium
-          bun run local bun run e2e
+          bun run local bun run gate tests e2e
 
       - run: bun run rls:check
         env:
