@@ -141,6 +141,8 @@ ff([
   "aac",
   "-b:a",
   "96k",
+  "-movflags",
+  "+faststart", // the index up front, so playback starts before the whole file arrives
   out,
 ]);
 rmSync(work, { recursive: true, force: true });
