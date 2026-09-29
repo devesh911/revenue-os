@@ -97,9 +97,11 @@ on conflict (org_id, key) do nothing;
 
 -- Console demo data: contacts and their conversations, messages, tasks and outcomes. These tables
 -- have no natural key, so every seeded row gets a fixed id made from the workspace id and a short
--- key (pg_temp.seed_id): re-running the pack inserts nothing twice.
+-- key (pg_temp.seed_id): re-running the pack inserts nothing twice. The md5 gets the version (3,
+-- name-based) and variant digits of a real UUID, which the app's id checks require.
 create or replace function pg_temp.seed_id(key text) returns uuid language sql stable
-  return md5(current_setting('seed.org_id') || ':' || key)::uuid;
+  return overlay(overlay(md5(current_setting('seed.org_id') || ':' || key) placing '3' from 13)
+                 placing '8' from 17)::uuid;
 
 create temp table seed_people on commit drop as
 select pg_temp.seed_id('contact:' || key) as id, first_name, last_name,

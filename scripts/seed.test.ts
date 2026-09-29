@@ -3,6 +3,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { ConversationIdSchema } from "../packages/shared/src/schemas";
 import { type Pack, seed } from "./seed";
 
 const admin = new pg.Pool({
@@ -245,6 +246,22 @@ describe.each([
     expect(await rowIds(orgId)).toEqual(seededRows); // same rows, same ids: links stay valid
     expect(await rowIds(other)).toEqual(otherBefore);
     expect(otherBefore).toHaveLength(5);
+  });
+
+  // The console and the worker parse ids with the shared uuid schema, and one bad id fails a whole
+  // list: an id that is 32 hex digits but not an RFC 9562 UUID broke every demo screen.
+  it("gives every demo row an id the console and the worker accept", async () => {
+    const { orgId } = await workspace(pack);
+    const { rows } = await admin.query(
+      ["contacts", "conversations", "tasks", "outcomes"] // messages have numeric ids
+        .map((t) => `select '${t}' t, id::text from ${t} where org_id = $1`)
+        .join(" union all "),
+      [orgId],
+    );
+    expect(rows).toHaveLength(16);
+    expect(
+      rows.filter((r) => !ConversationIdSchema.safeParse(r.id).success),
+    ).toEqual([]);
   });
 
   // Nothing in the schema stops a row of one workspace pointing at a contact or conversation of
