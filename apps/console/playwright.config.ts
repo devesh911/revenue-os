@@ -14,12 +14,18 @@
 //     both together): the boot smoke passes, the auth spec fails with its own "must be set" error.
 //     `-- --list` collects every spec with no browser, no webServer and no global setup.
 // e2e specs sit OUTSIDE tsc scope by design (Node-runner vs DOM types); `--list` is their syntax gate.
+//
+// The marketing site's browser checks run here too, as the "www" project (apps/www/e2e, against a
+// `vite preview` of its own build on 4174), so `bun run e2e` — the gate's browser checks and CI's
+// e2e step — runs them with no second config. It needs no stack env. Left out for `bun run see`.
 import { defineConfig, devices } from "@playwright/test";
 
 // Only the local-env wrapper sets VITE_API_URL — the same gate global-setup.ts uses, so a shell that
 // merely exports SUPABASE_* (CI's GITHUB_ENV) never starts a worker beside a dummy-env console.
 const apiUrl = process.env.VITE_API_URL;
 const reuseExistingServer = !process.env.CI; // stale-server landmine otherwise: always fresh in CI
+const www = !process.env.SEE_PATHS; // the marketing site's checks, except for `bun run see`
+const WWW_URL = "http://localhost:4174";
 
 export default defineConfig({
   testDir: "e2e",
@@ -36,7 +42,18 @@ export default defineConfig({
     baseURL: "http://localhost:4173", // vite preview (strictPort in vite.config.ts)
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(www
+      ? [
+          {
+            name: "www",
+            testDir: "../www/e2e",
+            use: { ...devices["Desktop Chrome"], baseURL: WWW_URL },
+          },
+        ]
+      : []),
+  ],
   webServer: [
     // The worker API, from the repo root, on the PORT the wrapper also baked into VITE_API_URL.
     ...(apiUrl
@@ -68,5 +85,19 @@ export default defineConfig({
           process.env.VITE_SUPABASE_ANON_KEY || "dummy-not-a-key",
       },
     },
+    // The marketing site, built to dist-e2e like the console (never its checked dist/).
+    ...(www
+      ? [
+          {
+            name: "www",
+            command:
+              "bun run build --outDir dist-e2e && bun run preview --outDir dist-e2e --port 4174 --strictPort",
+            cwd: "../www",
+            url: WWW_URL,
+            reuseExistingServer,
+            timeout: 120_000,
+          },
+        ]
+      : []),
   ],
 });

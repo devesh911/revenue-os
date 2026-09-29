@@ -1,6 +1,8 @@
 // Unit spec for the booking client (Cal.com v2 + the preview adapter), the
-// analytics hook, the step-by-step loop runner (lib/sequence: its first paint, and
-// when it starts playing) and the message chime with its sound switch (lib/chime).
+// analytics hook, the step-by-step loop runner (lib/sequence: its first paint, when
+// it starts playing, a looped range and a driven visual), How it works' steps (their
+// accents, and the beats each step plays) and the message chime with its sound
+// switch (lib/chime).
 // fetch, IntersectionObserver and Web Audio are stand-ins, so nothing leaves the
 // machine and nothing plays; the request shapes pinned here are the ones Cal.com's
 // public API documents.
@@ -8,6 +10,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as React from "react";
 import { createElement, useRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { howItWorks, howSteps } from "../src/content/beforeCall";
 import { hasHeardSample, initAnalytics, track } from "../src/lib/analytics";
 import {
   BookingError,
@@ -18,6 +21,9 @@ import {
   previewSlots,
 } from "../src/lib/booking";
 import { useSequence } from "../src/lib/sequence";
+import { PLAN, READY, SAVED } from "../src/visuals/CallBrief";
+import { RUNS } from "../src/visuals/HowSteps";
+import { STARTS as STUDY_STARTS } from "../src/visuals/IntentEvidence";
 
 const NOW = new Date("2026-09-23T05:00:00Z"); // Wed 10:30 IST
 const TZ = "Asia/Kolkata";
@@ -369,13 +375,21 @@ describe("useSequence — what the first paint shows, and when it plays", () => 
   });
 
   // A three-step visual that prints the runner's state as its text.
-  function Probe() {
+  function Probe({ loop }: { loop?: readonly [number, number] }) {
     const ref = useRef<HTMLDivElement>(null);
-    const { step, resetting, playing } = useSequence(ref, [0, 600, 1500], 2000);
+    const { step, resetting, playing } = useSequence(
+      ref,
+      [0, 600, 1500],
+      2000,
+      { loop },
+    );
     return createElement("div", { ref }, `${step} ${resetting} ${playing}`);
   }
-  const paint = () =>
-    renderToStaticMarkup(createElement(Probe)).replace(/<[^>]+>/g, "");
+  const paint = (loop?: readonly [number, number]) =>
+    renderToStaticMarkup(createElement(Probe, { loop })).replace(
+      /<[^>]+>/g,
+      "",
+    );
   const browser = (observer: boolean, reduce: boolean) => ({
     ...(observer && { IntersectionObserver: class {} }),
     matchMedia: (q: string) => ({ matches: reduce && q.includes("reduce") }),
@@ -418,6 +432,49 @@ describe("useSequence — what the first paint shows, and when it plays", () => 
     );
     for (const fn of effects) fn();
     expect(sets).toContain(2);
+  });
+
+  test("a looped range: the server render is the range's last beat, standing still", () => {
+    expect(paint([0, 1])).toBe("1 false false");
+  });
+
+  // Its effects run by hand, the step state starting outside the range [2, 3] (as
+  // when a visitor picks another step): what the runner moves the step to.
+  function movedIn(still: boolean) {
+    g.window = browser(true, false);
+    const sets: unknown[] = [];
+    const effects: Array<() => unknown> = [];
+    let calls = 0;
+    withHooks(
+      {
+        useState: (init: unknown) => [
+          // the second state is the step: out of range
+          calls++ === 1 ? 0 : typeof init === "function" ? init() : init,
+          (v: unknown) => sets.push(v),
+        ],
+        useEffect: (fn: () => unknown) => effects.push(fn),
+        useRef: (v: unknown) => ({ current: v }),
+        useSyncExternalStore: () => still, // the page-wide Pause switch
+      },
+      () =>
+        useSequence({ current: null }, [0, 600, 1500, 2400], 2000, {
+          loop: [2, 3],
+        }),
+    );
+    for (const fn of effects) fn();
+    return sets;
+  }
+
+  test("with motion, a range that doesn't hold the current beat moves it to the range's first beat", () => {
+    const sets = movedIn(false);
+    expect(sets).toContain(2);
+    expect(sets).not.toContain(3);
+  });
+
+  test("with Pause on, the same move goes to the range's last beat, its finished frame", () => {
+    const sets = movedIn(true);
+    expect(sets).toContain(3);
+    expect(sets).not.toContain(2);
   });
 
   // Its effects run by hand under a stand-in observer, in a viewport 800px tall:
@@ -470,6 +527,47 @@ describe("useSequence — what the first paint shows, and when it plays", () => 
     ]);
     return { sets, thresholds };
   }
+
+  test("a visual something else drives (on: false) never observes the screen", () => {
+    let made = 0;
+    class Observer {
+      constructor() {
+        made++;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    const run = (on: boolean) => {
+      g.window = { ...browser(true, false), IntersectionObserver: Observer };
+      g.IntersectionObserver = Observer;
+      g.document = {
+        hidden: false,
+        addEventListener() {},
+        removeEventListener() {},
+      };
+      const effects: Array<() => unknown> = [];
+      withHooks(
+        {
+          useState: (init: unknown) => [
+            typeof init === "function" ? init() : init,
+            () => {},
+          ],
+          useEffect: (fn: () => unknown) => effects.push(fn),
+          useRef: (v: unknown) => ({ current: v }),
+          useSyncExternalStore: () => false,
+        },
+        () =>
+          useSequence({ current: {} as HTMLElement }, [0, 600, 1500], 2000, {
+            on,
+          }),
+      );
+      for (const fn of effects) fn();
+    };
+    run(false);
+    expect(made, "driven: no observer").toBe(0);
+    run(true);
+    expect(made, "on its own: one observer").toBe(1);
+  });
 
   test("it plays once a third is on screen, or once a stage too tall for that fills the view", () => {
     expect(verdict(0.35, 0.35).sets, "a third on screen").toEqual([true]);
@@ -723,5 +821,33 @@ describe("chime — the message chime and its sound switch", () => {
     m.setSound(true);
     expect(heard).toBe(1);
     expect(store.get()).toBe(true);
+  });
+});
+
+describe("How it works' steps — the accents, and the beats each step plays", () => {
+  test("every accent word appears in the title exactly once", () => {
+    for (const word of howItWorks.accents)
+      expect(howItWorks.title.split(word).length - 1, word).toBe(1);
+  });
+
+  test("one run of beats per step", () => {
+    expect(howSteps.length).toBe(RUNS.length);
+  });
+
+  test("the runs play the brief's beats 0–7 and 13–14 and every beat of the intent study", () => {
+    const played = { brief: new Set<number>(), study: new Set<number>() };
+    for (const [pane, first, last] of RUNS) {
+      expect(first, `${pane} ${first}–${last}`).toBeLessThanOrEqual(last);
+      for (let b = first; b <= last; b++) played[pane].add(b);
+    }
+    const range = (a: number, b: number) =>
+      Array.from({ length: b - a + 1 }, (_, i) => a + i);
+    expect([...played.brief].sort((a, b) => a - b)).toEqual([
+      ...range(0, SAVED),
+      ...range(PLAN, READY),
+    ]);
+    expect([...played.study].sort((a, b) => a - b)).toEqual(
+      range(0, STUDY_STARTS.length - 1),
+    );
   });
 });

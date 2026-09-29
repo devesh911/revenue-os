@@ -24,6 +24,11 @@
   --color-ink: #141413; /* headings, primary buttons, the dark panel */
   --color-clay: #d97757; /* the one accent: fills, strokes, large type */
   --color-clay-deep: #a9492a; /* clay for small text on paper (5.4:1) */
+  --color-clay-type: color-mix(
+    in oklab,
+    var(--color-clay) 85%,
+    var(--color-clay-deep)
+  ); /* clay for large accent type on paper (3.2:1; plain clay is 2.96:1) */
   --color-olive: #788c5d; /* low intent / nurture */
   --color-olive-deep: #56663f; /* olive for small text on paper (5.9:1) */
   --color-olive-lift: color-mix(
@@ -142,6 +147,27 @@
   }
   50% {
     transform: translateY(-4px);
+  }
+}
+/* a line of the agent's voice streaming on (design/Typed.tsx): each word arrives,
+   the caret rides the newest word (on for the first half of its run, off for the
+   second), and the finished line settles from stone to its own colour */
+@keyframes ro-type {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ro-caret {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ro-ink {
+  from {
+    color: var(--color-stone);
   }
 }
 /* ── hero survey ground (visuals/SurveyGround.tsx): its keyframes and utilities ── */
@@ -360,6 +386,40 @@
   }
 }
 
+/* ── how it works steps (visuals/HowSteps.tsx): its keyframes and utilities ── */
+/* the selected step's rule fills with clay beat by beat: each beat grows it from
+   --from to --to */
+@keyframes how-fill {
+  from {
+    transform: scaleY(var(--from));
+  }
+  to {
+    transform: scaleY(var(--to));
+  }
+}
+/* the product window's lift: strongest below, a little to the sides, none on top */
+@utility how-window {
+  box-shadow:
+    0 1px 2px color-mix(in oklab, var(--color-ink) 6%, transparent),
+    0 24px 64px -12px color-mix(in oklab, var(--color-ink) 30%, transparent);
+}
+/* the brand plate behind the window: clay, deeper to the bottom right, oat-warmed
+   top left */
+@utility how-plate {
+  background:
+    radial-gradient(
+      120% 90% at 100% 100%,
+      var(--color-clay-deep),
+      transparent 65%
+    ),
+    radial-gradient(
+      90% 70% at 0% 0%,
+      color-mix(in oklab, var(--color-oat) 55%, var(--color-clay)),
+      transparent 70%
+    ),
+    var(--color-clay);
+}
+
 /* ── scroll reveal — mark an element with {...reveal(delayMs)} (lib/reveal.ts).
       Content is only hidden once lib/reveal.ts has set html[data-motion] (JS on,
       motion allowed), so a failed script or reduced motion never hides anything —
@@ -381,8 +441,10 @@
 
 /* ── reduced motion — the floor: no keyframe runs, no smooth scroll, no SMIL
       motion dots (SVG <animateMotion> ignores CSS, so those groups carry
-      data-motion-only and are removed here). These rules are unlayered, so they
-      outrank every Tailwind utility (all @layer) without !important. */
+      data-motion-only and are removed here). Delays go to zero too, so nothing
+      waits to appear, and the timings are !important so a transition a component
+      writes inline (a computed delay) can't outrun the floor either. */
+/* biome-ignore-start lint/complexity/noImportantStyles: the motion floor must beat inline transitions */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -390,9 +452,11 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms;
-    animation-iteration-count: 1;
-    transition-duration: 0.01ms;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
   [data-motion-only] {
     display: none;
@@ -404,21 +468,27 @@
 html[data-still] *,
 html[data-still] *::before,
 html[data-still] *::after,
-[data-paused] * {
+[data-paused] *,
+[data-paused] *::before,
+[data-paused] *::after {
   animation-play-state: paused;
 }
 /* …except a visual the Pause switch caught before it ever ran: it shows its finished
    frame (lib/sequence.ts `settled`), so its entry animations complete at once, as
    under reduced motion, instead of freezing on their first keyframe. Same
-   specificity as the rule above and later, so it wins. */
+   specificity as the rule above and later, so it wins; its timings are the floor's,
+   delays and inline transitions included. */
 html [data-settled] *,
 html [data-settled] *::before,
 html [data-settled] *::after {
-  animation-duration: 0.01ms;
-  animation-iteration-count: 1;
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
   animation-play-state: running;
-  transition-duration: 0.01ms;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
 }
+/* biome-ignore-end lint/complexity/noImportantStyles: the motion floor must beat inline transitions */
 
 /* ── decorative utilities ─────────────────────────────────────────────────── */
 /* a fine paper grain for the dark + clay panels (kept subtle: 4% alpha). */

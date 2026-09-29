@@ -2,8 +2,9 @@ import { type CSSProperties, Fragment, type ReactNode, useRef } from "react";
 import { intentScore, intentSignals } from "../content/beforeCall";
 import { intentEvidence as copy } from "../content/intentEvidence";
 import { MonoLabel } from "../design/MonoLabel";
+import { Typed } from "../design/Typed";
 import { cx } from "../lib/cx";
-import { useSequence } from "../lib/sequence";
+import { type Sequence, useSequence } from "../lib/sequence";
 import { Icon, RECALL } from "./Icon";
 
 // "Why he's a high-intent buyer": the intent step of the story, zoomed in. A ledger
@@ -11,11 +12,18 @@ import { Icon, RECALL } from "./Icon";
 // lands with its weight and extends the climb, the meter fills and crosses the
 // call-now line, the home loan lands as context with no weight, the total rolls up
 // to 78, and the router lights "Call now" while the follow-up plan stays dim. The
-// numbers are beforeCall.ts's, never restated. useSequence steps it (reduced motion,
-// the Pause switch and the server render show the final frame); a beat eases only on
-// its way in, so the reset snaps back while the stage is faded. Below lg it stacks —
-// each card over its own track — and every beat only fades, so the height never
-// jumps. One labelled image: the summary tells the story once.
+// numbers are beforeCall.ts's, never restated. On the page it plays inside How it
+// works' product window at step 4, driven by HowSteps (`at`), which scrolls the window
+// to each beat's element (`data-beat`; the last frames the score with "Call now")
+// under the pinned step strip and caption (`data-pin`: in a phone-width window the
+// strip shows only this step, so the header stays short; the caption streams on word
+// by word, design/Typed); alone
+// it runs itself with useSequence (reduced motion, the Pause switch and the server
+// render show the final frame). A beat eases only on its way in, so the reset snaps
+// back while the stage is faded. Its breakpoints are container queries, since its
+// width is the window's: narrower than 944px it stacks, each card over its own track,
+// and every beat only fades, so the height never jumps. One labelled image: the
+// summary tells the story once.
 const { total, outOf, callNow } = intentScore;
 const N = intentSignals.length;
 const pct = (v: number) => `${(v / outOf) * 100}%`;
@@ -33,13 +41,13 @@ const TOTAL = N + 2;
 const ROUTE = N + 3;
 const CROSS = ROWS.findIndex((r) => r.b >= callNow) + 1; // the beat past the line
 const LANDED = 900 + N * 1650; // the home loan lands
-const STARTS = [
+export const STARTS = [
   0,
   ...Array.from({ length: N + 1 }, (_, i) => 900 + i * 1650),
   LANDED + 1800,
   LANDED + 3400,
 ];
-const HOLD = 4600;
+export const HOLD = 4600;
 const TICKS = [0, 0.25, 0.5, 0.75, 1]
   .map((f) => f * outOf)
   .filter((v) => v !== callNow);
@@ -63,13 +71,24 @@ const KICK = "text-[11px] uppercase tracking-[0.12em]";
 const STEM = "absolute w-[2px] rounded-[1px]";
 
 // An element eases into its beat (`on`); before it, it rests at `off`, untransitioned.
+// Only these properties ease, never visibility: when the window's pane turns visible,
+// an element easing visibility would stay hidden through its delay.
+const EASED =
+  "opacity, transform, translate, color, background-color, border-color, box-shadow";
 const ease = (
   on: boolean,
   off: CSSProperties,
   ms = 700,
   delay = 0,
 ): CSSProperties =>
-  on ? { transition: `all ${ms}ms var(--ease-soft) ${delay}ms` } : off;
+  on
+    ? {
+        transitionProperty: EASED,
+        transitionDuration: `${ms}ms`,
+        transitionTimingFunction: "var(--ease-soft)",
+        transitionDelay: `${delay}ms`,
+      }
+    : off;
 
 // Hyphenated words ("re-call", "call-now") wrap whole, never at the hyphen.
 const keep = (text: string) =>
@@ -83,9 +102,10 @@ const keep = (text: string) =>
     ),
   );
 
-export function IntentEvidence() {
+export function IntentEvidence({ at: shown }: { at?: Sequence }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { step, resetting, settled } = useSequence(ref, STARTS, HOLD);
+  const own = useSequence(ref, STARTS, HOLD, { on: !shown });
+  const { step, resetting, settled } = shown ?? own;
   const at = (n: number) => step >= n;
   const crossed = at(CROSS);
   const routed = at(ROUTE);
@@ -97,21 +117,25 @@ export function IntentEvidence() {
       role="img"
       aria-label={copy.summary}
       className={cx(
-        "relative isolate overflow-hidden rounded-[24px] border border-line bg-paper transition-opacity duration-[450ms] ease-soft",
+        "@container relative isolate overflow-clip bg-paper transition-opacity duration-[450ms] ease-soft",
+        !shown && "rounded-[24px] border border-line",
         resetting && "opacity-15",
       )}
     >
       <div
         aria-hidden="true"
-        className="grid gap-[22px] px-[16px] pt-[24px] pb-[28px] md:px-[32px] md:pt-[28px] md:pb-[32px] lg:gap-[24px] lg:pt-[24px] lg:pb-[24px] lg:px-[40px] xl:px-[48px]"
+        className="grid gap-[22px] px-[16px] pt-[24px] pb-[28px] @min-[688px]:px-[32px] @min-[688px]:pt-[28px] @min-[688px]:pb-[32px] @min-[944px]:gap-[24px] @min-[944px]:pt-[24px] @min-[944px]:pb-[24px] @min-[944px]:px-[40px] @min-[1120px]:px-[48px]"
       >
         <span
-          className="-z-1 pointer-events-none absolute right-[4%] bottom-0 h-[46%] w-[46%] bg-[radial-gradient(50%_55%_at_60%_60%,color-mix(in_oklab,var(--color-clay)_14%,transparent),transparent_75%)] max-lg:hidden"
+          className="-z-1 pointer-events-none absolute right-[4%] bottom-0 h-[46%] w-[46%] bg-[radial-gradient(50%_55%_at_60%_60%,color-mix(in_oklab,var(--color-clay)_14%,transparent),transparent_75%)] @max-[944px]:hidden"
           style={ease(routed, { opacity: 0 }, 1600, 800)}
         />
 
-        <div className="grid gap-[10px]">
-          <ol className="flex flex-wrap items-center gap-x-[14px] gap-y-[4px] font-mono text-[11px] text-stone uppercase leading-[1.4] tracking-[0.1em] lg:gap-x-0">
+        <div
+          data-pin
+          className="sticky top-0 z-[5] -mx-[16px] -mt-[24px] grid gap-[10px] border-line border-b bg-paper px-[16px] pt-[16px] pb-[12px] @min-[688px]:-mx-[32px] @min-[688px]:-mt-[28px] @min-[688px]:px-[32px] @min-[944px]:static @min-[944px]:m-0 @min-[944px]:border-0 @min-[944px]:bg-transparent @min-[944px]:p-0"
+        >
+          <ol className="flex flex-wrap items-center gap-x-[14px] gap-y-[4px] font-mono text-[11px] text-stone uppercase leading-[1.4] tracking-[0.1em] @min-[944px]:gap-x-0">
             {copy.story.steps.map((s, i) => {
               const here = i === copy.story.at;
               return (
@@ -119,11 +143,11 @@ export function IntentEvidence() {
                   key={s}
                   className={cx(
                     "inline-flex items-center whitespace-nowrap",
-                    here && "text-ink",
+                    here ? "text-ink" : "@max-[440px]:hidden",
                   )}
                 >
                   {i > 0 && (
-                    <span className="mx-[9px] h-px w-[14px] bg-mute max-lg:hidden" />
+                    <span className="mx-[9px] h-px w-[14px] bg-mute @max-[944px]:hidden" />
                   )}
                   {here && (
                     <span className="mr-[7px] size-[6px] rounded-full bg-clay" />
@@ -134,40 +158,38 @@ export function IntentEvidence() {
               );
             })}
           </ol>
-          <p className="grid font-serif text-[18px] text-ink leading-[1.4] tracking-[-0.005em] lg:text-[20px]">
+          <p className="grid font-serif text-[18px] text-ink leading-[1.4] tracking-[-0.005em] @max-[440px]:text-[16.5px] @max-[440px]:leading-[1.36] @min-[944px]:text-[20px]">
             {CAPTIONS.map((c, i) => (
               <span
                 key={c}
                 className={cx(
                   "max-w-[50ch] text-pretty [grid-area:1/1]",
-                  i !== step &&
-                    "translate-y-[6px] opacity-0 transition-opacity duration-200",
+                  i !== step && "invisible",
                 )}
-                style={ease(i === step, {}, 700, 240)}
               >
                 <span className="mr-[4px] align-[-0.12em] text-[1.3em] text-clay leading-[0]">
                   {copy.quote}
                 </span>
-                {keep(c)}
+                {i === step ? <Typed text={c} still={settled} /> : keep(c)}
               </span>
             ))}
           </p>
         </div>
 
         <div
-          className="relative grid [--gap:36px] [--lg:332px] [--row:50px] lg:grid-cols-[var(--lg)_minmax(0,1fr)] lg:grid-rows-[34px_repeat(var(--rows),var(--row))_76px_auto] lg:gap-x-(--gap) xl:[--gap:44px]"
+          className="relative grid [--gap:36px] [--lg:332px] [--row:50px] @min-[944px]:grid-cols-[var(--lg)_minmax(0,1fr)] @min-[944px]:grid-rows-[34px_repeat(var(--rows),var(--row))_76px_auto] @min-[944px]:gap-x-(--gap) @min-[1120px]:[--gap:44px]"
           style={{ "--rows": N + 1 } as CSSProperties}
         >
           <MonoLabel
             className={cx(
               KICK,
-              "hidden justify-between self-end px-[14px] pb-[8px] text-stone lg:col-start-1 lg:flex",
+              "hidden justify-between self-end px-[14px] pb-[8px] text-stone @min-[944px]:col-start-1 @min-[944px]:flex",
             )}
           >
             <span>{copy.evidence}</span>
             <span>{copy.weight}</span>
           </MonoLabel>
-          <MonoLabel className="relative block h-[26px] self-end text-[11px] text-stone tabular-nums leading-none lg:col-start-2 lg:h-0">
+          <MonoLabel className="relative block h-[26px] self-end text-[11px] text-stone tabular-nums leading-none @min-[944px]:col-start-2 @min-[944px]:h-0">
             {TICKS.map((v) => (
               <span
                 key={v}
@@ -190,13 +212,13 @@ export function IntentEvidence() {
               style={{ left: pct(callNow), ...ease(crossed, {}, 600, 1050) }}
             >
               {callNow}
-              <span className="text-stone max-lg:hidden">
+              <span className="text-stone @max-[944px]:hidden">
                 {" "}
                 · {copy.callNowLine}
               </span>
             </span>
           </MonoLabel>
-          <div className="pointer-events-none absolute top-[34px] right-0 left-[calc(var(--lg)+var(--gap))] h-[calc(var(--rows)*var(--row)+76px)] max-lg:hidden">
+          <div className="pointer-events-none absolute top-[34px] right-0 left-[calc(var(--lg)+var(--gap))] h-[calc(var(--rows)*var(--row)+76px)] @max-[944px]:hidden">
             {TICKS.map((v) => (
               <span
                 key={v}
@@ -213,41 +235,46 @@ export function IntentEvidence() {
             />
           </div>
 
-          {ROWS.map((r, i) => (
-            <Fragment key={r.label}>
-              <Card
-                on={at(i + 1)}
-                label={r.label}
-                detail={r.detail}
-                weight={`+${r.weight}`}
-              />
-              <Track crossed={crossed}>
-                <span
-                  className="absolute top-[calc(50%-5px)] h-[10px] origin-left rounded-[3px] bg-clay"
-                  style={{
-                    left: pct(r.a),
-                    width: pct(r.weight),
-                    ...ease(at(i + 1), { transform: "scaleX(0)" }, 900, 350),
-                  }}
-                >
-                  {i < N - 1 && (
-                    <span
-                      className="absolute top-full left-[calc(100%-1px)] h-[calc(var(--row)-10px)] w-px origin-top bg-stone/55 max-lg:hidden"
-                      style={ease(
-                        at(i + 2),
-                        { transform: "scaleY(0)" },
-                        500,
-                        150,
-                      )}
-                    />
-                  )}
-                </span>
-              </Track>
-            </Fragment>
-          ))}
+          {ROWS.map((r, i) => {
+            const landed = i + 1; // its beat
+            return (
+              <Fragment key={r.label}>
+                <Card
+                  on={at(landed)}
+                  beat={landed}
+                  label={r.label}
+                  detail={r.detail}
+                  weight={`+${r.weight}`}
+                />
+                <Track crossed={crossed}>
+                  <span
+                    className="absolute top-[calc(50%-5px)] h-[10px] origin-left rounded-[3px] bg-clay"
+                    style={{
+                      left: pct(r.a),
+                      width: pct(r.weight),
+                      ...ease(at(landed), { transform: "scaleX(0)" }, 900, 350),
+                    }}
+                  >
+                    {i < N - 1 && (
+                      <span
+                        className="absolute top-full left-[calc(100%-1px)] h-[calc(var(--row)-10px)] w-px origin-top bg-stone/55 @max-[944px]:hidden"
+                        style={ease(
+                          at(i + 2),
+                          { transform: "scaleY(0)" },
+                          500,
+                          150,
+                        )}
+                      />
+                    )}
+                  </span>
+                </Track>
+              </Fragment>
+            );
+          })}
           <Card
             ctx
             on={at(CONTEXT)}
+            beat={CONTEXT}
             label={copy.context.label}
             detail={copy.context.detail}
           />
@@ -275,7 +302,10 @@ export function IntentEvidence() {
             </MonoLabel>
           </Track>
 
-          <div className="mt-[18px] flex items-center justify-between gap-[12px] border-ink border-t px-[2px] pt-[12px] lg:col-start-1 lg:mt-[8px] lg:px-[14px]">
+          <div
+            data-beat={`${TOTAL} ${ROUTE}`}
+            className="mt-[18px] flex items-center justify-between gap-[12px] border-ink border-t px-[2px] pt-[12px] @min-[944px]:col-start-1 @min-[944px]:mt-[8px] @min-[944px]:px-[14px]"
+          >
             <div className="grid gap-[6px]">
               <MonoLabel className={cx(KICK, "text-stone")}>
                 {copy.intent}
@@ -314,7 +344,7 @@ export function IntentEvidence() {
               </MonoLabel>
             </div>
           </div>
-          <div className="relative z-1 mt-[4px] h-[48px] lg:col-start-2 lg:mt-[8px] lg:h-auto">
+          <div className="relative z-1 mt-[4px] h-[48px] @min-[944px]:col-start-2 @min-[944px]:mt-[8px] @min-[944px]:h-auto">
             <div className="absolute inset-x-0 top-[calc(50%-7px)] h-[14px] rounded-[4px] bg-[color-mix(in_oklab,var(--color-clay)_11%,var(--color-paper-2))]">
               {ROWS.map((r, i) => (
                 <span
@@ -332,7 +362,7 @@ export function IntentEvidence() {
               ))}
             </div>
             <MonoLabel
-              className="-translate-x-1/2 absolute bottom-[calc(50%+14px)] text-[11px] text-ink tabular-nums leading-none max-lg:hidden"
+              className="-translate-x-1/2 absolute bottom-[calc(50%+14px)] text-[11px] text-ink tabular-nums leading-none @max-[944px]:hidden"
               style={{ left: pct(total), ...ease(at(TOTAL), { opacity: 0 }) }}
             >
               {total}
@@ -350,7 +380,7 @@ export function IntentEvidence() {
             </span>
           </div>
 
-          <div className="order-2 grid gap-[4px] px-[2px] pt-[18px] lg:order-none lg:col-start-1 lg:self-end lg:px-[14px] lg:pt-0 lg:pb-[4px]">
+          <div className="order-2 grid gap-[4px] px-[2px] pt-[18px] @min-[944px]:order-none @min-[944px]:col-start-1 @min-[944px]:self-end @min-[944px]:px-[14px] @min-[944px]:pt-0 @min-[944px]:pb-[4px]">
             <MonoLabel className={cx(KICK, "text-stone")}>
               {copy.routing.kicker}
             </MonoLabel>
@@ -358,9 +388,9 @@ export function IntentEvidence() {
               {copy.routing.note}
             </p>
           </div>
-          <div className="relative grid gap-[12px] pt-[46px] lg:col-start-2 lg:grid-cols-2 lg:gap-[16px]">
+          <div className="relative grid gap-[12px] pt-[46px] @min-[944px]:col-start-2 @min-[944px]:grid-cols-2 @min-[944px]:gap-[16px]">
             <span
-              className="absolute top-[22px] left-1/4 h-[24px] rounded-tl-[10px] border-olive/60 border-t border-l border-dashed max-lg:hidden"
+              className="absolute top-[22px] left-1/4 h-[24px] rounded-tl-[10px] border-olive/60 border-t border-l border-dashed @max-[944px]:hidden"
               style={{ width: beforeTotal("25%") }}
             />
             <span
@@ -416,8 +446,9 @@ export function IntentEvidence() {
               </p>
             </div>
             <div
+              data-beat={ROUTE}
               className={cx(
-                "grid content-start gap-[6px] rounded-[14px] border bg-card px-[16px] pt-[14px] pb-[15px] max-lg:-order-1",
+                "grid content-start gap-[6px] rounded-[14px] border bg-card px-[16px] pt-[14px] pb-[15px] @max-[944px]:-order-1",
                 routed
                   ? "border-[color-mix(in_oklab,var(--color-clay)_55%,var(--color-line))] shadow-lift"
                   : "border-line",
@@ -487,12 +518,14 @@ export function IntentEvidence() {
 // One piece of evidence: a card in the ledger (dashed, with no weight, for context).
 function Card({
   on,
+  beat,
   ctx = false,
   label,
   detail,
   weight,
 }: {
   on: boolean;
+  beat: number; // the beat it lands at, for the window to scroll to
   ctx?: boolean;
   label: string;
   detail: string;
@@ -500,8 +533,9 @@ function Card({
 }) {
   return (
     <div
+      data-beat={beat}
       className={cx(
-        "relative z-1 grid min-h-[48px] grid-cols-[minmax(0,1fr)_auto] items-center gap-[12px] self-center rounded-[11px] border border-line px-[14px] py-[7px] max-lg:mt-[10px] lg:col-start-1",
+        "relative z-1 grid min-h-[48px] grid-cols-[minmax(0,1fr)_auto] items-center gap-[12px] self-center rounded-[11px] border border-line px-[14px] py-[7px] @max-[944px]:mt-[10px] @min-[944px]:col-start-1",
         ctx
           ? "border-dashed"
           : "bg-card shadow-[0_1px_2px_color-mix(in_oklab,var(--color-ink)_4%,transparent)]",
@@ -515,7 +549,7 @@ function Card({
         <p className="font-medium text-[13.5px] text-ink leading-[1.35]">
           {label}
         </p>
-        <MonoLabel className="block text-[11px] text-stone leading-[1.4] lg:truncate">
+        <MonoLabel className="block text-[11px] text-stone leading-[1.4] @min-[944px]:truncate">
           {detail}
         </MonoLabel>
       </div>
@@ -538,11 +572,11 @@ function Track({
   children: ReactNode;
 }) {
   return (
-    <div className="relative z-1 h-[22px] lg:col-start-2 lg:h-auto">
-      <span className="absolute inset-x-0 top-1/2 h-px bg-line lg:hidden" />
+    <div className="relative z-1 h-[22px] @min-[944px]:col-start-2 @min-[944px]:h-auto">
+      <span className="absolute inset-x-0 top-1/2 h-px bg-line @min-[944px]:hidden" />
       <span
         className={cx(
-          "absolute top-[calc(50%-6px)] h-[12px] w-px lg:hidden",
+          "absolute top-[calc(50%-6px)] h-[12px] w-px @min-[944px]:hidden",
           crossed ? "bg-clay-deep" : "bg-ink/30",
         )}
         style={{ left: pct(callNow) }}

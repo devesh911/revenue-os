@@ -1,4 +1,4 @@
-// Chapter 03 of How it works — the call and after: three steps, each with a small
+// The call and after, directly after How it works: three steps, each with a small
 // product example, and the follow-up branch beneath them. The follow-up schedule is
 // an example: the cadence is set per project. `as const` keeps each step's example
 // typed on its own shape. The call status, delay and "after" read as one phrase
@@ -14,7 +14,6 @@
 const loopArrow = "↻";
 
 export const workflow = {
-  step: "03", // chapter 03 of How it works (content/beforeCall.ts holds 01 and 02)
   kicker: "The call and after",
   title: "The call, then the next step",
   intro:

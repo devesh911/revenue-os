@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
 import { intentScore, intentSignals } from "../content/beforeCall";
 import { type BriefRow, callBrief as c } from "../content/callBrief";
 import { MonoLabel } from "../design/MonoLabel";
+import { Typed } from "../design/Typed";
 import {
   chime,
   setSound,
@@ -10,7 +11,7 @@ import {
   useSoundReady,
 } from "../lib/chime";
 import { cx } from "../lib/cx";
-import { useSequence } from "../lib/sequence";
+import { type Sequence, useSequence } from "../lib/sequence";
 import { CHECK, Icon } from "./Icon";
 
 // Rohan's call brief writes itself before the call: each fact lands with a mono chip
@@ -20,25 +21,28 @@ import { CHECK, Icon } from "./Icon";
 // settles into the row and docks, small, under her source. Then the four intent
 // signals add up one by one — a running total beside a bar that turns clay to olive —
 // to the score, the six-step plan writes itself and the call starts.
-// useSequence runs the loop; server render and reduced motion show the finished brief.
-// Phones stack it under a caption bar that sticks below the nav; Priya's message hangs
-// from that bar, her docked reply sits under it, and with no rail the Intent row adds
-// the signals up itself.
+// On the page it plays inside How it works' product window, driven by HowSteps (`at`),
+// which also scrolls the window to each beat's element (`data-beat`); rendered alone
+// it runs itself with useSequence. Server render and reduced motion show the finished
+// brief. Narrow, it stacks under a caption bar that pins to the top (below the nav when
+// alone, the window's top inside it: --pin); Priya's message hangs from that bar, her
+// docked reply sits under it, and with no rail the Intent row adds the signals up itself.
+// Each caption streams on word by word under its timestamp (design/Typed).
 
 // When each beat starts (ms). Priya's reply holds ~2.9 s, each signal ~0.8 s; a loop
 // runs ~21.3 s with its fade.
-const STARTS = [
+export const STARTS = [
   0, 800, 1800, 2800, 3800, 4900, 6400, 9300, 10300, 11100, 11900, 12700, 13600,
   14800, 17000,
 ];
-const HOLD = 3900;
-const ASK = 5; // the open question goes to Priya
-const REPLY = 6; // her reply pops in front of the brief, with the chime
-const SAVED = 7; // it settles into the row and the project's facts
+export const HOLD = 3900;
+export const ASK = 5; // the open question goes to Priya
+export const REPLY = 6; // her reply pops in front of the brief, with the chime
+export const SAVED = 7; // it settles into the row and the project's facts
 const SIGNALS = 8; // beats 8–11 add one intent signal each
-const SCORE = 12; // the sum, and the brief's Intent row (from 720px)
-const PLAN = 13;
-const READY = 14;
+export const SCORE = 12; // the sum, and the brief's Intent row (from 720px)
+export const PLAN = 13;
+export const READY = 14;
 const CAPTION = [0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 9, 10, 11];
 const PROGRESS = [
   0, 0.12, 0.24, 0.36, 0.48, 0.56, 0.6, 0.68, 0.72, 0.74, 0.76, 0.78, 0.82,
@@ -108,9 +112,10 @@ const meter = (sum: number) =>
 
 type Phase = "before" | "shown" | "gone";
 
-export function CallBrief() {
+export function CallBrief({ at }: { at?: Sequence }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { step, resetting, playing, settled } = useSequence(ref, STARTS, HOLD);
+  const own = useSequence(ref, STARTS, HOLD, { on: !at });
+  const { step, resetting, playing, settled } = at ?? own;
   // The chime marks Priya's reply arriving — only as it arrives, only while playing.
   const prev = useRef(step);
   useEffect(() => {
@@ -128,7 +133,10 @@ export function CallBrief() {
     <div
       ref={ref}
       data-settled={settled || undefined}
-      className="@container relative overflow-clip rounded-[16px] border border-line bg-paper"
+      className={cx(
+        "@container relative overflow-clip bg-paper",
+        !at && "rounded-[16px] border border-line",
+      )}
     >
       <p className="sr-only">{c.summary}</p>
       <div className="relative isolate grid grid-cols-[minmax(0,1fr)] gap-[8px] px-[16px] pt-[26px] pb-[24px] @min-[720px]:grid-cols-[minmax(180px,220px)_minmax(0,1fr)] @min-[1040px]:grid-cols-[minmax(200px,256px)_minmax(0,1fr)] @min-[720px]:gap-x-[36px] @min-[1040px]:gap-x-[48px] @min-[720px]:gap-y-[24px] @min-[720px]:px-[32px] @min-[1040px]:px-[40px] @min-[720px]:pt-[32px] @min-[720px]:pb-[56px]">
@@ -137,8 +145,15 @@ export function CallBrief() {
           className="brief-ground pointer-events-none absolute inset-0 -z-10"
         />
         <div className="contents @min-[720px]:grid @min-[720px]:content-start @min-[720px]:gap-[40px] @min-[720px]:pt-[28px]">
-          <div className="sticky top-[64px] z-[5] -mx-[16px] -mt-[26px] self-start border-line border-b bg-paper px-[16px] pt-[13px] pb-[12px] @min-[720px]:static @min-[720px]:m-0 @min-[720px]:border-0 @min-[720px]:bg-transparent @min-[720px]:p-0">
-            <Captions at={CAPTION[step] ?? 0} className={fade} />
+          <div
+            data-pin
+            className="sticky top-[var(--pin,64px)] z-[5] -mx-[16px] -mt-[26px] self-start border-line border-b bg-paper px-[16px] pt-[13px] pb-[12px] @min-[720px]:static @min-[720px]:m-0 @min-[720px]:border-0 @min-[720px]:bg-transparent @min-[720px]:p-0"
+          >
+            <Captions
+              at={CAPTION[step] ?? 0}
+              still={settled}
+              className={fade}
+            />
             <SoundSwitch className="absolute top-0 right-[6px] @min-[720px]:top-auto @min-[720px]:right-[12px] @min-[720px]:bottom-[6px]" />
             <PriyaMessage
               phase={reply}
@@ -158,7 +173,18 @@ export function CallBrief() {
   );
 }
 
-function Captions({ at, className }: { at: number; className: string }) {
+// The agent's running captions, one per beat, stacked in one cell so the bar never
+// changes height. The line on show swaps in at once, its timestamp with it (the bar
+// never goes blank), and streams on (Typed); the others are hidden.
+function Captions({
+  at,
+  still,
+  className,
+}: {
+  at: number;
+  still: boolean;
+  className: string;
+}) {
   return (
     <p
       aria-hidden="true"
@@ -170,12 +196,7 @@ function Captions({ at, className }: { at: number; className: string }) {
       {c.captions.map((cap, i) => (
         <span
           key={cap.time}
-          className={cx(
-            "text-pretty [grid-area:1/1]",
-            i === at
-              ? "transition delay-[240ms] duration-700 ease-soft"
-              : "translate-y-[6px] opacity-0 transition-opacity duration-200",
-          )}
+          className={cx("text-pretty [grid-area:1/1]", i !== at && "invisible")}
         >
           <MonoLabel className="mb-[8px] block text-[11px] text-stone leading-[1.4] tracking-[0.04em]">
             {cap.time}
@@ -183,7 +204,7 @@ function Captions({ at, className }: { at: number; className: string }) {
           <span className="mr-[4px] align-[-0.12em] text-[1.3em] text-clay leading-[0]">
             {c.quote}
           </span>
-          {cap.text}
+          {i === at ? <Typed text={cap.text} still={still} /> : cap.text}
         </span>
       ))}
     </p>
@@ -511,6 +532,7 @@ function Row({
   label,
   source,
   active,
+  beat,
   className,
   overlay,
   children,
@@ -518,12 +540,14 @@ function Row({
   label: string;
   source: ReactNode;
   active: boolean;
+  beat?: string; // the beats this row is written at, for the window to scroll to
   className?: string | false;
   overlay?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div
+      data-beat={beat}
       className={cx(
         "relative -mx-(--pad) grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-[10px] gap-y-[4px] px-(--pad) py-[11px] @min-[380px]:gap-x-[16px] @min-[720px]:py-[9px] @min-[1040px]:grid-cols-[112px_minmax(0,1fr)_auto] @min-[1040px]:gap-y-0",
         "not-first:before:absolute not-first:before:inset-x-(--pad) not-first:before:top-0 not-first:before:h-px not-first:before:bg-line",
@@ -587,6 +611,7 @@ function FactRow({
     <Row
       label={row.label}
       active={step === at}
+      beat={String(at)}
       className={on && FLASH}
       source={
         <MonoLabel
@@ -631,6 +656,7 @@ function QuestionRow({ step, reply }: { step: number; reply: Phase }) {
     <Row
       label={q.label}
       active={asked && step < SIGNALS}
+      beat={`${ASK} ${REPLY} ${SAVED}`}
       className={
         saved
           ? cx(FLASH, FLASH_OK)
@@ -886,7 +912,10 @@ function Docked({
 
 function Plan({ on }: { on: boolean }) {
   return (
-    <div className="-mx-(--pad) mt-[6px] border-line border-t bg-paper-2/45 px-(--pad) pt-[13px] pb-[14px]">
+    <div
+      data-beat={PLAN}
+      className="-mx-(--pad) mt-[6px] border-line border-t bg-paper-2/45 px-(--pad) pt-[13px] pb-[14px]"
+    >
       <div className="mb-[10px] flex justify-between gap-[12px]">
         <MonoLabel className={KICK}>{c.plan.title}</MonoLabel>
         <MonoLabel className={KICK}>{c.plan.meta}</MonoLabel>
@@ -941,7 +970,10 @@ function Plan({ on }: { on: boolean }) {
 
 function Footer({ ready }: { ready: boolean }) {
   return (
-    <div className="-mx-(--pad) flex min-h-[42px] flex-wrap items-center justify-between gap-[12px] border-line border-t px-(--pad) pt-[14px] @min-[720px]:pt-[12px]">
+    <div
+      data-beat={READY}
+      className="-mx-(--pad) flex min-h-[42px] flex-wrap items-center justify-between gap-[12px] border-line border-t px-(--pad) pt-[14px] @min-[720px]:pt-[12px]"
+    >
       <div className="grid items-center *:[grid-area:1/1]">
         <MonoLabel
           className={cx(

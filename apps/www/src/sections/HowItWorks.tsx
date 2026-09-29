@@ -1,76 +1,52 @@
-import { type ReactNode, useId } from "react";
-import { chapters, howItWorks } from "../content/beforeCall";
+import { useId } from "react";
+import { howItWorks } from "../content/beforeCall";
 import { Heading } from "../design/Heading";
 import { Kicker } from "../design/Kicker";
 import { MonoLabel } from "../design/MonoLabel";
 import { SectionFrame } from "../design/SectionFrame";
 import { Text } from "../design/Text";
 import { reveal } from "../lib/reveal";
-import { CallBrief } from "../visuals/CallBrief";
-import { IntentEvidence } from "../visuals/IntentEvidence";
+import { HowSteps } from "../visuals/HowSteps";
 
-// How it works, in the order one enquiry lives it: the intro, then chapter 01 —
-// before the call, the brief assembles (CallBrief) — and chapter 02 — call now or
-// follow up, the brief's Intent row opened up (IntentEvidence). Each chapter's message sits directly
-// above the visual that shows it. Chapter 03, the call and after, is the dark engine
-// panel that follows (StageGrid). Chapters 01 and 02 carry "Illustrative example":
-// intent scoring and questions to the sales team are planned.
+// How it works, told as one enquiry: the intro (the kicker with its "Illustrative
+// example" tag, the headline with its accent words, the lede), then five steps
+// beside a product window that plays the call brief and the intent study
+// (HowSteps). Intent scoring and questions to the sales team are planned, so the tag
+// sits in the kicker row and again on the window. The engine panel after it is
+// "The call and after" (StageGrid).
+
+// The title with its accent words in clay: the same serif and weight, colour only
+// (never italic). Punctuation stays outside the spans, in ink.
+const ACCENT = new RegExp(`(${howItWorks.accents.join("|")})`);
+const accented = howItWorks.title.split(ACCENT).map((part, i) =>
+  i % 2 ? (
+    <span key={part} className="text-clay-type">
+      {part}
+    </span>
+  ) : (
+    part
+  ),
+);
+
 export function HowItWorks() {
   const title = useId();
   return (
     <SectionFrame id="how" aria-labelledby={title}>
       <div {...reveal()} className="max-w-[760px]">
-        <Kicker>{howItWorks.kicker}</Kicker>
+        <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px]">
+          <Kicker>{howItWorks.kicker}</Kicker>
+          <MonoLabel className="inline-flex rounded-full border border-line px-[10px] py-[5px] text-[11px] text-stone uppercase tracking-[0.1em]">
+            {howItWorks.illustrative}
+          </MonoLabel>
+        </div>
         <Heading id={title} className="mt-[20px]">
-          {howItWorks.title}
+          {accented}
         </Heading>
         <Text size="lede" className="mt-[20px] max-w-[56ch]">
           {howItWorks.sub}
         </Text>
       </div>
-      <Chapter {...chapters.context} className="mt-[72px] md:mt-[96px]">
-        <CallBrief />
-      </Chapter>
-      <Chapter {...chapters.intent} className="mt-[88px] md:mt-[120px]">
-        <IntentEvidence />
-      </Chapter>
+      <HowSteps />
     </SectionFrame>
-  );
-}
-
-function Chapter({
-  step,
-  kicker,
-  title,
-  sub,
-  className,
-  children,
-}: {
-  step: string;
-  kicker: string;
-  title: string;
-  sub: string;
-  className: string;
-  children: ReactNode;
-}) {
-  const id = useId();
-  return (
-    <section aria-labelledby={id} className={className}>
-      <div {...reveal()} className="max-w-[720px]">
-        <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[10px]">
-          <Kicker>
-            {step} · {kicker}
-          </Kicker>
-          <MonoLabel className="inline-flex rounded-full border border-line px-[10px] py-[5px] text-[11px] text-stone uppercase tracking-[0.1em]">
-            {howItWorks.illustrative}
-          </MonoLabel>
-        </div>
-        <Heading as="h3" size="section" id={id} className="mt-[18px]">
-          {title}
-        </Heading>
-        <Text className="mt-[16px] max-w-[56ch]">{sub}</Text>
-      </div>
-      <div className="mt-[40px] md:mt-[48px]">{children}</div>
-    </section>
   );
 }
