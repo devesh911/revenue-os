@@ -22,9 +22,11 @@ description: Use when building a roadmap item — any session implementing the n
 4. **Failing test first**, at the layer you touch. For security, RLS, migration or guard work,
    review the failing tests line by line before writing the implementation.
 5. Implement **with its production caller** — a capability nothing real calls is not done.
-6. `bun run gates` run bare (never piped). Env-dependent suites: CI is the verdict.
+6. `bun run gate` run bare (never piped). Env-dependent suites: CI is the verdict.
 7. Show it working: run it from a real entry point (API call, script against the local stack,
-   browser) and capture the evidence.
+   `bun run see <console path>`) and capture the evidence. Then run the verifier agent with
+   Devesh's request word for word; the done gate won't let you stop on product code without its PASS,
+   or its CANNOT_VERIFY naming what only Devesh can provide (he is told it is NOT verified).
 8. PR body: first line `Roadmap: Slice N — <item>`, `Roadmap: Side track — <what>` or
    `Roadmap: off-roadmap — <what>`; then what / why / evidence. `gh pr checks <n> --watch` — the
    required `checks` must be observed green on GitHub; absent or red means stop.
@@ -32,7 +34,8 @@ description: Use when building a roadmap item — any session implementing the n
    no line to tick; its PR body's evidence is the record); update `STATE.md → What works today` if
    reality changed; add a `Decisions in force` line for any decision.
 10. Merge per PHASE (STATE.md line 1): SETUP = squash-merge one PR at a time after confirming
-    `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge.
+    `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge. The done gate
+    refuses `gh pr merge <n>` unless the PR's head commit passed `bun run gate` and the verifier here.
 11. After merge, republish the tracker page (see AGENTS.md → The loop, step 6).
 12. If the last item of the slice landed, set the slice to `proof ready` and ask Devesh to watch
     the proof. Never fill in `Seen by Devesh:` yourself.

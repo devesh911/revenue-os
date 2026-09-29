@@ -4,3 +4,19 @@ docs/**    @devesh911
 CLAUDE.md  @devesh911
 AGENTS.md  @devesh911
 ROADMAP.md @devesh911
+
+# What "done" means: the checks, the done gate and the verifier. Loosening any of them is Devesh's call
+# (AGENTS.md, hard rail 7); scripts/done-gate.ts also tells him on every stop that changes one, and its
+# test fails if a file it flags (RULE_FILES) is missing here. A name without a "/" matches at any depth.
+.github/**                          @devesh911
+.claude/settings.json               @devesh911
+.claude/agents/**                   @devesh911
+.codex/**                           @devesh911
+scripts/done-gate*                  @devesh911
+scripts/guards.sh                   @devesh911
+package.json                        @devesh911
+bunfig.toml                         @devesh911
+biome.json                          @devesh911
+tsconfig*.json                      @devesh911
+tests/rls_coverage.sql              @devesh911
+apps/console/playwright.config.ts   @devesh911

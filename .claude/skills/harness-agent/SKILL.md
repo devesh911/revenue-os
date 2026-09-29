@@ -21,7 +21,7 @@ description: Use BEFORE touching packages/harness — the turn loop, tools, guar
 - G1: no `bun:*`/`Bun.` in packages/** (lint-enforced). All DB access through the injected `OrgScopedDb` (withOrg tx upstream).
 
 ## Commands
-`bun test packages/harness` · full gates `bun run gates` · live demo: `bun packages/harness/demo-harness.ts <orgId>` (scripted LLM, real rows).
+`bun test packages/harness` · every check `bun run gate` · live demo: `bun packages/harness/demo-harness.ts <orgId>` (scripted LLM, real rows).
 
 ## Learned since this router was written (dynamic — run it, don't skip)
 `grep -inE 'harness|guard|tool|T26|LLM|turn|autonomy' lessons.md` and read `STATE.md → Decisions in force`.
