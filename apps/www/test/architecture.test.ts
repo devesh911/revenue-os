@@ -438,10 +438,10 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "beforeCall",
       [
-        "Follow one enquiry, from import to site visit.",
+        "Follow one lead, from the moment it lands to the site visit.",
         "Your team answers once. Every call knows.",
         "Every score shows its working.",
-        "It starts with your lead import.",
+        "It starts the moment a lead lands.",
         "Rohan's enquiry, step by step",
         "Illustrative example",
         "Repeat enquiry",
@@ -563,13 +563,13 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "sections/HowItWorks",
       "beforeCall",
-      ["Follow one enquiry", "site visit", "Illustrative example"],
+      ["Follow one lead", "site visit", "Illustrative example"],
     ],
     [
       "visuals/HowSteps",
       "beforeCall",
       [
-        "It starts with your lead import",
+        "It starts the moment a lead lands",
         "Your team answers once",
         "Every score shows",
         "step by step",

@@ -116,7 +116,7 @@ scrolls:
 1. **Hero** (`sections/Hero.tsx`) — the promise, "Book a demo", the sample call,
    and one finished result: Rohan called 2 min after import, a site visit booked.
 2. **How it works** (`sections/HowItWorks.tsx`, `#how`, the nav's "How it
-   works") — the intro "Follow one enquiry, from import to site visit.", then
+   works") — the intro "Follow one lead, from the moment it lands to the site visit.", then
    five unnumbered steps beside a product window (`visuals/HowSteps.tsx`) that
    plays the call brief (`CallBrief`, 7:12–7:14 PM) and the intent study
    (`IntentEvidence`, the brief's Intent row opened up).
@@ -180,8 +180,8 @@ test suites keep it gone.
 ## How it works
 
 `sections/HowItWorks.tsx` holds the intro: the "How it works" kicker with an
-**"Illustrative example"** tag beside it, the headline "Follow one enquiry, from
-import to site visit." with **import** and **site visit** set in clay (the same
+**"Illustrative example"** tag beside it, the headline "Follow one lead, from the
+moment it lands to the site visit." with **lands** and **site visit** set in clay (the same
 serif, colour only, never italic; punctuation stays ink), then the lede. The
 accent colour is `clay-type`, clay mixed 85% with clay-deep: plain clay is under
 3:1 on paper, so accents are for large type only. Intent scoring and questions to
@@ -208,8 +208,9 @@ newest, then the line settles to ink; reduced motion and Pause show the whole li
 with no caret. In a phone-width window the intent study's strip shows only its own
 step, so its pinned header stays short:
 
-1. **It starts with your lead import.** The brief opens on his enquiry, "from
-   import".
+1. **It starts the moment a lead lands.** The brief opens on his enquiry, in his
+   own words. The copy says "lands", never "import": leads will come by more
+   than one channel (CSV today; CRM connectors and inbound calls are planned).
 2. **A brief before every call.** The project match, his history, his language.
 3. **Your team answers once. Every call knows.** The open question goes to
    Priya on WhatsApp; her reply pops up (with the chime), then is saved.

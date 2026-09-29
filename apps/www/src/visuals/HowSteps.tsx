@@ -50,7 +50,7 @@ const TIMES = {
 } as const;
 // What each step plays: a run of one study's beats, in story order.
 export const RUNS: ReadonlyArray<readonly [Pane, number, number]> = [
-  ["brief", 0, 1], // his enquiry, read from tonight's import
+  ["brief", 0, 1], // his enquiry, read the moment it lands
   ["brief", 2, ASK - 1], // the inventory match, his history, his note
   ["brief", ASK, SAVED], // the question to Priya; her answer, saved
   ["study", 0, STUDY_STARTS.length - 1], // his intent, signal by signal, to "Call now"

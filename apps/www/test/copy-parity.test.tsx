@@ -230,7 +230,10 @@ describe("copy — the buyer-outcome story", () => {
     ["proof badge", "Illustrative example"],
     ["proof title", "What your pilot report shows"],
     ["proof metric", "Enquiries called the same day"],
-    ["how it works", "Follow one enquiry, from import to site visit."],
+    [
+      "how it works",
+      "Follow one lead, from the moment it lands to the site visit.",
+    ],
     ["how it works, step 3", "Your team answers once. Every call knows."],
     ["how it works, step 4", "Every score shows its working."],
     ["the call and after", "The call, then the next step"],
@@ -539,12 +542,15 @@ describe("the hero's drawing sheet and floor plan — decorative, drawn on first
   });
 });
 
-describe("the page, told in order — one enquiry from import to site visit", () => {
+describe("the page, told in order — one lead, from the moment it lands to the site visit", () => {
   // Each mark, in the order a visitor scrolls to it; each is on the page once.
   const ORDER: Array<[string, string]> = [
     ["the hero", "<h1"],
     ["How it works", ' id="how"'],
-    ["its intro", ">Follow one enquiry, from import to site visit.<"],
+    [
+      "its intro",
+      ">Follow one lead, from the moment it lands to the site visit.<",
+    ],
     ["its steps", 'role="tablist"'],
     ...howSteps.map((s, i): [string, string] => [
       `step ${i + 1}'s title`,
@@ -590,7 +596,7 @@ describe("the page, told in order — one enquiry from import to site visit", ()
     // punctuation outside them, in ink
     expect(how()).toMatch(
       new RegExp(
-        `<h2\\b[^>]*id="${id}"[^>]*>${esc('Follow one enquiry, from <span class="text-clay-type">import</span> to <span class="text-clay-type">site visit</span>.')}</h2>`,
+        `<h2\\b[^>]*id="${id}"[^>]*>${esc('Follow one lead, from the moment it <span class="text-clay-type">lands</span> to the <span class="text-clay-type">site visit</span>.')}</h2>`,
       ),
     );
     const h2 = /<h2\b[\s\S]*?<\/h2>/.exec(how())?.[0] ?? "";
@@ -599,7 +605,7 @@ describe("the page, told in order — one enquiry from import to site visit", ()
       expect(h2).toContain(`<span class="text-clay-type">${word}</span>`);
     // the kicker, its tag, the heading and the lede, then the steps
     expect(textOf(unaccent(intro())).trim()).toBe(
-      "How it works Illustrative example Follow one enquiry, from import to site visit. One evening, one buyer: Rohan Mehta's enquiry arrives in your lead import (a CSV from your portal or CRM) at 7:12 PM. Here is what Revenue OS does before it calls him, how it decides to call now or follow up, and what happens on the call and after.",
+      "How it works Illustrative example Follow one lead, from the moment it lands to the site visit. One evening, one buyer: Rohan Mehta's enquiry lands at 7:12 PM. Here is what Revenue OS does before it calls him, how it decides to call now or follow up, and what happens on the call and after.",
     );
     inView(intro(), "Illustrative example", true);
     for (const tags of runs(intro(), "Illustrative example"))
