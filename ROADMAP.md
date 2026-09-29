@@ -30,6 +30,11 @@ Seen by Devesh: —
 - [x] Keep agents on the plan: a Claude Code session started at the repo or a worktree root is shown the current slice and item, and each of its prompts carries a one-line reminder (agent) · evidence: [#105](https://github.com/devesh911/revenue-os/pull/105), the exact hook commands printed the banner and the one-line reminder from an unrelated folder with bun off the PATH; the hook tests in scripts/cycle.test.ts pass
 - [ ] Every PR body's first line names its roadmap item, the Side track or off-roadmap (AGENTS.md → The loop, step 4), and CI refuses a PR without it (agent)
 - [ ] Rewrite the examples in docs/patterns from real code (agent)
+- [ ] A change's tests are proven to test it: the gate runs its new and edited tests against main's code, where they must fail, and against the branch, where they must pass (agent)
+- [ ] Every product line a change adds is run by at least one test (the gate reads `bun test --coverage`); a deliberate gap is marked on the line and shown to Devesh (agent)
+- [ ] For guardrail, tenancy and money code, the gate deliberately breaks each new line (flips a condition, removes a statement) and at least one test must then fail (agent)
+- [ ] The verifier checks that each behaviour Devesh asked for, and the standard edge cases (another company, a duplicate, empty input, a failure, a retry), has a test at the layer people use (API or browser, not only the database), and that data one part writes passes the schema the part reading it uses (agent)
+- [ ] A change to a rule file (the done gate, CI, lint or type settings, the hooks, the verifier) merges without waiting for Devesh, so agents keep shipping on their own, but never silently: its PR body says which rule changed, whether it tightens or loosens it, and why; CI fails a PR that changes a rule file without saying so; the tracker page lists every merged rule change (agent)
 
 ## Slice 1: Foundations the agent will stand on
 Status: not started
