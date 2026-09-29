@@ -11,12 +11,13 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import {
   checkRules,
   onSharedStack,
@@ -60,6 +61,25 @@ const commitAll = (dir: string) => {
   ]);
 };
 
+/** A commit made before the session started, as a teammate's or an earlier session's would be. */
+const commitOld = (dir: string) => {
+  sh(dir, ["git", "add", "-A"]);
+  sh(
+    dir,
+    [
+      "git",
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-qm",
+      "old",
+    ],
+    { GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z" },
+  );
+};
+
 /** A throwaway repo on `main` holding a copy of the gate and nothing else. */
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), "done-gate-"));
@@ -68,7 +88,7 @@ function repo() {
   copyFileSync(GATE, join(dir, "scripts", "done-gate.ts"));
   writeFileSync(join(dir, "STATE.md"), "# State\n");
   sh(dir, ["git", "init", "-q", "-b", "main"]);
-  commitAll(dir);
+  commitOld(dir);
   return dir;
 }
 
@@ -278,6 +298,33 @@ describe("checkRules", () => {
     expect(problemsOf(listed)).toEqual([]);
   });
 
+  it("reads a throw the formatter wrapped over several lines as one statement, and knows NotImplementedError", () => {
+    const file = "services/worker/src/sms.ts";
+    const wrapped = add(
+      file,
+      "  throw new Error(",
+      '    "sendSms: the SMS provider is not implemented yet, see STATE.md",',
+      "  );",
+    );
+    expect(problemsOf(wrapped)).toEqual([
+      `${file}:1 adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change`,
+    ]);
+    expect(
+      problemsOf(add(file, "  throw new NotImplementedError();")),
+    ).toHaveLength(1);
+    expect(
+      problemsOf(
+        add(
+          file,
+          "class NotImplementedError extends Error {}",
+          "  throw new Error(",
+          '    "the provider refused the number",',
+          "  );",
+        ),
+      ),
+    ).toEqual([]);
+  });
+
   it("blocks an export that nothing outside tests uses", () => {
     const file = "packages/harness/src/planner.ts";
     const exp = add(file, "export async function planNextStep(ctx: Ctx) {");
@@ -288,6 +335,26 @@ describe("checkRules", () => {
     expect(only("packages/harness/test/planner.test.ts")).toHaveLength(1);
     expect(only("services/worker/src/handlers/agent-turn.ts")).toEqual([]);
     expect(only(file)).toEqual([]); // used inside its own file, exported for its test
+  });
+
+  it("blocks a default export or an export list that nothing outside tests uses", () => {
+    const page = "apps/console/src/pages/Billing.tsx";
+    expect(
+      problemsOf(add(page, "export default function BillingPage() {")),
+    ).toEqual([
+      `${page}:1 exports a default, but nothing outside tests uses it; land it together with the code that calls it`,
+    ]);
+    const file = "services/worker/src/invoice.ts";
+    expect(
+      problemsOf(add(file, "export { formatInvoice, total as sum };")),
+    ).toEqual([
+      `${file}:1 exports formatInvoice, but nothing outside tests uses it; land it together with the code that calls it`,
+    ]);
+    expect(
+      problemsOf(add(page, "export default BillingPage;"), () => [
+        "apps/console/src/routes.tsx",
+      ]),
+    ).toEqual([]);
   });
 
   it("leaves scripts, docs and this gate's own files alone", () => {
@@ -365,6 +432,42 @@ describe("checkRules", () => {
 });
 
 describe("usesExport: who counts as using an export", () => {
+  it("counts a default export used by a default import, `default as`, or an import() of its module", () => {
+    const page = "apps/console/src/pages/Billing.tsx";
+    const routes = "apps/console/src/routes.tsx";
+    const by = (source: string, from = routes) =>
+      usesExport(source, from, page, "default");
+    expect(by('import Billing from "./pages/Billing";\n')).toBe(true);
+    expect(by('import Billing, { plans } from "./pages/Billing.tsx";\n')).toBe(
+      true,
+    );
+    expect(by('import { default as Billing } from "./pages/Billing";\n')).toBe(
+      true,
+    );
+    expect(by('const Billing = lazy(() => import("./pages/Billing"));\n')).toBe(
+      true,
+    );
+    expect(by('import { Billing } from "./pages/Billing";\n')).toBe(false);
+    expect(by('import Billing from "./pages/Other";\n')).toBe(false);
+    expect(
+      by("export default function BillingPage() {}\nBillingPage();\n", page),
+    ).toBe(false);
+  });
+
+  it("counts a name exported by a list only for a use beyond its declaration and the list", () => {
+    const file = "services/worker/src/invoice.ts";
+    const own = (source: string) =>
+      usesExport(source, file, file, "formatInvoice");
+    expect(
+      own("function formatInvoice() {}\nexport { formatInvoice };\n"),
+    ).toBe(false);
+    expect(
+      own(
+        "function formatInvoice() {}\nexport { formatInvoice };\nconst t = formatInvoice();\n",
+      ),
+    ).toBe(true);
+  });
+
   const file = "services/worker/src/jobs.ts";
   const other = "services/worker/src/handlers/run.ts";
   const uses = (source: string, from = other, owner = file, name = "x") =>
@@ -623,16 +726,36 @@ describe("the hook", () => {
   const gate = (dir: string, ...args: string[]) =>
     sh(dir, ["bun", "scripts/done-gate.ts", ...args]);
 
-  // What the gate calls "this exact code": every non-ignored file, as a git tree id.
+  // What the gate calls "this exact code": every non-ignored file, as a git tree id. Its results live in the
+  // repository's shared git folder, which every worktree of it uses.
   function checksPassed(dir: string) {
-    const index = join(dir, ".git", "test-index");
+    const common = sh(dir, [
+      "git",
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ]).stdout.trim();
+    const index = join(common, `test-index-${Date.now()}`);
     sh(dir, ["git", "add", "-A"], { GIT_INDEX_FILE: index });
     const tree = sh(dir, ["git", "write-tree"], {
       GIT_INDEX_FILE: index,
     }).stdout.trim();
     rmSync(index);
-    write(dir, `.git/done-gate/checked/${tree}`, "typecheck, 3 tests");
+    write(common, `done-gate/checked/${tree}`, "typecheck, 3 tests");
   }
+  const verified = (dir: string, cwd: string, note: string) => {
+    hook(cwd, "SubagentStart", { agent_type: "verifier" });
+    gate(dir, "verdict", "pass", note);
+    return hook(cwd, "SubagentStop", { agent_type: "verifier" });
+  };
+  /** A second checkout of the same repository, in its own folder. */
+  const worktree = (dir: string, branch: string) => {
+    const wt = mkdtempSync(join(tmpdir(), "done-gate-wt-"));
+    dirs.push(wt);
+    rmSync(wt, { recursive: true });
+    sh(dir, ["git", "worktree", "add", "-qb", branch, wt]);
+    return realpathSync(wt);
+  };
 
   it("does nothing outside a git checkout, or when the session changed nothing", () => {
     const outside = mkdtempSync(join(tmpdir(), "done-gate-none-"));
@@ -799,7 +922,11 @@ describe("the hook", () => {
   });
 
   /** Runs a hook exactly as Codex does: the command from .codex/hooks.json, `$SHELL -lc`, from a subfolder. */
-  const codex = (dir: string, event: string) => {
+  const codex = (
+    dir: string,
+    event: string,
+    extra: Record<string, unknown> = {},
+  ) => {
     const { hooks } = JSON.parse(
       readFileSync(join(import.meta.dir, "..", ".codex", "hooks.json"), "utf8"),
     ) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
@@ -823,6 +950,7 @@ describe("the hook", () => {
           source: "startup",
           stop_hook_active: false,
           last_assistant_message: "Done.",
+          ...extra,
         }),
         encoding: "utf8",
       },
@@ -861,6 +989,59 @@ describe("the hook", () => {
     expect(codex(dir, "Stop")).toEqual({ status: 0, stdout: "" }); // told once
   });
 
+  it("notes the checkout a Codex command names, so its change there is judged at a Codex stop", () => {
+    const dir = repo();
+    write(dir, "services/README.md", "the worker\n");
+    commitOld(dir);
+    const wt = worktree(dir, "feat/codex");
+    expect(codex(dir, "SessionStart").status).toBe(0);
+    expect(
+      codex(dir, "PreToolUse", {
+        tool_name: "Bash",
+        tool_input: { command: `cd ${wt} && bun test` },
+      }),
+    ).toEqual({ status: 0, stdout: "" }); // a note, never a say in the tool call
+    write(wt, "services/worker/src/a.ts", "// @ts-ignore\n");
+    expect(JSON.parse(codex(dir, "Stop").stdout)).toMatchObject({
+      decision: "block",
+      reason: expect.stringContaining("switches the type checker off"),
+    });
+  });
+
+  it("is wired in both apps: a note before each command or edit, a judgement at each stop", () => {
+    const wired = (file: string) => {
+      const { hooks } = JSON.parse(
+        readFileSync(join(import.meta.dir, "..", file), "utf8"),
+      ) as {
+        hooks: Record<
+          string,
+          { matcher?: string; hooks: { command: string }[] }[]
+        >;
+      };
+      return Object.fromEntries(
+        Object.entries(hooks).map(([event, groups]) => [
+          event,
+          groups
+            .filter((g) => g.hooks.some((h) => h.command.includes("done-gate")))
+            .map((g) => g.matcher ?? ""),
+        ]),
+      );
+    };
+    expect(wired(".claude/settings.json")).toMatchObject({
+      SessionStart: [""],
+      PreToolUse: ["Bash|Edit|Write|MultiEdit|NotebookEdit"],
+      Stop: [""],
+      TeammateIdle: [""],
+      SubagentStart: ["verifier"],
+      SubagentStop: ["verifier"],
+    });
+    expect(wired(".codex/hooks.json")).toMatchObject({
+      SessionStart: [""],
+      PreToolUse: ["^(Bash|apply_patch)$"],
+      Stop: [""],
+    });
+  });
+
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");
@@ -871,6 +1052,143 @@ describe("the hook", () => {
     expect(hook(dir, "Stop")).toEqual({
       ...QUIET,
       told: "Done gate ⚠ NOT verified: the verifier needs something only you can provide: a real WhatsApp number to text (checks green: typecheck, 3 tests)",
+    });
+  });
+
+  it("judges work the session committed on a branch and then left, even after it went back to main", () => {
+    const dir = repo();
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
+    hook(dir, "SessionStart");
+    sh(dir, ["git", "checkout", "-qb", "feat/sms"]);
+    write(dir, "services/worker/src/sms.ts", "const sms = 1;\n");
+    commitAll(dir);
+    const commit = sh(dir, [
+      "git",
+      "rev-parse",
+      "--short=7",
+      "HEAD",
+    ]).stdout.trim();
+    sh(dir, ["git", "checkout", "-q", "main"]); // as before `git branch -d`, or after a merge
+    const r = hook(dir, "Stop");
+    expect(r.sentBack).toBe(true);
+    expect(r.told).toContain(
+      `in feat/sms (commit ${commit}): made in this session, never checked`,
+    );
+    expect(r.reason).toContain(`git checkout feat/sms`);
+
+    sh(dir, ["git", "checkout", "-q", "feat/sms"]); // prove it where it is
+    checksPassed(dir);
+    expect(verified(dir, dir, "sent a test SMS and saw it logged").status).toBe(
+      0,
+    );
+    expect(hook(dir, "Stop").told).toContain(
+      "verifier PASS: sent a test SMS and saw it logged",
+    );
+    sh(dir, ["git", "checkout", "-q", "main"]);
+    expect(hook(dir, "Stop").sentBack).toBe(false);
+    expect(hook(dir, "Stop")).toEqual(QUIET);
+  });
+
+  it("does not judge a session that only switched to someone else's branch or visited another checkout", () => {
+    const dir = repo();
+    sh(dir, ["git", "checkout", "-qb", "feat/other"]);
+    write(dir, "services/worker/src/other.ts", "const other = 1;\n");
+    commitOld(dir);
+    sh(dir, ["git", "checkout", "-q", "main"]);
+    const wt = worktree(dir, "feat/theirs");
+    write(wt, "services/worker/src/theirs.ts", "const theirs = 1;\n"); // their work in progress
+    hook(dir, "SessionStart");
+    sh(dir, ["git", "checkout", "-q", "feat/other"]); // gh pr checkout, to read it
+    expect(hook(dir, "Stop")).toEqual(QUIET);
+    hook(dir, "PreToolUse", {
+      tool_name: "Bash",
+      tool_input: { command: `cd ${wt} && git diff` },
+    });
+    expect(hook(wt, "Stop").sentBack).toBe(false);
+    expect(hook(dir, "Stop")).toEqual(QUIET);
+  });
+
+  it("does not judge a pull that brings in a teammate's work merged during the session", () => {
+    const dir = repo();
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
+    hook(dir, "SessionStart");
+    const theirs = worktree(dir, "teammate"); // somebody else's checkout
+    write(theirs, "services/worker/src/theirs.ts", "const theirs = 1;\n");
+    commitAll(theirs); // merged on GitHub while this session ran
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "teammate"]);
+    sh(dir, ["git", "merge", "-q", "--ff-only", "origin/main"]); // the session pulls main
+    expect(hook(dir, "Stop").sentBack).toBe(false);
+  });
+
+  it("judges what the session changed in another checkout, wherever its shell ends", () => {
+    const dir = repo();
+    const wt = worktree(dir, "feat/pay");
+    hook(dir, "SessionStart");
+    hook(dir, "PreToolUse", {
+      // an edit by path, the shell still in the main checkout
+      tool_name: "Edit",
+      tool_input: { file_path: join(wt, "services/worker/src/pay.ts") },
+    });
+    write(wt, "services/worker/src/pay.ts", "// @ts-ignore\nconst pay = 1;\n");
+    const r = hook(dir, "Stop");
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "services/worker/src/pay.ts:1 switches the type checker off",
+    );
+    expect(r.reason).toStartWith(`In ${relative(realpathSync(dir), wt)}: `);
+
+    const outside = mkdtempSync(join(tmpdir(), "done-gate-none-")); // or a shell left outside the repo
+    dirs.push(outside);
+    const away = sh(
+      outside,
+      ["bun", join(dir, "scripts", "done-gate.ts"), "hook"],
+      {},
+      JSON.stringify({
+        hook_event_name: "Stop",
+        session_id: "s1",
+        cwd: outside,
+      }),
+    );
+    expect(JSON.parse(away.stdout).decision).toBe("block");
+
+    write(wt, "services/worker/src/pay.ts", "const pay = 1;\n");
+    checksPassed(wt);
+    expect(verified(wt, dir, "a test payment went through").status).toBe(0); // ruled from the worktree
+    expect(hook(dir, "Stop").told).toContain(
+      "verifier PASS: a test payment went through",
+    );
+  });
+
+  it("tells Devesh once when a session changed nothing but its checkout holds unverified product work from before", () => {
+    const dir = repo();
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
+    sh(dir, ["git", "checkout", "-qb", "feat/half"]);
+    write(dir, "services/worker/src/half.ts", "const half = 1;\n");
+    commitOld(dir);
+    hook(dir, "SessionStart");
+    expect(hook(dir, "Stop")).toEqual({
+      ...QUIET,
+      told: "Done gate ⚠ this session changed nothing in the main checkout, but it holds product changes from before the session that nobody has verified",
+    });
+    expect(hook(dir, "Stop")).toEqual(QUIET);
+  });
+
+  it("accepts the code it gave up on once the verifier passes it, and still delivers a question", () => {
+    const dir = repo();
+    write(dir, "services/worker/src/a.ts", "const a = 1;\n");
+    checksPassed(dir);
+    for (let i = 1; i <= 5; i++) expect(hook(dir, "Stop").sentBack).toBe(true);
+    expect(hook(dir, "Stop").told).toContain(
+      "NOT DONE: the agent stopped after 5 tries",
+    );
+    gate(dir, "pause", "Should the retry wait an hour?");
+    expect(hook(dir, "Stop").told).toBe(
+      "Done gate ⏸ waiting on you: Should the retry wait an hour? (the change so far is NOT verified)",
+    );
+    expect(verified(dir, dir, "the job ran and wrote its row").status).toBe(0);
+    expect(hook(dir, "Stop")).toEqual({
+      ...QUIET,
+      told: "Done gate ✓ typecheck, 3 tests · verifier PASS: the job ran and wrote its row",
     });
   });
 

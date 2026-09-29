@@ -50,9 +50,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   `proof ready` and ask him to look; only Devesh fills in `Seen by Devesh:` with a date.
 - Passing tests are required and never sufficient. Tests with fakes prove logic, not the product.
 - **The done gate enforces this, so nobody has to remember it.** Whenever a Claude agent stops,
-  `scripts/done-gate.ts` checks its change: first the rules against fake-done (throwing stubs, exports
-  nothing calls, silenced checks, skipped tests, tests that read source code), then every check on
-  the exact code, then, if product code changed, a ruling from the verifier agent
+  `scripts/done-gate.ts` checks what its session changed, in every checkout it worked in and in every
+  commit it made on a branch and then left (even merged): first the rules against fake-done (throwing
+  stubs, exports nothing calls, silenced checks, skipped tests, tests that read source code), then every
+  check on the exact code, then, if product code changed, a ruling from the verifier agent
   (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words: PASS,
   or CANNOT_VERIFY naming what only Devesh can provide (a real phone number, an account, a key),
   which reaches him marked NOT verified. Until then the agent is sent back to work, and Devesh sees

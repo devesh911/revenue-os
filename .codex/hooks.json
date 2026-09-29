@@ -1,5 +1,5 @@
 {
-  "description": "Shows every Codex session the current roadmap slice and item (scripts/cycle.ts). Codex runs these only after they are trusted in /hooks; and runs the done gate (scripts/done-gate.ts) when a turn ends.",
+  "description": "Shows every Codex session the current roadmap slice and item (scripts/cycle.ts), and runs the done gate (scripts/done-gate.ts): before a command or patch it notes the checkout being worked in, and when a turn ends it judges the change. Codex runs each hook only after it is trusted in /hooks.",
   "hooks": {
     "SessionStart": [
       {
@@ -29,6 +29,18 @@
             "type": "command",
             "command": "sh \"$(git rev-parse --show-toplevel)/scripts/cycle-hook.sh\" --pin",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
+            "timeout": 30
           }
         ]
       }

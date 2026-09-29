@@ -72,8 +72,8 @@ evidence (the command and its key output, the screenshot path, the database rows
   something you need to run is broken, rule FAIL and say what broke. Devesh is told the change is NOT
   verified.
 
-Your last action records the ruling. The done gate accepts only yours, and only for the code exactly as
-it is when you record it:
+Your last action records the ruling, run from the checkout that holds the change (its worktree, if it
+has one). The done gate accepts only yours, and only for the code exactly as it is when you record it:
 
     bun run gate verdict pass|fail "<one line Devesh can read: what you saw>"
     bun run gate verdict cannot-verify "<exactly what only Devesh can provide>"

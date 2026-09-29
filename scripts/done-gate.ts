@@ -10,12 +10,16 @@
 //   bun run gate verdict cannot-verify "<what only Devesh can provide>"
 //   bun run see /o/:org/contacts [more paths]     sign in as the dev login; save what each page shows
 //
-// A stop passes when the session changed nothing, or when (1) the change against main breaks none of
-// the rules below, (2) every check is green on this exact code, and (3) if product code changed, the
-// verifier agent (and only it) ruled PASS on this exact code, or CANNOT_VERIFY naming what only Devesh
-// can provide (he is told it is NOT verified). Codex has no verifier agent, so its green product change
-// stops once, marked NOT independently verified. Results are kept per code state in .git/done-gate, so
-// the same code is never checked twice.
+// A stop judges what the session changed in every checkout it worked in, not only the one its shell ends
+// in: before each tool call, a hook notes the checkout of the session's folder, of a file it edits, or one a
+// command names, as the session found it. Commits the session made on a branch and then left (switched
+// away, merged, deleted) are judged too; a checkout it only looked at, switched or pulled is not. A stop
+// passes when nothing changed, or when (1) the change against main breaks none of the rules below, (2)
+// every check is green on this exact code, and (3) if product code changed, the verifier agent (and only
+// it) ruled PASS on this exact code, or CANNOT_VERIFY naming what only Devesh can provide (he is told it is
+// NOT verified). Codex has no verifier agent, so its green product change stops once, marked NOT
+// independently verified. Results are kept per code state in .git/done-gate, so the same code is never
+// checked twice.
 import { spawnSync } from "node:child_process";
 import {
   closeSync,
@@ -26,6 +30,7 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -36,7 +41,7 @@ import {
 } from "node:fs";
 import { type AddressInfo, createConnection, createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 // Hooks can start with a bare PATH; bun, supabase, psql and docker live in these.
 process.env.PATH = [
@@ -54,11 +59,29 @@ const TEST =
 const CODE = /\.[cm]?[jt]sx?$/;
 const EXPORT =
   /^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([\w$]+)/;
+/** PURE: the names an added line exports: one declaration, "default", or each name of `export { a, b as c }`. */
+const exportsOf = (text: string): string[] => {
+  const one = text.match(EXPORT)?.[1];
+  if (one) return [one];
+  if (/^export\s+default\b/.test(text)) return ["default"];
+  const list = text.match(/^export\s*\{([^}]*)\}\s*;?\s*$/)?.[1] ?? "";
+  return list
+    .split(",")
+    .map(
+      (s) =>
+        s
+          .trim()
+          .split(/\s+as\s+/)
+          .at(-1) ?? "",
+    )
+    .filter((n) => /^[\w$]+$/.test(n));
+};
 // A string literal naming source code: a src/ path, or a file ending .ts/.tsx/.js/.jsx.
 const SOURCE_PATH =
   /["'`](?:[^"'`\n]*\/)?(?:src(?:\/[^"'`\n]*)?|[^"'`\n]+\.[cm]?[jt]sx?)["'`]/;
-// Files that decide what "done" means. Changing them is allowed; Devesh is told every time, and
-// .github/CODEOWNERS makes him review each one.
+// Files that decide what "done" means. Changing them is allowed, and Devesh is told every time (in the
+// stop's message and in CI's log). .github/CODEOWNERS names him as their owner, but GitHub asks for his
+// review only once the main ruleset requires code-owner review, which it does not yet.
 export const RULE_FILES =
   /^(\.github\/|\.codex\/|\.claude\/(settings\.json|agents\/)|scripts\/(guards\.sh|done-gate)|tests\/rls_coverage\.sql|package\.json$|bunfig\.toml$|(apps\/[^/]+\/)?(biome|tsconfig[^/]*)\.json$|apps\/console\/playwright\.config\.ts$)/;
 const ALLOW = "done-gate: allow";
@@ -101,6 +124,7 @@ type HookInput = {
   session_id?: string;
   cwd?: string;
   agent_type?: string;
+  tool_input?: Record<string, unknown>;
   background_tasks?: unknown[];
   session_crons?: unknown[];
 };
@@ -177,7 +201,21 @@ export function checkRules(
       )
       .map((a) => a.file),
   );
-  for (const a of added) {
+  // A throw with the added lines that continue it: the formatter wraps a long message onto its own line.
+  const statement = (i: number) => {
+    let text = added[i]?.text ?? "";
+    for (
+      let j = i + 1;
+      j < i + 6 &&
+      !/;\s*$/.test(text) &&
+      added[j]?.file === added[i]?.file &&
+      added[j]?.line === (added[j - 1]?.line ?? 0) + 1;
+      j++
+    )
+      text += ` ${added[j]?.text.trim()}`;
+    return text;
+  };
+  for (const [i, a] of added.entries()) {
     if (!CODE.test(a.file) || a.file.startsWith("scripts/done-gate")) continue; // this file quotes what it bans
     const explained = a.text.match(
       /(?:biome-ignore\S*|@ts-expect-error)\s*:?\s*(.*)$/,
@@ -188,6 +226,7 @@ export function checkRules(
       );
     const problem = lineProblem(
       a,
+      /\bthrow\b/.test(a.text) ? statement(i) : a.text,
       stubListed,
       readsSource.has(a.file),
       usersOf,
@@ -214,6 +253,7 @@ export function checkRules(
 
 function lineProblem(
   { file, text }: Added,
+  stmt: string,
   stubListed: boolean,
   readsSource: boolean,
   usersOf: (name: string, file: string) => string[],
@@ -231,14 +271,16 @@ function lineProblem(
   if (!PRODUCT.test(file)) return;
   if (
     !stubListed &&
-    /\bthrow\b.*\b(not (yet )?(implemented|wired)|unimplemented|stub)\b|\bnot(Wired|Implemented)\s*\(/i.test(
-      text,
+    /\bthrow\b.*\b(not (yet )?(implemented|wired)|unimplemented|stub)\b|\bnot(Wired|Implemented)\s*\(|\bthrow\s+(new\s+)?NotImplemented\w*/i.test(
+      stmt,
     )
   )
     return "adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change";
-  const name = text.match(EXPORT)?.[1];
-  if (name && !usersOf(name, file).some((f) => !TEST.test(f)))
-    return `exports ${name}, but nothing outside tests uses it; land it together with the code that calls it`;
+  const name = exportsOf(text).find(
+    (n) => !usersOf(n, file).some((f) => !TEST.test(f)),
+  );
+  if (name)
+    return `exports ${name === "default" ? "a default" : name}, but nothing outside tests uses it; land it together with the code that calls it`;
 }
 
 /** PURE: does this added line switch a test off? A line that starts with "*" is inside a comment, up to its end. */
@@ -297,19 +339,30 @@ export function usesExport(
 ): boolean {
   const bare = uncommented(source, true); // for uses; `code` keeps the strings that name modules
   const id = `(?<![\\w$.])${reEscape(name)}(?![\\w$])`;
+  const code = uncommented(source);
+  const into = (spec: string) =>
+    [file, ...barrels].some((t) => leadsTo(spec, from, t));
+  if (name === "default")
+    // a default import, `default as`, or an import() or require() of the module
+    return (
+      from !== file &&
+      [
+        ...code.matchAll(
+          /\b(?:(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*(?:,\s*\{[^}]*\})?|\{[^}]*\bdefault\b[^}]*\})\s*from|(?:import|require)\s*\()\s*["']([^"']+)["']/g,
+        ),
+      ].some(([, spec = ""]) => into(spec))
+    );
   if (from === file)
+    // without its declaration and any `export { … }` list naming it
     return new RegExp(`(?<=(?:\\?|\\bcase)\\s*)${id}|${id}(?!\\s*\\??:)`).test(
       bare.replace(
         new RegExp(
-          `^export\\s+(?:async\\s+)?(?:function\\*?|const|let|class)\\s+${id}`,
-          "m",
+          `^export\\s*\\{[^}]*\\}\\s*;?|(?:^export\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class)\\s+${id}`,
+          "gm",
         ),
         "",
       ),
     );
-  const code = uncommented(source);
-  const into = (spec: string) =>
-    [file, ...barrels].some((t) => leadsTo(spec, from, t));
   // ns.name, where ns is `import * as ns`, or a namespace re-exported by name (`export * as voice`, then
   // `import { voice }`, then voice.place()).
   const member = (ns: string) =>
@@ -456,26 +509,28 @@ function snapshot(repo: string, withDiff = true, base?: string): Snap {
         .filter(Boolean);
     let stars: [string, string[]][] | undefined; // files that `export * from`, and from where
     let namespaced: string[] | undefined; // files that may `import * as`
-    for (const { file, text } of added) {
-      const name = text.match(EXPORT)?.[1];
-      if (!name || users.has(`${file} ${name}`)) continue;
-      stars ??= grep("export *").map((f) => [
-        f,
-        [...uncommented(read(f)).matchAll(STAR_FROM)].map((m) => m[1] ?? ""),
-      ]);
-      const reach = [file]; // file, then every barrel that re-exports it, however deep
-      for (const to of reach)
-        for (const [b, specs] of stars)
-          if (!reach.includes(b) && specs.some((s) => leadsTo(s, b, to)))
-            reach.push(b);
-      namespaced ??= grep("* as");
-      users.set(
-        `${file} ${name}`,
-        [...new Set([...grep(name, true), ...namespaced])].filter((f) =>
-          usesExport(read(f), f, file, name, reach.slice(1)),
-        ),
-      );
-    }
+    for (const { file, text } of added)
+      for (const name of exportsOf(text)) {
+        if (users.has(`${file} ${name}`)) continue;
+        stars ??= grep("export *").map((f) => [
+          f,
+          [...uncommented(read(f)).matchAll(STAR_FROM)].map((m) => m[1] ?? ""),
+        ]);
+        const reach = [file]; // file, then every barrel that re-exports it, however deep
+        for (const to of reach)
+          for (const [b, specs] of stars)
+            if (!reach.includes(b) && specs.some((s) => leadsTo(s, b, to)))
+              reach.push(b);
+        namespaced ??= grep("* as");
+        const word =
+          name === "default" ? modulePath(file).split("/").at(-1) : name;
+        users.set(
+          `${file} ${name}`,
+          [...new Set([...grep(word ?? name, true), ...namespaced])].filter(
+            (f) => usesExport(read(f), f, file, name, reach.slice(1)),
+          ),
+        );
+      }
     return { repo, tree, files, added, users };
   } finally {
     rmSync(index, { force: true });
@@ -499,6 +554,15 @@ class Store {
     const value = this.get(kind, key);
     rmSync(this.file(kind, key), { force: true });
     return value;
+  }
+  /** The keys of `kind` that start with `prefix`, each with when it was written. */
+  list(kind: string, prefix = "") {
+    const dir = join(this.dir, kind);
+    return existsSync(dir)
+      ? readdirSync(dir)
+          .filter((k) => k.startsWith(prefix))
+          .map((key) => ({ key, at: statSync(join(dir, key)).mtimeMs }))
+      : [];
   }
 }
 
@@ -696,12 +760,21 @@ const tally = (name: string, out: string) => {
   return n ? `${n} ${name}` : name;
 };
 
-async function runChecks(repo: string): Promise<{ ok: boolean; text: string }> {
+/** `complete`: every check ran. Without Docker on this machine the database checks are left to CI. */
+async function runChecks(
+  repo: string,
+): Promise<{ ok: boolean; text: string; complete?: boolean }> {
   const dbUp = await reachable(54322);
-  if (!dbUp && spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0)
+  const docker = dbUp
+    ? undefined
+    : spawnSync("docker", ["info"], { stdio: "ignore" });
+  if (docker && !docker.error)
     return {
       ok: false,
-      text: "the local database is not running, so the tests can't run. Start it with `supabase start`, then stop again.",
+      text:
+        docker.status === 0
+          ? "the local database is not running, so the tests can't run. Start it with `supabase start`, then stop again."
+          : "Docker is installed but not running, so the tests can't run. Start Docker Desktop, then `supabase start`, then stop again.",
     };
   const passed: string[] = [];
   /** The first failure, or nothing when every check passes. */
@@ -727,7 +800,7 @@ async function runChecks(repo: string): Promise<{ ok: boolean; text: string }> {
     passed.push(
       "NOT run here (no Docker): tests, database policies, browser checks; CI runs them",
     );
-  return { ok: true, text: passed.join(", ") };
+  return { ok: true, text: passed.join(", "), complete: dbUp };
 }
 
 const rulesOn = (snap: Snap) =>
@@ -739,8 +812,12 @@ const rulesOn = (snap: Snap) =>
 const listed = (problems: string[]) =>
   `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line; Devesh sees every exception.`;
 
-/** Rules + checks: everything a machine can prove. Checks are cached per exact code. */
-async function prove(snap: Snap, store: Store): Promise<Proof> {
+/** Rules + checks: everything a machine can prove. Checks are cached per exact code; `cachedOnly` runs none. */
+async function prove(
+  snap: Snap,
+  store: Store,
+  cachedOnly = false,
+): Promise<Proof> {
   const { problems, notes } = rulesOn(snap);
   if (problems.length)
     return {
@@ -750,6 +827,8 @@ async function prove(snap: Snap, store: Store): Promise<Proof> {
     };
   const cached = store.get("checked", snap.tree);
   if (cached) return { ok: true, checks: cached, notes };
+  if (cachedOnly)
+    return { ok: false, headline: "the checks have not passed", reason: "" };
   const r = await runChecks(snap.repo);
   if (!r.ok)
     return {
@@ -757,7 +836,7 @@ async function prove(snap: Snap, store: Store): Promise<Proof> {
       headline: r.text.split("\n")[0] ?? "a check failed",
       reason: `You can't finish yet: ${r.text}\nFix the cause. Never skip, silence or weaken a check to get past it.`,
     };
-  store.put("checked", snap.tree, r.text);
+  if (r.complete) store.put("checked", snap.tree, r.text); // a partial run must not pass a later full one
   return { ok: true, checks: r.text, notes };
 }
 
@@ -766,19 +845,33 @@ async function judge(
   snap: Snap,
   store: Store,
   codex: boolean,
-): Promise<
-  | { ok: true; message: string }
-  | { ok: false; headline: string; reason: string }
-> {
-  const proof = await prove(snap, store);
+  cachedOnly = false,
+): Promise<Verdict> {
+  const proof = await prove(snap, store, cachedOnly);
   if (!proof.ok) return proof;
+  return rule(snap.tree, proof, snap.files.some(isProduct), store, codex);
+}
+
+const isProduct = (f: string) => PRODUCT.test(f) && !TEST.test(f);
+type Verdict =
+  | { ok: true; message: string }
+  | { ok: false; headline: string; reason: string };
+
+/** Proven by machine; does the change also need, and have, the verifier's ruling on this exact code? */
+function rule(
+  tree: string,
+  proof: { checks: string; notes: string[] },
+  product: boolean,
+  store: Store,
+  codex: boolean,
+): Verdict {
   const told = proof.notes.length ? ` · ⚠ ${proof.notes.join(" · ")}` : "";
-  if (!snap.files.some((f) => PRODUCT.test(f) && !TEST.test(f)))
+  if (!product)
     return {
       ok: true,
       message: `Done gate ✓ ${proof.checks} (no product code changed, so no verifier needed)${told}`,
     };
-  const ruling = parseRuling(store.get("verdict", snap.tree));
+  const ruling = parseRuling(store.get("verdict", tree));
   if (!ruling && codex)
     return {
       ok: true,
@@ -821,6 +914,141 @@ function parseRuling(raw: string | undefined): Ruling | undefined {
 const say = (systemMessage: string) =>
   process.stdout.write(JSON.stringify({ systemMessage }));
 
+const real = (path: string) => {
+  try {
+    return path && realpathSync(path); // realpathSync("") would be the current folder
+  } catch {
+    return "";
+  }
+};
+const toplevel = (dir: string) =>
+  real(git(dir, ["rev-parse", "--show-toplevel"], {}, true));
+/** Every checkout of this repository: the main one first, then each worktree. */
+const checkoutsOf = (repo: string) =>
+  git(repo, ["worktree", "list", "--porcelain"], {}, true)
+    .split("\n")
+    .filter((l) => l.startsWith("worktree "))
+    .map((l) => real(l.slice(9)))
+    .filter(Boolean);
+const keyOf = (session: string, what: string) =>
+  `${session}-${Bun.hash(what).toString(36)}`;
+
+/**
+ * Before the session works in a checkout, note it and the state it was found in: the checkout of its folder, of a
+ * file it is about to edit, or one its command names by path. Only what changes after that is the session's.
+ */
+function touch(repo: string, input: HookInput, store: Store, session: string) {
+  const all = checkoutsOf(repo);
+  const cwd = input.cwd ?? repo;
+  const tool = input.tool_input ?? {};
+  const hits = new Set<string>();
+  for (const p of [cwd, tool.file_path, tool.notebook_path]) {
+    if (typeof p !== "string") continue;
+    let dir = resolve(cwd, p);
+    while (!existsSync(dir) && dir !== dirname(dir)) dir = dirname(dir); // a file about to be created
+    const path = real(dir);
+    const deepest = all // a worktree sits inside the main checkout's folder
+      .filter((c) => path === c || path.startsWith(`${c}/`))
+      .sort((a, b) => b.length - a.length)[0];
+    if (deepest) hits.add(deepest);
+  }
+  let command = typeof tool.command === "string" ? tool.command : "";
+  for (const c of [...all].sort((a, b) => b.length - a.length))
+    for (const form of [c, relative(all[0] ?? c, c)])
+      if (form && command.includes(form)) {
+        hits.add(c);
+        command = command.split(form).join(" "); // else the main checkout's path, a prefix of a worktree's, matches too
+      }
+  for (const c of hits) {
+    const key = keyOf(session, c);
+    if (store.get("seen", key)) continue;
+    const tree = snapshot(c, false).tree;
+    if (!store.get("accepted", key)) store.put("accepted", key, tree);
+    store.put("baseline", key, tree);
+    store.put("seen", key, c);
+  }
+  if (!store.get("started", session))
+    store.put("started", session, String(Math.floor(Date.now() / 1000)));
+}
+
+type Left = { branch: string; root: string; commit: string; tree: string };
+
+/**
+ * Commits this session made on a branch and then left (switched away, or merged and deleted the branch): the
+ * newest per branch. A branch some checkout is on now is judged as that checkout instead.
+ */
+function leftBehind(roots: string[], started: number): Left[] {
+  const on = new Set(
+    roots.map((r) => git(r, ["branch", "--show-current"], {}, true)),
+  );
+  const left = new Map<string, { root: string; commit: string }>();
+  for (const root of roots) {
+    const log = git(
+      root,
+      ["reflog", "show", "--date=unix", "--format=%H %gd %ct %gs", "HEAD"],
+      {},
+      true,
+    ).split("\n");
+    for (const [i, entry] of log.entries()) {
+      const [, at = "", , ...subject] = entry.split(" ");
+      if (!(Number(at.match(/\{(\d+)\}/)?.[1]) >= started)) break;
+      const from = subject
+        .join(" ")
+        .match(/^checkout: moving from (\S+) to /)?.[1];
+      const [commit = "", , made = "0"] = (log[i + 1] ?? "").split(" ");
+      if (from && !on.has(from) && !left.has(from) && Number(made) >= started)
+        left.set(from, { root, commit });
+    }
+  }
+  return [...left].map(([branch, { root, commit }]) => ({
+    branch,
+    root,
+    commit,
+    tree: git(root, ["rev-parse", `${commit}^{tree}`]),
+  }));
+}
+
+/** A commit the session left must have passed the checks, and the verifier if it changed product code. */
+function judgeLeft(c: Left, store: Store, codex: boolean): Verdict {
+  const short = c.commit.slice(0, 7);
+  const checks = store.get("checked", c.tree);
+  if (!checks)
+    return {
+      ok: false,
+      headline: "made in this session, never checked",
+      reason: `You can't finish yet: this session committed ${short} on ${c.branch} and moved away without proving it (it may already be pushed or merged). Check it out (\`git checkout ${c.branch}\`, or \`git checkout ${short}\` if the branch is gone), run \`bun run gate\` there, then stop again.`,
+    };
+  const base = git(c.root, ["merge-base", c.commit, "origin/main"], {}, true);
+  const files = git(
+    c.root,
+    base
+      ? ["diff", "--name-only", base, c.commit]
+      : [
+          "diff-tree",
+          "--no-commit-id",
+          "--name-only",
+          "-r",
+          "--root",
+          c.commit,
+        ],
+    {},
+    true,
+  ).split("\n");
+  const r = rule(
+    c.tree,
+    { checks, notes: [] },
+    files.some(isProduct),
+    store,
+    codex,
+  );
+  return r.ok
+    ? r
+    : {
+        ...r,
+        reason: `${r.reason}\nThe code in question is commit ${short} on ${c.branch}: check it out, and have the verifier rule there.`,
+      };
+}
+
 async function stop(
   input: HookInput,
   repo: string,
@@ -829,68 +1057,178 @@ async function stop(
   codex: boolean,
 ) {
   if (input.background_tasks?.length || input.session_crons?.length) return; // it will be woken again
-  const snap = snapshot(repo);
-  if (store.get("accepted", session) === snap.tree) return; // nothing changed since the last accepted stop
-  if (store.get("gave-up", session) === snap.tree)
+  const here = toplevel(input.cwd ?? repo);
+  const roots = [
+    ...new Set([
+      ...store
+        .list("seen", `${session}-`)
+        .map(({ key }) => store.get("seen", key) ?? ""),
+      here,
+    ]),
+  ].filter((r) => r && existsSync(r));
+  const main = checkoutsOf(repo)[0] ?? repo;
+  const name = (root: string) => relative(main, root) || "the main checkout";
+  const started = Number(store.get("started", session) ?? 0);
+  const work: {
+    key: string;
+    tree: string;
+    where?: string; // unset: the checkout the agent is in, named in no message
+    judge: (cachedOnly: boolean) => Promise<Verdict>;
+  }[] = [];
+  const notes: string[] = [];
+  for (const root of roots) {
+    const key = keyOf(session, root);
+    const accepted = store.get("accepted", key);
+    const tree = snapshot(root, false).tree;
+    if (tree === accepted) {
+      // Work from before the session, never judged: say so once, rather than pass it in silence.
+      if (
+        tree === store.get("baseline", key) &&
+        !store.get("warned", `${key}-${tree}`)
+      ) {
+        store.put("warned", `${key}-${tree}`, "1");
+        if (
+          snapshot(root).files.some(isProduct) &&
+          !parseRuling(store.get("verdict", tree))
+        )
+          notes.push(
+            `Done gate ⚠ this session changed nothing in ${name(root)}, but it holds product changes from before the session that nobody has verified`,
+          );
+      }
+      continue;
+    }
+    // Switched, pulled or reset, with nothing of its own on top, to commits the session did not make or that
+    // main already holds (a teammate's work merged meanwhile; the session's own merged work is judged as left).
+    const [headTree, made, head] = git(
+      root,
+      ["log", "-1", "--format=%T %ct %H"],
+      {},
+      true,
+    ).split(" ");
+    if (
+      accepted &&
+      tree === headTree &&
+      (Number(made) < started ||
+        git(root, ["merge-base", "HEAD", "origin/main"], {}, true) === head)
+    ) {
+      store.put("accepted", key, tree);
+      continue;
+    }
+    work.push({
+      key,
+      tree,
+      where: root === here ? undefined : name(root),
+      judge: (cachedOnly) => judge(snapshot(root), store, codex, cachedOnly),
+    });
+  }
+  if (started)
+    for (const c of leftBehind(roots, started)) {
+      const key = keyOf(session, `left ${c.commit}`);
+      if (
+        store.get("accepted", key) !== c.tree &&
+        !work.some((w) => w.tree === c.tree)
+      )
+        work.push({
+          key,
+          tree: c.tree,
+          where: `${c.branch} (commit ${c.commit.slice(0, 7)})`,
+          judge: async () => judgeLeft(c, store, codex),
+        });
+    }
+  if (!work.length) return notes.length ? say(notes.join("\n")) : undefined;
+  for (const w of work) {
+    const pause = store.take("pause", w.tree);
+    if (pause)
+      return say(
+        `Done gate ⏸ waiting on you: ${pause} (the change so far is NOT verified)`,
+      );
+  }
+  // After the agent gave up on this exact code, only what is already known counts: no check runs again.
+  const print = work
+    .map((w) => w.tree)
+    .sort()
+    .join(" ");
+  const gaveUp = store.get("gave-up", session) === print;
+  const passed: string[] = [];
+  let failed: { headline: string; reason: string } | undefined;
+  for (const w of work) {
+    const j = await w.judge(gaveUp);
+    const at = w.where ? `in ${w.where}: ` : "";
+    if (!j.ok) {
+      failed = {
+        headline: `${at}${j.headline}`,
+        reason: `${at ? `In ${w.where}: ` : ""}${j.reason}`,
+      };
+      break;
+    }
+    passed.push(
+      w.where
+        ? j.message.replace("Done gate ", `Done gate (${w.where}) `)
+        : j.message,
+    );
+  }
+  if (!failed) {
+    for (const w of work) store.put("accepted", w.key, w.tree);
+    store.take("blocks", session);
+    store.take("gave-up", session);
+    return say([...passed, ...notes].join("\n"));
+  }
+  if (gaveUp)
     return say(
       "Done gate ✗ still NOT DONE (unchanged since the agent gave up)",
     );
-  const pause = store.take("pause", snap.tree);
-  if (pause)
-    return say(
-      `Done gate ⏸ waiting on you: ${pause} (the change so far is NOT verified)`,
-    );
-  const j = await judge(snap, store, codex);
-  if (j.ok) {
-    store.take("blocks", session);
-    store.put("accepted", session, snap.tree);
-    return say(j.message);
-  }
   const n = Number(store.get("blocks", session) ?? 0) + 1;
   if (n > MAX_BLOCKS) {
     store.take("blocks", session);
-    store.put("gave-up", session, snap.tree);
+    store.put("gave-up", session, print);
     return say(
-      `Done gate ✗ NOT DONE: the agent stopped after ${MAX_BLOCKS} tries, still failing: ${j.headline}`,
+      `Done gate ✗ NOT DONE: the agent stopped after ${MAX_BLOCKS} tries, still failing: ${failed.headline}`,
     );
   }
   store.put("blocks", session, String(n));
-  const told = `Done gate ✗ sent the agent back (${n}/${MAX_BLOCKS}): ${j.headline}`;
+  const told = `Done gate ✗ sent the agent back (${n}/${MAX_BLOCKS}): ${failed.headline}`;
   // Claude Code and Codex both document this for Stop; Codex ignores stdout on exit 2, losing Devesh's line.
   if (input.hook_event_name === "Stop")
     return process.stdout.write(
       JSON.stringify({
         decision: "block",
-        reason: j.reason,
+        reason: failed.reason,
         systemMessage: told,
       }),
     );
   say(told); // TeammateIdle blocks only by exit 2
-  process.stderr.write(j.reason);
+  process.stderr.write(failed.reason);
   process.exit(2);
 }
 
-/** The verifier may finish only after recording a ruling on the code as it is now; then that ruling counts. */
-function verifierDone(store: Store, tree: string) {
-  const ruling = store.take("pending", tree);
-  if (ruling) return store.put("verdict", tree, ruling);
+/**
+ * The verifier may finish only after recording a ruling (`bun run gate verdict`, run in the checkout it judged)
+ * while it ran; each such ruling then counts for the exact code it names.
+ */
+function verifierDone(store: Store, session: string) {
+  const since = Number(store.get("verifier", session) ?? Date.now());
+  const rulings = store.list("pending").filter((p) => p.at >= since);
+  for (const { key } of rulings)
+    store.put("verdict", key, store.take("pending", key) ?? "");
+  if (rulings.length) return store.take("verifier", session);
   process.stderr.write(
-    'Before you finish, record your ruling on the code exactly as it is now:\nbun run gate verdict pass|fail "<one line: what you saw>"\nor, only when seeing it work needs something only Devesh has: bun run gate verdict cannot-verify "<exactly what he must provide>"',
+    'Before you finish, record your ruling on the code exactly as it is now, from the checkout that holds it:\nbun run gate verdict pass|fail "<one line: what you saw>"\nor, only when seeing it work needs something only Devesh has: bun run gate verdict cannot-verify "<exactly what he must provide>"',
   );
   process.exit(2);
 }
 
 /** `codex`: run by .codex/hooks.json (`hook codex`) rather than Claude Code's .claude/settings.json. */
 async function hook(input: HookInput, codex: boolean) {
-  const repo = git(
-    input.cwd ?? process.cwd(),
-    ["rev-parse", "--show-toplevel"],
-    {},
-    true,
-  );
+  const event = input.hook_event_name;
+  // A shell left outside any checkout: this file's own repository still holds the session's record.
+  const repo =
+    toplevel(input.cwd ?? process.cwd()) || toplevel(import.meta.dir);
   const own = repo && join(repo, "scripts", "done-gate.ts");
   if (!own || !existsSync(own)) return; // a checkout without this gate
-  if (realpathSync(own) !== realpathSync(import.meta.path)) {
+  if (
+    event !== "PreToolUse" &&
+    realpathSync(own) !== realpathSync(import.meta.path)
+  ) {
     // Hooks load this file from the project root; always judge with the gate that belongs to the code.
     const r = spawnSync(
       process.execPath,
@@ -903,18 +1241,17 @@ async function hook(input: HookInput, codex: boolean) {
     process.exit(r.status ?? 0);
   }
   const store = new Store(stateDir(repo));
-  const session = `${input.session_id ?? "unknown"}-${Bun.hash(repo).toString(36)}`;
-  const tree = () => snapshot(repo, false).tree;
-  switch (input.hook_event_name) {
+  const session = input.session_id ?? "unknown";
+  switch (event) {
     case "SessionStart":
-      if (!store.get("accepted", session))
-        store.put("accepted", session, tree());
-      return;
-    case "SubagentStart": // a fresh verifier: forget any ruling recorded before it started
-      if (input.agent_type === "verifier") store.take("pending", tree());
+    case "PreToolUse":
+      return touch(repo, input, store, session);
+    case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
+      if (input.agent_type === "verifier")
+        store.put("verifier", session, String(Date.now()));
       return;
     case "SubagentStop":
-      if (input.agent_type === "verifier") return verifierDone(store, tree());
+      if (input.agent_type === "verifier") verifierDone(store, session);
       return;
     case "Stop":
     case "TeammateIdle":
@@ -928,15 +1265,16 @@ const USAGE = `usage: bun run gate [rules [--base <ref>] | tests [e2e] | pause "
 if (import.meta.main) {
   const [cmd = "check", ...args] = process.argv.slice(2);
   if (cmd === "hook") {
+    let input: HookInput = {};
     try {
-      await hook(
-        JSON.parse((await Bun.stdin.text()) || "{}") as HookInput,
-        args[0] === "codex",
-      );
+      input = JSON.parse((await Bun.stdin.text()) || "{}") as HookInput;
+      await hook(input, args[0] === "codex");
     } catch (e) {
-      say(
-        `Done gate ⚠ could not run (${String(e).split("\n")[0]}); this stop was NOT checked`,
-      );
+      // Only a stop is a check; a failure to note a checkout before a tool call stays quiet.
+      if (input.hook_event_name !== "PreToolUse")
+        say(
+          `Done gate ⚠ could not run (${String(e).split("\n")[0]}); this stop was NOT checked`,
+        );
     }
     process.exit(0);
   }
