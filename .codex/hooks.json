@@ -40,7 +40,7 @@
           {
             "type": "command",
             "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
-            "timeout": 30
+            "timeout": 60
           }
         ]
       }

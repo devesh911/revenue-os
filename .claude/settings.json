@@ -57,7 +57,7 @@
           {
             "type": "command",
             "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
-            "timeout": 30
+            "timeout": 60
           }
         ]
       }

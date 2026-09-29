@@ -10,18 +10,20 @@
 //   bun run gate verdict cannot-verify "<what only Devesh can provide>"
 //   bun run see /o/:org/contacts [more paths]     sign in as the dev login; save what each page shows
 //
-// A stop judges what the session changed in every checkout it worked in, not only the one its shell ends
-// in: before each tool call, a hook notes the checkout of the session's folder, of a file it edits, or one a
-// command names, as the session found it. Commits the session made on a branch and then left (switched
-// away, merged, deleted) are judged too; a checkout it only looked at, switched or pulled is not. A stop
-// passes when nothing changed, or when (1) the change against main breaks none of the rules below, (2)
-// every check is green on this exact code, and (3) if product code changed, the verifier agent (and only
-// it) ruled PASS on this exact code, or CANNOT_VERIFY naming what only Devesh can provide (he is told it is
-// NOT verified). Codex has no verifier agent, so its green product change stops once, marked NOT
-// independently verified. Results are kept per code state in .git/done-gate, so the same code is never
-// checked twice.
+// Two moments are checked. A stop: the session's change, in each checkout it worked in and was the last to work
+// in (a hook before each command or edit notes them, and the state it found each in), must be proven; a checkout
+// it only looked at, switched or pulled is not its change. A merge: an agent's `gh pr merge` goes through only when
+// the pull request's head commit was proven here, so work committed, pushed and merged in one go is checked too.
+// Proven means (1) the change against main breaks none of the rules below, (2) every check is green on this exact
+// code, and (3) if product code changed, the verifier agent (and only it) ruled PASS on this exact code; at a
+// stop, a CANNOT_VERIFY naming what only Devesh can provide also lets the agent stop, told to him as NOT
+// verified, and then only Devesh merges. Codex has no verifier agent, so its green product change stops once,
+// marked NOT independently verified. Results are kept per code state in .git/done-gate, so the same code is
+// never checked twice.
+
 import { spawnSync } from "node:child_process";
 import {
+  appendFileSync,
   closeSync,
   copyFileSync,
   existsSync,
@@ -43,12 +45,12 @@ import { type AddressInfo, createConnection, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-// Hooks can start with a bare PATH; bun, supabase, psql and docker live in these.
+// Hooks can start with a bare PATH; bun, gh, supabase, psql and docker live in these.
 process.env.PATH = [
   dirname(process.execPath),
+  process.env.PATH,
   "/opt/homebrew/bin",
   "/usr/local/bin",
-  process.env.PATH,
 ].join(":");
 
 const MAX_BLOCKS = 5; // then the agent may stop, shown to Devesh as NOT DONE (Claude Code's own cap is 8)
@@ -201,20 +203,6 @@ export function checkRules(
       )
       .map((a) => a.file),
   );
-  // A throw with the added lines that continue it: the formatter wraps a long message onto its own line.
-  const statement = (i: number) => {
-    let text = added[i]?.text ?? "";
-    for (
-      let j = i + 1;
-      j < i + 6 &&
-      !/;\s*$/.test(text) &&
-      added[j]?.file === added[i]?.file &&
-      added[j]?.line === (added[j - 1]?.line ?? 0) + 1;
-      j++
-    )
-      text += ` ${added[j]?.text.trim()}`;
-    return text;
-  };
   for (const [i, a] of added.entries()) {
     if (!CODE.test(a.file) || a.file.startsWith("scripts/done-gate")) continue; // this file quotes what it bans
     const explained = a.text.match(
@@ -224,16 +212,18 @@ export function checkRules(
       notes.push(
         `checker silenced at ${a.file}:${a.line}: ${explained[1] || "(no reason given)"}`,
       );
+    const stmt = statementAt(added, i);
     const problem = lineProblem(
       a,
-      /\bthrow\b/.test(a.text) ? statement(i) : a.text,
+      stmt.code,
       stubListed,
       readsSource.has(a.file),
       usersOf,
     );
     if (!problem) continue;
-    // The reason after the marker; a ")" it didn't open closed "(done-gate: allow …)" around it.
-    const raw = a.text
+    // The reason after the marker, on any line of the statement (the formatter may move it past a wrapped
+    // throw); a ")" it didn't open closed "(done-gate: allow …)" around it.
+    const raw = (stmt.lines.find((l) => l.includes(ALLOW)) ?? a.text)
       .split(ALLOW)[1]
       ?.replace(/\*\/\s*$/, "")
       .trim();
@@ -249,6 +239,30 @@ export function checkRules(
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);
   return { problems, notes };
+}
+
+/**
+ * PURE: the added line at `i` as code (comments dropped), joined with the added lines that continue it when it
+ * opens a throw or an `export {` list, which the formatter wraps over several lines; and those lines as written.
+ */
+function statementAt(added: Added[], i: number) {
+  const a = added[i];
+  const lines = [a?.text ?? ""];
+  const bare = (t: string) => uncommented(t, true).trim(); // no comments, strings emptied
+  if (
+    a &&
+    (/\bthrow\b/.test(bare(a.text)) || /^export\s*\{[^}]*$/.test(bare(a.text)))
+  )
+    for (
+      let j = i + 1;
+      j < i + 40 &&
+      !bare(lines.join("\n")).endsWith(";") &&
+      added[j]?.file === a.file &&
+      added[j]?.line === (added[j - 1]?.line ?? 0) + 1;
+      j++
+    )
+      lines.push(added[j]?.text ?? "");
+  return { code: lines.map((l) => uncommented(l).trim()).join(" "), lines };
 }
 
 function lineProblem(
@@ -276,7 +290,7 @@ function lineProblem(
     )
   )
     return "adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change";
-  const name = exportsOf(text).find(
+  const name = exportsOf(stmt).find(
     (n) => !usersOf(n, file).some((f) => !TEST.test(f)),
   );
   if (name)
@@ -353,11 +367,11 @@ export function usesExport(
       ].some(([, spec = ""]) => into(spec))
     );
   if (from === file)
-    // without its declaration and any `export { … }` list naming it
+    // without its declaration, the imports, and any `export { … }` list naming it
     return new RegExp(`(?<=(?:\\?|\\bcase)\\s*)${id}|${id}(?!\\s*\\??:)`).test(
       bare.replace(
         new RegExp(
-          `^export\\s*\\{[^}]*\\}\\s*;?|(?:^export\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class)\\s+${id}`,
+          `^import\\b[^;]*;|^export\\s*\\{[^}]*\\}\\s*;?|(?:^export\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class)\\s+${id}`,
           "gm",
         ),
         "",
@@ -509,8 +523,8 @@ function snapshot(repo: string, withDiff = true, base?: string): Snap {
         .filter(Boolean);
     let stars: [string, string[]][] | undefined; // files that `export * from`, and from where
     let namespaced: string[] | undefined; // files that may `import * as`
-    for (const { file, text } of added)
-      for (const name of exportsOf(text)) {
+    for (const [i, { file }] of added.entries())
+      for (const name of exportsOf(statementAt(added, i).code)) {
         if (users.has(`${file} ${name}`)) continue;
         stars ??= grep("export *").map((f) => [
           f,
@@ -522,13 +536,21 @@ function snapshot(repo: string, withDiff = true, base?: string): Snap {
             if (!reach.includes(b) && specs.some((s) => leadsTo(s, b, to)))
               reach.push(b);
         namespaced ??= grep("* as");
-        const word =
-          name === "default" ? modulePath(file).split("/").at(-1) : name;
+        // A default export's importers name its module, or its package for a package's entry file.
+        const words =
+          name === "default"
+            ? [
+                modulePath(file).split("/").at(-1) ?? "",
+                file.match(
+                  /^packages\/([^/]+)\/src\/index\.[cm]?[jt]sx?$/,
+                )?.[1] ?? "",
+              ].filter(Boolean)
+            : [name];
         users.set(
           `${file} ${name}`,
-          [...new Set([...grep(word ?? name, true), ...namespaced])].filter(
-            (f) => usesExport(read(f), f, file, name, reach.slice(1)),
-          ),
+          [
+            ...new Set([...words.flatMap((w) => grep(w, true)), ...namespaced]),
+          ].filter((f) => usesExport(read(f), f, file, name, reach.slice(1))),
         );
       }
     return { repo, tree, files, added, users };
@@ -549,6 +571,9 @@ class Store {
   }
   put(kind: string, key: string, value: string) {
     writeFileSync(this.file(kind, key), value);
+  }
+  add(kind: string, key: string, value: string) {
+    appendFileSync(this.file(kind, key), value);
   }
   take(kind: string, key: string) {
     const value = this.get(kind, key);
@@ -760,6 +785,8 @@ const tally = (name: string, out: string) => {
   return n ? `${n} ${name}` : name;
 };
 
+const noDocker = () => spawnSync("docker", ["--version"]).error !== undefined;
+
 /** `complete`: every check ran. Without Docker on this machine the database checks are left to CI. */
 async function runChecks(
   repo: string,
@@ -825,7 +852,9 @@ async function prove(
       headline: `${problems.length} rule problem(s), first: ${problems[0]}`,
       reason: `You can't finish yet: your change breaks the done rules.\n${listed(problems)}`,
     };
-  const cached = store.get("checked", snap.tree);
+  const cached =
+    store.get("checked", snap.tree) ??
+    (noDocker() ? store.get("partial", snap.tree) : undefined);
   if (cached) return { ok: true, checks: cached, notes };
   if (cachedOnly)
     return { ok: false, headline: "the checks have not passed", reason: "" };
@@ -836,7 +865,7 @@ async function prove(
       headline: r.text.split("\n")[0] ?? "a check failed",
       reason: `You can't finish yet: ${r.text}\nFix the cause. Never skip, silence or weaken a check to get past it.`,
     };
-  if (r.complete) store.put("checked", snap.tree, r.text); // a partial run must not pass a later full one
+  store.put(r.complete ? "checked" : "partial", snap.tree, r.text); // a partial run never passes a full one
   return { ok: true, checks: r.text, notes };
 }
 
@@ -930,123 +959,189 @@ const checkoutsOf = (repo: string) =>
     .filter((l) => l.startsWith("worktree "))
     .map((l) => real(l.slice(9)))
     .filter(Boolean);
-const keyOf = (session: string, what: string) =>
-  `${session}-${Bun.hash(what).toString(36)}`;
+const keyOf = (session: string, root: string) =>
+  `${session}-${Bun.hash(root).toString(36)}`;
+const idOf = (root: string) => Bun.hash(root).toString(36);
+/** What a checkout holds beyond its HEAD commit (edits, new files) as one id, which a pull or a switch keeps. */
+const extra = (root: string, tree: string) =>
+  Bun.hash(git(root, ["diff-tree", "-r", "HEAD", tree], {}, true)).toString(36);
 
 /**
- * Before the session works in a checkout, note it and the state it was found in: the checkout of its folder, of a
- * file it is about to edit, or one its command names by path. Only what changes after that is the session's.
+ * Before a tool call, note each checkout the session is about to work in, and that it is the last to work there:
+ * the checkout of its folder, of a file it edits, one a command enters (`cd`, `git -C`) or names by path. The
+ * state a checkout is found in (the first time, or after another session worked there) is the baseline: only
+ * what changes after it can be this session's.
  */
 function touch(repo: string, input: HookInput, store: Store, session: string) {
   const all = checkoutsOf(repo);
   const cwd = input.cwd ?? repo;
   const tool = input.tool_input ?? {};
+  const command = typeof tool.command === "string" ? tool.command : "";
+  const entered = [
+    ...command.matchAll(/(?:\bcd|\s-C)\s+("[^"]+"|'[^']+'|[^\s;&|)]+)/g),
+  ].map(([, p = ""]) =>
+    p
+      .replace(/^["']|["']$/g, "")
+      .replace(/^~(?=\/|$)/, process.env.HOME ?? "~"),
+  );
   const hits = new Set<string>();
-  for (const p of [cwd, tool.file_path, tool.notebook_path]) {
-    if (typeof p !== "string") continue;
+  for (const p of [cwd, tool.file_path, tool.notebook_path, ...entered]) {
+    if (typeof p !== "string" || !p) continue;
     let dir = resolve(cwd, p);
     while (!existsSync(dir) && dir !== dirname(dir)) dir = dirname(dir); // a file about to be created
     const path = real(dir);
-    const deepest = all // a worktree sits inside the main checkout's folder
+    const deepest = all // a worktree may sit inside the main checkout's folder
       .filter((c) => path === c || path.startsWith(`${c}/`))
       .sort((a, b) => b.length - a.length)[0];
     if (deepest) hits.add(deepest);
   }
-  let command = typeof tool.command === "string" ? tool.command : "";
+  let named = command;
   for (const c of [...all].sort((a, b) => b.length - a.length))
-    for (const form of [c, relative(all[0] ?? c, c)])
-      if (form && command.includes(form)) {
+    for (const form of [
+      c,
+      c.replace(/^\/private(?=\/)/, ""),
+      relative(all[0] ?? c, c),
+    ])
+      if (form && named.includes(form)) {
         hits.add(c);
-        command = command.split(form).join(" "); // else the main checkout's path, a prefix of a worktree's, matches too
+        named = named.split(form).join(" "); // else the main checkout's path, a prefix of a worktree's, matches too
       }
   for (const c of hits) {
     const key = keyOf(session, c);
-    if (store.get("seen", key)) continue;
-    const tree = snapshot(c, false).tree;
-    if (!store.get("accepted", key)) store.put("accepted", key, tree);
-    store.put("baseline", key, tree);
-    store.put("seen", key, c);
+    if (!store.get("seen", key) || store.get("toucher", idOf(c)) !== session) {
+      const tree = snapshot(c, false).tree;
+      store.put("accepted", key, tree);
+      store.put("extra", key, extra(c, tree));
+      if (!store.get("seen", key)) store.put("baseline", key, tree);
+      store.put("seen", key, c);
+    }
+    store.put("toucher", idOf(c), session);
   }
   if (!store.get("started", session))
     store.put("started", session, String(Math.floor(Date.now() / 1000)));
 }
 
-type Left = { branch: string; root: string; commit: string; tree: string };
-
-/**
- * Commits this session made on a branch and then left (switched away, or merged and deleted the branch): the
- * newest per branch. A branch some checkout is on now is judged as that checkout instead.
- */
-function leftBehind(roots: string[], started: number): Left[] {
-  const on = new Set(
-    roots.map((r) => git(r, ["branch", "--show-current"], {}, true)),
-  );
-  const left = new Map<string, { root: string; commit: string }>();
-  for (const root of roots) {
-    const log = git(
-      root,
-      ["reflog", "show", "--date=unix", "--format=%H %gd %ct %gs", "HEAD"],
-      {},
-      true,
-    ).split("\n");
-    for (const [i, entry] of log.entries()) {
-      const [, at = "", , ...subject] = entry.split(" ");
-      if (!(Number(at.match(/\{(\d+)\}/)?.[1]) >= started)) break;
-      const from = subject
-        .join(" ")
-        .match(/^checkout: moving from (\S+) to /)?.[1];
-      const [commit = "", , made = "0"] = (log[i + 1] ?? "").split(" ");
-      if (from && !on.has(from) && !left.has(from) && Number(made) >= started)
-        left.set(from, { root, commit });
-    }
-  }
-  return [...left].map(([branch, { root, commit }]) => ({
-    branch,
-    root,
-    commit,
-    tree: git(root, ["rev-parse", `${commit}^{tree}`]),
-  }));
+/** The checkouts a stop answers for: those the session noted, and the one its shell is in. */
+function rootsOf(repo: string, store: Store, session: string, cwd?: string) {
+  const here = toplevel(cwd ?? repo);
+  const all = checkoutsOf(repo);
+  return {
+    all,
+    here,
+    roots: [
+      ...new Set([
+        ...store
+          .list("seen", `${session}-`)
+          .map(({ key }) => store.get("seen", key) ?? ""),
+        ...(all.includes(here) ? [here] : []),
+      ]),
+    ].filter((r) => r && existsSync(r)),
+  };
 }
 
-/** A commit the session left must have passed the checks, and the verifier if it changed product code. */
-function judgeLeft(c: Left, store: Store, codex: boolean): Verdict {
-  const short = c.commit.slice(0, 7);
-  const checks = store.get("checked", c.tree);
+const deny = (why: string) =>
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `The done gate refused this merge: ${why}`,
+      },
+      systemMessage: `Done gate ✗ merge refused: ${why.split("\n")[0]}`,
+    }),
+  );
+
+/**
+ * An agent's `gh pr merge` goes through only for code proven on this machine: the pull request's head commit
+ * passed `bun run gate`, and for product code the verifier ruled PASS on it. Merging is where work reaches main,
+ * so it is checked here however the session got to it.
+ */
+function mergeGate(
+  repo: string,
+  input: HookInput,
+  store: Store,
+  codex: boolean,
+) {
+  const command =
+    typeof input.tool_input?.command === "string"
+      ? input.tool_input.command
+      : "";
+  const merge = command.match(/\bgh\s+pr\s+merge\b([^;&|]*)/);
+  if (!merge) return;
+  if (/\bgit\s+push\b/.test(command))
+    return deny(
+      "a push and a merge in one command leave no moment to check what is merged. Push, then run `gh pr merge` on its own.",
+    );
+  const args = (merge[1] ?? "").trim().split(/\s+/).filter(Boolean);
+  const r = args.findIndex((a) => a === "-R" || a === "--repo");
+  const pr =
+    args.find((a) => /^\d+$|\/pull\/\d+/.test(a)) ??
+    (args[0] && !args[0].startsWith("-") ? args[0] : undefined);
+  const view = spawnSync(
+    "gh",
+    [
+      "pr",
+      "view",
+      ...(pr ? [pr] : []),
+      ...(r >= 0 ? args.slice(r, r + 2) : []),
+      "--json",
+      "headRefOid",
+      "-q",
+      ".headRefOid",
+    ],
+    { cwd: input.cwd ?? repo, encoding: "utf8", timeout: 20_000 },
+  );
+  const head = view.status === 0 ? view.stdout.trim() : "";
+  if (!/^[0-9a-f]{40}$/.test(head))
+    return deny(
+      `it could not read the pull request's head commit (\`gh pr view\`: ${(view.stderr || "no answer").trim().split("\n")[0]}), so it can't check what would be merged.`,
+    );
+  const short = head.slice(0, 7);
+  const treeOf = () =>
+    git(repo, ["rev-parse", "--verify", "--quiet", `${head}^{tree}`], {}, true);
+  let tree = treeOf();
+  if (!tree) {
+    spawnSync("git", ["fetch", "--quiet", "origin", head], {
+      cwd: repo,
+      timeout: 20_000,
+    });
+    tree = treeOf();
+  }
+  const where = `Check out ${short} with nothing else changed (a clean worktree: \`git worktree add --detach .claude/worktrees/check ${short}\`), run \`bun run gate\` there`;
+  if (!tree)
+    return deny(
+      `its head commit ${short} is not in this repository, so nobody here has proven it. Fetch it; ${where.charAt(0).toLowerCase()}${where.slice(1)}, then merge.`,
+    );
+  const checks = store.get("checked", tree) ?? store.get("partial", tree);
   if (!checks)
-    return {
-      ok: false,
-      headline: "made in this session, never checked",
-      reason: `You can't finish yet: this session committed ${short} on ${c.branch} and moved away without proving it (it may already be pushed or merged). Check it out (\`git checkout ${c.branch}\`, or \`git checkout ${short}\` if the branch is gone), run \`bun run gate\` there, then stop again.`,
-    };
-  const base = git(c.root, ["merge-base", c.commit, "origin/main"], {}, true);
-  const files = git(
-    c.root,
+    return deny(
+      `its head commit ${short} has not passed \`bun run gate\` on this machine. ${where} (and the verifier, for product code), then merge.`,
+    );
+  const base = git(repo, ["merge-base", head, "origin/main"], {}, true);
+  const product = git(
+    repo,
     base
-      ? ["diff", "--name-only", base, c.commit]
-      : [
-          "diff-tree",
-          "--no-commit-id",
-          "--name-only",
-          "-r",
-          "--root",
-          c.commit,
-        ],
+      ? ["diff", "--name-only", base, head]
+      : ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", head],
     {},
     true,
-  ).split("\n");
-  const r = rule(
-    c.tree,
-    { checks, notes: [] },
-    files.some(isProduct),
-    store,
-    codex,
+  )
+    .split("\n")
+    .some(isProduct);
+  const ruling = parseRuling(store.get("verdict", tree));
+  if (!product || ruling?.verdict === "pass")
+    return say(
+      `Done gate ✓ merge of ${short}: ${checks}${ruling?.verdict === "pass" ? ` · verifier PASS: ${ruling.note}` : " (no product code changed)"}`,
+    );
+  return deny(
+    !ruling
+      ? codex
+        ? `nobody independent has seen ${short} work, and Codex has no verifier agent. Ask Claude to run the verifier on ${short}, or leave the merge to Devesh.`
+        : `nobody independent has seen ${short} work. ${where}, run the verifier agent there, then merge.`
+      : ruling.verdict === "fail"
+        ? `the verifier ruled FAIL on ${short}: ${ruling.note}`
+        : `the verifier could not verify ${short} without something only Devesh can provide (${ruling.note}), so only Devesh merges it.`,
   );
-  return r.ok
-    ? r
-    : {
-        ...r,
-        reason: `${r.reason}\nThe code in question is commit ${short} on ${c.branch}: check it out, and have the verifier rule there.`,
-      };
 }
 
 async function stop(
@@ -1056,30 +1151,21 @@ async function stop(
   session: string,
   codex: boolean,
 ) {
-  if (input.background_tasks?.length || input.session_crons?.length) return; // it will be woken again
-  const here = toplevel(input.cwd ?? repo);
-  const roots = [
-    ...new Set([
-      ...store
-        .list("seen", `${session}-`)
-        .map(({ key }) => store.get("seen", key) ?? ""),
-      here,
-    ]),
-  ].filter((r) => r && existsSync(r));
-  const main = checkoutsOf(repo)[0] ?? repo;
-  const name = (root: string) => relative(main, root) || "the main checkout";
+  const { all, here, roots } = rootsOf(repo, store, session, input.cwd);
+  const name = (root: string) =>
+    relative(all[0] ?? repo, root) || "the main checkout";
   const started = Number(store.get("started", session) ?? 0);
-  const work: {
-    key: string;
-    tree: string;
-    where?: string; // unset: the checkout the agent is in, named in no message
-    judge: (cachedOnly: boolean) => Promise<Verdict>;
-  }[] = [];
+  const trees: string[] = [];
+  const work: { key: string; root: string; tree: string; where?: string }[] =
+    [];
   const notes: string[] = [];
   for (const root of roots) {
     const key = keyOf(session, root);
-    const accepted = store.get("accepted", key);
     const tree = snapshot(root, false).tree;
+    trees.push(tree);
+    const toucher = store.get("toucher", idOf(root));
+    if (toucher && toucher !== session) continue; // another session worked here since: its change, not this one's
+    const accepted = store.get("accepted", key);
     if (tree === accepted) {
       // Work from before the session, never judged: say so once, rather than pass it in silence.
       if (
@@ -1097,17 +1183,17 @@ async function stop(
       }
       continue;
     }
-    // Switched, pulled or reset, with nothing of its own on top, to commits the session did not make or that
-    // main already holds (a teammate's work merged meanwhile; the session's own merged work is judged as left).
-    const [headTree, made, head] = git(
+    // A pull, switch or reset to commits the session did not make (or that main already holds), with the
+    // checkout's own edits and new files as they were: not the session's work.
+    const [made, head] = git(
       root,
-      ["log", "-1", "--format=%T %ct %H"],
+      ["log", "-1", "--format=%ct %H"],
       {},
       true,
     ).split(" ");
     if (
       accepted &&
-      tree === headTree &&
+      store.get("extra", key) === extra(root, tree) &&
       (Number(made) < started ||
         git(root, ["merge-base", "HEAD", "origin/main"], {}, true) === head)
     ) {
@@ -1116,28 +1202,18 @@ async function stop(
     }
     work.push({
       key,
+      root,
       tree,
       where: root === here ? undefined : name(root),
-      judge: (cachedOnly) => judge(snapshot(root), store, codex, cachedOnly),
     });
   }
-  if (started)
-    for (const c of leftBehind(roots, started)) {
-      const key = keyOf(session, `left ${c.commit}`);
-      if (
-        store.get("accepted", key) !== c.tree &&
-        !work.some((w) => w.tree === c.tree)
-      )
-        work.push({
-          key,
-          tree: c.tree,
-          where: `${c.branch} (commit ${c.commit.slice(0, 7)})`,
-          judge: async () => judgeLeft(c, store, codex),
-        });
-    }
   if (!work.length) return notes.length ? say(notes.join("\n")) : undefined;
-  for (const w of work) {
-    const pause = store.take("pause", w.tree);
+  if (input.background_tasks?.length || input.session_crons?.length)
+    return say(
+      "Done gate ⏳ not checked yet: background work is still running. The first stop after it ends is checked.",
+    );
+  for (const tree of new Set([...trees, ...work.map((w) => w.tree)])) {
+    const pause = store.take("pause", tree);
     if (pause)
       return say(
         `Done gate ⏸ waiting on you: ${pause} (the change so far is NOT verified)`,
@@ -1152,13 +1228,14 @@ async function stop(
   const passed: string[] = [];
   let failed: { headline: string; reason: string } | undefined;
   for (const w of work) {
-    const j = await w.judge(gaveUp);
-    const at = w.where ? `in ${w.where}: ` : "";
+    const j = await judge(snapshot(w.root), store, codex, gaveUp);
     if (!j.ok) {
-      failed = {
-        headline: `${at}${j.headline}`,
-        reason: `${at ? `In ${w.where}: ` : ""}${j.reason}`,
-      };
+      failed = w.where
+        ? {
+            headline: `in ${w.where}: ${j.headline}`,
+            reason: `In ${w.where}: ${j.reason}`,
+          }
+        : j;
       break;
     }
     passed.push(
@@ -1202,15 +1279,42 @@ async function stop(
 }
 
 /**
- * The verifier may finish only after recording a ruling (`bun run gate verdict`, run in the checkout it judged)
- * while it ran; each such ruling then counts for the exact code it names.
+ * The verifier may finish only after recording a ruling (`bun run gate verdict`, in the checkout it judged)
+ * while it ran, on code this session is working on. If it recorded several on the same code, a FAIL stands.
  */
-function verifierDone(store: Store, session: string) {
+function verifierDone(
+  repo: string,
+  input: HookInput,
+  store: Store,
+  session: string,
+) {
   const since = Number(store.get("verifier", session) ?? Date.now());
-  const rulings = store.list("pending").filter((p) => p.at >= since);
-  for (const { key } of rulings)
-    store.put("verdict", key, store.take("pending", key) ?? "");
-  if (rulings.length) return store.take("verifier", session);
+  const mine = new Set(
+    rootsOf(repo, store, session, input.cwd).roots.map(
+      (r) => snapshot(r, false).tree,
+    ),
+  );
+  let promoted = 0;
+  for (const { key } of store.list("pending")) {
+    if (!mine.has(key)) continue;
+    const fresh = (store.get("pending", key) ?? "")
+      .split("\n")
+      .map((l) => parseRuling(l) as (Ruling & { at?: number }) | undefined)
+      .filter((r) => r && (r.at ?? 0) >= since) as Ruling[];
+    const pick =
+      fresh.find((r) => r.verdict === "fail") ??
+      fresh.find((r) => r.verdict === "cannot-verify") ??
+      fresh.at(-1);
+    if (!pick) continue;
+    store.put(
+      "verdict",
+      key,
+      JSON.stringify({ verdict: pick.verdict, note: pick.note }),
+    );
+    store.take("pending", key);
+    promoted++;
+  }
+  if (promoted) return store.take("verifier", session);
   process.stderr.write(
     'Before you finish, record your ruling on the code exactly as it is now, from the checkout that holds it:\nbun run gate verdict pass|fail "<one line: what you saw>"\nor, only when seeing it work needs something only Devesh has: bun run gate verdict cannot-verify "<exactly what he must provide>"',
   );
@@ -1220,11 +1324,15 @@ function verifierDone(store: Store, session: string) {
 /** `codex`: run by .codex/hooks.json (`hook codex`) rather than Claude Code's .claude/settings.json. */
 async function hook(input: HookInput, codex: boolean) {
   const event = input.hook_event_name;
-  // A shell left outside any checkout: this file's own repository still holds the session's record.
+  // The gate of the checkout the agent is in; when that has none (a branch cut before the gate, another
+  // repository, no checkout at all), the one this file belongs to, whose repository holds the session's record.
+  const shell = toplevel(input.cwd ?? process.cwd());
   const repo =
-    toplevel(input.cwd ?? process.cwd()) || toplevel(import.meta.dir);
-  const own = repo && join(repo, "scripts", "done-gate.ts");
-  if (!own || !existsSync(own)) return; // a checkout without this gate
+    shell && existsSync(join(shell, "scripts", "done-gate.ts"))
+      ? shell
+      : toplevel(import.meta.dir);
+  if (!repo) return;
+  const own = join(repo, "scripts", "done-gate.ts");
   if (
     event !== "PreToolUse" &&
     realpathSync(own) !== realpathSync(import.meta.path)
@@ -1244,14 +1352,17 @@ async function hook(input: HookInput, codex: boolean) {
   const session = input.session_id ?? "unknown";
   switch (event) {
     case "SessionStart":
-    case "PreToolUse":
       return touch(repo, input, store, session);
+    case "PreToolUse":
+      touch(repo, input, store, session);
+      return mergeGate(repo, input, store, codex);
     case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
       if (input.agent_type === "verifier")
         store.put("verifier", session, String(Date.now()));
       return;
     case "SubagentStop":
-      if (input.agent_type === "verifier") verifierDone(store, session);
+      if (input.agent_type === "verifier")
+        verifierDone(repo, input, store, session);
       return;
     case "Stop":
     case "TeammateIdle":
@@ -1337,7 +1448,11 @@ if (import.meta.main) {
       verdict: args[0] as Ruling["verdict"],
       note: args.slice(1).join(" ").trim(),
     };
-    store.put("pending", snapshot(repo, false).tree, JSON.stringify(ruling));
+    store.add(
+      "pending",
+      snapshot(repo, false).tree,
+      `${JSON.stringify({ ...ruling, at: Date.now() })}\n`,
+    );
     console.log(
       `Ruling noted: ${ruling.verdict.toUpperCase()}: ${ruling.note}\nIt counts only when it comes from the verifier agent, and only for the code exactly as it is now.`,
     );

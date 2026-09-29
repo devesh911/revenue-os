@@ -50,8 +50,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   `proof ready` and ask him to look; only Devesh fills in `Seen by Devesh:` with a date.
 - Passing tests are required and never sufficient. Tests with fakes prove logic, not the product.
 - **The done gate enforces this, so nobody has to remember it.** Whenever a Claude agent stops,
-  `scripts/done-gate.ts` checks what its session changed, in every checkout it worked in and in every
-  commit it made on a branch and then left (even merged): first the rules against fake-done (throwing
+  `scripts/done-gate.ts` checks what its session changed in each checkout it worked in (and was the last
+  to work in): first the rules against fake-done (throwing
   stubs, exports nothing calls, silenced checks, skipped tests, tests that read source code), then every
   check on the exact code, then, if product code changed, a ruling from the verifier agent
   (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words: PASS,
@@ -111,7 +111,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    evidence (the gate's line, the verifier's ruling, how the result was seen working). Watch CI:
    `gh pr checks <n> --watch`. Green means observed green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
-   three or more open task PRs, stop taking new work.
+   three or more open task PRs, stop taking new work. The done gate refuses an agent's `gh pr merge`
+   unless the PR's head commit, exactly, passed `bun run gate` on this machine and, for product code,
+   the verifier ruled PASS on it; a CANNOT_VERIFY means only Devesh merges it.
 6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
    to tick; its PR body's what / why / evidence is the record), updates `STATE.md → What works
    today` if reality changed, and adds a line to `STATE.md → Decisions in force` for any decision.
