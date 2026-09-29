@@ -5,12 +5,14 @@ import { track } from "../lib/analytics";
 import { Icon, PAUSE, PLAY } from "./Icon";
 
 // The hero's listen button: plays and pauses the sample recording in place — no
-// player, no transcript. The pill never changes width: every label sits in one
+// player. The pill never changes width: every label sits in one
 // grid cell and only the current one shows. The recording loads on the first
 // press (nothing is fetched until then); a failed load says so and the next
 // press retries. "Sample play" is tracked once per page, on the first playback
-// that actually starts. The honesty note (a text-to-speech recreation) sits
-// right after the button, as a full-width item of the caller's flex row.
+// that actually starts. The honesty note (a dramatised call, voiced with ElevenLabs)
+// sits right after the button, as a full-width item of the caller's flex row, and
+// under it a closed "Read the transcript" disclosure holds every line of the call
+// (the recording's text alternative, WCAG 1.2.1).
 type State = "idle" | "playing" | "paused" | "ended";
 
 const LABELS: Record<State, string> = {
@@ -28,7 +30,7 @@ export function SampleAudio({ className }: { className?: string }) {
   const tracked = useRef(false);
   const [state, setState] = useState<State>("idle");
   const [failed, setFailed] = useState(false);
-  const noteId = useId(); // the text-to-speech note describes the button
+  const noteId = useId(); // the honesty note describes the button
 
   useEffect(() => () => audio.current?.pause(), []);
 
@@ -107,6 +109,24 @@ export function SampleAudio({ className }: { className?: string }) {
         </span>
         {sampleCall.disclosure}
       </p>
+      <details className="w-full max-w-[34rem] text-[13px] text-stone leading-[1.55]">
+        <summary className="w-fit cursor-pointer underline decoration-line underline-offset-[3px] hover:text-ink-2">
+          {sampleCall.transcriptLabel}
+        </summary>
+        <ol className="mt-[10px] grid gap-[8px]">
+          {sampleCall.transcript.map((line) => (
+            <li
+              key={line.text}
+              className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-[12px]"
+            >
+              <span className="pt-[2px] font-mono text-[11px] uppercase tracking-[0.08em]">
+                {line.who}
+              </span>
+              <span className="text-pretty text-ink-2">{line.text}</span>
+            </li>
+          ))}
+        </ol>
+      </details>
     </>
   );
 }

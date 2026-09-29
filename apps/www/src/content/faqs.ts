@@ -18,7 +18,7 @@ export const faqCopy = {
 export const faqs: Faq[] = [
   {
     q: "How natural does the voice sound?",
-    a: "The sample on this page is recreated with basic text-to-speech, not the voice used on real calls. On the demo you'll hear the production voice speaking Hinglish, and you approve the call script before any call goes out.",
+    a: "The sample on this page is a dramatised call voiced with ElevenLabs, not a recording of a real one. On the demo you'll hear the production voice speaking Hinglish, and you approve the call script before any call goes out.",
   },
   {
     q: "Does it replace my sales team?",

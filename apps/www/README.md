@@ -16,7 +16,7 @@ bun install                    # once, from the repo root
 bun run --filter www dev       # vite dev server
 bun run --filter www build     # production build → apps/www/dist
 bun run --filter www preview   # serve the built dist locally
-bun apps/www/scripts/make-sample-call.ts   # regenerate the synthetic sample call (macOS)
+bun apps/www/scripts/make-sample-call.ts <takes>   # rebuild the sample call from its ElevenLabs takes
 ```
 
 ## Configuration
@@ -74,8 +74,8 @@ filter (the `heard_sample` property on each completed booking gives the split).
 | Path | What it holds |
 | --- | --- |
 | `index.html` | The Vite entry: a `#root` div + `<script type="module" src="/src/main.tsx">`, plus the head meta (title, description, Open Graph, `theme-color`, `color-scheme: only light` so forced-dark browsers leave the page alone) and the favicon link. The title and description repeat the hero copy — update them together. |
-| `public/` | Static files served as-is — `favicon.svg` (the brand mark), `sample-call.m4a` (the synthetic sample call). |
-| `scripts/make-sample-call.ts` | Regenerates `public/sample-call.m4a` with the system text-to-speech voices (macOS). Afterwards, set `sampleCall.seconds` in `content/hero.ts` to the new length — the copy-parity suite checks it against the file. |
+| `public/` | Static files served as-is — `favicon.svg` (the brand mark), `sample-call.m4a` (the dramatised sample call, voiced with ElevenLabs). |
+| `scripts/make-sample-call.ts` | Rebuilds `public/sample-call.m4a` from its ElevenLabs takes (one line per take; run it with no folder to print the voices, model and exact lines to generate). Needs ffmpeg. Afterwards, set `sampleCall.seconds` in `content/hero.ts` to the new length — the copy-parity suite checks it against the file. |
 | `src/main.tsx` | Boot entry — mounts `<App/>` into `#root`, owns the single stylesheet side-effect `import "./styles.css"` (so `App` stays SSR-safe), loads Plausible when configured, and calls `armChime()` so the visitor's first tap, click or key press unlocks the message chime (see **Sound**). |
 | `src/App.tsx` | Composes the page inside `BookingProvider`: skip link, sticky `header → nav`, `main` → the sections in page order (see **Page order**): hero · How it works (`HowItWorks`: the intro, 01, 02) · the engine panel (`StageGrid`, 03) · examples · pilot · the pilot report (`Proof`) · FAQ · closing, `footer` → the meta row, and the one `BookingDialog`. Calls `useReveal()` once and honours cold-load deep links (`/#pilot`; `/#book` opens the booking dialog). Imports no CSS. |
 | `src/styles.css` | `@import "tailwindcss"` + the `@theme` tokens (paper / ink / clay palette, illustration plates, the `card` surface, the `lift` shadow, type families, the soft ease), the shared `ro-*` keyframes, one reserved block per visual for its own keyframes and utilities (`survey-*` for the hero's drawing sheet, `intent-*` for the intent study, `brief-*` for the call brief), the scroll-reveal, pause, and reduced-motion rules, the decorative `@utility` classes, and **every** `@font-face` block. The **only** place raw colour hex lives. |
@@ -149,7 +149,9 @@ in this order and the copy-parity suite pins it, heading by heading.
 The hero follows study A3 ("Surveyor's grid") from the hook-studies board, as it
 is. The copy column holds a plain mono eyebrow (no kicker dot, as in the study),
 the page's one headline, the lede, "Book a demo",
-"Hear a sample call 0:42" with its text-to-speech note, and under that the
+"Hear a sample call 1:13" with its honesty note (a dramatised call voiced with
+ElevenLabs; Rohan is not a real customer), a closed "Read the transcript" list
+of every line (the agent says it is an AI in the first), and under that the
 page-wide **Pause animations** switch (a real button, 44px touch target; hidden
 under reduced motion, where there is nothing to pause).
 
@@ -281,7 +283,7 @@ studies in How it works — and never decorates for its own sake.
 
 - **Honesty.** Revenue OS has no live customers yet: never present names, logos,
   results or quotes as real. Examples are labelled ("Illustrative example",
-  "Example", "Sample call", and the text-to-speech note under the listen button).
+  "Example", "Sample call", and the dramatised-call note under the listen button).
   Claims match what exists today: English + Hindi/Hinglish; leads arrive by CSV
   import, so speed reads "called 2 min after import" — never a seconds-to-call
   claim or a lead portal as a live source; CRM connectors and intent scoring are

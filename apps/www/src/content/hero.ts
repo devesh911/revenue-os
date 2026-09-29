@@ -1,19 +1,68 @@
 // The hero's copy, the sample recording its listen button plays in place, the
 // result card that sits on the drawing (one ready buyer's call, finished) and the
 // drawing sheet under it. Hero, SampleAudio and SurveyGround compose these and
-// inline none. The recording is SYNTHETIC (apps/www/scripts/make-sample-call.ts).
+// inline none. The recording is a DRAMATISED call: both voices are generated with
+// ElevenLabs (apps/www/scripts/make-sample-call.ts assembles the takes), Rohan is not a
+// real customer, and the agent says in its first line that it is an AI assistant.
+// The transcript is what is said, in the same Hinglish as the Examples section.
 // Names, places and figures are illustrative. \u00a0 keeps a number with its unit.
 
 const ILLUSTRATIVE = "Names and figures are illustrative.";
 
+const agent = "Asha · AI";
+const buyer = "Rohan";
+
 export const sampleCall = {
   src: "/sample-call.m4a",
-  seconds: 42,
-  disclosure: `Recreated with basic text-to-speech, not the voice used on real calls. ${ILLUSTRATIVE}`,
+  seconds: 73,
+  disclosure: `A dramatised call: both voices are generated with ElevenLabs, and Rohan is not a real customer. ${ILLUSTRATIVE}`,
   play: "Play sample call", // after it has finished
   pause: "Pause sample call",
   resume: "Resume sample call",
   unavailable: "The recording didn't load.",
+  // What is said, line by line (WCAG 1.2.1: a text alternative for the recording).
+  transcriptLabel: "Read the transcript",
+  transcript: [
+    {
+      who: agent,
+      text: "Namaste Rohan ji! Main Asha bol rahi hoon, Meridian Greens ki AI assistant. Aapne abhi Whitefield mein 2\u00a0BHK ke liye enquiry ki thi. Do minute baat ho sakti hai?",
+    },
+    { who: buyer, text: "Haan, haan, boliye." },
+    {
+      who: agent,
+      text: "Aapne budget nabbe lakh tak bataya tha. Tower\u00a0B mein teen 2\u00a0BHK units hain jo usmein aa jaate hain.",
+    },
+    {
+      who: buyer,
+      text: "Accha. Carpet area kitna hai? Aur parking included hai?",
+    },
+    {
+      who: agent,
+      text: "2 BHK ka carpet area 1,050\u00a0sq\u00a0ft hai, aur ek covered parking included hai.",
+    },
+    { who: buyer, text: "Possession kab tak milega?" },
+    {
+      who: agent,
+      text: "December 2027 mein. Aap kab tak shift karna chahte hain?",
+    },
+    { who: buyer, text: "Next year tak plan hai. Home loan bhi lena padega." },
+    {
+      who: agent,
+      text: "Koi baat nahin, hamare loan partner se bhi baat karwa dete hain. Ek baar project dekhna chahenge?",
+    },
+    { who: buyer, text: "Okay. Weekend pe dekh sakte hain?" },
+    { who: agent, text: "Bilkul. Saturday subah gyarah baje theek rahega?" },
+    { who: buyer, text: "Haan, gyarah baje chalega." },
+    {
+      who: agent,
+      text: "Perfect. Saturday, 11\u00a0AM, Tower\u00a0B: aapka visit book ho gaya. Location pin aur details main abhi WhatsApp pe bhej rahi hoon.",
+    },
+    { who: buyer, text: "Great, thank you." },
+    {
+      who: agent,
+      text: "Thank you, Rohan ji. Saturday ko hamari sales team aapka intezaar karegi.",
+    },
+  ],
 } as const;
 
 export const hero = {

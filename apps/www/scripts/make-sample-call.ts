@@ -1,93 +1,149 @@
-// Regenerates the SYNTHETIC sample call (public/sample-call.m4a) and prints its
-// length for sampleCall.seconds in src/content/hero.ts. macOS only: it uses the system
-// text-to-speech voices (`say`) and `afconvert`. The agent speaks Hindi-script
-// text (Lekha, hi_IN) so Hindi words are pronounced natively; the buyer speaks
-// romanised Hinglish (Aman, en_IN). Replace the output with a real recording
-// as soon as one exists.
-//   bun apps/www/scripts/make-sample-call.ts
+// Assembles the DRAMATISED sample call (public/sample-call.m4a) from ElevenLabs takes
+// and prints its length for sampleCall.seconds in src/content/hero.ts.
+//
+// The takes are generated in ElevenLabs, one line per take, with the voices, model and
+// exact text below (Hindi in Devanagari so it is pronounced natively; English terms as
+// they are said). Download them in call order as 01.mp3 … 15.mp3 into one folder, then:
+//   bun apps/www/scripts/make-sample-call.ts <folder>
+// Each take is trimmed, long pauses inside it are cut to 0.3 s, both voices are levelled
+// to one loudness, the turns are joined with natural gaps, and the call gets a light
+// phone-line band (110 Hz – 7.4 kHz) and a -16 LUFS master. Needs ffmpeg on PATH.
+// The transcript on the page (sampleCall.transcript) is the same call, romanised.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const RATE = 22050;
-const GAP = 0.45; // seconds of silence between turns
-const LEAD_IN = 0.3;
+const MODEL = "eleven_v3";
+const VOICES = {
+  agent: {
+    name: "Koyal – Clear & Natural Sales Agent",
+    id: "WCm1zbL9QZhPl3W662WR",
+  },
+  buyer: {
+    name: "Amit – Social Media & Conversational",
+    id: "GMZSbUPPZmaF5CfxdwVt",
+  },
+} as const;
 
-const LINES: Array<{ voice: "Lekha" | "Aman"; tts: string }> = [
-  {
-    voice: "Lekha",
-    tts: "नमस्ते रोहन जी, मैं आशा बोल रही हूँ, Meridian Homes से। आपने अभी Whitefield के 2 BHK के बारे में enquiry की थी?",
-  },
-  {
-    voice: "Aman",
-    tts: "Haan ji. Budget around ninety lakh hai. Possession kab tak milega?",
-  },
-  {
-    voice: "Lekha",
-    tts: "Tower B में December 2027 में possession है, और 2 BHK नब्बे लाख के अंदर available है। आप कब तक shift करना चाहते हैं?",
-  },
-  { voice: "Aman", tts: "Next year tak. Home loan bhi lena hai." },
-  {
-    voice: "Lekha",
-    tts: "बिल्कुल, हम loan partner से भी connect करा देंगे। क्या आप Saturday को site visit के लिए आ सकते हैं?",
-  },
-  { voice: "Aman", tts: "Saturday, eleven baje theek rahega." },
-  {
-    voice: "Lekha",
-    tts: "Done. Saturday ग्यारह बजे का visit book हो गया। Location और details मैं WhatsApp पर भेज रही हूँ।",
-  },
+// [speaker, text sent to ElevenLabs, pause before the line in seconds]
+const LINES: Array<[keyof typeof VOICES, string, number]> = [
+  [
+    "agent",
+    "[warmly] नमस्ते रोहन जी! मैं Asha बोल रही हूँ, Meridian Greens की AI assistant. आपने अभी Whitefield में 2 BHK के लिए enquiry की थी — दो मिनट बात हो सकती है?",
+    0.3,
+  ],
+  ["buyer", "[casually] हाँ, हाँ, बोलिए।", 0.35],
+  [
+    "agent",
+    "आपने budget नब्बे लाख तक बताया था। Tower B में तीन 2 BHK units हैं जो उसमें आ जाते हैं।",
+    0.4,
+  ],
+  ["buyer", "अच्छा। Carpet area कितना है? और parking included है?", 0.45],
+  [
+    "agent",
+    "2 BHK का carpet area 1,050 square feet है, और एक covered parking included है।",
+    0.5,
+  ],
+  ["buyer", "Possession कब तक मिलेगा?", 0.35],
+  ["agent", "December 2027 में। आप कब तक shift करना चाहते हैं?", 0.45],
+  ["buyer", "Next year तक plan है। Home loan भी लेना पड़ेगा।", 0.45],
+  [
+    "agent",
+    "कोई बात नहीं, हमारे loan partner से भी बात करवा देते हैं। एक बार project देखना चाहेंगे?",
+    0.5,
+  ],
+  ["buyer", "Okay. Weekend पे देख सकते हैं?", 0.4],
+  ["agent", "बिल्कुल। Saturday सुबह ग्यारह बजे ठीक रहेगा?", 0.45],
+  ["buyer", "हाँ, ग्यारह बजे चलेगा।", 0.35],
+  [
+    "agent",
+    "Perfect. Saturday, eleven AM, Tower B — आपका visit book हो गया। Location pin और details मैं अभी WhatsApp पे भेज रही हूँ।",
+    0.45,
+  ],
+  ["buyer", "Great, thank you.", 0.35],
+  [
+    "agent",
+    "Thank you, रोहन जी। Saturday को हमारी sales team आपका इंतज़ार करेगी।",
+    0.35,
+  ],
 ];
+const TAIL = 0.45;
+const RATE = 48000;
 
-const dir = mkdtempSync(join(tmpdir(), "sample-call-"));
-const silence = (s: number) => Buffer.alloc(Math.round(s * RATE) * 2);
-const chunks: Buffer[] = [silence(LEAD_IN)];
-let t = LEAD_IN;
-for (const [i, line] of LINES.entries()) {
-  const wav = join(dir, `${i}.wav`);
-  execFileSync("say", [
-    "-v",
-    line.voice,
-    "-o",
-    wav,
-    `--data-format=LEI16@${RATE}`,
-    line.tts,
-  ]);
-  const buf = readFileSync(wav);
-  const pcm = buf.subarray(buf.indexOf("data") + 8); // WAVE: "data" + u32 size
-  chunks.push(pcm, silence(GAP));
-  t += pcm.length / 2 / RATE + GAP;
+const dir = process.argv[2];
+if (!dir) {
+  console.log(
+    `model ${MODEL}; agent ${VOICES.agent.name} (${VOICES.agent.id}); buyer ${VOICES.buyer.name} (${VOICES.buyer.id})`,
+  );
+  for (const [i, [who, text]] of LINES.entries())
+    console.log(`${String(i + 1).padStart(2, "0")} ${who}: ${text}`);
+  console.error(
+    "usage: bun apps/www/scripts/make-sample-call.ts <folder with 01.mp3 … 15.mp3>",
+  );
+  process.exit(1);
 }
 
-const data = Buffer.concat(chunks);
-const header = Buffer.alloc(44);
-header.write("RIFF", 0);
-header.writeUInt32LE(36 + data.length, 4);
-header.write("WAVEfmt ", 8);
-header.writeUInt32LE(16, 16); // PCM chunk size
-header.writeUInt16LE(1, 20); // PCM
-header.writeUInt16LE(1, 22); // mono
-header.writeUInt32LE(RATE, 24);
-header.writeUInt32LE(RATE * 2, 28);
-header.writeUInt16LE(2, 32);
-header.writeUInt16LE(16, 34);
-header.write("data", 36);
-header.writeUInt32LE(data.length, 40);
-const full = join(dir, "full.wav");
-writeFileSync(full, Buffer.concat([header, data]));
-
+const ff = (args: string[]) =>
+  execFileSync("ffmpeg", ["-v", "error", "-y", ...args], {
+    maxBuffer: 1 << 30,
+  });
+const work = mkdtempSync(join(tmpdir(), "sample-call-"));
+const parts: Float32Array[] = [];
+for (const [i, [, , pause]] of LINES.entries()) {
+  const take = resolve(dir, `${String(i + 1).padStart(2, "0")}.mp3`);
+  if (!existsSync(take)) throw new Error(`missing take ${take}`);
+  const raw = ff([
+    "-i",
+    take,
+    "-af",
+    // trim both ends, then cut any pause inside the line down to 0.3 s
+    "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06,areverse,silenceremove=stop_periods=-1:stop_duration=0.32:stop_threshold=-40dB:stop_silence=0.3",
+    "-ac",
+    "1",
+    "-ar",
+    String(RATE),
+    "-f",
+    "f32le",
+    "-",
+  ]);
+  const x = new Float32Array(raw.buffer, raw.byteOffset, raw.length / 4);
+  const rms = Math.sqrt(x.reduce((s, v) => s + v * v, 0) / x.length);
+  parts.push(
+    new Float32Array(Math.round(pause * RATE)),
+    x.map((v) => (v * 0.1) / rms),
+  );
+}
+parts.push(new Float32Array(Math.round(TAIL * RATE)));
+const call = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
+let at = 0;
+for (const p of parts) {
+  call.set(p, at);
+  at += p.length;
+}
+const pcm = join(work, "call.f32");
+writeFileSync(pcm, Buffer.from(call.buffer));
 const out = resolve(import.meta.dir, "../public/sample-call.m4a");
-execFileSync("afconvert", [
+ff([
   "-f",
-  "m4af",
-  "-d",
+  "f32le",
+  "-ar",
+  String(RATE),
+  "-ac",
+  "1",
+  "-i",
+  pcm,
+  "-af",
+  "highpass=f=110,lowpass=f=7400,acompressor=threshold=-20dB:ratio=2.5:attack=5:release=120:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7",
+  "-ar",
+  String(RATE),
+  "-c:a",
   "aac",
-  "-b",
-  "48000",
-  full,
+  "-b:a",
+  "96k",
   out,
 ]);
-rmSync(dir, { recursive: true });
-
-console.log(`wrote ${out}`);
-console.log(`duration: ${t.toFixed(1)}s`);
+rmSync(work, { recursive: true, force: true });
+console.log(
+  `wrote ${out}: ${(call.length / RATE).toFixed(1)} s → set sampleCall.seconds to ${Math.round(call.length / RATE)}`,
+);

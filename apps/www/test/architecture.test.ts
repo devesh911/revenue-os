@@ -510,7 +510,7 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "visuals/SampleAudio",
       "hero",
-      ["Hear a sample call", "/sample-call.m4a", "not the voice used"],
+      ["Hear a sample call", "/sample-call.m4a", "Read the transcript"],
     ],
     [
       "sections/Proof",
