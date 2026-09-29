@@ -10,6 +10,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -20,9 +21,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import {
   checkRules,
+  mergeOf,
   onSharedStack,
   parseDiff,
   RULE_FILES,
+  simpleCommands,
   usesExport,
 } from "./done-gate";
 
@@ -469,6 +472,59 @@ describe("checkRules", () => {
       rules.join("\n"),
     ).stdout;
     expect(rules.filter((f) => !matched.split("\n").includes(f))).toEqual([]);
+  });
+});
+
+describe("reading a shell command: which gh pr merge it runs", () => {
+  const merges = (line: string) =>
+    simpleCommands(line)
+      .map(mergeOf)
+      .filter(Boolean)
+      .map((m) => m?.pr ?? "(none)");
+
+  it("finds a merge only where the command runs one, not where text mentions it", () => {
+    expect(merges('grep -rn "gh pr merge" scripts AGENTS.md')).toEqual([]);
+    expect(
+      merges('git commit -qm "refuse an agent gh pr merge unless proven"'),
+    ).toEqual([]);
+    expect(
+      merges(
+        "git commit -F - <<'EOF'\nWhy\ngh pr merge 7 is refused now\nEOF\ngit log -1",
+      ),
+    ).toEqual([]); // a heredoc is text
+    expect(
+      merges('gh pr create --body "Step 5: gh pr merge is refused"'),
+    ).toEqual([]);
+    expect(
+      merges("cd ../w && gh pr merge 12 --squash --delete-branch"),
+    ).toEqual(["12"]);
+    expect(merges("gh pr merge 7 --squash && gh pr merge 9 --squash")).toEqual([
+      "7",
+      "9",
+    ]);
+    expect(merges("GH_TOKEN=x /opt/homebrew/bin/gh pr -R o/r merge 9")).toEqual(
+      ["9"],
+    );
+  });
+
+  it("takes the pull request from where gh does: the first word after merge that no option owns", () => {
+    expect(merges('gh pr merge --squash --body "Fixes 7 flaky tests"')).toEqual(
+      ["(none)"],
+    );
+    expect(merges('gh pr merge "7" --squash')).toEqual(["7"]);
+    expect(merges("gh pr merge --squash -t 'Release 2' feat/x")).toEqual([
+      "feat/x",
+    ]);
+    expect(merges("gh pr merge --squash --delete-branch\nsleep 7")).toEqual([
+      "(none)",
+    ]);
+    expect(
+      mergeOf(
+        simpleCommands(
+          "gh pr merge https://github.com/o/r/pull/5 --auto --match-head-commit=abc1234",
+        )[0] ?? [],
+      ),
+    ).toMatchObject({ pr: "https://github.com/o/r/pull/5", head: "abc1234" });
   });
 });
 
@@ -1079,7 +1135,7 @@ describe("the hook", () => {
     };
     expect(wired(".claude/settings.json")).toMatchObject({
       SessionStart: [""],
-      PreToolUse: ["Bash|Edit|Write|MultiEdit|NotebookEdit"],
+      PreToolUse: ["Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit"],
       Stop: [""],
       TeammateIdle: [""],
       SubagentStart: ["verifier"],
@@ -1126,14 +1182,16 @@ describe("the hook", () => {
     const merge = (
       command = "gh pr merge 7 --squash --delete-branch",
       codex = false,
+      pr = head,
+      session = "s1",
     ) => {
       const r = sh(
         dir,
         ["bun", GATE, "hook", ...(codex ? ["codex"] : [])],
-        fakeGh(head),
+        fakeGh(pr),
         JSON.stringify({
           hook_event_name: "PreToolUse",
-          session_id: "s1",
+          session_id: session,
           cwd: dir,
           tool_name: "Bash",
           tool_input: { command },
@@ -1167,7 +1225,43 @@ describe("the hook", () => {
       told: `Done gate ✓ merge of ${short}: typecheck, 3 tests · verifier PASS: sent a test SMS and saw it logged`,
     });
     expect(merge("git push && gh pr merge 7 --squash").refused).toBe(true);
-    expect(merge("gh pr list")).toEqual({ refused: false, why: "", told: "" });
+    for (const quiet of [
+      "gh pr list",
+      'grep -n "gh pr merge" scripts/done-gate.ts',
+      'git commit -qm "an agent gh pr merge is refused until proven"',
+      "gh pr merge 7 --disable-auto",
+      "gh pr merge --help",
+      "gh pr merge 7 -R someone/else --squash", // another repository's
+    ])
+      expect(merge(quiet)).toEqual({ refused: false, why: "", told: "" });
+    expect(merge("gh pr merge --squash").why).toContain(
+      "name the pull request by its number",
+    );
+    expect(
+      merge("gh pr merge 7 --squash && gh pr merge 9 --squash").why,
+    ).toContain("one pull request at a time");
+    expect(merge("gh pr merge 7 --auto --squash").why).toContain(
+      `--match-head-commit ${head}`,
+    );
+    expect(
+      merge(`gh pr merge 7 --auto --squash --match-head-commit ${head}`)
+        .refused,
+    ).toBe(false);
+    expect(merge("gh api -X PUT repos/o/r/pulls/7/merge").refused).toBe(true);
+    mkdirSync(join(dir, "scratch-lib"));
+    sh(join(dir, "scratch-lib"), ["git", "init", "-q"]); // a folder the gate can't snapshot
+    sh(dir, ["git", "checkout", "-q", "main"]);
+    write(dir, "services/worker/src/sms.ts", "const sms = 2;\n"); // unproven again
+    commitAll(dir);
+    const unproven = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
+    const fresh = merge(undefined, false, unproven, "s2"); // s2's first note of this checkout fails
+    expect(fresh.refused).toBe(true);
+    expect(fresh.why).toContain(`${unproven.slice(0, 7)} has not passed`);
+    expect(
+      readdirSync(join(dir, ".git", "done-gate", "seen")).some((k) =>
+        k.startsWith("s2-"),
+      ),
+    ).toBe(false);
   });
 
   it("refuses a merge the verifier could not verify: only Devesh merges it", () => {
@@ -1183,7 +1277,7 @@ describe("the hook", () => {
     const r = hook(
       dir,
       "PreToolUse",
-      { tool_name: "Bash", tool_input: { command: "gh pr merge --squash" } },
+      { tool_name: "Bash", tool_input: { command: "gh pr merge 7 --squash" } },
       fakeGh(head),
     );
     expect(r.told).toBe(
@@ -1284,6 +1378,68 @@ describe("the hook", () => {
     write(wt, "services/worker/src/b.ts", "// @ts-ignore\n");
     expect(hook(dir, "Stop")).toEqual(QUIET);
     expect(hook(wt, "Stop", { session_id: "builder" }).sentBack).toBe(true);
+  });
+
+  it("does not count a builder's fresh commit as the session's when the session only switched to it", () => {
+    const dir = repo();
+    const review = worktree(dir, "review");
+    const b = worktree(dir, "feat/b");
+    hook(review, "SessionStart"); // the reviewer's own worktree
+    write(b, "services/worker/src/b.ts", "const b = 1;\n");
+    commitAll(b); // the builder commits during the review
+    const pr = sh(b, ["git", "rev-parse", "HEAD"]).stdout.trim();
+    sh(review, ["git", "checkout", "-q", "--detach", pr]); // to read and try it
+    expect(hook(review, "Stop")).toEqual(QUIET);
+  });
+
+  it("treats a worktree removed and added again at the same path as a new checkout", () => {
+    const dir = repo();
+    const b = worktree(dir, "feat/b");
+    write(b, "services/worker/src/b.ts", "const b = 1;\n");
+    commitAll(b);
+    hook(dir, "SessionStart");
+    const check = join(
+      realpathSync(dirname(b)),
+      `done-gate-check-${Date.now()}`,
+    );
+    dirs.push(check);
+    sh(dir, ["git", "worktree", "add", "-q", "--detach", check, "main"]);
+    hook(dir, "PreToolUse", {
+      tool_name: "Bash",
+      tool_input: { command: `cd ${check} && git log` },
+    });
+    sh(dir, ["git", "worktree", "remove", check]);
+    sh(dir, ["git", "worktree", "add", "-q", "--detach", check, "feat/b"]); // someone else's PR, same path
+    expect(hook(dir, "Stop")).toEqual(QUIET);
+  });
+
+  it("keeps each verifier's ruling apart when two run at once", () => {
+    const dir = repo();
+    const b = worktree(dir, "feat/b");
+    for (const [root, file] of [
+      [dir, "services/worker/src/a.ts"],
+      [b, "services/worker/src/b.ts"],
+    ] as const) {
+      hook(dir, "PreToolUse", {
+        tool_name: "Edit",
+        tool_input: { file_path: join(root, file) },
+      });
+      write(root, file, "const x = 1;\n");
+      checksPassed(root);
+    }
+    hook(dir, "SubagentStart", { agent_type: "verifier", agent_id: "v1" });
+    hook(dir, "SubagentStart", { agent_type: "verifier", agent_id: "v2" });
+    gate(dir, "verdict", "pass", "a works");
+    expect(
+      hook(dir, "SubagentStop", { agent_type: "verifier", agent_id: "v1" })
+        .status,
+    ).toBe(0);
+    gate(b, "verdict", "pass", "b works");
+    expect(
+      hook(dir, "SubagentStop", { agent_type: "verifier", agent_id: "v2" })
+        .status,
+    ).toBe(0);
+    expect(hook(dir, "Stop").sentBack).toBe(false);
   });
 
   it("still judges the session's checkouts when its shell ends in a checkout without the gate", () => {

@@ -111,9 +111,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    evidence (the gate's line, the verifier's ruling, how the result was seen working). Watch CI:
    `gh pr checks <n> --watch`. Green means observed green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
-   three or more open task PRs, stop taking new work. The done gate refuses an agent's `gh pr merge`
-   unless the PR's head commit, exactly, passed `bun run gate` on this machine and, for product code,
-   the verifier ruled PASS on it; a CANNOT_VERIFY means only Devesh merges it.
+   three or more open task PRs, stop taking new work. Merge with `gh pr merge <number>`, one per
+   command: the done gate refuses it unless the PR's head commit, exactly, passed `bun run gate` on this
+   machine and, for product code, the verifier ruled PASS on it; a CANNOT_VERIFY means only Devesh
+   merges it. `--auto` needs `--match-head-commit <that commit>`.
 6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
    to tick; its PR body's what / why / evidence is the record), updates `STATE.md → What works
    today` if reality changed, and adds a line to `STATE.md → Decisions in force` for any decision.

@@ -126,6 +126,7 @@ type HookInput = {
   session_id?: string;
   cwd?: string;
   agent_type?: string;
+  agent_id?: string;
   tool_input?: Record<string, unknown>;
   background_tasks?: unknown[];
   session_crons?: unknown[];
@@ -962,6 +963,30 @@ const checkoutsOf = (repo: string) =>
 const keyOf = (session: string, root: string) =>
   `${session}-${Bun.hash(root).toString(36)}`;
 const idOf = (root: string) => Bun.hash(root).toString(36);
+/** Which checkout sits at `root`: a worktree removed and added again at the same path is another one. */
+const identity = (root: string) => {
+  try {
+    return `${root}\n${statSync(join(root, ".git")).ino}`;
+  } catch {
+    return root;
+  }
+};
+/**
+ * Did this session make the commit HEAD is on, in this checkout (a commit, amend, rebase, cherry-pick or merge
+ * commit since it started)? Arriving at a commit by a switch, a reset or a fast-forward is not making it.
+ */
+const madeHere = (root: string, started: number) => {
+  const [at = "", ...how] = git(
+    root,
+    ["reflog", "show", "-1", "--date=unix", "--format=%gd %gs", "HEAD"],
+    {},
+    true,
+  ).split(" ");
+  return (
+    Number(at.match(/\{(\d+)\}/)?.[1]) >= started &&
+    !/^(checkout|reset): |: Fast-forward$/.test(how.join(" "))
+  );
+};
 /** What a checkout holds beyond its HEAD commit (edits, new files) as one id, which a pull or a switch keeps. */
 const extra = (root: string, tree: string) =>
   Bun.hash(git(root, ["diff-tree", "-r", "HEAD", tree], {}, true)).toString(36);
@@ -1008,12 +1033,13 @@ function touch(repo: string, input: HookInput, store: Store, session: string) {
       }
   for (const c of hits) {
     const key = keyOf(session, c);
-    if (!store.get("seen", key) || store.get("toucher", idOf(c)) !== session) {
+    const same = store.get("seen", key) === identity(c);
+    if (!same || store.get("toucher", idOf(c)) !== session) {
       const tree = snapshot(c, false).tree;
       store.put("accepted", key, tree);
       store.put("extra", key, extra(c, tree));
-      if (!store.get("seen", key)) store.put("baseline", key, tree);
-      store.put("seen", key, c);
+      if (!same) store.put("baseline", key, tree);
+      store.put("seen", key, identity(c));
     }
     store.put("toucher", idOf(c), session);
   }
@@ -1032,12 +1058,158 @@ function rootsOf(repo: string, store: Store, session: string, cwd?: string) {
       ...new Set([
         ...store
           .list("seen", `${session}-`)
-          .map(({ key }) => store.get("seen", key) ?? ""),
+          .map(({ key }) => store.get("seen", key) ?? "")
+          .filter((seen) => seen === identity(seen.split("\n")[0] ?? "")) // still the checkout it saw
+          .map((seen) => seen.split("\n")[0] ?? ""),
         ...(all.includes(here) ? [here] : []),
       ]),
     ].filter((r) => r && existsSync(r)),
   };
 }
+
+/**
+ * PURE: a shell command line → its simple commands, as words with quotes and escapes removed. Enough to see
+ * what a command runs, not a shell: `;`, `&`, `|`, new lines, `(…)`, `$(…)` and backquotes separate commands,
+ * and a heredoc's body (text, not commands) is skipped.
+ */
+export function simpleCommands(line: string): string[][] {
+  const out: string[][] = [[]];
+  const heredocs: string[] = [];
+  let word = "";
+  let quote = "";
+  let inWord = false;
+  const end = () => {
+    if (inWord) out[out.length - 1]?.push(word);
+    word = "";
+    inWord = false;
+  };
+  const next = () => {
+    end();
+    if (out[out.length - 1]?.length) out.push([]);
+  };
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i] ?? "";
+    if (quote) {
+      if (ch === quote) quote = "";
+      else if (ch === "\\" && quote === '"') word += line[++i] ?? "";
+      else word += ch;
+    } else if (ch === "<" && line[i + 1] === "<" && line[i + 2] !== "<") {
+      const tag = line.slice(i + 2).match(/^-?\s*(['"]?)([\w.-]+)\1/);
+      if (tag) {
+        heredocs.push(tag[2] ?? "");
+        i += 1 + tag[0].length;
+      }
+    } else if (ch === "\n") {
+      next();
+      for (const tag of heredocs.splice(0)) {
+        let at = i + 1;
+        while (at < line.length) {
+          const eol = line.indexOf("\n", at);
+          const text = line.slice(at, eol < 0 ? undefined : eol);
+          at = eol < 0 ? line.length : eol + 1;
+          if (text.trim() === tag) break;
+        }
+        i = at - 1;
+      }
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      inWord = true;
+    } else if (ch === "\\") {
+      word += line[++i] ?? "";
+      inWord = true;
+    } else if (";&|()`".includes(ch) || (ch === "$" && line[i + 1] === "(")) {
+      next();
+    } else if (/\s/.test(ch)) end();
+    else {
+      word += ch;
+      inWord = true;
+    }
+  }
+  end();
+  return out.filter((c) => c.length);
+}
+
+/** A simple command's words from the program on (`VAR=x`, `env`, `command` … dropped; /usr/bin/gh is gh). */
+const program = (words: string[]) => {
+  let i = 0;
+  while (
+    /^[A-Za-z_]\w*=/.test(words[i] ?? "") ||
+    ["env", "command", "exec", "time", "nohup", "sudo"].includes(words[i] ?? "")
+  )
+    i++;
+  return words.slice(i).map((w, k) => (k ? w : w.replace(/^.*\//, "")));
+};
+// gh pr merge options that take a value; any other option is a switch.
+const GH_VALUE = new Set([
+  "-t",
+  "--subject",
+  "-b",
+  "--body",
+  "-F",
+  "--body-file",
+  "-A",
+  "--author-email",
+  "--match-head-commit",
+  "-R",
+  "--repo",
+]);
+
+/** PURE: a simple command's words → the `gh pr merge` it runs, if any: the pull request named, and its options. */
+export function mergeOf(words: string[]) {
+  const w = program(words);
+  if (w[0] !== "gh" || w[1] !== "pr") return;
+  const value = new Map<string, string>();
+  const on = new Set<string>();
+  const rest: string[] = [];
+  for (let i = 2; i < w.length; i++) {
+    const a = w[i] ?? "";
+    const eq = a.match(/^(--[\w-]+)=(.*)$/);
+    if (eq) value.set(eq[1] ?? "", eq[2] ?? "");
+    else if (GH_VALUE.has(a)) value.set(a, w[++i] ?? "");
+    else if (a.startsWith("-")) on.add(a);
+    else rest.push(a);
+  }
+  if (rest[0] !== "merge") return;
+  return {
+    pr: rest[1],
+    repo: value.get("-R") ?? value.get("--repo"),
+    head: value.get("--match-head-commit"),
+    on,
+  };
+}
+
+const runsGit = (words: string[], sub: string) => {
+  const w = program(words);
+  let i = 1;
+  while ((w[i] ?? "").startsWith("-"))
+    i += ["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(
+      w[i] ?? "",
+    )
+      ? 2
+      : 1;
+  return w[0] === "git" && w[i] === sub;
+};
+const mergesThroughApi = (words: string[]) => {
+  const w = program(words);
+  return (
+    w[0] === "gh" &&
+    w[1] === "api" &&
+    w.some((a) =>
+      /\/pulls\/\d+\/merge\b|\b(mergePullRequest|enablePullRequestAutoMerge)\b/.test(
+        a,
+      ),
+    )
+  );
+};
+/** "owner/name" of a GitHub repository, from a remote URL, a pull request URL or `owner/name`. */
+const ownerRepo = (s = "") =>
+  s
+    .toLowerCase()
+    .replace(/\/pull\/.*$/, "")
+    .replace(/\.git$/, "")
+    .match(/([\w.-]+)\/([\w.-]+)\/?$/)
+    ?.slice(1)
+    .join("/");
 
 const deny = (why: string) =>
   process.stdout.write(
@@ -1066,47 +1238,78 @@ function mergeGate(
     typeof input.tool_input?.command === "string"
       ? input.tool_input.command
       : "";
-  const merge = command.match(/\bgh\s+pr\s+merge\b([^;&|]*)/);
-  if (!merge) return;
-  if (/\bgit\s+push\b/.test(command))
+  if (!/\bgh\b/.test(command)) return;
+  const commands = simpleCommands(command);
+  if (commands.some(mergesThroughApi))
     return deny(
-      "a push and a merge in one command leave no moment to check what is merged. Push, then run `gh pr merge` on its own.",
+      "merge with `gh pr merge <number>`, which the done gate checks, not through `gh api`.",
     );
-  const args = (merge[1] ?? "").trim().split(/\s+/).filter(Boolean);
-  const r = args.findIndex((a) => a === "-R" || a === "--repo");
-  const pr =
-    args.find((a) => /^\d+$|\/pull\/\d+/.test(a)) ??
-    (args[0] && !args[0].startsWith("-") ? args[0] : undefined);
+  const merges = commands
+    .map(mergeOf)
+    .filter(
+      (m) => m && !["--disable-auto", "--help", "-h"].some((f) => m.on.has(f)),
+    );
+  const m = merges[0];
+  if (!m) return;
+  if (merges.length > 1)
+    return deny("merge one pull request at a time, each in its own command.");
+  if (commands.some((c) => runsGit(c, "push")))
+    return deny(
+      "a push and a merge in one command leave no moment to check what is merged. Push, then run `gh pr merge <number>` on its own.",
+    );
+  const other = m.repo ?? (m.pr?.includes("/pull/") ? m.pr : undefined);
+  if (
+    other
+      ? ownerRepo(other) !==
+        ownerRepo(git(repo, ["remote", "get-url", "origin"], {}, true))
+      : !checkoutsOf(repo).includes(toplevel(input.cwd ?? repo))
+  )
+    return; // another repository's pull request
+  const number = m.pr
+    ?.match(/^(\d+)$|\/pull\/(\d+)/)
+    ?.slice(1)
+    .find(Boolean);
+  if (!number)
+    return deny(
+      "name the pull request by its number (`gh pr merge <number> …`), so that the one checked is the one merged.",
+    );
   const view = spawnSync(
     "gh",
     [
       "pr",
       "view",
-      ...(pr ? [pr] : []),
-      ...(r >= 0 ? args.slice(r, r + 2) : []),
+      number,
+      ...(m.repo ? ["-R", m.repo] : []),
       "--json",
-      "headRefOid",
+      "headRefOid,baseRefOid",
       "-q",
-      ".headRefOid",
+      '.headRefOid + " " + .baseRefOid',
     ],
     { cwd: input.cwd ?? repo, encoding: "utf8", timeout: 20_000 },
   );
-  const head = view.status === 0 ? view.stdout.trim() : "";
+  const [head = "", baseRef = ""] =
+    view.status === 0 ? view.stdout.trim().split(" ") : [];
   if (!/^[0-9a-f]{40}$/.test(head))
     return deny(
-      `it could not read the pull request's head commit (\`gh pr view\`: ${(view.stderr || "no answer").trim().split("\n")[0]}), so it can't check what would be merged.`,
+      `it could not read pull request ${number}'s head commit (\`gh pr view\`: ${(view.stderr || "no answer").trim().split("\n")[0]}), so it can't check what would be merged.`,
     );
   const short = head.slice(0, 7);
-  const treeOf = () =>
-    git(repo, ["rev-parse", "--verify", "--quiet", `${head}^{tree}`], {}, true);
-  let tree = treeOf();
-  if (!tree) {
-    spawnSync("git", ["fetch", "--quiet", "origin", head], {
-      cwd: repo,
-      timeout: 20_000,
-    });
-    tree = treeOf();
-  }
+  if (
+    m.on.has("--auto") &&
+    !(m.head && m.head.length >= 7 && head.startsWith(m.head))
+  )
+    return deny(
+      `auto-merge would also merge whatever is pushed later, unchecked. Add \`--match-head-commit ${head}\`, or merge once the checks are green.`,
+    );
+  const have = (rev: string) =>
+    git(repo, ["rev-parse", "--verify", "--quiet", `${rev}^{tree}`], {}, true);
+  for (const rev of [head, baseRef])
+    if (rev && !have(rev))
+      spawnSync("git", ["fetch", "--quiet", "origin", rev], {
+        cwd: repo,
+        timeout: 20_000,
+      });
+  const tree = have(head);
   const where = `Check out ${short} with nothing else changed (a clean worktree: \`git worktree add --detach .claude/worktrees/check ${short}\`), run \`bun run gate\` there`;
   if (!tree)
     return deny(
@@ -1117,12 +1320,33 @@ function mergeGate(
     return deny(
       `its head commit ${short} has not passed \`bun run gate\` on this machine. ${where} (and the verifier, for product code), then merge.`,
     );
-  const base = git(repo, ["merge-base", head, "origin/main"], {}, true);
+  // Against the base GitHub merges into (the local main may be behind), listed as the stop's rules list files.
+  const base =
+    (baseRef && git(repo, ["merge-base", head, baseRef], {}, true)) ||
+    git(repo, ["merge-base", head, "origin/main"], {}, true);
   const product = git(
     repo,
     base
-      ? ["diff", "--name-only", base, head]
-      : ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", head],
+      ? [
+          "-c",
+          "core.quotePath=off",
+          "diff",
+          "--name-only",
+          "--no-renames",
+          base,
+          head,
+        ]
+      : [
+          "-c",
+          "core.quotePath=off",
+          "diff-tree",
+          "--no-commit-id",
+          "--name-only",
+          "--no-renames",
+          "-r",
+          "--root",
+          head,
+        ],
     {},
     true,
   )
@@ -1159,54 +1383,54 @@ async function stop(
   const work: { key: string; root: string; tree: string; where?: string }[] =
     [];
   const notes: string[] = [];
-  for (const root of roots) {
-    const key = keyOf(session, root);
-    const tree = snapshot(root, false).tree;
-    trees.push(tree);
-    const toucher = store.get("toucher", idOf(root));
-    if (toucher && toucher !== session) continue; // another session worked here since: its change, not this one's
-    const accepted = store.get("accepted", key);
-    if (tree === accepted) {
-      // Work from before the session, never judged: say so once, rather than pass it in silence.
-      if (
-        tree === store.get("baseline", key) &&
-        !store.get("warned", `${key}-${tree}`)
-      ) {
-        store.put("warned", `${key}-${tree}`, "1");
+  for (const root of roots)
+    try {
+      const key = keyOf(session, root);
+      const tree = snapshot(root, false).tree;
+      trees.push(tree);
+      const toucher = store.get("toucher", idOf(root));
+      if (toucher && toucher !== session) continue; // another session worked here since: its change, not this one's
+      const accepted = store.get("accepted", key);
+      if (tree === accepted) {
+        // Work from before the session, never judged: say so once, rather than pass it in silence.
         if (
-          snapshot(root).files.some(isProduct) &&
-          !parseRuling(store.get("verdict", tree))
-        )
-          notes.push(
-            `Done gate ⚠ this session changed nothing in ${name(root)}, but it holds product changes from before the session that nobody has verified`,
-          );
+          tree === store.get("baseline", key) &&
+          !store.get("warned", `${key}-${tree}`)
+        ) {
+          store.put("warned", `${key}-${tree}`, "1");
+          if (
+            snapshot(root).files.some(isProduct) &&
+            !parseRuling(store.get("verdict", tree))
+          )
+            notes.push(
+              `Done gate ⚠ this session changed nothing in ${name(root)}, but it holds product changes from before the session that nobody has verified`,
+            );
+        }
+        continue;
       }
-      continue;
+      // A pull, switch or reset to commits the session did not make (or that main already holds), with the
+      // checkout's own edits and new files as they were: not the session's work.
+      const head = git(root, ["rev-parse", "HEAD"], {}, true);
+      if (
+        accepted &&
+        store.get("extra", key) === extra(root, tree) &&
+        (!madeHere(root, started) ||
+          git(root, ["merge-base", "HEAD", "origin/main"], {}, true) === head)
+      ) {
+        store.put("accepted", key, tree);
+        continue;
+      }
+      work.push({
+        key,
+        root,
+        tree,
+        where: root === here ? undefined : name(root),
+      });
+    } catch (e) {
+      notes.push(
+        `Done gate ⚠ could not read ${name(root)} (${String(e).split("\n")[0]}): its change was NOT checked`,
+      );
     }
-    // A pull, switch or reset to commits the session did not make (or that main already holds), with the
-    // checkout's own edits and new files as they were: not the session's work.
-    const [made, head] = git(
-      root,
-      ["log", "-1", "--format=%ct %H"],
-      {},
-      true,
-    ).split(" ");
-    if (
-      accepted &&
-      store.get("extra", key) === extra(root, tree) &&
-      (Number(made) < started ||
-        git(root, ["merge-base", "HEAD", "origin/main"], {}, true) === head)
-    ) {
-      store.put("accepted", key, tree);
-      continue;
-    }
-    work.push({
-      key,
-      root,
-      tree,
-      where: root === here ? undefined : name(root),
-    });
-  }
   if (!work.length) return notes.length ? say(notes.join("\n")) : undefined;
   if (input.background_tasks?.length || input.session_crons?.length)
     return say(
@@ -1288,11 +1512,16 @@ function verifierDone(
   store: Store,
   session: string,
 ) {
-  const since = Number(store.get("verifier", session) ?? Date.now());
+  const me = `${session}-${input.agent_id ?? "main"}`;
+  const since = Number(store.get("verifier", me) ?? Date.now());
   const mine = new Set(
-    rootsOf(repo, store, session, input.cwd).roots.map(
-      (r) => snapshot(r, false).tree,
-    ),
+    rootsOf(repo, store, session, input.cwd).roots.flatMap((r) => {
+      try {
+        return [snapshot(r, false).tree];
+      } catch {
+        return []; // a checkout that can't be read holds no code to rule on
+      }
+    }),
   );
   let promoted = 0;
   for (const { key } of store.list("pending")) {
@@ -1314,7 +1543,7 @@ function verifierDone(
     store.take("pending", key);
     promoted++;
   }
-  if (promoted) return store.take("verifier", session);
+  if (promoted) return store.take("verifier", me);
   process.stderr.write(
     'Before you finish, record your ruling on the code exactly as it is now, from the checkout that holds it:\nbun run gate verdict pass|fail "<one line: what you saw>"\nor, only when seeing it work needs something only Devesh has: bun run gate verdict cannot-verify "<exactly what he must provide>"',
   );
@@ -1354,11 +1583,19 @@ async function hook(input: HookInput, codex: boolean) {
     case "SessionStart":
       return touch(repo, input, store, session);
     case "PreToolUse":
-      touch(repo, input, store, session);
-      return mergeGate(repo, input, store, codex);
+      try {
+        mergeGate(repo, input, store, codex);
+      } catch (e) {
+        deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
+      }
+      return touch(repo, input, store, session); // a failure here stays quiet: no tool call waits on it
     case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
       if (input.agent_type === "verifier")
-        store.put("verifier", session, String(Date.now()));
+        store.put(
+          "verifier",
+          `${session}-${input.agent_id ?? "main"}`,
+          String(Date.now()),
+        );
       return;
     case "SubagentStop":
       if (input.agent_type === "verifier")
