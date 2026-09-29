@@ -1,10 +1,12 @@
+<meta charset="utf-8">
 <title>Revenue OS Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
-/* Renders ROADMAP.md and STATE.md, which are published next to this page. Those two files are
-   the source of truth; this page only reads them. Republish after they change on main. */
+/* Renders ROADMAP.md and STATE.md with parse.js (docs/tracker/parse.js), all three published next
+   to this page. The two .md files are the source of truth; this page only reads them. Republish
+   after they change on main. */
 :root{
   --ground:#EEF1F5; --surface:#FFFFFF; --surface-2:#F6F8FB; --ink:#16202E; --muted:#5B6678; --line:#D6DCE5; --line-soft:#E6EAF0;
   --accent:#3B5BDB; --accent-soft:#E3E9FB; --accent-ink:#FFFFFF;
@@ -165,12 +167,13 @@ details.fold ul.plain{margin-top:10px}
     </div>
   </section>
 
-  <p class="foot">To change anything on this page, edit <code>ROADMAP.md</code> or <code>STATE.md</code> in a pull request. After it merges, republish this page with the new files. This page never holds its own data.</p>
+  <p class="foot">To change anything on this page, edit <code>ROADMAP.md</code> or <code>STATE.md</code> in a pull request. After it merges, republish this page with the new files (<code>ROADMAP.md</code>, <code>STATE.md</code> and <code>parse.js</code>, published next to it). This page never holds its own data.</p>
 </div>
 
 <script type="module">
 // The parsing and the current-slice rule live in parse.js, shared with the agent hooks (scripts/cycle.ts).
-import { currentSlice, nextItem, parseRoadmap, parseState, seenOk } from "./parse.js";
+// It is imported inside the try at the end, so a missing parse.js shows an error, not "Loading…".
+let currentSlice, nextItem, parseRoadmap, parseState, seenOk;
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
@@ -262,6 +265,9 @@ document.getElementById("filters").addEventListener("click", e => { const b = e.
 
 (async () => {
   try {
+    ({ currentSlice, nextItem, parseRoadmap, parseState, seenOk } = await import("./parse.js").catch(() => {
+      throw new Error("Could not load parse.js. Publish it next to this page.");
+    }));
     const [roadmap, state] = await Promise.all([load("ROADMAP.md"), load("STATE.md")]);
     R = parseRoadmap(roadmap); S = parseState(state); render();
   } catch (e) {

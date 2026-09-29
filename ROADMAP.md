@@ -3,8 +3,9 @@
 The plan, as vertical slices. Each slice ends in a **proof**: something real that Devesh can
 watch happen. The **current slice** is the lowest-numbered slice that is not `done`, not
 `proof ready`, and not blocked; `bun run cycle --banner` prints it. A slice counts as blocked
-unless its line reads exactly `Blocked by: nothing`: the PR that clears its last blocker (a
-slice finishing, or Devesh delivering a Waiting item) sets the line to `nothing`. While a slice
+unless its line reads exactly `Blocked by: nothing` (`bun run cycle --check` reports a near miss
+such as `Nothing`, `none` or `—`): the PR that clears its last blocker (a slice finishing, or
+Devesh delivering a Waiting item) sets the line to `nothing`. While a slice
 waits on Devesh — to watch its proof or to supply something — agents move to the next unblocked
 slice. How items and slices get marked done is in `AGENTS.md → Definition of done`.
 
@@ -19,15 +20,15 @@ outside the slices; the tracker page skips it.
 ## Slice 0: One source of truth
 Status: in progress
 Goal: Anyone can tell in five minutes what the product is, what works, what is next and what is blocked.
-Proof: Devesh opens NORTH-STAR, ROADMAP, STATE and the tracker page and can answer those four questions without asking anyone. In a fresh agent session, the agent names the current slice and item without being told, answers an off-topic question without leaving the item, and replies to "add a pricing page" by asking "off-roadmap or replan?".
+Proof: Devesh opens NORTH-STAR, ROADMAP, STATE and the tracker page and can answer those four questions without asking anyone. In a fresh agent session, the agent names the current slice and item without being told, answers an off-topic question without leaving the item, and replies to "add a dark mode to the console" (a console feature on no slice, not the marketing site) by asking "off-roadmap PR, or replan?" and building nothing until Devesh picks.
 Blocked by: nothing
 Seen by Devesh: —
 
 - [x] Collapse the docs into four law files plus reference and archive (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102)
 - [x] Rewrite AGENTS.md around a definition of done that means "seen working" (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102)
 - [x] Tracker page that renders ROADMAP.md and STATE.md and flags format mistakes (agent) · evidence: [#102](https://github.com/devesh911/revenue-os/pull/102), parsers run against both files with zero problems
-- [x] Keep agents on the plan: every agent session starts with the current slice and item, and every prompt carries a one-line reminder (agent) · evidence: [#105](https://github.com/devesh911/revenue-os/pull/105), the exact hook commands printed the banner and the one-line reminder from an unrelated folder with bun off the PATH; 11 hook tests pass
-- [ ] Every PR names its roadmap item (or says off-roadmap, replan or side track), and CI refuses one that does not (agent)
+- [x] Keep agents on the plan: a Claude Code session started at the repo or a worktree root is shown the current slice and item, and each of its prompts carries a one-line reminder (agent) · evidence: [#105](https://github.com/devesh911/revenue-os/pull/105), the exact hook commands printed the banner and the one-line reminder from an unrelated folder with bun off the PATH; the hook tests in scripts/cycle.test.ts pass
+- [ ] Every PR body's first line names its roadmap item, the Side track or off-roadmap (AGENTS.md → The loop, step 4), and CI refuses a PR without it (agent)
 - [ ] Rewrite the examples in docs/patterns from real code (agent)
 
 ## Slice 1: Foundations the agent will stand on
@@ -134,4 +135,4 @@ Seen by Devesh: —
 - [ ] Replace every password and key created during setup, then switch the repo to human-only merges (PHASE: LIVE) using docs/runbooks/go-live.md (Devesh)
 
 ## Side track: marketing site
-The landing page (`apps/www`) is built beside the slices and never counts toward one. A marketing-site ask needs no replan. At most one side-track PR is open at a time, and its description says `Track: marketing site`.
+The landing page (`apps/www`) is built beside the slices and never counts toward one. A marketing-site ask needs no replan. At most one side-track PR is open at a time. Its branch description is `Side track: <what>` and its PR body starts `Roadmap: Side track — <what>`; it has no roadmap line to tick, so its PR body's what / why / evidence is the record.

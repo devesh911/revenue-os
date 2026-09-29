@@ -1,6 +1,6 @@
 ---
 name: task-loop
-description: Use when building a roadmap item — any session implementing the next unchecked item of the current slice in ROADMAP.md. The branch → failing test → implementation → gates → PR → observed-green CI → evidence → roadmap/state update procedure, the WIP cap, and merge discipline.
+description: Use when building a roadmap item — any session implementing the next unchecked item of the current slice in ROADMAP.md, or a Side-track or off-roadmap PR. The branch → failing test → implementation → gates → PR → observed-green CI → evidence → roadmap/state update procedure, the WIP cap, and merge discipline.
 ---
 
 # task-loop — the per-item build loop (AGENTS.md is the rulebook; this is the checklist)
@@ -17,17 +17,20 @@ description: Use when building a roadmap item — any session implementing the n
 1. **WIP cap:** three or more open task PRs ⇒ stop and tell Devesh.
 2. **Check the item against current main** — it may already be done or overtaken.
 3. Branch `feat/…` or `fix/…` off up-to-date `origin/main` — independent, never stacked — and record
-   the item: `git config branch.<name>.description "<item text>"` (the hooks show it on every prompt).
+   what it builds: `git config branch.<name>.description "<text>"`, the text being the item's text,
+   `Side track: <what>` or `Off-roadmap: <what>` (the hooks show it on every prompt).
 4. **Failing test first**, at the layer you touch. For security, RLS, migration or guard work,
    review the failing tests line by line before writing the implementation.
 5. Implement **with its production caller** — a capability nothing real calls is not done.
 6. `bun run gates` run bare (never piped). Env-dependent suites: CI is the verdict.
 7. Show it working: run it from a real entry point (API call, script against the local stack,
    browser) and capture the evidence.
-8. PR body: what / why / evidence. `gh pr checks <n> --watch` — the required `checks` must be
-   observed green on GitHub; absent or red means stop.
-9. Same PR: tick the item in `ROADMAP.md` with `· evidence: …`; update `STATE.md → What works
-   today` if reality changed; add a `Decisions in force` line for any decision.
+8. PR body: first line `Roadmap: Slice N — <item>`, `Roadmap: Side track — <what>` or
+   `Roadmap: off-roadmap — <what>`; then what / why / evidence. `gh pr checks <n> --watch` — the
+   required `checks` must be observed green on GitHub; absent or red means stop.
+9. Same PR: tick the item in `ROADMAP.md` with `· evidence: …` (a Side-track or off-roadmap PR has
+   no line to tick; its PR body's evidence is the record); update `STATE.md → What works today` if
+   reality changed; add a `Decisions in force` line for any decision.
 10. Merge per PHASE (STATE.md line 1): SETUP = squash-merge one PR at a time after confirming
     `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge.
 11. After merge, republish the tracker page (see AGENTS.md → The loop, step 6).
@@ -38,7 +41,13 @@ description: Use when building a roadmap item — any session implementing the n
 Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a
 justification line · mutate an active agent/workflow version · approve a PR · call a stubbed or
 caller-less capability "done" · merge while `STATE.md` says `PHASE: LIVE` · drop the current item
-for a new ask without Devesh saying "off-roadmap" or "replan" (AGENTS.md → The loop, step 1).
+for a new build ask except as AGENTS.md → The loop, step 1 allows (marketing site: the Side track, no
+replan; an item from a later slice: a replan that moves its line into the current slice; anything
+else: only after Devesh says "off-roadmap" or "replan") · open a second off-roadmap PR, or a second
+Side-track PR, while one of the same kind is open (two separate limits, so one of each may be open;
+AGENTS.md → The loop, step 1 has the command that finds them) · commit work that does not belong in
+the repo (prospect lists, videos, research, naming, real people's data; the repo's own fake seed
+and test data is fine to commit).
 
 ## Parallel waves (optional, when items are file-disjoint)
 One worktree per item under `.claude/worktrees/` (never in lint scope); worktrees verify env-free and

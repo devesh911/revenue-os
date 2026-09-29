@@ -4,6 +4,32 @@
 
 export const STATUSES = ["Works", "Tests only", "Partial", "Stub", "Missing"];
 export const seenOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(v || "");
+// A file saved with Windows line endings, or with an invisible byte-order mark first, reads the same.
+const lf = (md) => md.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+
+// A "Blocked by" value as meant: struck-through text, Markdown marks, quotes, wrapping brackets,
+// trailing punctuation and a note ("(note)", or after ";", ",", ":", a dash or a spaced hyphen)
+// removed, in lower case. A leading dash stays: "— the Meta keys" names a blocker.
+function bare(v) {
+  let s = v
+    .replace(/<!--.*?-->/g, "")
+    .replace(/(?<=\S)[.!?]\s+\S.*$/, "")
+    .replace(/~~.*?~~/g, "")
+    .replace(/[`*_"'“”‘’]/g, "")
+    .toLowerCase();
+  for (let was; was !== s; ) {
+    was = s;
+    s = s
+      .trim()
+      .replace(/[.,;:!?…]+$/, "")
+      .replace(/^\((.*)\)$|^\[(.*)\]$/, "$1$2")
+      .replace(/\s+\([^()]*\)$/, "")
+      .replace(/(?<=\S)(?:\s*[;,:—–]|\s+-+(?:\s|$)).*$/, "");
+  }
+  return s.replace(/\s+/g, " ");
+}
+const MEANS_NOTHING =
+  /^(nothing|none|nil|n\/?a|no|no blockers?|not blocked|unblocked|clear|[—–-]*)$/;
 
 export function sections(md) {
   const out = {};
@@ -23,15 +49,14 @@ export function sections(md) {
 export function parseRoadmap(md) {
   const slices = [];
   const problems = [];
-  const parts = md
-    .split(/^## /m)
-    .slice(1)
-    .filter((p) => p.startsWith("Slice "));
-  for (const part of parts) {
+  for (const part of lf(md).split(/^## /m).slice(1)) {
     const lines = part.split("\n");
+    if (lines[0].startsWith("Side track:")) continue;
     const head = lines[0].match(/^Slice (\d+):\s*(.+)$/);
     if (!head) {
-      problems.push(`Bad slice heading: "${lines[0]}"`);
+      problems.push(
+        `Unknown section heading "## ${lines[0]}": use "## Slice N: title" or "## Side track: title"`,
+      );
       continue;
     }
     const s = { n: +head[1], title: head[2].trim(), items: [] };
@@ -73,6 +98,13 @@ export function parseRoadmap(md) {
       !["not started", "in progress", "proof ready", "done"].includes(s.Status)
     )
       problems.push(`Slice ${s.n} has an unknown status "${s.Status}"`);
+    // Only the exact word unblocks (currentSlice). Anything else that means "nothing" would park the
+    // slice quietly, so say so; any other text is a real blocker, even "Nothing but …" or "— …".
+    const b = s["Blocked by"];
+    if (b !== undefined && b !== "nothing" && MEANS_NOTHING.test(bare(b)))
+      problems.push(
+        `Slice ${s.n}: "Blocked by: ${b}" counts as blocked; write exactly "Blocked by: nothing" or name the blocker`,
+      );
     if (s.Status === "done" && !seenOk(s["Seen by Devesh"]))
       problems.push(`Slice ${s.n} says done but "Seen by Devesh" has no date`);
     slices.push(s);
@@ -82,7 +114,9 @@ export function parseRoadmap(md) {
 }
 
 export function parseState(md) {
-  const phase = (md.match(/^PHASE:\s*(\w+)/m) || [])[1] || "?";
+  md = lf(md);
+  // Line 1 decides who merges, so only the exact words count; a comment may follow after a space.
+  const phase = (md.match(/^PHASE: (SETUP|LIVE)(?=\s|$)/) || [])[1] || "?";
   const updated = (md.match(/^Updated:\s*(.+)$/m) || [])[1] || "";
   const sec = sections(md);
   const problems = [];
@@ -104,7 +138,9 @@ export function parseState(md) {
       c.length === 4 && c[0] !== "Area" && !/^-+$/.test(c[0].replace(/:/g, "")),
   );
   if (phase === "?")
-    problems.push('STATE.md: line 1 must be "PHASE: SETUP" or "PHASE: LIVE"');
+    problems.push(
+      `STATE.md: line 1 must be "PHASE: SETUP" or "PHASE: LIVE", not "${md.split("\n")[0]}"`,
+    );
   for (const h of [
     "What works today",
     "Waiting on Devesh",
