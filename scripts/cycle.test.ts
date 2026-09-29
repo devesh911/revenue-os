@@ -495,7 +495,8 @@ it("the banner says the plan may be out of date when it could not fetch origin/m
 });
 
 // A scratch repo whose remote never answers: git runs remote.sh, which waits on a pipe nobody
-// writes to. left() lists the processes still running from it.
+// writes to. left() lists the processes still running from it, with their full command lines
+// (`ps -o args`: on Linux, `pgrep -l` prints only the program name, never "remote.sh").
 function hangingRemote() {
   const s = scratchRepo();
   const fifo = join(s.dir, "never");
@@ -504,7 +505,10 @@ function hangingRemote() {
   s.run(s.work, "config", "protocol.ext.allow", "always");
   s.run(s.work, "remote", "set-url", "origin", `ext::sh ${s.dir}/remote.sh`);
   const left = () =>
-    spawnSync("pgrep", ["-fl", s.dir], { encoding: "utf8" }).stdout.trim();
+    spawnSync("ps", ["-A", "-o", "pid=,args="], { encoding: "utf8" })
+      .stdout.split("\n")
+      .filter((l) => l.includes(s.dir))
+      .join("\n");
   const gone = async () => {
     for (let i = 0; left() && i < 20; i++) await Bun.sleep(100);
     return left();
