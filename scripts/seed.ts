@@ -30,7 +30,11 @@ const localDbUrl = () =>
   process.env.LOCAL_DB_URL ||
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 
-export async function seed(pack: Pack): Promise<{ orgId: string }> {
+/** Seeds `pack` into the workspace `slug` (default: the pack's own, which the dev login uses). */
+export async function seed(
+  pack: Pack,
+  slug?: string,
+): Promise<{ orgId: string }> {
   const meta = PACKS[pack];
   if (!meta)
     throw new Error(
@@ -54,7 +58,7 @@ export async function seed(pack: Pack): Promise<{ orgId: string }> {
       `insert into orgs (name, slug, vertical) values ($1, $2, $3)
 			 on conflict (slug) do update set name = excluded.name
 			 returning id`,
-      [meta.name, meta.slug, meta.vertical],
+      [meta.name, slug ?? meta.slug, meta.vertical],
     );
     const orgId: string = org.rows[0].id;
     await client.query(`select set_config('seed.org_id', $1, true)`, [orgId]);

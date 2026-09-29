@@ -1,4 +1,6 @@
--- Vertical pack: b2b_wholesale — ceramic pilot (db-design §9). Applied by scripts/seed.ts.
+-- Vertical pack: b2b_wholesale — ceramic pilot (db-design §9). Applied by scripts/seed.ts, which
+-- sets seed.org_id for the transaction. Idempotent: template rows by their natural keys, demo rows
+-- by fixed ids (see the demo data block).
 
 insert into dispositions (org_id, key, label, category, is_terminal, position) values
   (current_setting('seed.org_id')::uuid, 'interested',       'Interested',          'qualified',     false, 1),
@@ -93,120 +95,145 @@ insert into eval_scenarios (org_id, key, persona, script, assertions) values
   (current_setting('seed.org_id')::uuid, 'hot_reorder',      '{"name":"Hot reorder","language":"en","traits":["existing buyer","wants urgent stock"]}', '{"turns":["asks availability","ready to order"]}', '{"expect_task":"callback","priority":"high"}')
 on conflict (org_id, key) do nothing;
 
--- Task 15: console screens data — contacts/conversations/messages/tasks/outcomes have no
--- natural key, so this block is NOT idempotent (unlike the template tables above); the
--- supported flow is `db:reset && db:seed <pack>` against a fresh database, one shot.
-with new_contacts as (
-  insert into contacts (org_id, first_name, last_name, lifecycle_stage, source, score, last_interaction_at)
-  values
-    (current_setting('seed.org_id')::uuid, 'Suresh',  'Kamath',    'qualified',   'csv_import', 78.0, now() - interval '1 day'),
-    (current_setting('seed.org_id')::uuid, 'Meena',   'Patel',     'new',         'meta_leads', 35.0, null),
-    (current_setting('seed.org_id')::uuid, 'Arjun',   'Reddy',     'contacted',   'portal',     50.0, now() - interval '3 days'),
-    (current_setting('seed.org_id')::uuid, 'Lakshmi', 'Rao',       'opportunity', 'csv_import', 88.0, now() - interval '2 days'),
-    (current_setting('seed.org_id')::uuid, 'Farhan',  'Sheikh',    'customer',    'manual',     92.0, now() - interval '15 days'),
-    (current_setting('seed.org_id')::uuid, 'Deepa',   'Krishnan',  'lost',        'meta_leads', 20.0, now() - interval '20 days')
-  returning id, first_name
-),
-convo_suresh as (
-  insert into conversations (org_id, contact_id, channel, direction, status, started_at, ended_at, summary)
-  select current_setting('seed.org_id')::uuid, id, 'voice', 'outbound', 'completed',
-         now() - interval '1 day', now() - interval '1 day' + interval '6 minutes',
-         'Qualified — retailer, 500 boxes/month, wants a sample kit'
-  from new_contacts where first_name = 'Suresh'
-  returning id, contact_id
-),
-convo_meena as (
-  insert into conversations (org_id, contact_id, channel, direction, status, started_at, ended_at)
-  select current_setting('seed.org_id')::uuid, id, 'whatsapp', 'inbound', 'active',
-         now() - interval '5 minutes', null
-  from new_contacts where first_name = 'Meena'
-  returning id, contact_id
-),
-convo_arjun as (
-  insert into conversations (org_id, contact_id, channel, direction, status, started_at, ended_at, summary)
-  select current_setting('seed.org_id')::uuid, id, 'voice', 'outbound', 'completed',
-         now() - interval '3 days', now() - interval '3 days' + interval '4 minutes',
-         'Price objection — asked for a callback with a rep'
-  from new_contacts where first_name = 'Arjun'
-  returning id, contact_id
-),
-convo_lakshmi as (
-  insert into conversations (org_id, contact_id, channel, direction, status, started_at, ended_at, summary)
-  select current_setting('seed.org_id')::uuid, id, 'whatsapp', 'outbound', 'completed',
-         now() - interval '2 days', now() - interval '2 days' + interval '2 minutes',
-         'Confirmed sample delivery and follow-up call'
-  from new_contacts where first_name = 'Lakshmi'
-  returning id, contact_id
-),
-msgs_suresh as (
-  insert into messages (org_id, conversation_id, seq, role, content, ts)
-  select current_setting('seed.org_id')::uuid, convo_suresh.id, s.seq, s.role, s.content,
-         (now() - interval '1 day') + (s.seq * interval '30 seconds')
-  from convo_suresh, (values
-    (1, 'agent',   'Hi Suresh, calling from the ceramics brand you enquired with. Do you have a minute?'),
-    (2, 'contact', 'Yes, go ahead.'),
-    (3, 'agent',   'What is your monthly volume and which city are you based in?'),
-    (4, 'contact', 'About 500 boxes a month, we are in Ahmedabad.'),
-    (5, 'agent',   'Great, that qualifies you for our retailer tier. Shall I send a sample kit?'),
-    (6, 'contact', 'Yes please, send it over.')
-  ) as s(seq, role, content)
-),
-msgs_meena as (
-  insert into messages (org_id, conversation_id, seq, role, content, ts)
-  select current_setting('seed.org_id')::uuid, convo_meena.id, s.seq, s.role, s.content,
-         now() - (6 - s.seq) * interval '1 minute'
-  from convo_meena, (values
-    (1, 'contact', 'Hi, I got your number from a trade fair. Do you supply floor tiles in bulk?'),
-    (2, 'agent',   'Hello! Yes we do — could you share your business type and typical monthly volume?')
-  ) as s(seq, role, content)
-),
-msgs_arjun as (
-  insert into messages (org_id, conversation_id, seq, role, content, ts)
-  select current_setting('seed.org_id')::uuid, convo_arjun.id, s.seq, s.role, s.content,
-         (now() - interval '3 days') + (s.seq * interval '30 seconds')
-  from convo_arjun, (values
-    (1, 'agent',   'Hi Arjun, following up on the enquiry for our ceramics range.'),
-    (2, 'contact', 'Your rates look higher than the competitor. Can you do better?'),
-    (3, 'agent',   'I cannot commit to pricing on this call, but I will have a rep call you back with a quote.')
-  ) as s(seq, role, content)
-),
-msgs_lakshmi as (
-  insert into messages (org_id, conversation_id, seq, role, content, ts)
-  select current_setting('seed.org_id')::uuid, convo_lakshmi.id, s.seq, s.role, s.content,
-         (now() - interval '2 days') + (s.seq * interval '20 seconds')
-  from convo_lakshmi, (values
-    (1, 'agent',   'Hi Lakshmi, confirming the sample kit is on its way — arriving Thursday.'),
-    (2, 'contact', 'Perfect, thank you. I will call once we review it.')
-  ) as s(seq, role, content)
-),
-new_tasks as (
-  insert into tasks (org_id, contact_id, conversation_id, kind, status, priority, title, due_at, completed_at)
-  select current_setting('seed.org_id')::uuid, t.contact_id, t.conversation_id, t.kind, t.status, t.priority, t.title, t.due_at, t.completed_at
-  from (
-    select contact_id, id as conversation_id, 'callback'::text as kind, 'open'::text as status, 2.0::numeric as priority,
-           'Callback Arjun with a rate quote' as title, now() + interval '2 days' as due_at, null::timestamptz as completed_at
-    from convo_arjun
-    union all
-    select contact_id, id as conversation_id, 'approval', 'open', 1.0,
-           'Approve quote for Suresh sample order', now() + interval '1 day', null
-    from convo_suresh
-    union all
-    select contact_id, id as conversation_id, 'review', 'done', 3.0,
-           'Review sample dispatch notes for Lakshmi', now() - interval '1 day', now() - interval '10 hours'
-    from convo_lakshmi
-  ) t
-  returning id
-),
-new_outcomes as (
-  insert into outcomes (org_id, contact_id, conversation_id, kind, source, occurred_at)
-  select current_setting('seed.org_id')::uuid, o.contact_id, o.conversation_id, o.kind, 'agent', o.occurred_at
-  from (
-    select contact_id, id as conversation_id, 'qualified' as kind, now() - interval '1 day' as occurred_at from convo_suresh
-    union all
-    select contact_id, id as conversation_id, 'booking', now() - interval '2 days' + interval '3 minutes' from convo_lakshmi
-    union all
-    select contact_id, id as conversation_id, 'qualified', now() - interval '2 days' from convo_lakshmi
-  ) o
-  returning id
-)
-select 1;
+-- Console demo data: contacts and their conversations, messages, tasks and outcomes. These tables
+-- have no natural key, so every seeded row gets a fixed id made from the workspace id and a short
+-- key (pg_temp.seed_id): re-running the pack inserts nothing twice.
+create or replace function pg_temp.seed_id(key text) returns uuid language sql stable
+  return md5(current_setting('seed.org_id') || ':' || key)::uuid;
+
+create temp table seed_people on commit drop as
+select pg_temp.seed_id('contact:' || key) as id, first_name, last_name,
+       lifecycle_stage::app.lifecycle_stage as lifecycle_stage, source, score, last_interaction_at
+from (values
+  ('suresh',  'Suresh',  'Kamath',   'qualified',   'csv_import', 78.0, now() - interval '1 day'),
+  ('meena',   'Meena',   'Patel',    'new',         'meta_leads', 35.0, null),
+  ('arjun',   'Arjun',   'Reddy',    'contacted',   'portal',     50.0, now() - interval '3 days'),
+  ('lakshmi', 'Lakshmi', 'Rao',      'opportunity', 'csv_import', 88.0, now() - interval '2 days'),
+  ('farhan',  'Farhan',  'Sheikh',   'customer',    'manual',     92.0, now() - interval '15 days'),
+  ('deepa',   'Deepa',   'Krishnan', 'lost',        'meta_leads', 20.0, now() - interval '20 days')
+) as p(key, first_name, last_name, lifecycle_stage, source, score, last_interaction_at);
+
+-- Copies of these people that older runs of this pack left in this workspace (same name and
+-- source, another id) go, with the conversations, messages, tasks and outcomes those runs made
+-- for them. Every delete is limited to this workspace, and a copy that anything else points at —
+-- a row of another workspace, or later work such as an appointment, deal, run or memory — is
+-- kept as it is: the seed neither fails on it nor reaches past this workspace through it. Copies
+-- are found by name and source alone, so hand-made rows in a seed workspace are NOT safe here:
+-- keep real work in a workspace of its own. (Removing their outcomes steps around "outcomes are
+-- append-only"; it only ever touches these local demo copies.)
+do $$
+declare
+  org constant uuid := current_setting('seed.org_id')::uuid;
+  stale uuid;
+  convos uuid[];
+  fk record;
+  linked boolean;
+begin
+  for stale in
+    select c.id from contacts c join seed_people p using (first_name, last_name, source)
+    where c.org_id = org and c.id <> p.id
+  loop
+    convos := array(select id from conversations where org_id = org and contact_id = stale);
+    -- Every foreign key into contacts or conversations, read from the catalog so tables added
+    -- later count too. Only rows of this workspace in the four tables the old seed wrote may
+    -- point at the copy.
+    for fk in
+      select conrelid::regclass as tbl, attname as col, confrelid = 'contacts'::regclass as to_contact
+      from pg_constraint join pg_attribute on attrelid = conrelid and attnum = conkey[1]
+      where contype = 'f' and confrelid in ('contacts'::regclass, 'conversations'::regclass)
+    loop
+      execute format('select exists (select from %s where %I = any($1) and (org_id is distinct from $2 or not $3))',
+                     fk.tbl, fk.col)
+        into linked
+        using case when fk.to_contact then array[stale] else convos end, org,
+              fk.tbl = any('{conversations,messages,tasks,outcomes}'::regclass[]);
+      exit when linked;
+    end loop;
+    continue when linked;
+    delete from outcomes where org_id = org and (contact_id = stale or conversation_id = any(convos));
+    delete from tasks where org_id = org and (contact_id = stale or conversation_id = any(convos));
+    delete from messages where org_id = org and conversation_id = any(convos);
+    delete from conversations where org_id = org and id = any(convos);
+    delete from contacts where org_id = org and id = stale;
+  end loop;
+end $$;
+
+insert into contacts (id, org_id, first_name, last_name, lifecycle_stage, source, score, last_interaction_at)
+select id, current_setting('seed.org_id')::uuid, first_name, last_name, lifecycle_stage, source, score, last_interaction_at
+from seed_people
+on conflict (id) do nothing;
+
+insert into conversations (id, org_id, contact_id, channel, direction, status, started_at, ended_at, summary)
+select pg_temp.seed_id('conversation:' || who), current_setting('seed.org_id')::uuid, pg_temp.seed_id('contact:' || who),
+       channel::app.channel, direction::app.direction, status::app.convo_status, started_at, ended_at, summary
+from (values
+  ('suresh',  'voice',    'outbound', 'completed', now() - interval '1 day',     now() - interval '1 day' + interval '6 minutes',
+   'Qualified — retailer, 500 boxes/month, wants a sample kit'),
+  ('meena',   'whatsapp', 'inbound',  'active',    now() - interval '5 minutes', null, null),
+  ('arjun',   'voice',    'outbound', 'completed', now() - interval '3 days',    now() - interval '3 days' + interval '4 minutes',
+   'Price objection — asked for a callback with a rep'),
+  ('lakshmi', 'whatsapp', 'outbound', 'completed', now() - interval '2 days',    now() - interval '2 days' + interval '2 minutes',
+   'Confirmed sample delivery and follow-up call')
+) as v(who, channel, direction, status, started_at, ended_at, summary)
+on conflict (id) do nothing;
+
+insert into messages (org_id, conversation_id, seq, role, content, ts)
+select current_setting('seed.org_id')::uuid, pg_temp.seed_id('conversation:suresh'), s.seq, s.role, s.content,
+       (now() - interval '1 day') + (s.seq * interval '30 seconds')
+from (values
+  (1, 'agent',   'Hi Suresh, calling from the ceramics brand you enquired with. Do you have a minute?'),
+  (2, 'contact', 'Yes, go ahead.'),
+  (3, 'agent',   'What is your monthly volume and which city are you based in?'),
+  (4, 'contact', 'About 500 boxes a month, we are in Ahmedabad.'),
+  (5, 'agent',   'Great, that qualifies you for our retailer tier. Shall I send a sample kit?'),
+  (6, 'contact', 'Yes please, send it over.')
+) as s(seq, role, content)
+on conflict (conversation_id, seq) do nothing;
+
+insert into messages (org_id, conversation_id, seq, role, content, ts)
+select current_setting('seed.org_id')::uuid, pg_temp.seed_id('conversation:meena'), s.seq, s.role, s.content,
+       now() - (6 - s.seq) * interval '1 minute'
+from (values
+  (1, 'contact', 'Hi, I got your number from a trade fair. Do you supply floor tiles in bulk?'),
+  (2, 'agent',   'Hello! Yes we do — could you share your business type and typical monthly volume?')
+) as s(seq, role, content)
+on conflict (conversation_id, seq) do nothing;
+
+insert into messages (org_id, conversation_id, seq, role, content, ts)
+select current_setting('seed.org_id')::uuid, pg_temp.seed_id('conversation:arjun'), s.seq, s.role, s.content,
+       (now() - interval '3 days') + (s.seq * interval '30 seconds')
+from (values
+  (1, 'agent',   'Hi Arjun, following up on the enquiry for our ceramics range.'),
+  (2, 'contact', 'Your rates look higher than the competitor. Can you do better?'),
+  (3, 'agent',   'I cannot commit to pricing on this call, but I will have a rep call you back with a quote.')
+) as s(seq, role, content)
+on conflict (conversation_id, seq) do nothing;
+
+insert into messages (org_id, conversation_id, seq, role, content, ts)
+select current_setting('seed.org_id')::uuid, pg_temp.seed_id('conversation:lakshmi'), s.seq, s.role, s.content,
+       (now() - interval '2 days') + (s.seq * interval '20 seconds')
+from (values
+  (1, 'agent',   'Hi Lakshmi, confirming the sample kit is on its way — arriving Thursday.'),
+  (2, 'contact', 'Perfect, thank you. I will call once we review it.')
+) as s(seq, role, content)
+on conflict (conversation_id, seq) do nothing;
+
+insert into tasks (id, org_id, contact_id, conversation_id, kind, status, priority, title, due_at, completed_at)
+select pg_temp.seed_id('task:' || who), current_setting('seed.org_id')::uuid, pg_temp.seed_id('contact:' || who),
+       pg_temp.seed_id('conversation:' || who), kind, status, priority, title, due_at, completed_at
+from (values
+  ('arjun',   'callback', 'open', 2.0, 'Callback Arjun with a rate quote',         now() + interval '2 days', null::timestamptz),
+  ('suresh',  'approval', 'open', 1.0, 'Approve quote for Suresh sample order',    now() + interval '1 day',  null),
+  ('lakshmi', 'review',   'done', 3.0, 'Review sample dispatch notes for Lakshmi', now() - interval '1 day',  now() - interval '10 hours')
+) as t(who, kind, status, priority, title, due_at, completed_at)
+on conflict (id) do nothing;
+
+insert into outcomes (id, org_id, contact_id, conversation_id, kind, source, occurred_at)
+select pg_temp.seed_id('outcome:' || who || ':' || kind), current_setting('seed.org_id')::uuid,
+       pg_temp.seed_id('contact:' || who), pg_temp.seed_id('conversation:' || who), kind, 'agent', occurred_at
+from (values
+  ('suresh',  'qualified', now() - interval '1 day'),
+  ('lakshmi', 'booking',   now() - interval '2 days' + interval '3 minutes'),
+  ('lakshmi', 'qualified', now() - interval '2 days')
+) as o(who, kind, occurred_at)
+on conflict (id) do nothing;
