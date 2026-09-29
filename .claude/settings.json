@@ -17,5 +17,29 @@
       "Write(./.env)",
       "Write(./.env.*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/cycle-hook.sh\" --banner",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/cycle-hook.sh\" --pin",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

@@ -1,10 +1,12 @@
+<meta charset="utf-8">
 <title>Revenue OS Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
-/* Renders ROADMAP.md and STATE.md, which are published next to this page. Those two files are
-   the source of truth; this page only reads them. Republish after they change on main. */
+/* Renders ROADMAP.md and STATE.md with parse.js (docs/tracker/parse.js), all three published next
+   to this page. The two .md files are the source of truth; this page only reads them. Republish
+   after they change on main. */
 :root{
   --ground:#EEF1F5; --surface:#FFFFFF; --surface-2:#F6F8FB; --ink:#16202E; --muted:#5B6678; --line:#D6DCE5; --line-soft:#E6EAF0;
   --accent:#3B5BDB; --accent-soft:#E3E9FB; --accent-ink:#FFFFFF;
@@ -165,58 +167,23 @@ details.fold ul.plain{margin-top:10px}
     </div>
   </section>
 
-  <p class="foot">To change anything on this page, edit <code>ROADMAP.md</code> or <code>STATE.md</code> in a pull request. After it merges, republish this page with the new files. This page never holds its own data.</p>
+  <p class="foot">To change anything on this page, edit <code>ROADMAP.md</code> or <code>STATE.md</code> in a pull request. After it merges, republish this page with the new files (<code>ROADMAP.md</code>, <code>STATE.md</code> and <code>parse.js</code>, published next to it). This page never holds its own data.</p>
 </div>
 
-<script>
+<script type="module">
+// The parsing and the current-slice rule live in parse.js, shared with the agent hooks (scripts/cycle.ts).
+// It is imported inside the try at the end, so a missing parse.js shows an error, not "Loading…".
+let currentSlice, nextItem, parseRoadmap, parseState, seenOk;
+
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
   .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-const seenOk = v => /^\d{4}-\d{2}-\d{2}/.test(v || "");
 
 async function load(name){
   for (const p of [name, `../../${name}`]) {
     try { const r = await fetch(p, {cache:"no-store"}); if (r.ok) return await r.text(); } catch {}
   }
   throw new Error(`Could not load ${name}. Publish it next to this page.`);
-}
-function sections(md){
-  const out = {}; let cur = null;
-  for (const line of md.split("\n")) {
-    const h = line.match(/^## (.+)$/);
-    if (h) { cur = h[1].trim(); out[cur] = []; continue; }
-    if (cur) out[cur].push(line);
-  }
-  return out;
-}
-
-function parseRoadmap(md){
-  const slices = []; const problems = [];
-  const parts = md.split(/^## /m).slice(1).filter(p => p.startsWith("Slice "));
-  for (const part of parts) {
-    const lines = part.split("\n");
-    const head = lines[0].match(/^Slice (\d+):\s*(.+)$/);
-    if (!head) { problems.push(`Bad slice heading: "${lines[0]}"`); continue; }
-    const s = { n:+head[1], title:head[2].trim(), items:[] };
-    for (const l of lines.slice(1)) {
-      const f = l.match(/^(Status|Goal|Proof|Blocked by|Seen by Devesh):\s*(.*)$/);
-      if (f) { s[f[1]] = f[2].trim(); continue; }
-      const it = l.match(/^- \[([ x])\] (.+?) \((agent|Devesh)\)(?: · evidence: (.+))?\s*$/);
-      if (it) {
-        s.items.push({ done: it[1] === "x", text: it[2], owner: it[3], evidence: it[4] || "" });
-        if (it[1] === "x" && !it[4]) problems.push(`Slice ${s.n}: "${it[2]}" is ticked without evidence`);
-        continue;
-      }
-      if (/^- \[/.test(l)) problems.push(`Slice ${s.n}: checklist line not in the expected shape: "${l.trim()}"`);
-      else if (l.trim()) problems.push(`Slice ${s.n}: line not understood (fields and items must each stay on one line): "${l.trim()}"`);
-    }
-    for (const k of ["Status","Goal","Proof","Blocked by","Seen by Devesh"]) if (!(k in s)) problems.push(`Slice ${s.n} is missing its "${k}:" line`);
-    if (s.Status && !["not started","in progress","proof ready","done"].includes(s.Status)) problems.push(`Slice ${s.n} has an unknown status "${s.Status}"`);
-    if (s.Status === "done" && !seenOk(s["Seen by Devesh"])) problems.push(`Slice ${s.n} says done but "Seen by Devesh" has no date`);
-    slices.push(s);
-  }
-  if (!slices.length) problems.push("No slices found in ROADMAP.md");
-  return { slices, problems };
 }
 
 const STATUS = [
@@ -226,28 +193,12 @@ const STATUS = [
   { key:"Stub", cls:"st-stub", color:"var(--stub)" },
   { key:"Missing", cls:"st-missing", color:"var(--missing)" },
 ];
-function parseState(md){
-  const phase = (md.match(/^PHASE:\s*(\w+)/m) || [])[1] || "?";
-  const updated = (md.match(/^Updated:\s*(.+)$/m) || [])[1] || "";
-  const sec = sections(md); const problems = [];
-  const table = (sec["What works today"] || []).filter(l => /^\|/.test(l)).map(l => l.split(/(?<!\\)\|/).slice(1,-1).map(c => c.trim().replace(/\\\|/g, "|")));
-  table.forEach(c => { if (c.length !== 4) problems.push(`STATE.md: a table row has ${c.length} columns, expected 4: "${c.join(" | ")}"`); });
-  const rows = table.filter(c => c.length === 4 && c[0] !== "Area" && !/^-+$/.test(c[0].replace(/:/g,"")));
-  for (const h of ["What works today", "Waiting on Devesh", "Decisions in force"]) if (!(h in sec)) problems.push(`STATE.md: missing the "## ${h}" heading (exact wording)`);
-  rows.forEach(r => { if (!STATUS.some(s => s.key === r[2])) problems.push(`STATE.md: unknown status "${r[2]}" for "${r[1]}"`); });
-  const checks = l => { const m = l.match(/^- \[([ x])\] (.+)$/); return m ? { done: m[1] === "x", text: m[2] } : null; };
-  const waiting = (sec["Waiting on Devesh"] || []).map(checks).filter(Boolean);
-  const decisions = (sec["Decisions in force"] || []).filter(l => /^- /.test(l)).map(l => l.slice(2));
-  if (!rows.length) problems.push('STATE.md: the "What works today" table is empty or missing');
-  return { phase, updated, rows, waiting, decisions, problems };
-}
 
 const sCls = st => ({ "done":"s-done", "proof ready":"s-proof", "in progress":"s-progress" }[st] || "s-not");
 let filter = "All", R, S;
 
 function render(){
-  // Current slice: lowest not done and not waiting for Devesh to watch its proof (AGENTS.md → The loop).
-  const current = R.slices.find(s => s.Status !== "done" && s.Status !== "proof ready") || R.slices.find(s => s.Status !== "done");
+  const current = currentSlice(R.slices), next = nextItem(current);
   document.getElementById("meta").innerHTML =
     `<span class="pill phase">Phase: ${esc(S.phase)}</span><span>State updated ${esc(S.updated)}</span>` +
     `<span>${R.slices.filter(s => s.Status === "done").length} of ${R.slices.length} slices done</span>`;
@@ -260,11 +211,14 @@ function render(){
        <h2>Slice ${current.n}: ${inline(current.title)} <span class="pill ${sCls(current.Status)}">${esc(current.Status)}</span></h2>
        <div class="bar" aria-hidden="true"><span style="width:${total ? Math.round(100*done/total) : 0}%"></span></div>
        <dl class="facts"><dt>Items</dt><dd>${done} of ${total} done</dd>
+       <dt>Next item</dt><dd>${next ? inline(next.text) : "None left for agents: set the slice to proof ready and ask Devesh to watch the proof"}</dd>
        <dt>Proof</dt><dd>${inline(current.Proof || "")}</dd>
        <dt>Blocked by</dt><dd>${inline(current["Blocked by"] || "")}</dd>
        <dt>Seen by Devesh</dt><dd class="${seenOk(seen) ? "seen-yes" : "seen-no"}">${inline(seenOk(seen) ? seen : "not yet")}</dd></dl>`;
   } else {
-    document.getElementById("now").innerHTML = `<div class="eyebrow">Current slice</div><h2>Every slice is done</h2>`;
+    const allDone = R.slices.every(s => s.Status === "done");
+    document.getElementById("now").innerHTML = `<div class="eyebrow">Current slice</div><h2>${allDone ? "Every slice is done" : "No slice can be built right now"}</h2>` +
+      (allDone ? "" : `<p class="muted">Every unfinished slice is waiting for Devesh: to watch its proof, or for what its "Blocked by" line names.</p>`);
   }
 
   const counts = STATUS.map(s => ({ ...s, n: S.rows.filter(r => r[2] === s.key).length }));
@@ -311,6 +265,9 @@ document.getElementById("filters").addEventListener("click", e => { const b = e.
 
 (async () => {
   try {
+    ({ currentSlice, nextItem, parseRoadmap, parseState, seenOk } = await import("./parse.js").catch(() => {
+      throw new Error("Could not load parse.js. Publish it next to this page.");
+    }));
     const [roadmap, state] = await Promise.all([load("ROADMAP.md"), load("STATE.md")]);
     R = parseRoadmap(roadmap); S = parseState(state); render();
   } catch (e) {

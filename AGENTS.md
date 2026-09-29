@@ -34,7 +34,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 7. **main is PR-only with CI green** (required check: `checks`). Merge authority follows the
    PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge independent PRs one at a
    time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. Loosening any guard or deny-list is Devesh-only in both phases.
+   only humans merge. Loosening any guard, hook or deny-list is Devesh-only in both phases.
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
@@ -44,33 +44,60 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   production entry point with real adapters — or it is explicitly an internal change with no
   runtime surface — and (3) its roadmap line carries evidence: the PR plus how it was seen
   working (command output, screenshot, database rows). Land every capability together with the
-  code that calls it; a function nothing calls is not done.
+  code that calls it; a function nothing calls is not done. Off-roadmap and Side-track PRs are
+  not roadmap items: (1) and (2) still apply, and their evidence lives in the PR body.
 - **A slice is done** only when Devesh has watched its proof. Agents set a slice to
   `proof ready` and ask him to look; only Devesh fills in `Seen by Devesh:` with a date.
 - Passing tests are required and never sufficient. Tests with fakes prove logic, not the product.
 - When time slips, cut console polish — never guardrails, consent or metering.
 
 ## The loop
-1. Take the next unchecked item in the **current slice** of `ROADMAP.md` (the lowest-numbered
-   slice that is not `done`, not `proof ready`, and not blocked by anything unfinished), or
-   Devesh's explicit ask. Check it against current main first — it may already be done. One
-   item, one branch, one PR.
-2. Branch `feat/…` or `fix/…` off up-to-date main — independent, never stacked. Tests at the
-   layer you touch; integration tests run against the real local Supabase stack and real
-   pg-boss — never mock the database; a bug fix starts from a failing reproduction.
+1. Take the next unchecked item in the **current slice** of `ROADMAP.md` (the rule is at the top
+   of that file; `bun run cycle --banner` prints it, and the agent hooks show it when a session
+   starts and on every prompt, but Claude Code loads them only for a session started at the
+   repo or a worktree root, never a subfolder). Check it against current main first — it may
+   already be done. One item, one branch, one PR. When Devesh asks for something else mid-cycle:
+   - a question or look-up: answer it; no branch switch, no code;
+   - work that does not belong in the repo (prospect lists, videos, research, naming, real
+     people's data; the repo's own fake seed and test data is fine to commit): do it in a
+     scratch folder outside the repo; never commit it; no branch;
+   - marketing-site work (`apps/www`): the **Side track** in `ROADMAP.md`; no replan;
+   - an item already on the roadmap in a later slice: that is a replan, and the PR that builds
+     it moves the line into the current slice;
+   - any other build ask: reply "off-roadmap PR, or replan?" and build nothing until Devesh
+     picks (a replan adds the item to the current slice in the same PR that builds it). A
+     message that already starts with "off-roadmap" or "replan" has picked.
+
+   At most one off-roadmap PR is open at a time. Find it by the first line of its PR body (step
+   4), never by a phrase search, which also matches a PR that only quotes that line:
+   `gh pr list --state open --json number,url,body --jq '.[] | select(.body | startswith("Roadmap: off-roadmap")) | .url'`
+
+   When one is open and Devesh asks for another, link it and ask him to merge or close it, or to
+   replan; build nothing new until he answers. The Side track has its own limit of one open PR
+   (the same command with `Roadmap: Side track`): when it is full, link that PR and ask Devesh
+   to merge or close it first.
+2. Branch `feat/…` or `fix/…` off up-to-date main — independent, never stacked — and record what
+   it builds: `git config branch.<name>.description "<text>"`. The text is the roadmap item's
+   text, `Side track: <what>` for marketing-site work, or `Off-roadmap: <what>` for an
+   off-roadmap PR. Tests at the layer you touch; integration tests run against the real local
+   Supabase stack and real pg-boss — never mock the database; a bug fix starts from a failing
+   reproduction.
 3. `bun run gates` green locally, run bare — never pipe a gate through anything that can
    swallow its exit code. CI also runs gitleaks, `bun audit`, the console build, `bun run
    guards` and a Docker build; CI is the verdict, especially for env-dependent suites
    (fresh worktrees have no `.env`).
-4. PR body: what / why / evidence (gate output and how the result was seen working). Watch CI:
-   `gh pr checks <n> --watch`. Green means observed green on GitHub.
+4. PR body: the first line is `Roadmap: Slice N — <item>`, `Roadmap: Side track — <what>` or
+   `Roadmap: off-roadmap — <what>`; then what / why / evidence (gate output and how the result
+   was seen working). Watch CI: `gh pr checks <n> --watch`. Green means observed green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
    three or more open task PRs, stop taking new work.
-6. The same PR ticks the roadmap item with evidence, updates `STATE.md → What works today` if
-   reality changed, and adds a line to `STATE.md → Decisions in force` for any decision made.
+6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
+   to tick; its PR body's what / why / evidence is the record), updates `STATE.md → What works
+   today` if reality changed, and adds a line to `STATE.md → Decisions in force` for any decision.
    A genuine surprise gets one factual line in `lessons.md`. After ROADMAP.md or STATE.md change
    on main, republish the tracker page (Claude: Artifact publish of `docs/tracker/index.html`
-   with files `ROADMAP.md` and `STATE.md`, `url` = the tracker link above).
+   with files `ROADMAP.md`, `STATE.md` and `parse.js` from `docs/tracker/parse.js`, `url` = the
+   tracker link above).
 
 ## Escalate to Devesh only for
 Credentials · money · external accounts · irreversible or outward-facing actions · genuine
@@ -88,7 +115,8 @@ record one line in `STATE.md → Decisions in force`, keep moving.
 - `docs/patterns/` holds the style to imitate: its rules bind; its examples are illustrations.
 
 ## Commands (scripts are the interface)
-`bun run gates` (typecheck + lint + test + RLS check) · `bun run local <cmd>` (any command with the
+`bun run gates` (typecheck + lint + test + RLS check) · `bun run cycle --banner` (where we are:
+current slice, next item, this branch's item) · `bun run local <cmd>` (any command with the
 running local stack's settings) · `bun run dev` · `bun run db:reset`
 (local only) · `bun run db:seed <pack>` · `bun run demo` · `bun run evals` · `bun run guards`
 

@@ -1,0 +1,28 @@
+{
+  "description": "Shows every Codex session the current roadmap slice and item (scripts/cycle.ts). Codex runs these only after they are trusted in /hooks.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/scripts/cycle-hook.sh\" --banner",
+            "timeout": 20,
+            "statusMessage": "Loading the current cycle"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"$(git rev-parse --show-toplevel)/scripts/cycle-hook.sh\" --pin",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
