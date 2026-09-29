@@ -114,7 +114,7 @@ the booking, and tells each step once, in the order it happens. As a visitor
 scrolls:
 
 1. **Hero** (`sections/Hero.tsx`) — the promise, "Book a demo", the sample call,
-   and one finished result: Rohan called 2 min after import, a site visit booked.
+   and one finished result: Rohan called 2 min after his lead landed, a site visit booked.
 2. **How it works** (`sections/HowItWorks.tsx`, `#how`, the nav's "How it
    works") — the intro "Follow one lead, from the moment it lands to the site visit.", then
    five unnumbered steps beside a product window (`visuals/HowSteps.tsx`) that
@@ -135,7 +135,7 @@ Each step's words sit beside the window that shows them, and the window moves
 on with the step, so a message never arrives before or after the picture that
 proves it. The clock only moves forward as the visitor scrolls: the intent study
 zooms into a moment of the brief (7:13:40 PM, the Intent row), and the call and
-after starts at the call, never back at the import. There are no chapter numbers
+after starts at the call, never back at the moment the lead landed. There are no chapter numbers
 and the steps are unnumbered, so nothing on the page counts: the engine panel's
 steps and flow, and the intent study's step strip, carry no numbers either (lists
 inside product cards, like the brief's call plan, keep their own). `App.tsx` composes the sections
@@ -163,12 +163,12 @@ server render and reduced motion show it drawn. The sheet and the plan are
 decorative (`aria-hidden`).
 
 On the plan sits the **result card**, tilted, as in the study: "Rohan Mehta" ·
-"Called 2 min after import" / "Captured" / "₹90 L", "2 BHK · Whitefield",
+"Called 2 min after it landed" / "Captured" / "₹90 L", "2 BHK · Whitefield",
 "Within 12 months" / "Site visit booked · Sat 11:00 AM". Its words live in
 `content/hero.ts` as `result`. It is an illustration of one call's outcome, not a
 live call: to a screen reader it is one image (`role="img"`) whose label says so
-and tells the call in words that read aloud well (only the label says the import
-was at 7:12 PM; the card's face shows no clock time but the visit's). From 1024px the plan takes a
+and tells the call in words that read aloud well (only the label says the lead
+landed at 7:12 PM; the card's face shows no clock time but the visit's). From 1024px the plan takes a
 fixed right-hand column and the copy centres beside it; between 640px and 1023px
 the plan and card sit centred under the copy; below 640px the plan is hidden and
 the card follows the copy.
@@ -209,8 +209,10 @@ with no caret. In a phone-width window the intent study's strip shows only its o
 step, so its pinned header stays short:
 
 1. **It starts the moment a lead lands.** The brief opens on his enquiry, in his
-   own words. The copy says "lands", never "import": leads will come by more
-   than one channel (CSV today; CRM connectors and inbound calls are planned).
+   own words. The story (hero, How it works and its window, The call and after)
+   says "lands", never "import": leads will come by more than one channel (CSV
+   today; CRM connectors and inbound calls are planned). A copy test enforces it;
+   the Pilot and FAQ may still say how leads arrive today.
 2. **A brief before every call.** The project match, his history, his language.
 3. **Your team answers once. Every call knows.** The open question goes to
    Priya on WhatsApp; her reply pops up (with the chime), then is saved.
@@ -318,7 +320,8 @@ studies in How it works — and never decorates for its own sake.
   results or quotes as real. Examples are labelled ("Illustrative example",
   "Example", "Sample call", and the text-to-speech note under the listen button).
   Claims match what exists today: English + Hindi/Hinglish; leads arrive by CSV
-  import, so speed reads "called 2 min after import" — never a seconds-to-call
+  import today, so speed reads "called 2 min after it landed" (the page never names
+  a channel, and never says "import" in the buyer story) — never a seconds-to-call
   claim or a lead portal as a live source; CRM connectors and intent scoring are
   planned; no published rates. An intent score out of 100 ("78 / 100") appears
   **only** in How it works (`#how`: step 4 and the window), which carries

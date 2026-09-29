@@ -2,7 +2,7 @@
 // product example, and the follow-up branch beneath them. The follow-up schedule is
 // an example: the cadence is set per project. `as const` keeps each step's example
 // typed on its own shape. The call status, delay and "after" read as one phrase
-// ("Called 2 min after import"); they are kept apart so the delay can change alone.
+// ("Called 2 min after it landed"); they are kept apart so the delay can change alone.
 // ‑ is a non-breaking hyphen, so "follow-ups" and "re-call" never split across lines.
 // StageGrid, FunnelFlow and IntentRouting compose it and inline none of it.
 //
@@ -35,7 +35,7 @@ export const workflow = {
         line: "Rohan Mehta · in Hinglish",
         status: "Called",
         delay: "2 min",
-        after: "after import",
+        after: "after it landed",
       },
     },
     {

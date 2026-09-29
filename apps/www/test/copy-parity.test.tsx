@@ -13,7 +13,7 @@
 // back in the window until its step, rendered on its own), the running total the
 // score builds through, Priya's reply docked in the finished brief, the sound
 // switch, one call-now rule and one follow-up plan,
-// Rohan's one evening (import 7:12, Priya's answer 7:13, the call 7:14, WhatsApp
+// Rohan's one evening (lead lands 7:12, Priya's answer 7:13, the call 7:14, WhatsApp
 // 7:16, the visit) told the same in every section, the honest labelling of the
 // pilot report and the plans, a score out of 100 only inside How it works, the
 // retired copy staying retired, and the default UI state and accessible shape
@@ -323,7 +323,7 @@ describe("copy — the buyer-outcome story", () => {
     "Visit · Sat",
     // the flow told once, in order: the intent study is the brief's Intent row
     // opened up (not a ranking of leads), the call and after opens on the call (the
-    // clock doesn't go back to the import), the examples are that call up close
+    // clock doesn't go back to the lead landing), the examples are that call up close
     // (not a restart of the story), the steps tell the brief in the order it plays
     // (no buyer asked anything), and the call-now line reads "50 or more" everywhere
     "Who to call first",
@@ -454,8 +454,8 @@ describe("the hero — study A3: one finished call, on the drawing sheet", () =>
     expect(label).toStartWith("Illustrative result of one call:");
     for (const s of [
       "Rohan Mehta",
-      "imported at 7:12 PM",
-      "in Hinglish 2 min after import",
+      "landed at 7:12 PM",
+      "in Hinglish 2 min later",
       "a budget of ₹90 lakh",
       "a 2 BHK in Whitefield",
       "within 12 months",
@@ -464,13 +464,13 @@ describe("the hero — study A3: one finished call, on the drawing sheet", () =>
       expect(label).toContain(s);
   });
 
-  test("first paint is the study's card, finished: Rohan, called 2 min after import, captured, visit booked", () => {
+  test("first paint is the study's card, finished: Rohan, called 2 min after it landed, captured, visit booked", () => {
     expect(textOf(card()).trim()).toBe(
-      "Rohan Mehta Called 2 min after import Captured ₹90 L 2 BHK · Whitefield Within 12 months Site visit booked · Sat 11:00 AM",
+      "Rohan Mehta Called 2 min after it landed Captured ₹90 L 2 BHK · Whitefield Within 12 months Site visit booked · Sat 11:00 AM",
     );
     for (const s of [
       "Rohan Mehta",
-      "Called 2 min after import",
+      "Called 2 min after it landed",
       "Captured",
       "₹90 L",
       "2 BHK · Whitefield",
@@ -794,12 +794,12 @@ describe("the call brief — its final frame in How it works' window on first pa
       "The call waits for the brief",
     ])
       heldBack(brief(), s, true);
-    heldBack(brief(), "Rohan Mehta, from tonight's import.");
+    heldBack(brief(), "Rohan Mehta, a new lead, just landed.");
   });
 
-  test("the home loan the intent study weighs is in his own enquiry, from the import", () => {
+  test("the home loan the intent study weighs is in his own enquiry, the words he sent", () => {
     const [enquiry] = callBrief.rows;
-    expect(enquiry?.source).toBe("from import");
+    expect(enquiry?.source).toBe("from his enquiry");
     expect(enquiry?.note).toContain("loan bhi lena hai");
     inView(brief(), "loan bhi lena hai");
   });
@@ -1012,8 +1012,8 @@ describe("one follow-up plan — the intent study's card and the engine panel's 
 
 // ── Rohan's evening: one timeline, told the same in every section ──────────
 // The anchor is the call, where the engine panel opens: its first step's example
-// ("Call started · 7:14 PM", "Called 2 min after import"), so the import is
-// 7:12 PM. The hero's card shows no clock time, as in study A3 (only its label
+// ("Call started · 7:14 PM", "Called 2 min after it landed"), so the lead
+// landed at 7:12 PM. The hero's card shows no clock time, as in study A3 (only its label
 // says 7:12 PM). Every other time is read from the content modules and checked
 // against the anchor, so a section can't drift to its own story.
 // A clock reading ("7:12 PM", "7:13:40 PM", "Thu 7:16 PM") in seconds after midnight…
@@ -1038,27 +1038,27 @@ describe("Rohan's timeline — one evening, the same in every section", () => {
   const [first] = workflow.steps;
   const called = first.example.time;
   const after = Number(/(\d+)\s*min\b/.exec(first.example.delay)?.[1]);
-  const imported = toClock(clock(called) - after * 60);
+  const landed = toClock(clock(called) - after * 60);
   const calledAfter = `${first.example.delay} ${first.example.after}`;
   const [confirmation] = examples.visit.messages;
   const between = (s: string) => {
-    expect(clock(s), `${s} is after the import`).toBeGreaterThanOrEqual(
-      clock(imported),
+    expect(clock(s), `${s} is after the lead landed`).toBeGreaterThanOrEqual(
+      clock(landed),
     );
     expect(clock(s), `${s} is before the call`).toBeLessThan(clock(called));
   };
 
-  test("one evening: imported 7:12 PM, Priya answers 7:13 PM, called 7:14 PM, WhatsApp 7:16 PM", () => {
+  test("one evening: the lead lands 7:12 PM, Priya answers 7:13 PM, called 7:14 PM, WhatsApp 7:16 PM", () => {
     expect([
-      imported,
+      landed,
       toClock(clock(callBrief.priya.time)),
       called,
       toClock(clock(confirmation.time)),
     ]).toEqual(["7:12 PM", "7:13 PM", "7:14 PM", "7:16 PM"]);
-    expect(calledAfter).toBe("2 min after import");
+    expect(calledAfter).toBe("2 min after it landed");
   });
 
-  test("the anchor — the call and after opens on the call at 7:14 PM, and its clock never goes back to the import", () => {
+  test("the anchor — the call and after opens on the call at 7:14 PM, and its clock never goes back to the lead landing", () => {
     const panel = textOf(engine());
     expect(panel).toContain(`${first.example.label} · ${called}`);
     expect(panel).toContain(`${first.example.status} ${calledAfter}`);
@@ -1067,31 +1067,31 @@ describe("Rohan's timeline — one evening, the same in every section", () => {
     expect(times[0], "the first time on the panel is the call").toBe(called);
     expect(
       times,
-      "the import's time is the brief's, not the panel's",
-    ).not.toContain(imported);
+      "the time the lead landed is the brief's, not the panel's",
+    ).not.toContain(landed);
     for (const t of times.filter((t) => t.endsWith("PM")))
       expect(clock(t), `${t} is not before the call`).toBeGreaterThanOrEqual(
         clock(called),
       );
   });
 
-  test("the hero's card is the same call and shows no clock time; its label says imported at 7:12 PM", () => {
+  test("the hero's card is the same call and shows no clock time; its label says landed at 7:12 PM", () => {
     expect(result.lead).toBe("Rohan Mehta");
     expect<string>(result.called).toBe(`Called ${calledAfter}`);
     const label = oneSpace(result.aria);
-    expect(label).toContain(`imported at ${imported}`);
-    expect(label).toContain(calledAfter);
+    expect(label).toContain(`landed at ${landed}`);
+    expect(label).toContain(`${first.example.delay} later`);
     // on its face, the only clock is the visit's slot
     const slot = /Sat,?\s+(\d{1,2}:\d{2}\s[AP]M)/.exec(result.outcome)?.[1];
     expect(clocks(textOf(card()))).toEqual([oneSpace(slot ?? "")]);
   });
 
-  test("the call brief: imported 7:12 PM, Priya answers at 7:13 PM, called 7:14 PM", () => {
+  test("the call brief: landed 7:12 PM, Priya answers at 7:13 PM, called 7:14 PM", () => {
     const shown = textOf(brief());
-    // the import, as the brief's card and its first source state it
-    const at = /imported\s+(.+)$/.exec(callBrief.card.sub)?.[1] ?? "";
-    expect(oneSpace(at)).toBe(imported);
-    expect(oneSpace(callBrief.rail.items[0]?.detail ?? "")).toEndWith(imported);
+    // the moment the lead landed, as the brief's card and its first source state it
+    const at = /landed\s+(.+)$/.exec(callBrief.card.sub)?.[1] ?? "";
+    expect(oneSpace(at)).toBe(landed);
+    expect(oneSpace(callBrief.rail.items[0]?.detail ?? "")).toEndWith(landed);
     expect(shown).toContain(oneSpace(callBrief.card.sub));
     // Priya's answer, in between
     expect(shown).toContain(oneSpace(callBrief.question.source));
@@ -1303,5 +1303,34 @@ describe("accessibility + first paint", () => {
 
   test("nothing is hidden by an inline style on first paint", () => {
     expect(markup).not.toMatch(/style="[^"]*opacity:\s*0/);
+  });
+});
+
+// ── the story talks about a lead landing, never an "import" (Devesh) ─────────
+// Sales teams say lead and site visit, and leads will come by more than one channel
+// (CSV today; CRM connectors and inbound calls are planned). The hero, How it works
+// (its window included: captions, header, source chips) and the call and after never
+// say "import"; the Pilot and FAQ, which state how leads arrive today, may.
+describe("the story never says import", () => {
+  for (const [name, part] of [
+    ["the hero", () => sectionAround(markup, "<h1")],
+    ["how it works, window included", how],
+    ["the call and after", engine],
+  ] as const)
+    test(`${name} has no "import"`, () => {
+      const shown = textOf(part());
+      expect(shown.length, `${name} rendered`).toBeGreaterThan(200);
+      expect(shown).not.toMatch(/\bimport/i);
+    });
+  test("every caption, header and source the call brief can show avoids it too", () => {
+    const all = JSON.stringify([
+      callBrief.captions,
+      callBrief.card,
+      callBrief.rows,
+      callBrief.rail,
+      intentEvidence.story,
+      result,
+    ]);
+    expect(all).not.toMatch(/\bimport/i);
   });
 });

@@ -10,9 +10,9 @@ import { intentScore, intentSignals } from "./beforeCall";
 const { total, outOf, callNow } = intentScore;
 
 export const intentEvidence = {
-  // The six steps between import and the call; this study zooms into `at`.
+  // The six steps between the lead landing and the call; this study zooms into `at`.
   story: {
-    steps: ["Import", "Context", "Sales check", "Intent", "Call plan", "Call"],
+    steps: ["Lead", "Context", "Sales check", "Intent", "Call plan", "Call"],
     at: 3,
     time: "7:13:40\u00a0PM",
   },
