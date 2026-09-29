@@ -107,7 +107,7 @@ export const callBrief = {
   rail: {
     title: "What the agent looked at",
     items: [
-      { title: "His enquiry", detail: "Portal · 7:12\u00a0PM" },
+      { title: "His enquiry", detail: "Landed · 7:12\u00a0PM" },
       { title: "Inventory sheet", detail: "Meridian Greens" },
       {
         title: "Enquiry history",

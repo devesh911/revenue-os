@@ -320,8 +320,8 @@ studies in How it works — and never decorates for its own sake.
   results or quotes as real. Examples are labelled ("Illustrative example",
   "Example", "Sample call", and the text-to-speech note under the listen button).
   Claims match what exists today: English + Hindi/Hinglish; leads arrive by CSV
-  import today, so speed reads "called 2 min after it landed" (the page never names
-  a channel, and never says "import" in the buyer story) — never a seconds-to-call
+  import today, so speed reads "called 2 min after it landed" (the buyer story never
+  names a channel or says "import"; the Pilot and FAQ say how leads arrive today) — never a seconds-to-call
   claim or a lead portal as a live source; CRM connectors and intent scoring are
   planned; no published rates. An intent score out of 100 ("78 / 100") appears
   **only** in How it works (`#how`: step 4 and the window), which carries

@@ -63,7 +63,7 @@ const { total, outOf, callNow } = intentScore;
 export const howSteps: readonly HowStep[] = [
   {
     title: "It starts the moment a lead lands.",
-    body: "His enquiry comes in from a property portal at 7:12\u00a0PM. Revenue\u00a0OS reads it in his own words and starts his call brief.",
+    body: "Wherever it came from, Revenue\u00a0OS reads his enquiry in his own words, notes what he asked for and starts his call brief.",
   },
   {
     title: "A brief before every call.",

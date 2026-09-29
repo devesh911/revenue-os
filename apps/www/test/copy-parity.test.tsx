@@ -1310,19 +1310,22 @@ describe("accessibility + first paint", () => {
 // Sales teams say lead and site visit, and leads will come by more than one channel
 // (CSV today; CRM connectors and inbound calls are planned). The hero, How it works
 // (its window included: captions, header, source chips) and the call and after never
-// say "import"; the Pilot and FAQ, which state how leads arrive today, may.
-describe("the story never says import", () => {
+// say "import" or name a channel (portal, CSV, CRM): "lands" is true for every
+// channel, today's and planned. The Pilot and FAQ, which state how leads arrive
+// today, may.
+const STORY_BANNED = /\bimport|\bportals?\b|\bCSV\b|\bCRM\b/i;
+describe("the story never says import, and names no channel", () => {
   for (const [name, part] of [
     ["the hero", () => sectionAround(markup, "<h1")],
     ["how it works, window included", how],
     ["the call and after", engine],
   ] as const)
-    test(`${name} has no "import"`, () => {
+    test(`${name} has no "import" and names no channel`, () => {
       const shown = textOf(part());
       expect(shown.length, `${name} rendered`).toBeGreaterThan(200);
-      expect(shown).not.toMatch(/\bimport/i);
+      expect(shown).not.toMatch(STORY_BANNED);
     });
-  test("every caption, header and source the call brief can show avoids it too", () => {
+  test("every caption, header, source and step the story can show avoids them too", () => {
     const all = JSON.stringify([
       callBrief.captions,
       callBrief.card,
@@ -1330,7 +1333,9 @@ describe("the story never says import", () => {
       callBrief.rail,
       intentEvidence.story,
       result,
+      howItWorks,
+      howSteps,
     ]);
-    expect(all).not.toMatch(/\bimport/i);
+    expect(all).not.toMatch(STORY_BANNED);
   });
 });
