@@ -359,8 +359,8 @@ studies in How it works — and never decorates for its own sake.
   (`sampleCall.seconds`), kept together in `content/hero.ts` beside the hero's
   result card (`result`), which tells the same call's outcome; replace them
   together when a real recording exists. **Rohan's evening** is one timeline
-  everywhere — imported 7:12 PM, Priya's answer 7:13 PM, called 7:14 PM ("2 min
-  after import"), WhatsApp confirmation Thu 7:16 PM, visit Sat 11:00 AM — and the
+  everywhere — the lead lands 7:12 PM, Priya's answer 7:13 PM, called 7:14 PM
+  ("2 min after it landed"), WhatsApp confirmation Thu 7:16 PM, visit Sat 11:00 AM — and the
   copy-parity suite checks every section against it.
 
 ## Adding a page (future contact-us)
