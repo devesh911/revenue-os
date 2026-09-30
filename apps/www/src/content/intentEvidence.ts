@@ -1,5 +1,5 @@
-// Words for chapter 02 of How it works, "Call now or follow up"
-// (visuals/IntentEvidence.tsx): the brief's Intent row opened up. The evidence and every number in it come from
+// Words for How it works' intent study, "Every score shows its working" (step 4,
+// visuals/IntentEvidence.tsx): the brief's Intent row opened up. The evidence and every number in it come from
 // beforeCall.ts (intentSignals, intentScore), so this study and the call brief
 // always agree; this module only holds the words around them: where the step sits
 // in the story, the agent's running captions (one per beat), the ledger and routing
@@ -10,9 +10,9 @@ import { intentScore, intentSignals } from "./beforeCall";
 const { total, outOf, callNow } = intentScore;
 
 export const intentEvidence = {
-  // The six steps between import and the call; this study zooms into `at`.
+  // The six steps between the lead landing and the call; this study zooms into `at`.
   story: {
-    steps: ["Import", "Context", "Sales check", "Intent", "Call plan", "Call"],
+    steps: ["Lead", "Context", "Sales check", "Intent", "Call plan", "Call"],
     at: 3,
     time: "7:13:40\u00a0PM",
   },

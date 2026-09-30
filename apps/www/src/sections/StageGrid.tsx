@@ -11,10 +11,10 @@ import { FunnelFlow } from "../visuals/FunnelFlow";
 import { CHECK, Icon } from "../visuals/Icon";
 import { IntentRouting } from "./IntentRouting";
 
-// "How it works" — the dark engine panel: the head (split from lg, the intro
-// starting on the text edge of the step column below it), the animated funnel
-// flow, the three steps, then the follow-up branch. Steps read as a railed
-// sequence on phones; at md the first two sit side by side and the third turns
+// "The call and after", directly after How it works — the dark engine panel: the
+// head (split from lg, the intro starting on the text edge of the step column
+// below it), the animated funnel flow, the three steps, then the follow-up
+// branch. Steps read as a railed sequence on phones; at md the first two sit side by side and the third turns
 // landscape across both columns (words left, example right) so the 2 + 1 split
 // reads as deliberate, with the flow standing well apart above them as its own
 // figure; from lg they run as three equal columns on 56px gutters (a hairline
@@ -84,7 +84,7 @@ export function StageGrid() {
       >
         <div>
           <Kicker tone="inverse" className="mb-[24px]">
-            {workflow.step} · {workflow.kicker}
+            {workflow.kicker}
           </Kicker>
           <Heading as="h3" size="section" id="the-call-title">
             {workflow.title}

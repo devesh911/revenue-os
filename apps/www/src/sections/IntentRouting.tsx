@@ -6,7 +6,7 @@ import { cx } from "../lib/cx";
 import { reveal } from "../lib/reveal";
 
 // The route out of the Qualify step for buyers still exploring (and for buyers under
-// the call-now line, chapter 02), closing the ink panel: the olive follow-up loop,
+// the call-now line, in How it works' intent study), closing the ink panel: the olive follow-up loop,
 // with its example plan. (The other route — ready buyers, clay — is the Visit step's
 // booked visit, so it needs no card of its own.) The glyph is
 // drawn in the FunnelFlow vocabulary (the dotted loop with a lead on it), so the

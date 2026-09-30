@@ -1,8 +1,8 @@
-// Chapter 03 of How it works — the call and after: three steps, each with a small
+// The call and after, directly after How it works: three steps, each with a small
 // product example, and the follow-up branch beneath them. The follow-up schedule is
 // an example: the cadence is set per project. `as const` keeps each step's example
 // typed on its own shape. The call status, delay and "after" read as one phrase
-// ("Called 2 min after import"); they are kept apart so the delay can change alone.
+// ("Called 2 min after it landed"); they are kept apart so the delay can change alone.
 // ‑ is a non-breaking hyphen, so "follow-ups" and "re-call" never split across lines.
 // StageGrid, FunnelFlow and IntentRouting compose it and inline none of it.
 //
@@ -14,7 +14,6 @@
 const loopArrow = "↻";
 
 export const workflow = {
-  step: "03", // chapter 03 of How it works (content/beforeCall.ts holds 01 and 02)
   kicker: "The call and after",
   title: "The call, then the next step",
   intro:
@@ -36,7 +35,7 @@ export const workflow = {
         line: "Rohan Mehta · in Hinglish",
         status: "Called",
         delay: "2 min",
-        after: "after import",
+        after: "after it landed",
       },
     },
     {

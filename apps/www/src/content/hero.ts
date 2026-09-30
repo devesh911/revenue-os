@@ -24,9 +24,9 @@ export const hero = {
 } as const;
 
 // The card on the drawing: what one call produced, not a live call. Leads arrive
-// by import, so speed reads "called … after import"; no score is shown.
+// the moment a lead lands, so speed reads "called … after it landed" (never a channel); no score is shown.
 const lead = "Rohan Mehta";
-const calledAfter = "2 min after import";
+const calledAfter = "2 min after it landed";
 const bhk = "2\u00a0BHK";
 const area = "Whitefield";
 const timeline = "Within 12 months";
@@ -38,7 +38,7 @@ export const result = {
   fields: ["₹90\u00a0L", `${bhk} · ${area}`, timeline],
   outcome: "Site visit booked · Sat 11:00\u00a0AM",
   // the card as one image, in words a screen reader speaks well
-  aria: `Illustrative result of one call: ${lead}'s enquiry, imported at 7:12\u00a0PM, was called in Hinglish ${calledAfter}. The call captured a budget of ₹90 lakh, a ${bhk} in ${area} and a timeline ${timeline.toLowerCase()}, and booked a site visit for Saturday at 11:00\u00a0AM.`,
+  aria: `Illustrative result of one call: ${lead}'s enquiry landed at 7:12\u00a0PM, and he was called in Hinglish 2 min later. The call captured a budget of ₹90 lakh, a ${bhk} in ${area} and a timeline ${timeline.toLowerCase()}, and booked a site visit for Saturday at 11:00\u00a0AM.`,
 } as const;
 
 // The hero's ground (visuals/SurveyGround): a drawing sheet with the plan of the

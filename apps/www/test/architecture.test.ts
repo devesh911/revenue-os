@@ -3,8 +3,8 @@
 // design system (the paper / ink / clay tokens, self-hosted Lora + IBM Plex Mono,
 // the motion floor, the page-wide pause switch, the one-shot scroll reveal, the
 // hero's floor plan that draws itself once), the file layout (the page in order —
-// the pilot report after the Pilot — the old looping call card gone, one set of
-// chapter numbers), content separation, How it works reading its four intent
+// the pilot report after the Pilot — the old looping call card gone, no chapter or
+// step numbers), content separation, How it works reading its four intent
 // signals from one module, namespaced keyframes, the demo-booking
 // wiring (one "Book a demo" label; the only external host is the booking API, in
 // one file) and the README.
@@ -71,8 +71,8 @@ describe("architecture — vite entry wiring", () => {
   test("src/App.tsx exports App and composes the sections in page order", () => {
     const src = read(resolve(SRC_DIR, "App.tsx"));
     expect(exportsName(src, "App")).toBe(true);
-    // How it works tells chapters 01 and 02; StageGrid, the engine panel, is 03;
-    // the pilot report (Proof) follows the Pilot (Pricing) it reports on
+    // How it works (its steps beside the window), then StageGrid, the engine panel
+    // (the call and after); the pilot report (Proof) follows the Pilot (Pricing)
     const ORDER = [
       "BookingProvider",
       "Nav",
@@ -206,10 +206,11 @@ describe("architecture — motion floor, pause switch, scroll reveal", () => {
     ).toBe(true);
   });
 
-  test("the before-the-call studies step through useSequence, with no timers of their own", () => {
+  test("How it works' steps and its two studies step through useSequence, with no timers of their own", () => {
     for (const file of [
       "visuals/IntentEvidence.tsx",
       "visuals/CallBrief.tsx",
+      "visuals/HowSteps.tsx",
     ]) {
       const src = code(read(resolve(SRC_DIR, file)));
       expect(src, `${file} uses useSequence`).toMatch(/useSequence\(/);
@@ -273,7 +274,15 @@ describe("architecture — component layout", () => {
   const LAYOUT: Array<[string, string[]]> = [
     [
       "design",
-      ["Heading", "Text", "Kicker", "MonoLabel", "CtaButton", "SectionFrame"],
+      [
+        "Heading",
+        "Text",
+        "Kicker",
+        "MonoLabel",
+        "CtaButton",
+        "SectionFrame",
+        "Typed",
+      ],
     ],
     [
       "visuals",
@@ -288,6 +297,7 @@ describe("architecture — component layout", () => {
         "SurveyGround",
         "IntentEvidence",
         "CallBrief",
+        "HowSteps",
       ],
     ],
     [
@@ -351,7 +361,7 @@ describe("architecture — component layout", () => {
     "sections/ClosingCta.tsx",
     "visuals/SampleCall.tsx",
     // the old looping call card, and "Before the call" as its own section (now
-    // chapter 01 of How it works)
+    // part of How it works)
     "visuals/HeroCall.tsx",
     "sections/BeforeCall.tsx",
   ];
@@ -368,19 +378,21 @@ describe("architecture — component layout", () => {
     expect(stale.map(rel)).toEqual([]);
   });
 
-  // The chapters are numbered 01 · 02 · 03 and nothing inside them starts a
-  // second count: chapter 03's steps and flow nodes, and chapter 02's step strip.
-  test("one numbering: no step numbers in the engine panel or the intent study's strip", () => {
-    expect(code(read(resolve(SRC_DIR, "content/workflow.ts")))).not.toMatch(
-      /\bnum\s*:/,
-    );
+  // Nothing on the page counts: How it works' steps are unnumbered, the engine
+  // panel's kicker has no chapter number, its steps and flow nodes have none, nor
+  // has the intent study's step strip.
+  test("no chapter numbers, and no step numbers in How it works' steps, the engine panel or the intent study's strip", () => {
+    const workflow = code(read(resolve(SRC_DIR, "content/workflow.ts")));
+    expect(workflow).not.toMatch(/\bnum\s*:/);
+    expect(workflow, "no chapter number").not.toMatch(/\bstep\s*:\s*["']\d/);
     for (const file of ["sections/StageGrid.tsx", "visuals/FunnelFlow.tsx"])
       expect(code(read(resolve(SRC_DIR, file))), file).not.toMatch(
         /\.num\b|padStart\(/,
       );
-    expect(
-      code(read(resolve(SRC_DIR, "visuals/IntentEvidence.tsx"))),
-    ).not.toMatch(/\{\s*i\s*\+\s*1\s*\}/);
+    for (const file of ["visuals/IntentEvidence.tsx", "visuals/HowSteps.tsx"])
+      expect(code(read(resolve(SRC_DIR, file))), file).not.toMatch(
+        /\{\s*i\s*\+\s*1\s*\}/,
+      );
   });
 });
 
@@ -395,7 +407,7 @@ describe("architecture — src/content/ holds the copy", () => {
         "Hear a sample call",
         "/sample-call.m4a",
         "Rohan Mehta",
-        "after import",
+        "after it landed",
         "Site visit booked",
         "Meridian Greens · Tower B",
         "Illustrative",
@@ -426,11 +438,11 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "beforeCall",
       [
-        "Follow one enquiry, from import to site visit.",
-        "Before the call",
+        "Follow one lead, from the moment it lands to the site visit.",
         "Your team answers once. Every call knows.",
-        "Call now or follow up",
         "Every score shows its working.",
+        "It starts the moment a lead lands.",
+        "Rohan's enquiry, step by step",
         "Illustrative example",
         "Repeat enquiry",
       ],
@@ -454,22 +466,27 @@ describe("architecture — src/content/ holds the copy", () => {
     });
   }
 
-  test("content/beforeCall.ts holds How it works: its intro, chapters 01 and 02, the signals", () => {
+  test("content/beforeCall.ts holds How it works: its intro, its five steps, the signals", () => {
     const src = read(resolve(SRC_DIR, "content/beforeCall.ts"));
     for (const name of [
       "howItWorks",
-      "chapters",
+      "howSteps",
       "intentSignals",
       "intentScore",
     ])
       expect(exportsName(src, name), `exports ${name}`).toBe(true);
     const section = code(read(resolve(SRC_DIR, "sections/HowItWorks.tsx")));
     expect(section).toMatch(
-      /import\s*\{[^}]*\bchapters\b[^}]*\bhowItWorks\b[^}]*\}\s*from\s*["']\.\.\/content\/beforeCall["']/,
+      /import\s*\{[^}]*\bhowItWorks\b[^}]*\}\s*from\s*["']\.\.\/content\/beforeCall["']/,
     );
-    // the chapters in story order, each heading directly above its own visual
-    expect(section).toMatch(
-      /chapters\.context\b[\s\S]*?<CallBrief\s*\/>[\s\S]*?chapters\.intent\b[\s\S]*?<IntentEvidence\s*\/>/,
+    expect(section).toMatch(/<HowSteps\s*\/>/);
+    // the steps drive both studies in the window: the brief, then the intent study
+    const steps = code(read(resolve(SRC_DIR, "visuals/HowSteps.tsx")));
+    expect(steps).toMatch(
+      /import\s*\{[^}]*\bhowSteps\b[^}]*\}\s*from\s*["']\.\.\/content\/beforeCall["']/,
+    );
+    expect(steps).toMatch(
+      /<CallBrief\b[^>]*\bat=[\s\S]*?<IntentEvidence\b[^>]*\bat=/,
     );
   });
 
@@ -500,7 +517,7 @@ describe("architecture — src/content/ holds the copy", () => {
         "Turn property enquiries",
         "Voice AI for Indian real estate",
         "Rohan Mehta",
-        "after import",
+        "after it landed",
         "Captured",
         "Site visit booked",
         "Illustrative result",
@@ -546,15 +563,20 @@ describe("architecture — src/content/ holds the copy", () => {
     [
       "sections/HowItWorks",
       "beforeCall",
+      ["Follow one lead", "site visit", "Illustrative example"],
+    ],
+    [
+      "visuals/HowSteps",
+      "beforeCall",
       [
-        "Follow one enquiry",
-        "Before the call",
+        "It starts the moment a lead lands",
         "Your team answers once",
-        "Call now or follow up",
         "Every score shows",
+        "step by step",
         "Illustrative example",
       ],
     ],
+    ["visuals/HowSteps", "site", ["Revenue OS"]],
     [
       "visuals/IntentEvidence",
       "intentEvidence",
@@ -680,7 +702,7 @@ describe("architecture — namespaced keyframes", () => {
 
   test("every @keyframes is ro- (shared) or a visual's own prefix", () => {
     const stray = names(css(), "keyframes").filter(
-      (n) => !/^(?:ro|survey|intent|brief)-/.test(n),
+      (n) => !/^(?:ro|survey|intent|brief|how)-/.test(n),
     );
     expect(stray).toEqual([]);
   });
@@ -700,6 +722,7 @@ describe("architecture — namespaced keyframes", () => {
     ["visuals/SurveyGround", "hero survey ground", "survey"],
     ["visuals/IntentEvidence", "intent evidence", "intent"],
     ["visuals/CallBrief", "call brief", "brief"],
+    ["visuals/HowSteps", "how it works steps", "how"],
   ];
   for (const [file, title, prefix] of AREAS) {
     test(`${file}: its keyframes and utilities are ${prefix}-*, in its own block`, () => {
@@ -783,9 +806,9 @@ describe("architecture — README", () => {
       "## Page order",
       "## The hero",
       "sections/HowItWorks.tsx",
-      "01 · Before the call",
-      "02 · Call now or follow up",
-      "03 · The call and after",
+      "visuals/HowSteps.tsx",
+      "The call and after",
+      "clay-type",
       "Pilot report",
       "Illustrative example",
       "content/beforeCall.ts",
@@ -808,6 +831,9 @@ describe("architecture — README", () => {
       "sections/BeforeCall",
       "Who to call first",
       "hero · proof",
+      "01 · Before the call",
+      "02 · Call now or follow up",
+      "03 · The call and after",
     ])
       expect(r).not.toContain(s);
   });
