@@ -34,7 +34,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 7. **main is PR-only with CI green** (required check: `checks`). Merge authority follows the
    PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge independent PRs one at a
    time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. Loosening any guard, hook or deny-list is Devesh-only in both phases.
+   only humans merge. A change to a rule file (the done gate, CI, lint or type settings, the hooks, the verifier, the package
+   scripts) is Devesh's to approve in both phases: before starting one, tell him what it will change and why and
+   ask what you need to know; only he merges it.
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
@@ -118,6 +120,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
    to tick; its PR body's what / why / evidence is the record), updates `STATE.md → What works
    today` if reality changed, and adds a line to `STATE.md → Decisions in force` for any decision.
+   Any area the PR touches that has an entry in `docs/fix-when-touched.md` gets that fix in the same PR.
    A genuine surprise gets one factual line in `lessons.md`. After ROADMAP.md or STATE.md change
    on main, republish the tracker page (Claude: Artifact publish of `docs/tracker/index.html`
    with files `ROADMAP.md`, `STATE.md` and `parse.js` from `docs/tracker/parse.js`, `url` = the
@@ -172,11 +175,12 @@ settings) · `bun run dev` · `bun run db:reset`
 - **Agent harness**: tool arguments are validated before execute · `guard()` before any side
   effect · job handlers first reload the row and no-op if stale · retrieved text (memories,
   knowledge) enters prompts fenced and labelled as data · model output never writes consent or
-  guardrail fields · no in-memory agent state (rows or it didn't happen) · no per-vertical code
+  guardrail fields (one exception: it may add a do-not-call block heard on a call, never remove one or grant consent) · no in-memory agent state (rows or it didn't happen) · no per-vertical code
   in `packages/harness` (verticals are seed/config rows).
 - Logs are pino JSON with `org_id`, `run_id`, `conversation_id` where known.
 - G1: no `bun:*` imports or `Bun.` globals in `packages/**` (imports are lint-enforced).
-- Hygiene: delete merged branches with `git branch -d` (never `-D`); remove worktrees with
+- Hygiene: delete merged branches with `git branch -d`; `-D` only for a squash-merged branch whose
+  tip is exactly the head its merged PR merged; remove worktrees with
   `git worktree remove` (never `rm -rf`).
 
 ## Gotchas
