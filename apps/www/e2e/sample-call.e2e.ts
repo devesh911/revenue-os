@@ -7,21 +7,9 @@
 // readable over the hero's graph paper.
 import { expect, test } from "@playwright/test";
 import { sampleCall } from "../src/content/hero";
+import { contrast } from "./contrast";
 
 const clock = `${Math.floor(sampleCall.seconds / 60)}:${String(sampleCall.seconds % 60).padStart(2, "0")}`;
-
-// WCAG relative luminance of a computed "rgb(r, g, b)" colour.
-const luminance = (rgb: string) => {
-  const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map((n) => {
-    const v = Number(n) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const contrast = (a: string, b: string) => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-};
 
 test("the sample call plays in place and pauses, and its transcript opens, readable", async ({
   page,

@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+// No compiled validators: zod otherwise probes `new Function` as the schemas below are
+// built, and the site's content security policy (public/_headers) reports that probe in
+// every visitor's browser.
+z.config({ jitless: true });
+
 // Demo booking against Cal.com's public v2 API: a public event type needs no key
 // and the API allows browser origins, so the marketing site can list open times
 // and create the booking itself (the buyer gets Cal.com's confirmation email and

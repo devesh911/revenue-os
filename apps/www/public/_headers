@@ -1,0 +1,9 @@
+# Security headers for every page of the marketing site, in Cloudflare Pages' _headers format (vite copies this
+# file into dist unchanged). A page loads only the site's own files and Plausible's analytics script, and talks
+# only to Cal.com's booking API and Plausible's event endpoint. Images and fonts may also be data: URLs (the paper
+# grain on the dark and clay panels, and the font files under 4 KB, which vite inlines). No other site may show
+# the page in a frame.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://plausible.io; connect-src 'self' https://api.cal.com https://plausible.io; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
