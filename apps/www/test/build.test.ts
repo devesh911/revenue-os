@@ -1,30 +1,55 @@
-// RED spec for TASK-34 — www componentization · BUILD GATE.
-// The retired static world had NO build step; the component rewrite ships a Vite
-// app (react + react-dom + tailwind v4, the console's stack). This gate proves
-// apps/www actually builds into a bundled component app that carries the hero copy.
-//
-// It runs `bun run build` (apps/www's "build": "vite build" script) with cwd
-// pinned to apps/www — exercising the workspace-installed vite. We deliberately do
-// NOT shell out to `bunx vite` (that auto-installs vite over the network); the
-// build must come from a real, declared devDependency.
-//
-// RED today: apps/www has no package.json / no vite setup, so `bun run build`
-// exits non-zero → the build-succeeded assertion fails (a clean assertion, the
-// execSync throw is caught). NOTE: in this env-free worktree vite is not installed
-// for www, so the *success* path is CI-owned (deps installed) — the same command,
-// green once GREEN adds the app + devDeps. Reported as such.
+// The marketing site's build. `bun run build` (apps/www's "vite build" script) runs with
+// cwd pinned to apps/www, so the workspace-installed vite does it; never `bunx vite`,
+// which would fetch one over the network. It must emit a bundled component app that
+// carries the hero copy, and ship the security headers Cloudflare Pages reads from
+// dist/_headers (public/_headers, copied by the build).
 import { describe, expect, test } from "bun:test";
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createBookingClient } from "../src/lib/booking";
 
 const WWW_DIR = resolve(import.meta.dir, "..");
 const DIST_DIR = resolve(WWW_DIR, "dist");
 // The hero headline — the one string that proves the component
 // tree, not just an empty shell, made it into the bundle.
 const HERO = "Turn property enquiries into qualified site visits.";
+// Plausible's script and event host (README → analytics): the test build sets no
+// script, so the bundle can't name it. A proxy or custom domain changes it here too.
+const PLAUSIBLE = "https://plausible.io";
 
-describe("AC build gate — apps/www builds into a bundled component app", () => {
+// The headers a _headers file gives one path: a path line, then its indented
+// "Name: value" lines; # starts a comment.
+function headersFor(file: string, path = "/*") {
+  const out: Record<string, string> = {};
+  let current = "";
+  for (const line of file.split("\n")) {
+    if (/^\s*(#|$)/.test(line)) continue;
+    if (!/^\s/.test(line)) current = line.trim();
+    else if (current === path) {
+      const at = line.indexOf(":");
+      out[line.slice(0, at).trim().toLowerCase()] = line.slice(at + 1).trim();
+    }
+  }
+  return out;
+}
+
+// The host the booking client really calls, seen through a fetch that records it.
+async function bookingHost() {
+  let url = "";
+  const client = createBookingClient({
+    username: "demo",
+    eventSlug: "demo",
+    fetch: async (u) => {
+      url = String(u);
+      return Response.json({});
+    },
+  });
+  await client.fetchSlots("UTC").catch(() => {});
+  return new URL(url).origin;
+}
+
+describe("apps/www builds into a bundled component app with its security headers", () => {
   test("vite build succeeds and emits a JS bundle carrying the hero copy", () => {
     let built = false;
     let out = "";
@@ -40,7 +65,6 @@ describe("AC build gate — apps/www builds into a bundled component app", () =>
       out = `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? String(err)}`;
       built = false;
     }
-    // RED today: no apps/www/package.json + no vite → `bun run build` is non-zero.
     expect(
       built,
       `\`bun run build\` must succeed in apps/www (vite build). Output:\n${out}`,
@@ -69,4 +93,38 @@ describe("AC build gate — apps/www builds into a bundled component app", () =>
       "the bundled JS must contain the hero headline copy",
     ).toBe(true);
   }, 260_000);
+
+  test("dist/_headers lets pages use only the site, Cal.com and Plausible, and no site frame them", async () => {
+    const file = resolve(DIST_DIR, "_headers");
+    expect(existsSync(file), "the build must ship dist/_headers").toBe(true);
+    const headers = headersFor(readFileSync(file, "utf8"));
+    const directives = (headers["content-security-policy"] ?? "")
+      .split(";")
+      .map((d) => d.trim().split(/\s+/))
+      .filter(([name]) => name);
+    // A browser obeys a directive's first copy: a repeat could hide a looser one.
+    const names = directives.map(([name]) => name);
+    expect(new Set(names).size, "no directive repeats").toBe(names.length);
+    // Exactly this policy, so any loosening is a deliberate edit here: each host only
+    // where the page needs it, data: only for the paper grain and the fonts vite
+    // inlines, no 'unsafe-inline' or 'unsafe-eval', and no site may frame the page.
+    const cal = await bookingHost();
+    expect(
+      Object.fromEntries(
+        directives.map(([name, ...sources]) => [name, sources]),
+      ),
+    ).toEqual({
+      "default-src": ["'self'"],
+      "script-src": ["'self'", PLAUSIBLE],
+      "connect-src": ["'self'", cal, PLAUSIBLE],
+      "img-src": ["'self'", "data:"],
+      "font-src": ["'self'", "data:"],
+      "object-src": ["'none'"],
+      "base-uri": ["'self'"],
+      "form-action": ["'self'"],
+      "frame-ancestors": ["'none'"],
+    });
+    expect(headers["x-content-type-options"]).toBe("nosniff");
+    expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  });
 });

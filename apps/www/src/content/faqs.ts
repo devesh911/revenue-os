@@ -18,7 +18,7 @@ export const faqCopy = {
 export const faqs: Faq[] = [
   {
     q: "How natural does the voice sound?",
-    a: "The sample on this page is recreated with basic text-to-speech, not the voice used on real calls. On the demo you'll hear the production voice speaking Hinglish, and you approve the call script before any call goes out.",
+    a: "The sample on this page is a dramatised call voiced with ElevenLabs, not a recording of a real one. On the demo you'll hear the production voice speaking Hinglish, and you approve the call script before any call goes out.",
   },
   {
     q: "Does it replace my sales team?",
@@ -26,7 +26,7 @@ export const faqs: Faq[] = [
   },
   {
     q: "Which tools does it work with?",
-    a: "Today, leads come in through a CSV import, and follow-ups go out by voice and WhatsApp. Connectors for CRMs such as Zoho and HubSpot are planned; tell us what you use on the demo.",
+    a: "In the pilot, your leads come in as a CSV export from the system you use today, and Revenue OS will call them and follow up on WhatsApp. Connectors for CRMs such as Zoho and HubSpot are planned; tell us what you use on the demo.",
   },
   {
     q: "How long does onboarding take?",
@@ -38,7 +38,7 @@ export const faqs: Faq[] = [
   },
   {
     q: "How are do-not-call rules handled?",
-    a: "Before every outbound call, Revenue OS checks your do-not-call list, quiet hours and attempt limits, and every conversation is logged so you can review it.",
+    a: "In the pilot, Revenue OS will check your do-not-call list, quiet hours and attempt limits before every outbound call, and log every conversation so you can review it.",
   },
 ];
 

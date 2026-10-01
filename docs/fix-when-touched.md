@@ -4,7 +4,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **How to use it**
 - Find the folder you are editing in the table below, and do that entry's fix for the files your PR touches. Your PR still names its own roadmap item on its first line; the PR body adds one line saying which entry here it also fixed.
-- Two entries have a latest date: the runbooks must be fixed by Slice 6's security walk, and the marketing copy and headers before the marketing site's Pages project is created.
+- One entry has a latest date: the runbooks must be fixed by Slice 6's security walk.
 - Anything that needs Devesh (his Mac, his settings, his files) is in STATE.md → Waiting on Devesh, not here.
 - When an entry is fully fixed, strike it from this list in that same PR.
 - File and line references were checked against main at commit ef7c60d on 2026-09-29.
@@ -15,11 +15,10 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 |---|---|
 | Any source file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
 | `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/db-design.md`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
-| `tests/`, `apps/console/test/`, `apps/www/test/`, `packages/harness/test/anthropic.test.ts`, `scripts/dev-login.test.ts` | 3. Tests that read source code as text |
+| `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts`, `scripts/dev-login.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
 | `docs/tracker/` | 6. Tracker page shows where it was published from |
-| `apps/www/` | 7. Marketing site: copy and security headers |
 | `scripts/demo.ts`, `tests/`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
 | Local branches, `.claude/worktrees/`, `.gitignore` | 8. Leftover branches and worktrees |
 
@@ -82,9 +81,8 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - `tests/transcript-xss.test.tsx`: delete; the lint rule against raw HTML injection already covers it.
 - `packages/harness/test/anthropic.test.ts` ("no SDK import" check): a lint rule that blocks importing the Anthropic SDK in `packages/`.
 - `scripts/dev-login.test.ts` (seed source check): run `bun run db:seed` and sign in.
-- `apps/www/test/architecture.test.ts`: keep only the checks for promises the site makes to buyers.
 - Acceptable as they are (they check docs or settings, not product code): `apps/console/test/readme-coverage.test.ts`, `apps/console/test/ui-contract.test.tsx`, `scripts/guards.test.ts`.
-- "RED today" comments on main: `apps/console/test/pages-adoption-tasks-agents-settings.test.tsx` (13), `tests/conversation-link.test.tsx` (10), `apps/console/test/pages-adoption-behavior.test.tsx` (4), `tests/console-contact-links.test.tsx` (3), `apps/www/test/build.test.ts` (2), `tests/vite-api-url-honesty.test.tsx` (2), and one each in `pages-adoption-home-dashboard.test.tsx`, `pages-adoption-source.test.ts`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts`.
+- "RED today" comments on main: `apps/console/test/pages-adoption-tasks-agents-settings.test.tsx` (13), `tests/conversation-link.test.tsx` (10), `apps/console/test/pages-adoption-behavior.test.tsx` (4), `tests/console-contact-links.test.tsx` (3), `tests/vite-api-url-honesty.test.tsx` (2), and one each in `pages-adoption-home-dashboard.test.tsx`, `pages-adoption-source.test.ts`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts`.
 - `apps/console/test/README.md:4` and the "RED idiom" comments in `guardrails-console.test.tsx` stop teaching "read the source as text" when either file is next edited.
 
 **From findings:**
@@ -138,20 +136,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 **From findings:**
 - The tracker page Devesh uses to see progress is 3 days stale; the manual republish step was skipped
 
-## Marketing site
-
-### 7. Marketing site: copy and security headers
-
-**Fix (copy):** The FAQ answers "Which tools does it work with?" and "How are do-not-call rules handled?" in `apps/www/src/content/faqs.ts` are reworded as what the pilot will do, until the matching STATE.md rows are live.
-
-**Fix (headers):** ship a headers file with the marketing site build (`apps/www/public/_headers`): a content security policy that allows only the site itself, Cal.com and Plausible, plus `frame-ancestors 'none'`, and a build test that finds the file in `apps/www/dist`. The console's headers are Slice 5's security-headers line.
-
-**When:** the next Side-track PR, and before the marketing site's Pages project is created (Devesh's Cloudflare Pages item in STATE.md → Waiting on Devesh waits for it). Today `faqs.ts:29` says leads come in by CSV import and follow-ups "go out by voice and WhatsApp", while the voice and WhatsApp senders are stubs, CSV import enrols nobody and nothing records do-not-call.
-
-**From findings:**
-- The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today
-- No content security policy or anti-framing header for the console or the marketing site (marketing half; the console half is Slice 5)
-
 ## Local checkout
 
 ### 8. Leftover branches and worktrees
@@ -181,4 +165,4 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 ---
 
-9 entries, from 13 findings (one, the security-headers finding, is shared with Slice 5).
+8 entries, from 11 findings.

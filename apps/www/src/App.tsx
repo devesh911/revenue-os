@@ -3,7 +3,6 @@ import { brand, footerMeta } from "./content/site";
 import { DotList } from "./design/DotList";
 import { MonoLabel } from "./design/MonoLabel";
 import { BookingProvider } from "./lib/bookingContext";
-import { useReveal } from "./lib/reveal";
 import { Faq } from "./sections/Faq";
 import { FooterCta } from "./sections/FooterCta";
 import { Hero } from "./sections/Hero";
@@ -20,12 +19,11 @@ import { BrandMark } from "./visuals/BrandMark";
 // the sections in <main> (StageGrid hosts the funnel flow + IntentRouting inside
 // its dark panel), and the footer meta row. SSR-safe: no CSS side-effect import
 // lives here (main.tsx owns `import "./styles.css"`), so the copy-parity suite can
-// renderToStaticMarkup(<App/>). useReveal() arms the one-shot scroll reveals; the
-// layout effect honours a deep link (/#pilot) — the page renders client-side,
-// so the browser's own jump fires before the target exists. Every "Book a demo"
-// opens the one BookingDialog, mounted once inside BookingProvider (#book too).
+// renderToStaticMarkup(<App/>). The layout effect honours a deep link (/#pilot) —
+// the page renders client-side, so the browser's own jump fires before the target
+// exists. Every "Book a demo" opens the one BookingDialog, mounted once inside
+// BookingProvider (#book too).
 export function App() {
-  useReveal();
   useLayoutEffect(() => {
     const target =
       location.hash && document.getElementById(location.hash.slice(1));

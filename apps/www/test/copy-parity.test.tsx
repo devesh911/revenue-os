@@ -308,9 +308,11 @@ describe("copy — the buyer-outcome story", () => {
     "Give us one project",
     // the old looping call card (HeroCall) and its lit floor plan stay gone: the
     // hero is study A3, one finished result on an unlabelled plan
+    // (the sample call's transcript greets Rohan too, so the card's own words are
+    // pinned: "…Meridian Homes se")
     "New lead",
     "Agent · Asha",
-    "Namaste Rohan",
+    "Meridian Homes se",
     "Budget around 90 lakh",
     "Ringing…",
     "Readiness",
@@ -383,9 +385,9 @@ describe("one primary action — Book a demo", () => {
 });
 
 describe("the hero's listen button — the sample recording, played in place", () => {
-  test('a button reads "Hear a sample call" with the recording\'s 0:42 length', () => {
+  test('a button reads "Hear a sample call" with the recording\'s 1:13 length', () => {
     expect(markup).toMatch(
-      /<button\b(?:(?!<\/button>).)*Hear a sample call(?:(?!<\/button>).)*0:42(?:(?!<\/button>).)*<\/button>/s,
+      /<button\b(?:(?!<\/button>).)*Hear a sample call(?:(?!<\/button>).)*1:13(?:(?!<\/button>).)*<\/button>/s,
     );
     // its other states' labels hold the pill's width, invisible until they apply
     const label = /<span class="([^"]*)">Hear a sample call<\/span>/.exec(
@@ -397,14 +399,14 @@ describe("the hero's listen button — the sample recording, played in place", (
 
   test("says what the recording is, visibly, right beside it", () => {
     const note =
-      /<p\b([^>]*)>(?:(?!<\/p>).)*Recreated with basic text-to-speech, not the voice used on real calls\. Names and figures are illustrative\./s.exec(
+      /<p\b([^>]*)>(?:(?!<\/p>).)*A dramatised call: both voices are generated with ElevenLabs, and Rohan is not a real customer\. Names and figures are illustrative\./s.exec(
         markup,
       );
     expect(note, "the disclosure renders").not.toBeNull();
     expect(note?.[1]).not.toMatch(/sr-only|\bhidden\b|invisible|aria-hidden/);
     // …and screen readers hear it with the button it qualifies
     const id =
-      /<p\b[^>]*\bid="([^"]+)"[^>]*>(?:(?!<\/p>).)*Recreated with basic text-to-speech/s.exec(
+      /<p\b[^>]*\bid="([^"]+)"[^>]*>(?:(?!<\/p>).)*A dramatised call: both voices/s.exec(
         markup,
       )?.[1];
     expect(id, "the disclosure has an id").toBeDefined();
@@ -418,9 +420,9 @@ describe("the hero's listen button — the sample recording, played in place", (
     expect(text()).not.toContain(sampleCall.unavailable);
   });
 
-  test("plays /sample-call.m4a, whose real length is the 0:42 shown", () => {
+  test("plays /sample-call.m4a, whose real length is the 1:13 shown", () => {
     expect(sampleCall.src).toBe("/sample-call.m4a");
-    expect(sampleCall.seconds).toBe(42);
+    expect(sampleCall.seconds).toBe(73);
     const file = resolve(import.meta.dir, "../public/sample-call.m4a");
     expect(existsSync(file), "public/sample-call.m4a must exist").toBe(true);
     // The MP4 movie header (mvhd) holds the timescale and duration.
@@ -433,6 +435,65 @@ describe("the hero's listen button — the sample recording, played in place", (
       ? Number(buf.readBigUInt64BE(i + 28))
       : buf.readUInt32BE(i + 20);
     expect(Math.abs(units / scale - sampleCall.seconds)).toBeLessThan(1);
+  });
+
+  test("its index comes before its audio, so playback starts before the file has fully arrived", () => {
+    const buf = readFileSync(
+      resolve(import.meta.dir, "../public/sample-call.m4a"),
+    );
+    expect(buf.indexOf("moov")).toBeGreaterThan(0);
+    expect(buf.indexOf("moov")).toBeLessThan(buf.indexOf("mdat"));
+  });
+
+  // The recording's text alternative (WCAG 1.2.1): every line, closed until asked.
+  test('a closed "Read the transcript" holds every line of the call, speaker first', () => {
+    const block = around(heroBand(), "details", "Read the transcript");
+    expect(block, "the transcript renders in the hero").not.toBe("");
+    expect(block).not.toMatch(/^<details\b[^>]*\bopen\b/);
+    expect(block).toMatch(/<summary\b[^>]*>Read the transcript<\/summary>/);
+    const said = textOf(block);
+    for (const { who, text } of sampleCall.transcript)
+      expect(said).toContain(oneSpace(`${who} ${text}`));
+  });
+
+  test("the agent says it is an AI in its first line", () => {
+    const [first] = sampleCall.transcript;
+    expect(first.who).toMatch(/\bAI\b/);
+    expect(first.text).toMatch(/\bAI assistant\b/);
+  });
+
+  test("it is Rohan's call from the Examples: each line shown there is said in it, by the same side", () => {
+    const agent = sampleCall.transcript[0].who;
+    for (const line of examples.conversation.lines) {
+      const said = sampleCall.transcript.find((l) =>
+        l.text.includes(line.text),
+      );
+      expect(said, line.text).toBeDefined();
+      expect(said?.who === agent).toBe(line.who === "Agent");
+    }
+  });
+
+  test("the pin the call promises on WhatsApp right away comes with the confirmation", () => {
+    const promise = sampleCall.transcript.find((l) =>
+      /location pin/i.test(l.text),
+    );
+    expect(promise?.text).toContain("abhi WhatsApp");
+    expect(examples.visit.messages[0].text).toContain(
+      "Here is the location pin",
+    );
+  });
+
+  test("the summary your salesperson gets lists only what Rohan asked on the call", () => {
+    const asked = examples.summary.fields.find(
+      (f) => f.label === "Asked about",
+    );
+    const rohan = sampleCall.transcript
+      .filter((l) => l.who === "Rohan")
+      .map((l) => l.text.toLowerCase())
+      .join(" ");
+    expect(asked).toBeDefined();
+    for (const topic of asked?.value.split(", ") ?? [])
+      expect(rohan, topic).toContain(topic.toLowerCase());
   });
 });
 
@@ -505,7 +566,7 @@ describe("the hero — study A3: one finished call, on the drawing sheet", () =>
     const band = heroBand();
     expect(band).toContain(button);
     expect(band.indexOf(button)).toBeGreaterThan(
-      band.indexOf("Recreated with basic text-to-speech"),
+      band.indexOf("A dramatised call: both voices"),
     );
     // the plan and the card stand alone, as in the study
     expect(figure()).not.toContain("<button");
@@ -1211,6 +1272,20 @@ describe("the pilot report — after the Pilot it reports on; an example, never 
 });
 
 describe("pilot — built vs planned, no rates", () => {
+  // The callers, senders and do-not-call records aren't live yet: the FAQ says
+  // what the pilot will do, never that it works today.
+  test("the FAQ's tools and do-not-call answers speak of the pilot, not of today", () => {
+    const faq = textOf(sectionAround(markup, ' id="faq"'));
+    expect(faq).toContain(
+      "In the pilot, your leads come in as a CSV export from the system you use today, and Revenue OS will call them",
+    );
+    expect(faq).toContain(
+      "In the pilot, Revenue OS will check your do-not-call list",
+    );
+    expect(faq).not.toContain("follow-ups go out by voice and WhatsApp");
+    expect(faq).not.toContain("Revenue OS checks your do-not-call list");
+  });
+
   test('three plans, the last one "Custom", none with a price figure', () => {
     const t = textOf(pilotSection());
     for (const s of [
@@ -1268,7 +1343,7 @@ describe("accessibility + first paint", () => {
       );
     expect(markup).toContain('aria-expanded="true"');
     expect(markup).toContain('aria-expanded="false"');
-    expect(text()).toContain("not the voice used on real calls. On the demo");
+    expect(text()).toContain("not a recording of a real one. On the demo");
   });
 
   test("landmarks and exactly one h1 — the hero headline", () => {

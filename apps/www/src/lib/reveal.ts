@@ -1,11 +1,13 @@
-import { type CSSProperties, type RefCallback, useLayoutEffect } from "react";
+import type { CSSProperties, RefCallback } from "react";
 
 // Scroll reveal, CSS-first. `reveal(delayMs)` returns the props that mark an
 // element for a one-shot fade-and-rise (styles.css owns the transition), including
 // a ref that observes the node as it mounts — so a block that mounts late still
-// reveals. `useReveal()` — called once, in App — opts the document in
-// (html[data-motion]) before paint; only then is anything hidden. Under reduced
-// motion or without IntersectionObserver nothing is observed and nothing hides.
+// reveals. `armReveal()` — called once, in main.tsx before the page mounts — opts
+// the document in (html[data-motion]); only then is anything hidden, and every block
+// is hidden from its first frame, so it only ever rises in. (Opted in any later, a
+// block already styled as shown would fade out first.) Under reduced motion or
+// without IntersectionObserver nothing is observed and nothing hides.
 const REDUCED = "(prefers-reduced-motion: reduce)";
 const motionOk = () =>
   "IntersectionObserver" in window && !window.matchMedia(REDUCED).matches;
@@ -51,13 +53,6 @@ export function reveal(delayMs = 0): {
   };
 }
 
-export function useReveal(): void {
-  useLayoutEffect(() => {
-    if (!motionOk()) return;
-    const root = document.documentElement;
-    root.dataset.motion = "";
-    return () => {
-      delete root.dataset.motion;
-    };
-  }, []);
+export function armReveal(): void {
+  if (motionOk()) document.documentElement.dataset.motion = "";
 }

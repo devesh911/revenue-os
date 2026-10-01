@@ -1,7 +1,7 @@
 /* styles.css — the marketing surface's single visual vocabulary. Warm paper, ink,
    and one clay accent: an editorial, Anthropic-inspired system (serif display,
-   quiet sans body, mono for machine data). Raw colour hex lives ONLY here
-   (architecture.test.ts); components reference tokens through generated utilities
+   quiet sans body, mono for machine data). Raw colour hex lives ONLY here;
+   components reference tokens through generated utilities
    (bg-paper, text-ink, border-line, text-clay-deep, bg-ink/5 …) or the @utility
    classes below — never raw hex. Alpha tiers come from Tailwind's `/<alpha>`
    modifier on these tokens, not from bespoke rgba tokens.
