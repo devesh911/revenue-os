@@ -93,6 +93,23 @@ test.describe("under reduced motion", () => {
 });
 
 test.describe("with motion", () => {
+  // The reveal hides a block only once the page has opted in (html[data-motion]); a
+  // browser without the scroll observer never opts in, so nothing is ever hidden.
+  test("without the scroll observer, the page never opts in and hides nothing", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      delete (window as { IntersectionObserver?: unknown })
+        .IntersectionObserver;
+    });
+    await page.goto("/");
+    expect(await page.locator("[data-reveal]").count()).toBeGreaterThan(0);
+    await expect(page.locator("html")).not.toHaveAttribute("data-motion");
+    // past the reveal's 0.9 s fade, so a block on its way out would be caught
+    await page.waitForTimeout(1500);
+    expect(await held(page)).toBe(0);
+  });
+
   test("every block the scroll reveal hides rises in once it has been on screen", async ({
     page,
   }) => {

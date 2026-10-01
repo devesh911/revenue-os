@@ -165,4 +165,4 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 ---
 
-9 entries, from 13 findings (one, the security-headers finding, is shared with Slice 5).
+8 entries, from 11 findings.

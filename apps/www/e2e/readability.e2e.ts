@@ -44,9 +44,19 @@ test("small text keeps 4.5:1 on every ground it sits on, and the focus ring 3:1"
         await pair(text, ground),
         `${text} on ${ground}`,
       ).toBeGreaterThanOrEqual(4.5);
+  // The ring the page really draws: Tab to the first control and read its outline.
+  await page.keyboard.press("Tab");
+  const ring = await page.evaluate(() => {
+    const el = document.activeElement;
+    if (!el || el === document.body) return null;
+    const s = getComputedStyle(el);
+    return { colour: s.outlineColor, style: s.outlineStyle };
+  });
+  expect(ring, "Tab reaches a control").not.toBeNull();
+  expect(ring?.style, "it draws a focus ring").not.toBe("none");
   for (const ground of FOCUS_GROUNDS)
     expect(
-      await pair("clay-deep", ground),
+      contrast(ring?.colour ?? "", await colour(ground)),
       `the focus ring on ${ground}`,
     ).toBeGreaterThanOrEqual(3);
 });
