@@ -35,8 +35,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge independent PRs one at a
    time on observed-green checks with real evidence, after confirming base == main; LIVE =
    only humans merge. A change to a rule file (the done gate, CI, lint or type settings, the hooks, the verifier, the package
-   scripts) is Devesh's to approve in both phases: before starting one, tell him what it will change and why and
-   ask what you need to know; only he merges it.
+   scripts) needs nobody's approval to start and is explained before it merges: its PR body says which rule changed,
+   whether it tightens or loosens it, and why; the agent shows Devesh that explanation in chat, then, in SETUP, merges
+   it itself on observed-green checks like any other PR. Agents use Devesh's own GitHub login, so GitHub's settings
+   only stop accidents; the hooks enforce what agents must not do (Slice 0's tools item adds the
+   refusals still missing).
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
@@ -62,6 +65,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   each verdict. Codex runs the same gate when a turn ends (`.codex/hooks.json`, once trusted in
   Codex's `/hooks`) but has no verifier agent, so a green product change stops once, marked NOT
   independently verified: ask Claude to run the verifier, or check it yourself. Humans run `bun run gate`.
+  The gate stops careless or premature "done", not an agent that sets out to forge it: Devesh's
+  own attention and GitHub's required `checks` are the backstops, and `STATE.md → What works
+  today` lists the gate's known holes.
 - CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
   agent and human.
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
