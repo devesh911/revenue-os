@@ -1,5 +1,5 @@
 // The call brief study (visuals/CallBrief.tsx): Rohan Mehta's brief writing itself
-// between import (7:12 PM) and the call (7:14 PM) — the agent's running captions,
+// between the lead landing (7:12 PM) and the call (7:14 PM) — the agent's running captions,
 // the sources it read, each fact with where it came from, the one question the
 // brochure can't answer (put to Priya Nair in sales on WhatsApp), the intent score
 // built from beforeCall.ts's signals, the six-step call plan and the call itself.
@@ -31,7 +31,7 @@ const rows: BriefRow[] = [
     value: "2\u00a0BHK in Whitefield, budget up to ₹90\u00a0L",
     note: "\u201c2bhk chahiye whitefield, budget 90 tak, loan bhi lena hai\u201d",
     quote: true,
-    source: "from import",
+    source: "from his enquiry",
   },
   {
     label: "Project match",
@@ -60,7 +60,7 @@ export const callBrief = {
   captions: [
     {
       time: "7:12:04\u00a0PM",
-      text: "Rohan Mehta, from tonight's import. Before I call him, I'll prepare.",
+      text: "Rohan Mehta, a new lead, just landed. Before I call him, I'll prepare.",
     },
     {
       time: "7:12:06\u00a0PM",
@@ -107,7 +107,7 @@ export const callBrief = {
   rail: {
     title: "What the agent looked at",
     items: [
-      { title: "Tonight's import", detail: "CSV · 7:12\u00a0PM" },
+      { title: "His enquiry", detail: "Landed · 7:12\u00a0PM" },
       { title: "Inventory sheet", detail: "Meridian Greens" },
       {
         title: "Enquiry history",
@@ -133,7 +133,7 @@ export const callBrief = {
   card: {
     title: "Call brief ·",
     lead: "Rohan Mehta",
-    sub: "2\u00a0BHK · Whitefield · imported 7:12\u00a0PM",
+    sub: "2\u00a0BHK · Whitefield · landed 7:12\u00a0PM",
     preparing: "Preparing",
     ready: "Ready",
   },

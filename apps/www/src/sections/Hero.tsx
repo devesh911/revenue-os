@@ -17,7 +17,7 @@ import { SurveyGround, SurveyPlan } from "../visuals/SurveyGround";
 // every loop on the page and finishes the plan's plot; under reduced motion there
 // is nothing to pause, so it hides). Beside the copy lies the plan of the flat
 // (SurveyPlan) with the result card on it, tilted: one enquiry, called 2 min after
-// import, qualified, a site visit booked — an illustration of the outcome, not a
+// it landed, qualified, a site visit booked — an illustration of the outcome, not a
 // live call, and one labelled image to a screen reader. From lg the plan takes a
 // fixed column (--survey-plan, styles.css) and the copy centres on it; stacked, the
 // plan follows the copy, centred; phones drop the plan and keep the card.

@@ -18,31 +18,57 @@ const FILLS_VIEW = 0.6;
 // 0.01 apart, so even a stage many screens tall reports while it fills the view
 const THRESHOLDS = Array.from({ length: 36 }, (_, i) => i / 100);
 
+export interface Sequence {
+  step: number;
+  resetting: boolean;
+  playing: boolean;
+  settled: boolean;
+}
+
 export function useSequence(
   ref: RefObject<HTMLElement | null>,
   starts: readonly number[],
   hold: number,
-): { step: number; resetting: boolean; playing: boolean; settled: boolean } {
+  // on: false — something else drives this visual (it gets its step as a prop), so
+  // never observe or tick. loop: [first, end] — play only those beats: after `end`
+  // (its own time, or `hold` if it is the last beat) fade and go back to `first`,
+  // instead of moving on.
+  { on = true, loop }: { on?: boolean; loop?: readonly [number, number] } = {},
+): Sequence {
   const last = starts.length - 1;
+  const [first, end] = loop ?? [0, last];
   const [motion] = useState(
     () =>
       typeof window !== "undefined" &&
       "IntersectionObserver" in window &&
       !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
-  const [step, setStep] = useState(motion ? 0 : last);
+  const [step, setStep] = useState(motion ? first : end);
   const [resetting, setResetting] = useState(false);
   const [live, setLive] = useState(false);
   const still = useStill();
   const played = useRef(false);
+  const back = useRef(first); // where a fade returns to: the range it started in
 
   useEffect(() => {
-    if (still && !played.current) setStep(last);
-  }, [still, last]);
+    if (still && !played.current) setStep(end);
+  }, [still, end]);
+
+  // A new range that doesn't hold the current beat moves it in: to its first beat
+  // when it will play, else to its finished frame, shown settled as if it never played.
+  useEffect(() => {
+    if (step >= first && step <= end) return;
+    setResetting(false);
+    if (motion && !still) setStep(first);
+    else {
+      played.current = false;
+      setStep(end);
+    }
+  }, [step, first, end, motion, still]);
 
   useEffect(() => {
     const el = ref.current;
-    if (!motion || !el) return;
+    if (!motion || !on || !el) return;
     let seen = false;
     const sync = () => setLive(seen && !document.hidden);
     const io = new IntersectionObserver(
@@ -63,26 +89,31 @@ export function useSequence(
       io.disconnect();
       document.removeEventListener("visibilitychange", sync);
     };
-  }, [motion, ref]);
+  }, [motion, on, ref]);
 
   useEffect(() => {
     if (!live || still) return;
     played.current = true;
-    const done = step >= last;
+    const done = step >= end;
+    const gap = (i: number) => (starts[i + 1] ?? 0) - (starts[i] ?? 0);
     const wait = resetting
       ? FADE
       : done
-        ? hold
-        : (starts[step + 1] ?? 0) - (starts[step] ?? 0);
+        ? end === last
+          ? hold
+          : gap(end)
+        : gap(step);
     const id = setTimeout(() => {
       if (resetting) {
         setResetting(false);
-        setStep(0);
-      } else if (done) setResetting(true);
-      else setStep(step + 1);
+        setStep(back.current);
+      } else if (done) {
+        back.current = first;
+        setResetting(true);
+      } else setStep(step + 1);
     }, wait);
     return () => clearTimeout(id);
-  }, [live, still, step, resetting, starts, hold, last]);
+  }, [live, still, step, resetting, starts, hold, last, first, end]);
 
   return {
     step,
