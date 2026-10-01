@@ -43,7 +43,7 @@ export const examples = {
       { label: "Budget", value: "₹90 L" },
       { label: "Timeline", value: "Within 12 months" },
       { label: "Financing", value: "Home loan needed" },
-      { label: "Asked about", value: "Possession date, loan partners" },
+      { label: "Asked about", value: "Carpet area, parking, possession" },
       { label: "Next step", value: "Site visit, Sat 11:00\u00a0AM" },
     ],
     plate: ["Budget", "Timeline", "Next step"],
@@ -56,11 +56,11 @@ export const examples = {
     messages: [
       {
         time: "Thu 7:16\u00a0PM",
-        text: "Hi Rohan, your site visit to Meridian Greens, Tower\u00a0B is confirmed for Saturday at 11:00\u00a0AM. We'll share the location pin before the visit.",
+        text: "Hi Rohan, your site visit to Meridian Greens, Tower\u00a0B is confirmed for Saturday at 11:00\u00a0AM. Here is the location pin.",
       },
       {
         time: "Fri 6:00\u00a0PM",
-        text: "Reminder: your visit is tomorrow at 11:00\u00a0AM. Here is the location pin for Tower\u00a0B.",
+        text: "Reminder: your visit to Tower\u00a0B is tomorrow at 11:00\u00a0AM.",
       },
     ],
     plate: ["Confirmed", "Reminder", "Site visit"],

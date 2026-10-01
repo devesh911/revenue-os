@@ -437,6 +437,14 @@ describe("the hero's listen button — the sample recording, played in place", (
     expect(Math.abs(units / scale - sampleCall.seconds)).toBeLessThan(1);
   });
 
+  test("its index comes before its audio, so playback starts before the file has fully arrived", () => {
+    const buf = readFileSync(
+      resolve(import.meta.dir, "../public/sample-call.m4a"),
+    );
+    expect(buf.indexOf("moov")).toBeGreaterThan(0);
+    expect(buf.indexOf("moov")).toBeLessThan(buf.indexOf("mdat"));
+  });
+
   // The recording's text alternative (WCAG 1.2.1): every line, closed until asked.
   test('a closed "Read the transcript" holds every line of the call, speaker first', () => {
     const block = around(heroBand(), "details", "Read the transcript");
@@ -463,6 +471,29 @@ describe("the hero's listen button — the sample recording, played in place", (
       expect(said, line.text).toBeDefined();
       expect(said?.who === agent).toBe(line.who === "Agent");
     }
+  });
+
+  test("the pin the call promises on WhatsApp right away comes with the confirmation", () => {
+    const promise = sampleCall.transcript.find((l) =>
+      /location pin/i.test(l.text),
+    );
+    expect(promise?.text).toContain("abhi WhatsApp");
+    expect(examples.visit.messages[0].text).toContain(
+      "Here is the location pin",
+    );
+  });
+
+  test("the summary your salesperson gets lists only what Rohan asked on the call", () => {
+    const asked = examples.summary.fields.find(
+      (f) => f.label === "Asked about",
+    );
+    const rohan = sampleCall.transcript
+      .filter((l) => l.who === "Rohan")
+      .map((l) => l.text.toLowerCase())
+      .join(" ");
+    expect(asked).toBeDefined();
+    for (const topic of asked?.value.split(", ") ?? [])
+      expect(rohan, topic).toContain(topic.toLowerCase());
   });
 });
 
@@ -1241,6 +1272,20 @@ describe("the pilot report — after the Pilot it reports on; an example, never 
 });
 
 describe("pilot — built vs planned, no rates", () => {
+  // The callers, senders and do-not-call records aren't live yet: the FAQ says
+  // what the pilot will do, never that it works today.
+  test("the FAQ's tools and do-not-call answers speak of the pilot, not of today", () => {
+    const faq = textOf(sectionAround(markup, ' id="faq"'));
+    expect(faq).toContain(
+      "In the pilot, your leads come in as a CSV export from the system you use today, and Revenue OS will call them",
+    );
+    expect(faq).toContain(
+      "In the pilot, Revenue OS will check your do-not-call list",
+    );
+    expect(faq).not.toContain("follow-ups go out by voice and WhatsApp");
+    expect(faq).not.toContain("Revenue OS checks your do-not-call list");
+  });
+
   test('three plans, the last one "Custom", none with a price figure', () => {
     const t = textOf(pilotSection());
     for (const s of [

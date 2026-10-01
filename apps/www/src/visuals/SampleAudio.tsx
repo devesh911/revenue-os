@@ -113,7 +113,7 @@ export function SampleAudio({ className }: { className?: string }) {
         <summary className="w-fit cursor-pointer underline decoration-line underline-offset-[3px] hover:text-ink-2">
           {sampleCall.transcriptLabel}
         </summary>
-        <ol className="mt-[10px] grid gap-[8px]">
+        <ol className="mt-[10px] grid gap-[8px] rounded-[10px] border border-line bg-card px-[14px] py-[12px]">
           {sampleCall.transcript.map((line) => (
             <li
               key={line.text}
