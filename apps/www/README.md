@@ -357,10 +357,11 @@ studies in How it works — and never decorates for its own sake.
   dialog) is React `useState`; its default is what SSR emits and the copy-parity
   suite pins (FAQ item 0 open, plans and menu closed, dialog closed), exposed via
   `aria-expanded` and the `data-faq` / `data-open` hooks.
-- **The sample call** is a file (`public/sample-call.m4a`) and its length
-  (`sampleCall.seconds`), kept together in `content/hero.ts` beside the hero's
-  result card (`result`), which tells the same call's outcome; replace them
-  together when a real recording exists. **Rohan's evening** is one timeline
+- **The sample call** is a file (`public/sample-call.m4a`), its length
+  (`sampleCall.seconds`) and its transcript (`sampleCall.transcript`), kept
+  together in `content/hero.ts` beside the hero's result card (`result`), which
+  tells the same call's outcome; replace all of them together when a real
+  recording exists. **Rohan's evening** is one timeline
   everywhere — the lead lands 7:12 PM, Priya's answer 7:13 PM, called 7:14 PM
   ("2 min after it landed"), WhatsApp confirmation Thu 7:16 PM, visit Sat 11:00 AM — and the
   copy-parity suite checks every section against it.
