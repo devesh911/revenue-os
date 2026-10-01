@@ -110,6 +110,51 @@ test.describe("with motion", () => {
     expect(await held(page)).toBe(0);
   });
 
+  // A block starts hidden and only ever rises in: on load none fades from shown to
+  // hidden (the page opts in to the reveal before any block exists), and the first
+  // screen's blocks rise in by themselves.
+  test("on load no block fades out, and the first screen rises in", async ({
+    page,
+  }) => {
+    // Every opacity transition a reveal block starts, as [from, to].
+    await page.addInitScript(() => {
+      const runs: number[][] = [];
+      Object.assign(window, { runs });
+      document.addEventListener(
+        "transitionrun",
+        (e) => {
+          const el = e.target as Element;
+          if (e.propertyName !== "opacity" || !el.hasAttribute("data-reveal"))
+            return;
+          for (const a of el.getAnimations())
+            if (
+              a instanceof CSSTransition &&
+              a.transitionProperty === "opacity"
+            )
+              runs.push(
+                (a.effect as KeyframeEffect)
+                  .getKeyframes()
+                  .map((k) => Number(k.opacity)),
+              );
+        },
+        true,
+      );
+    });
+    await page.goto("/");
+    const firstScreen = page.locator("#main [data-reveal]").first();
+    await expect(firstScreen).toHaveCSS("opacity", "1");
+    // past the longest first-screen delay and the 0.9 s rise
+    await page.waitForTimeout(1500);
+    const runs = await page.evaluate(
+      () => (window as unknown as { runs: number[][] }).runs,
+    );
+    expect(runs.length, "the first screen rises in").toBeGreaterThan(0);
+    expect(
+      runs.filter(([from, to]) => to < from),
+      "no reveal block fades out",
+    ).toEqual([]);
+  });
+
   test("every block the scroll reveal hides rises in once it has been on screen", async ({
     page,
   }) => {

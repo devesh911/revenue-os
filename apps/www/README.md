@@ -296,8 +296,10 @@ studies in How it works — and never decorates for its own sake.
   aside when something else drives the visual (the studies inside How it works'
   window, which `HowSteps` hands their beat).
 - **Scroll reveal** — spread `{...reveal(delayMs)}` on a block for a one-shot
-  fade-and-rise. Content is only hidden once `useReveal()` has opted the document
-  in (`html[data-motion]`), so a failed script never hides anything.
+  fade-and-rise. Content is only hidden once `armReveal()` (in `main.tsx`, before
+  the page mounts) has opted the document in (`html[data-motion]`), so a failed
+  script never hides anything, and a block is hidden from its first frame, so it
+  only ever rises in.
 - **Everything can be paused.** The "Pause animations" switch in the hero's copy
   column sets `html[data-still]` (WCAG 2.2.2): CSS keyframes freeze, SVGs pause
   through `useLiveSvg()`, `useSequence()` loops hold their beat, and the hero's
