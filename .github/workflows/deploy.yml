@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build + ship to VPS (staging stack)
-        run: echo "TODO task-14b - docker build, save, scp, compose up staging, then Playwright smoke"
+        run: echo "Not built yet (Slice 2) - docker build, save, scp, compose up staging, then Playwright smoke"
 
   prod:
     # Slice 6's live-deploy item (ROADMAP.md) arms this (restore: github.event_name == 'release')
@@ -34,4 +34,4 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Migrations first, then image swap, then health gate
-        run: echo "TODO task-14 - supabase db push (prod), compose pull+up, curl /health + /ready"
+        run: echo "Not built yet (Slice 6) - supabase db push (prod), compose pull+up, curl /health + /ready"

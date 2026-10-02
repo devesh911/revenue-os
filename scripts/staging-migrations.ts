@@ -1,9 +1,10 @@
 // Whether this run of .github/workflows/staging-migrations.yml may and must apply migrations to the cloud test
 // database (staging), told to the workflow as `apply=true` or `apply=false`. First it asks GitHub whether `checks`
 // passed on the commit (SHA): an automatic run starts only after ci passed, but a skipped `checks` still lets ci
-// pass, and a hand run may name any commit of main. Then it links the project and reads `supabase migration list`:
-// the commit's migrations go in only when it changed a migration file or the cloud lacks one it has (an earlier run
-// was missed or failed). Anything it can't read fails the run; nothing here ever skips by guessing.
+// pass, and a hand run starts on main's newest commit whatever ci said about it. Then it links the project and reads
+// `supabase migration list`: the commit's migrations go in only when it changed a migration file or the cloud lacks
+// one it has (an earlier run was missed or failed). Anything it can't read fails the run; nothing here ever skips by
+// guessing.
 
 import { spawnSync } from "node:child_process";
 import { appendFileSync, readdirSync } from "node:fs";
@@ -46,7 +47,8 @@ if (
     "needs SHA (the full commit id), GITHUB_REPOSITORY, PROJECT_REF and GITHUB_OUTPUT",
   );
 
-// 1. `checks` passed on this exact commit, as GitHub Actions reported it last (anyone may post a check of that name).
+// 1. `checks` passed on this exact commit, as GitHub Actions reported it last: anyone may post a check of that name,
+// and main's copy of the rules lets only ci.yml's job `checks` report it from GitHub Actions (done-gate/pr.ts).
 type CheckRun = {
   id: number;
   conclusion: string | null;

@@ -8,6 +8,9 @@ name: staging-migrations
 #
 # Re-run by hand: Actions → staging-migrations → Run workflow (on main) runs it on main's newest commit, with the
 # same question to GitHub about `checks`; "Re-run all jobs" on the newest run does the same for that run's commit.
+#
+# If a migration fails on the cloud test database, every later run stops at it, and no agent can fix that alone:
+# docs/runbooks/staging-migration-failed.md is the way out.
 on:
   workflow_run:
     workflows: [ci]
@@ -18,16 +21,18 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: staging-migrations
-  cancel-in-progress: false # never stop a push to the database half-way; runs queue one at a time
-
 jobs:
   staging-migrations:
     # ci's push to main passed, never a pull request's run (a fork's branch may be called main too), or a hand run on main.
     if: >-
       (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # One job at a time, never cancelled half-way through a push to the database. GitHub keeps at most one waiting
+    # and a newer one replaces it, which loses nothing: the newer commit holds every migration the older one had, and
+    # it catches up. Set on the job, so a run whose job is skipped (ci failed or was cancelled) never replaces one.
+    concurrency:
+      group: staging-migrations
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: staging # SUPABASE_ACCESS_TOKEN + SUPABASE_DB_PASSWORD live here only
     permissions:
@@ -68,5 +73,8 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          supabase db push --include-all
+          supabase db push --include-all || {
+            echo "✗ A migration failed on the cloud test database, and every later run will stop at it until it is fixed: docs/runbooks/staging-migration-failed.md says what to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
           supabase migration list

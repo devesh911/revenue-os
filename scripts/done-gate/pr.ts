@@ -1,6 +1,7 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
-// every pull request with --head): the done rules, each rule change explained and recorded, and no other workflow
-// able to report a check named rules-from-main.
+// every pull request with --head): the done rules, each rule change explained and recorded, no other workflow
+// able to report a check named rules-from-main or checks (the two main's ruleset requires), and no migration on main
+// changed or its number reused (migrations.ts).
 
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
@@ -11,6 +12,7 @@ import type { Snap } from "./snapshot";
 const WORKFLOWS = ".github/workflows/";
 const OURS = `${WORKFLOWS}rules-from-main.yml`;
 const NAME = "rules-from-main";
+const CI = `${WORKFLOWS}ci.yml`; // its job `checks` is the only one that may report a check named checks
 type Job = { name?: unknown; permissions?: unknown };
 
 /** Can a job's token write checks or statuses? `write-all`, either scope at write, or no permissions anywhere. */
@@ -27,7 +29,8 @@ const writesChecks = (permissions: unknown) =>
  * PURE: the pull request's workflow files → problems when any besides ours could report a check named
  * rules-from-main, which main's ruleset requires: a job of that id or name (read as YAML, so quoting, anchors and
  * folded text change nothing), a job whose name is an expression, which can't be read until it runs, or a job whose
- * token can write checks or statuses. Ours must hold exactly one job, of that id.
+ * token can write checks or statuses. Ours must hold exactly one job, of that id. Likewise for `checks`, the other
+ * required check, which scripts/staging-migrations.ts also trusts: only ci.yml's job `checks` may carry that name.
  */
 export function secondCheck(workflows: Record<string, string>): string[] {
   const problems: string[] = [];
@@ -41,19 +44,28 @@ export function secondCheck(workflows: Record<string, string>): string[] {
       if (file !== OURS)
         for (const [id, job] of Object.entries(jobs)) {
           const name = String(job?.name ?? id);
-          if (
-            [id, name].some((n) => n.toLowerCase() === NAME) ||
-            /\$\{\{/.test(name)
-          )
+          const named = (check: string) =>
+            [id, name].some((n) => n.toLowerCase() === check);
+          if (named(NAME) || /\$\{\{/.test(name))
             problems.push(
               `${file}, job ${id}: its check could be named ${NAME}, the name only ${OURS} may report (a job's name must be plain text)`,
+            );
+          if (
+            named("checks") &&
+            !(file === CI && id === "checks" && name === id)
+          )
+            problems.push(
+              `${file}, job ${id}: its check could be named checks, the name only ${CI}'s job checks may report`,
             );
           if (writesChecks(job?.permissions ?? doc?.permissions))
             problems.push(
               `${file}, job ${id}: its token could write checks or statuses, and so report a check named ${NAME}; give it permissions without checks or statuses write`,
             );
         }
-      else if (Object.keys(jobs).join() !== NAME)
+      else if (
+        Object.keys(jobs).join() !== NAME ||
+        String(jobs[NAME]?.name ?? NAME) !== NAME // a name of its own would report as that name instead
+      )
         problems.push(`${OURS} must hold exactly one job, ${NAME}`);
     } catch (e) {
       problems.push(

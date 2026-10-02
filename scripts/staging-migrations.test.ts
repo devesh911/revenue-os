@@ -19,6 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import pg from "pg";
+import { isLocalUrl } from "./local-url";
 
 setDefaultTimeout(30_000);
 const dirs: string[] = [];
@@ -52,6 +53,7 @@ type Job = {
   name?: string;
   if?: string;
   environment?: string;
+  concurrency?: unknown;
   permissions?: unknown;
   env?: unknown;
   steps?: Step[];
@@ -95,8 +97,10 @@ describe("staging-migrations.yml: the cloud test database changes only after `ch
     expect(job().if?.replace(/\s+/g, " ").trim()).toBe(
       "(github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
     );
-    // One at a time, never cancelled half-way through a push to the database.
-    expect(w.concurrency).toEqual({
+    // One job at a time, never cancelled half-way through a push to the database. Set on the job, not the run, so
+    // a run whose job is skipped (ci failed or was cancelled) never replaces a run waiting to apply.
+    expect(w.concurrency).toBeUndefined();
+    expect(job().concurrency).toEqual({
       group: "staging-migrations",
       "cancel-in-progress": false,
     });
@@ -185,11 +189,13 @@ function runJob(
   {
     checks = PASSED as unknown[],
     listFails = false,
+    pushFails = false,
     listed,
     cloudUrl,
   }: {
     checks?: unknown[];
     listFails?: boolean;
+    pushFails?: boolean;
     listed?: string[];
     cloudUrl?: string;
   } = {},
@@ -242,7 +248,7 @@ function runJob(
       cloudUrl
         ? `exec "${Bun.which("supabase")}" "$@" --db-url "${cloudUrl}"`
         : `echo "Connecting to remote database..." >&2; cat "${bin}/list.json"; exit ${listFails ? 1 : 0}`
-    }; fi\n`,
+    }; fi\nif [ "$1 $2" = "db push" ]; then exit ${pushFails ? 1 : 0}; fi\n`,
   );
   chmodSync(join(bin, "gh"), 0o755);
   chmodSync(join(bin, "supabase"), 0o755);
@@ -301,7 +307,7 @@ afterAll(async () => {
 });
 /** A new database holding `applied` as its applied migrations (none recorded at all without it); its address. */
 async function cloudOf(applied?: string[]) {
-  if (!["127.0.0.1", "localhost"].includes(ADMIN.hostname))
+  if (!isLocalUrl(ADMIN.href))
     throw new Error("scratch databases only on the local stack");
   const name = `staging_migrations_test_${process.pid}_${databases.length}`;
   const admin = new pg.Client({ connectionString: ADMIN.href });
@@ -379,6 +385,30 @@ describe("the decide step: apply only when the commit changed a migration or the
     expect([r.status, r.output, r.applied]).toEqual([0, "apply=true\n", 0]);
     expect(r.out).toContain("Applying: the cloud test database lacks 002.");
     expect(r.calls).toContain("supabase db push --include-all");
+  });
+
+  it("when a migration fails on the cloud, fails the run and points Devesh at the way out", () => {
+    const r = runJob(
+      (dir) =>
+        write(dir, `${M}/003_tasks.sql`, "create table tasks (id int);\n"),
+      ["001", "002"],
+      { pushFails: true },
+    );
+    expect([r.status, r.output, r.applied]).toEqual([0, "apply=true\n", 1]);
+    expect(r.summary).toContain(
+      "A migration failed on the cloud test database, and every later run will stop at it until it is fixed: docs/runbooks/staging-migration-failed.md says what to do",
+    );
+    expect(
+      existsSync(
+        join(
+          import.meta.dir,
+          "..",
+          "docs",
+          "runbooks",
+          "staging-migration-failed.md",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("never reaches the cloud when `checks` has not passed on this commit, as GitHub Actions reported it", () => {
