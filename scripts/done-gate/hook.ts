@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { toplevel, touch } from "./checkouts";
-import type { HookInput } from "./hook-io";
+import { type HookInput, runsIn } from "./hook-io";
 import { deny, mergeGate } from "./merge-gate";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
@@ -18,12 +18,14 @@ import { verifierDone } from "./verifier";
  */
 export async function hook(input: HookInput, codex: boolean, entry: string) {
   const event = input.hook_event_name;
+  let command = input; // before a tool call, with the folder its command runs in
   // Before a tool call, what agents' tools may not do is judged first, so nothing that fails before it lets a
   // command through; a check that fails refuses the command.
   if (event === "PreToolUse") {
     let refused: string | undefined;
     try {
-      refused = commandRefusal(input);
+      command = runsIn(input);
+      refused = commandRefusal(command);
     } catch (e) {
       refused = `it could not check this command (${String(e).split("\n")[0]}).`;
     }
@@ -57,11 +59,11 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
       return touch(repo, input, store, session);
     case "PreToolUse":
       try {
-        mergeGate(repo, input, store, codex);
+        mergeGate(repo, command, store, codex);
       } catch (e) {
         deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
       }
-      return touch(repo, input, store, session); // a failure here stays quiet: no tool call waits on it
+      return touch(repo, command, store, session); // a failure here stays quiet: no tool call waits on it
     case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
       if (input.agent_type === "verifier")
         store.put(

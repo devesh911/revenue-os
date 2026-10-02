@@ -19,6 +19,8 @@ import {
 } from "./shell-words";
 
 /** What the check may look up about a folder a command reaches ("" is where the command starts). */
+const MAX_LINE = 64 * 1024; // reading takes longer the longer the line; agents' commands are far shorter
+
 export type Look = {
   /** The branch the checkout there is on. */
   branchOf: (dir: string) => string | undefined;
@@ -40,6 +42,8 @@ const CLOUD =
 
 /** PURE: a shell command line → why agents may not run it, or nothing when they may. */
 export function toolRefusal(command: string, look: Look): string | undefined {
+  if (command.length > MAX_LINE)
+    return `it is ${Math.round(command.length / 1024)} KB long, more than this check reads (64 KB); put long text in a file and pass the file.`;
   return judge(command, look, command);
 }
 
@@ -64,13 +68,8 @@ export function commandRefusal(input: HookInput) {
   const tool = input.tool_input ?? {};
   if (input.tool_name === "apply_patch" || typeof tool.command !== "string")
     return;
-  const home = (p: string) => p.replace(/^~(?=\/|$)/, homedir());
-  // Claude Code's terminal tool may run its command in a folder of its own.
-  const cwd = resolve(
-    input.cwd ?? process.cwd(),
-    typeof tool.cwd === "string" ? home(tool.cwd) : "",
-  );
-  const at = (dir: string) => resolve(cwd, home(dir));
+  const at = (dir: string) =>
+    resolve(input.cwd ?? process.cwd(), dir.replace(/^~(?=\/|$)/, homedir()));
   return toolRefusal(tool.command, {
     branchOf: (dir) =>
       git(at(dir), ["symbolic-ref", "--quiet", "--short", "HEAD"], {}, true) ||

@@ -1725,6 +1725,22 @@ describe("the hook", () => {
     expect(terminal("grep -rn FAKE .").told).toContain("apps/console/.env");
     expect(terminal("grep -rn FAKE .", "services")).toEqual(QUIET);
     expect(terminal("grep -rn FAKE . --exclude='.env*'")).toEqual(QUIET);
+    // Work the terminal starts in another checkout is that checkout's, judged at the stop.
+    expect(hook(dir, "SessionStart").status).toBe(0);
+    expect(terminal("bun test", wt)).toEqual(QUIET);
+    write(wt, "services/worker/src/a.ts", "// @ts-ignore\n");
+    const r = hook(dir, "Stop");
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain("switches the type checker off");
+  });
+
+  it("refuses a command line too long to read, rather than reading it slowly", () => {
+    const dir = repo();
+    const r = hook(dir, "PreToolUse", {
+      tool_name: "Bash",
+      tool_input: { command: `grep ${"-e x ".repeat(20_000)}notes.md` },
+    });
+    expect(r.told).toContain("more than this check reads (64 KB)");
   });
 
   it("is wired in both apps: a note before each command or edit, a judgement at each stop", () => {
