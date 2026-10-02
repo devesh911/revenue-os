@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const GUARDS = join(import.meta.dir, "guards.sh");
+const PUBLIC_ADDRESS = join(import.meta.dir, "guards", "public-address.sh");
 const dirs: string[] = [];
 afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
@@ -73,7 +74,7 @@ describe("guard S4.1 · public IPv4 literal in tracked files", () => {
 
   it("excuses exactly one path (the SVG icon file) — a path allowlist hides future leaks", () => {
     const excused = [
-      ...readFileSync(GUARDS, "utf8").matchAll(/':!([^']+)'/g),
+      ...readFileSync(PUBLIC_ADDRESS, "utf8").matchAll(/':!([^']+)'/g),
     ].map((m) => m[1]);
     expect(excused).toEqual(["apps/www/src/visuals/IntentEvidence.tsx"]);
   });
