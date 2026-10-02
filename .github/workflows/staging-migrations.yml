@@ -1,0 +1,80 @@
+name: staging-migrations
+# The cloud test database (staging) changes only after the tests pass. This starts when ci finishes on a push to main
+# and runs only if it passed; it checks out exactly the commit ci tested, asks GitHub whether `checks` passed on it
+# (scripts/staging-migrations.ts), and applies migrations only when that commit changed a migration file or the cloud
+# test database lacks one main has (read with `supabase migration list`, so a missed run catches up). A run with
+# nothing to apply shows its apply step as skipped. `workflow_run` always runs main's copy of this file, so a branch
+# can't change what it does; the `staging` environment deploys only from main.
+#
+# Re-run by hand: Actions → staging-migrations → Run workflow (on main) runs it on main's newest commit, with the
+# same question to GitHub about `checks`; "Re-run all jobs" on the newest run does the same for that run's commit.
+#
+# If a migration fails on the cloud test database, every later run stops at it, and no agent can fix that alone:
+# docs/runbooks/staging-migration-failed.md is the way out.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-migrations:
+    # ci's push to main passed, never a pull request's run (a fork's branch may be called main too), or a hand run on main.
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # One job at a time, never cancelled half-way through a push to the database. GitHub keeps at most one waiting
+    # and a newer one replaces it, which loses nothing: the newer commit holds every migration the older one had, and
+    # it catches up. Set on the job, so a run whose job is skipped (ci failed or was cancelled) never replaces one.
+    concurrency:
+      group: staging-migrations
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: staging # SUPABASE_ACCESS_TOKEN + SUPABASE_DB_PASSWORD live here only
+    permissions:
+      contents: read
+      checks: read # to ask GitHub whether `checks` passed on the commit
+    steps:
+      # Actions SHA-pinned (AGENTS.md → Conventions), as in ci.yml. Nothing is installed: the job that holds the cloud
+      # secrets runs only bun, the Supabase CLI and the one script.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2 # the commit and its parent, to see which migration files it changed
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.3.11" # pinned to the Bun engine (AGENTS.md → Conventions)
+
+      - uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1 branch tip 2026-07-11
+        with:
+          version: 2.109.1 # must match the local CLI that writes supabase/config.toml: setup-cli's default
+          # once installed an older release that can't read the newer config keys; upgrade both together
+
+      - name: Did `checks` pass on this commit, and does the cloud test database need its migrations?
+        id: decide
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          PROJECT_REF: ajtfillmkjhoffxllqja
+          GH_TOKEN: ${{ github.token }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: bun scripts/staging-migrations.ts
+
+      # Migrations are append-only (expand-contract), so `db push` applies only what the database lacks.
+      - name: Apply migrations to staging
+        if: steps.decide.outputs.apply == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase db push --include-all || {
+            echo "✗ A migration failed on the cloud test database, and every later run will stop at it until it is fixed: docs/runbooks/staging-migration-failed.md says what to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
+          supabase migration list

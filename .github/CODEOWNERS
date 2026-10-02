@@ -16,6 +16,7 @@ ROADMAP.md @devesh911
 **/.claude/commands/**              @devesh911
 scripts/done-gate*                  @devesh911
 scripts/done-gate/**                @devesh911
+scripts/staging-migrations*         @devesh911
 scripts/guards.sh                   @devesh911
 scripts/guards/**                   @devesh911
 scripts/cycle-hook.sh               @devesh911
