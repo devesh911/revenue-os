@@ -18,6 +18,17 @@ const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
        pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data`;
 
+/**
+ * PURE: a message holding text the pull request supplied (a file's name, its body's first line) as one log line:
+ * each control character is written as its code, so a newline or carriage return can't start a line of its own,
+ * which GitHub's runner would read as a command such as `::error`.
+ */
+const oneLine = (s: string) =>
+  s.replace(
+    /\p{Cc}/gu,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+
 /** `--base <ref>` and `--head <ref>`, each at most once, and nothing else; undefined for any other words. */
 const refsOf = (args: string[]) => {
   const refs = new Map<string, string>();
@@ -102,9 +113,9 @@ export async function cli(cmd: string, args: string[]) {
     const what = `the change${head ? ` in ${head}` : ""} since ${base}`;
     console.log(
       (problems.length
-        ? `Pull request ✗ ${problems.length} problem(s) in ${what}:\n${problems.map((p) => `- ${p}`).join("\n")}`
+        ? `Pull request ✗ ${problems.length} problem(s) in ${what}:\n${problems.map((p) => `- ${oneLine(p)}`).join("\n")}`
         : `Pull request ✓ its first line names what it is, nothing in ${what} breaks the done rules, every rule change is explained and recorded, and every fix-when-touched entry it touches is answered`) +
-        notes.map((n) => `\n⚠ ${n}`).join(""),
+        notes.map((n) => `\n⚠ ${oneLine(n)}`).join(""),
     );
     process.exit(problems.length ? 1 : 0);
   } else if (

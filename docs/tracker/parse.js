@@ -6,6 +6,14 @@ export const STATUSES = ["Works", "Tests only", "Partial", "Stub", "Missing"];
 export const seenOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(v || "");
 // A file saved with Windows line endings, or with an invisible byte-order mark first, reads the same.
 const lf = (md) => md.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+// An item's text as people retype it (a branch's description, a PR's first line): letter case, Markdown marks,
+// quotes and extra spaces don't count.
+export const plain = (s) =>
+  s
+    .replace(/[`*_~"'“”‘’]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 
 // A "Blocked by" value as meant: struck-through text, Markdown marks, quotes, wrapping brackets,
 // trailing punctuation and a note ("(note)", or after ";", ",", ":", a dash or a spaced hyphen)

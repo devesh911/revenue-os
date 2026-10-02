@@ -16,6 +16,7 @@ import {
   nextItem,
   parseRoadmap,
   parseState,
+  plain,
 } from "../docs/tracker/parse.js";
 
 export type Cycle = {
@@ -44,15 +45,9 @@ function kindOf(c: Cycle) {
     const kind = /^side/i.test(c.item) ? "Side-track work" : "off-roadmap work";
     return what ? { kind, what, onRoadmap: false } : undefined;
   }
-  const norm = (s: string) =>
-    s
-      .replace(/[`*_~"'“”‘’]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
   const known = [c.roadmap, c.branchRoadmap ?? ""].some((md) =>
     parseRoadmap(md).slices.some((s) =>
-      s.items.some((i) => norm(i.text) === norm(c.item)),
+      s.items.some((i) => plain(i.text) === plain(c.item)),
     ),
   );
   return known

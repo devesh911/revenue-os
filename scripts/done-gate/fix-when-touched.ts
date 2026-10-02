@@ -5,7 +5,10 @@
 import { shown } from "./rule-changes";
 
 export const TABLE = "docs/fix-when-touched.md";
-const SAID = /^Fix-when-touched: (\d+) · (?:fixed|not applicable) · \S/;
+// An answer, as a list item or not; its reason needs a word (three letters or digits in a row), not "." or "n/a".
+const ANSWER = /^(?:[-*+] )?Fix-when-touched:/;
+const SAID =
+  /^(?:[-*+] )?Fix-when-touched: (\d+) · (?:fixed|not applicable) · (?=.*[\p{L}\p{N}]{3})/u;
 const HOW =
   "`Fix-when-touched: <entry number> · fixed · <what you fixed>` or `Fix-when-touched: <entry number> · not applicable · <why>`";
 
@@ -30,6 +33,14 @@ export function areasOf(md: string) {
   });
 }
 
+/** PURE: a warning when main's table has no row this check can read, since then no entry is asked about. */
+export const unreadTable = (table: string) =>
+  areasOf(table).length
+    ? []
+    : [
+        `${TABLE} on main has no "Find your area" table this check can read, so no entry was asked about: restore the table`,
+      ];
+
 /** PURE: does a path of the table (a folder ending in "/", or a file) cover `file`, at any letter case? */
 const covers = (path: string, file: string) =>
   path.endsWith("/")
@@ -47,14 +58,14 @@ export function fixWhenTouchedProblems(
 ): string[] {
   const said = shown(body)
     .split(/\r?\n/)
-    .filter((l) => l.startsWith("Fix-when-touched:"));
-  const answered = said.map((l) => l.match(SAID)?.[1]);
+    .filter((l) => ANSWER.test(l));
+  const answered = said.map((l) => Number(l.match(SAID)?.[1]));
   const problems = said
     .filter((l) => !SAID.test(l))
     .map((l) => `the PR body's line "${l}" is not written as ${HOW}`);
   for (const { n, title, paths } of areasOf(table)) {
     const hit = files.filter((f) => paths.some((p) => covers(p, f)));
-    if (hit.length && !answered.includes(n))
+    if (hit.length && !answered.includes(Number(n)))
       problems.push(
         `${TABLE} entry ${n} (${title}) covers ${hit.join(", ")}: add the line \`Fix-when-touched: ${n} · fixed · <what you fixed>\` or \`Fix-when-touched: ${n} · not applicable · <why>\` to the PR body`,
       );

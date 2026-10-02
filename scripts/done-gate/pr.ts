@@ -2,7 +2,7 @@
 // every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
 // each fix-when-touched entry it touches answered, and no other workflow able to report a check named rules-from-main.
 
-import { fixWhenTouchedProblems, TABLE } from "./fix-when-touched";
+import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { firstLineProblems } from "./pr-first-line";
 import { ruleChangeProblems } from "./rule-changes";
@@ -69,7 +69,7 @@ export function secondCheck(workflows: Record<string, string>): string[] {
 const at = (snap: Snap, file: string) =>
   git(snap.repo, ["cat-file", "blob", `${snap.tree}:${file}`], {}, true);
 
-/** `base` is main: its fix-when-touched table judges, never the branch's. */
+/** `base` is main: its fix-when-touched table judges, never the branch's, and its ROADMAP.md says what is finished. */
 export function judgePr(
   snap: Snap,
   body: string,
@@ -77,6 +77,9 @@ export function judgePr(
   base = "origin/main",
 ) {
   const { problems, notes } = rulesOn(snap);
+  const onBase = (file: string) =>
+    git(snap.repo, ["cat-file", "blob", `${base}:${file}`], {}, true);
+  const table = onBase(TABLE);
   const workflows = Object.fromEntries(
     git(
       snap.repo,
@@ -93,6 +96,7 @@ export function judgePr(
       ...firstLineProblems(
         body,
         at(snap, "ROADMAP.md"),
+        onBase("ROADMAP.md"),
         snap.files.includes("ROADMAP.md"),
       ),
       ...problems,
@@ -104,13 +108,9 @@ export function judgePr(
         pr,
         snap.removed,
       ),
-      ...fixWhenTouchedProblems(
-        snap.files,
-        body,
-        git(snap.repo, ["cat-file", "blob", `${base}:${TABLE}`], {}, true),
-      ),
+      ...fixWhenTouchedProblems(snap.files, body, table),
       ...secondCheck(workflows),
     ],
-    notes,
+    notes: [...notes, ...unreadTable(table)],
   };
 }
