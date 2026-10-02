@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -89,6 +90,11 @@ function repo() {
   dirs.push(dir);
   mkdirSync(join(dir, "scripts"));
   copyFileSync(GATE, join(dir, "scripts", "done-gate.ts"));
+  cpSync(
+    join(import.meta.dir, "done-gate"),
+    join(dir, "scripts", "done-gate"),
+    { recursive: true },
+  );
   writeFileSync(join(dir, "STATE.md"), "# State\n");
   sh(dir, ["git", "init", "-q", "-b", "main"]);
   commitOld(dir);
