@@ -1,7 +1,8 @@
 # Database Design — Vertical-Agnostic Revenue OS (V1)
 
 > **Reference, not rules.** The design intent and conventions of the data layer. The migrations in `supabase/migrations/` are the real schema; several tables described here have no code using them yet. Rules live in `AGENTS.md`; what exists today is in `STATE.md`; the plan is `ROADMAP.md`. Where this file and the code disagree, the code is right.
-> **Consumer:** Claude Code. Migrations should be generated from the DDL in this file, in order, via `supabase migration new <name>`. **Numbering truth (D33):** the V1 baseline `000`–`009` spans **§3–§8 + §13 + §14** — one file per `-- NNN_name.sql` marker; later migrations (`010`+) extend the baseline and are annotated inline where they amend it.
+> **Consumer:** Claude Code, for intent only. **Never write a migration from the DDL in this file.** The schema is the migrations in `supabase/migrations/`: a change is a new migration written for that change, numbered after the last one there, append-only (never edit, rename or delete one already on main, never reuse a number; `rules-from-main` refuses each). History: the baseline `000`–`009` was first written from §3–§8, §13 and §14 of this file, and later migrations changed what they describe, so the DDL here is out of date wherever the two differ.
+> **Reserved, no code yet:** no product code (apps, services, packages) reads or writes these 16 tables: profiles, api_keys, companies, pipelines, pipeline_stages, deals, field_definitions, dispositions, campaigns, knowledge_documents, knowledge_chunks, contact_scores, integrations, eval_scenarios, eval_runs (both used only by `bun run evals`), prospect_candidates. Build on one only together with the code that uses it.
 > **Companion doc:** `docs/NORTH-STAR.md` (what we are building). The old product spec is archived at `docs/archive/project-spec.md`.
 
 ---

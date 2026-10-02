@@ -16,13 +16,13 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | If your PR touches… | Fix this too |
 |---|---|
 | Any file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
-| `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/db-design.md`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
+| `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
 | `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
 | `scripts/demo.ts`, `tests/`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
 | Local branches, `.claude/worktrees/`, `.gitignore` | 8. Leftover branches and worktrees |
-| `packages/harness/src/policies.ts`, `packages/harness/src/workflow/`, `services/worker/src/scheduler.ts`, `services/worker/src/runs.ts`, `services/worker/src/handlers/place-call.ts`, `packages/db/src/screens.ts`, `services/worker/src/routes/screens.ts`, `apps/console/src/features/screens/`, `apps/console/src/pages/Settings/`, `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/db/src/orgs.ts`, `scripts/demo.ts`, `services/worker/test/handlers.test.ts`, `scripts/guards.sh` | 10. Files with more than one job |
+| `packages/harness/src/policies.ts`, `packages/harness/src/workflow/`, `services/worker/src/scheduler.ts`, `services/worker/src/runs.ts`, `services/worker/src/handlers/place-call.ts`, `packages/db/src/screens.ts`, `services/worker/src/routes/screens.ts`, `apps/console/src/features/screens/`, `apps/console/src/pages/Settings/`, `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/db/src/orgs.ts`, `scripts/demo.ts`, `services/worker/test/handlers.test.ts` | 10. Files with more than one job |
 | `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/harness/src/workflow/interpret.ts`, `packages/db/src/contacts.ts` | 11. Functions over the complexity limit |
 
 ## Product code
@@ -40,7 +40,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - `services/worker/src/index.ts:62`: "TODO: mount packages/harness loop consumers", which `jobs.ts` already does.
 - `packages/harness/src/policies.ts:3-4` says the do-not-call, calling-hours, attempt-limit and spending-limit checks arrive later; the first three already exist there and the spending limit does not exist yet.
 - `packages/harness/src/types.ts:47` says company settings can tighten a tool's approval level; nothing does that.
-- `packages/harness/src/loop.ts:22-25`, `packages/db/src/screens.ts:1`, `scripts/guards.sh:2`.
+- `packages/harness/src/loop.ts:22-25`, `packages/db/src/screens.ts:1`.
 - Two test comments cite lines of `services/worker/src/scheduler.ts` that have since moved: `packages/harness/test/interpret-action-payloads.test.ts` (the outcome handling, in `applyInlineAction`) and `packages/harness/test/seed-workflow-definitions.test.ts` (the step-map check, in `processRun`). Name the function instead.
 
 **From findings:**
@@ -49,17 +49,16 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 ### 2. Unused code that shows agents a second way of doing things
 
-**Fix:** Delete code nothing in the product calls, so agents stop building on it, and mark in docs/db-design.md the tables no code uses yet as reserved.
+**Fix:** Delete code nothing in the product calls, so agents stop building on it.
 
 **When:** the PR that next touches that package or doc.
 
 **What goes, and where:**
-- The unused copy of three tables written for the Drizzle database library, which the product does not use: `packages/db/src/schema.ts`, the `export * as schema` line and the "the ONLY DB entry" comment in `packages/db/src/index.ts:1`, `drizzle-orm` in `packages/db/package.json`, Drizzle's listing in docs/tech-stack.md, and the Drizzle example in docs/patterns if Slice 0's examples item has not already removed it.
+- The unused copy of three tables written for the Drizzle database library, which the product does not use: `packages/db/src/schema.ts`, the `export * as schema` line and the "the ONLY DB entry" comment in `packages/db/src/index.ts:1`, `drizzle-orm` in `packages/db/package.json`, Drizzle's listing in docs/tech-stack.md, and the mention of `packages/db/src/schema.ts` in `docs/patterns/drizzle-query.md` (`bun run guards` fails once the file is gone and the mention stays).
 - The unused functions that pick an AI model by name: `registerProvider` and `selectProvider` in `packages/harness/src/llm/index.ts` (re-exported at `packages/harness/src/index.ts:10-11`); fix that file's header, since the live worker builds its model client in `jobs.ts`.
 - The old harness demo script `packages/harness/demo-harness.ts` (outside the type check, and it no longer type-checks), plus the harness-agent skill line telling agents to run it; `bun run demo` and `bun run evals` cover it.
 - The unused text-box component `apps/console/src/ui/primitives/Textarea.tsx`, or keep it with a note saying it is a design-system piece waiting for a screen.
 - The scheduler's separate hand-over action, which nothing produces: its branch in `applyInlineAction` (`services/worker/src/scheduler.ts`) and the `handoff` member of the `Action` type in `packages/harness/src/workflow/schema.ts`. Only this action kind is dead. The `handoff` entry in the same file's list of task kinds (`TASK_KINDS`) is live and stays: the seeded real-estate sequence creates a hand-over task with it (`supabase/seeds/real_estate.sql`, its `handoff_task` step), so deleting it would park that lead's sequence as failed. (Corrected 2026-10-01: this entry used to cite the task-kind list as dead too.)
-- docs/db-design.md marks as "reserved, no code yet" the 16 tables no product code reads or writes (profiles, api_keys, companies, pipelines, pipeline_stages, deals, field_definitions, dispositions, campaigns, knowledge_documents, knowledge_chunks, contact_scores, integrations, eval_scenarios, eval_runs, prospect_candidates).
 
 **From findings:**
 - Dead modules that advertise a second way of doing things: Drizzle schema mirror and dependency, AI-provider registry, a stale demo script, an unused component
@@ -101,9 +100,9 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 **When:** the PR that next edits that skill, `.claude/agents/verifier.md` or lessons.md. The verifier is a rule file, so that PR's body explains the rule change before it merges.
 
 **Known spots on main:**
-- "Outranks" sentences: `.claude/skills/console-feature/SKILL.md:26`, `db-work/SKILL.md:15`, `harness-agent/SKILL.md:28`, `worker-webhook/SKILL.md:27` (task-loop's was replaced on 2026-10-02).
+- "Outranks" sentences: `.claude/skills/console-feature/SKILL.md:26`, `harness-agent/SKILL.md:28` (task-loop's was replaced on 2026-10-02, db-work's and worker-webhook's on 2026-10-03).
 - `.claude/skills/task-loop/SKILL.md`, its "Learned since this skill was written" section still sends agents to grep lessons.md; turn the lessons it greps for (gates, CI, pipes, worktrees, queues, exit codes) into checks, then cut the grep.
-- Drifted facts: console-feature says browser tests are not run in CI (they are) and that query keys come from one shared factory (each feature defines its own), and cites an archived decision code; worker-webhook says local settings come from `supabase status` (they come from `bun run local <cmd>`); harness-agent says all types live in `src/types.ts` (14 live elsewhere).
+- Drifted facts: console-feature says browser tests are not run in CI (they are) and that query keys come from one shared factory (each feature defines its own), and cites an archived decision code; harness-agent says all types live in `src/types.ts` (14 live elsewhere).
 - The step-map freeze is stated nowhere agents look before touching the engine. Add one line to `.claude/skills/harness-agent/SKILL.md` (whose reading list still sends agents to the step map's design, "T26.2 workflow JSON", with no warning) and one to `.claude/agents/verifier.md` (the verifier's line was added on 2026-10-02; the harness-agent line is still owed): the fixed step map in `packages/harness/src/workflow/` is frozen until Slice 3 deletes it, so no new step kinds and no new logic that branches on the call's one-word result (moving where that result arrives is allowed); the verifier rules FAIL on a change that adds either (STATE.md → Decisions in force holds the decision). (Added 2026-10-01: a leftover of a finding the last replan called settled.)
 - lessons.md (36 KB, about 56 entries, many resolved or from the retired orchestrator) is the source for the checks. Still-true lessons worth a check first: a piped gate hiding its failure, a test mock that replaces a whole module without keeping the real parts, a guard with no production caller, test data that describes a world that doesn't exist, the lint preset being silently switched off, company links without delete rules, cross-site scripting tests that check the wrong text, and a blank secret in the web server's settings.
 
@@ -185,7 +184,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | `packages/db/src/orgs.ts`: companies (`createOrgWithAdmin`, `updateOrg`, `userOrgs`) and members (`memberRole`, `addMember`) | `orgs.ts` and `members.ts` | Slice 5 · "One shared membership and role check…" |
 | `scripts/demo.ts` (402 lines) | a library and a command line | Slice 3 · "`bun run demo --keep` runs the sequence a real company gets…", or Slice 4's end-of-call item if it comes first |
 | `services/worker/test/handlers.test.ts` (618 lines, four handlers) | one test file per handler | Slice 1 · "A call or WhatsApp send is never blindly repeated…" |
-| `scripts/guards.sh` | a `scripts/guards/` folder; the same PR widens `RULE_FILES` in the done gate and `.github/CODEOWNERS`, which name only `scripts/guards.sh`, or the new folder silently stops counting as a rule file | Slice 0 · "Examples that teach unsafe code are removed…" (it adds a guards check) |
 
 **Leave as they are:** the rest of `services/worker/src/scheduler.ts` (each other seam is about to be rewritten: attempts counting by Slice 3's contact limits, job queuing by Slice 1's never-blindly-repeated item); the call and WhatsApp handlers; the small worker files; the harness's `types.ts`, `context.ts`, `retrieval.ts` and `tools/`; `packages/channels`; the console's `app/session`; `apps/www/test/lib.test.ts`. No shared queue-settings file: the never-blindly-repeated item may queue jobs inside the open transaction with pg-boss's own `db` send option instead (untested; decide there). The stand-in senders stay in `services/worker/src/jobs.ts` until Slice 2's real WhatsApp sender lands. Unused code is deleted, not moved (entry 2).
 
@@ -221,10 +219,10 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | The fixed 'local database only' safety check was copied, and four places still use the weak version | Settled by [#124](https://github.com/devesh911/revenue-os/pull/124) (the test setup, db:reset, evals and the demo use scripts/local-url.ts) |
 | Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Settled by [#124](https://github.com/devesh911/revenue-os/pull/124) (tests/test-companies.ts; every job clean-up, the demo's included, touches only its own company) |
 | Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Settled by [#124](https://github.com/devesh911/revenue-os/pull/124) (four whole-suite test runs started at once all pass and leave another company's data and the dev login's workspaces alone; what is still shared is in STATE.md → What works today, "Automated tests and CI") |
-| The pattern files that AGENTS.md says 'bind' teach unauthenticated, role-less, wrong-signature code | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
-| The pattern docs agents are told to imitate describe code that does not exist, with no role check | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
-| docs/patterns examples are invented code that does not match the real APIs, and agents are told to imitate it | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
-| The design doc and migrations README still tell Claude to generate migrations from design DDL that contradicts current decisions | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
+| The pattern files that AGENTS.md says 'bind' teach unauthenticated, role-less, wrong-signature code | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the route and job examples are deleted and marked "do not copy" with the roadmap line that brings each; `bun run guards` fails a pattern naming a missing file, `scripts/guards/pattern-files.ts`) |
+| The pattern docs agents are told to imitate describe code that does not exist, with no role check | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (as above) |
+| docs/patterns examples are invented code that does not match the real APIs, and agents are told to imitate it | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the rest are excerpts of named real files, and `bun run guards` fails one that no longer matches its file) |
+| The design doc and migrations README still tell Claude to generate migrations from design DDL that contradicts current decisions | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (both, and the db-work skill, say the migrations are the schema and a change is a new migration) |
 | Test files are outside the typecheck gate: 49 type errors, including fakes that no longer match the real interfaces | Moved: Slice 3 · "Test files are type-checked like product code…" |
 | About 98 test files are never type-checked, and 49 type errors already hide in the worker, engine and script tests | Moved: Slice 3 · "Test files are type-checked like product code…" |
 | Test files are never type-checked; fakes have drifted from the real interfaces | Moved: Slice 3 · "Test files are type-checked like product code…" |
@@ -264,7 +262,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Module boundaries are not enforced: 28 verified cross-boundary imports, and only the no-Bun rule is linted | Slice 3 · "Lint enforces which parts of the code may import which…", then entry 9 here for its allowed exceptions |
 | No spending limit on the AI: 'spend cap' is declared as a guardrail and claimed as enforced, but nothing implements it | Slice 3 · "A daily limit on the AI tokens each lead and each company can use…" |
 | Agent evals never run automatically; nothing checks the AI's behaviour before a version goes live | Slice 3 · "Test conversations the agent must pass…" |
-| Voice webhook trust is one secret for every company, and the company comes from the URL; the WhatsApp build is told to copy this receiver | Slice 4 · "Voice agent set up from our own agent settings and pushed to Vapi…" (the "do not copy" mark on the skill's pointer: Slice 0's examples item) |
+| Voice webhook trust is one secret for every company, and the company comes from the URL; the WhatsApp build is told to copy this receiver | Slice 4 · "Voice agent set up from our own agent settings and pushed to Vapi…" (the "do not copy" mark on the skill's pointer: done in [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS)) |
 | Vapi call results are filed under whichever company id is in the web address; one secret is shared by all companies | Slice 4 · "Voice agent set up from our own agent settings and pushed to Vapi…" |
 | Each API response shape is hand-written twice (database package and console), and the message-role list four times | Slice 5 · "Each API response is described once, in packages/shared…" |
 | No content security policy or anti-framing header for the console or the marketing site | Console half: Slice 5 · "Console security headers…". Marketing half settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (`apps/www/public/_headers`) |
@@ -290,7 +288,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today | Settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (the FAQ says what the pilot will do; entry 7 struck) |
 | Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout | Entry 8 |
 
-Totals: Slice 0 holds 5, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 12 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
+Totals: Slice 0 holds none, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 17 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
 
 ---
 
