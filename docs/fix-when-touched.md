@@ -228,7 +228,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Finding | Where it went |
 |---|---|
 | The path from a change to the cloud staging database has no mechanical stop: edited or clashing migrations pass CI, the staging push does not wait for CI, and main's rule lets the agents' own login skip checks | Slice 0 · "The cloud test database (staging) changes only after the tests pass…" |
-| The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the Claude Code and Codex hooks refuse cloud database pushes and `.env` reads, `scripts/done-gate/tools.ts`, and Claude Code's settings deny them; `bun run db:migrate` deleted) |
+| The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Settled by [#119](https://github.com/devesh911/revenue-os/pull/119) (the Claude Code and Codex hooks refuse cloud database pushes and `.env` reads, `scripts/done-gate/tools.ts`, and Claude Code's settings deny them; `bun run db:migrate` deleted) |
 | The fixed 'local database only' safety check was copied, and four places still use the weak version | Slice 0 · "A test run can't delete data it did not create…" |
 | Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Slice 0 · "A test run can't delete data it did not create…" |
 | Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Slice 0 · "A test run can't delete data it did not create…" |
