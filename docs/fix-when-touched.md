@@ -7,7 +7,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - One entry has a latest date: the runbooks must be fixed by Slice 6's security walk.
 - Anything that needs Devesh (his Mac, his settings, his files) is in STATE.md → Waiting on Devesh, not here.
 - When an entry is fully fixed, strike it from this list in that same PR.
-- Cite code by file and function name, not by line number: line numbers go stale as soon as the file changes (entry 1 lists four test comments where they already have).
+- Cite code by file and function name, not by line number: line numbers go stale as soon as the file changes (entry 1 lists two test comments where they already have).
 - File and line references were checked against main at commit ef7c60d on 2026-09-29; entries 10 and 11, the additions to entries 1, 2, 4 and 8, and the findings table at the end were checked at 7d5e52e on 2026-10-01.
 
 ## Find your area
@@ -16,7 +16,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 |---|---|
 | Any source file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
 | `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/db-design.md`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
-| `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts`, `scripts/dev-login.test.ts` | 3. Tests that read source code as text |
+| `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
 | `scripts/demo.ts`, `tests/`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
@@ -41,7 +41,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - `packages/harness/src/policies.ts:3-4` says the do-not-call, calling-hours, attempt-limit and spending-limit checks arrive later; the first three already exist there and the spending limit does not exist yet.
 - `packages/harness/src/types.ts:47` says company settings can tighten a tool's approval level; nothing does that.
 - `packages/harness/src/loop.ts:22-25`, `packages/db/src/screens.ts:1`, `scripts/guards.sh:2`.
-- Four test comments cite lines of `services/worker/src/scheduler.ts` that have since moved: `services/worker/test/scheduler-apply-poison.test.ts` (the query that picks due runs, in `tick`), `services/worker/test/send-wa-step-dedupe.test.ts` (the duplicate-protection key, in `enqueueJob`), `packages/harness/test/interpret-action-payloads.test.ts` (the outcome handling, in `applyInlineAction`) and `packages/harness/test/seed-workflow-definitions.test.ts` (the step-map check, in `processRun`). Name the function instead.
+- Two test comments cite lines of `services/worker/src/scheduler.ts` that have since moved: `packages/harness/test/interpret-action-payloads.test.ts` (the outcome handling, in `applyInlineAction`) and `packages/harness/test/seed-workflow-definitions.test.ts` (the step-map check, in `processRun`). Name the function instead.
 
 **From findings:**
 - Old ID codes in code comments point to archived docs, and the T-numbers collide with docs/tech-stack.md
@@ -84,7 +84,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - `tests/conversation-link.test.tsx`: keep its render test, moved to `apps/console/test/`; delete the rest.
 - `tests/transcript-xss.test.tsx`: delete; the lint rule against raw HTML injection already covers it.
 - `packages/harness/test/anthropic.test.ts` ("no SDK import" check): a lint rule that blocks importing the Anthropic SDK in `packages/`.
-- `scripts/dev-login.test.ts` (seed source check): run `bun run db:seed` and sign in.
+
 - Acceptable as they are (they check docs or settings, not product code): `apps/console/test/readme-coverage.test.ts`, `apps/console/test/ui-contract.test.tsx`, `scripts/guards.test.ts`.
 - "RED today" comments on main: `apps/console/test/pages-adoption-tasks-agents-settings.test.tsx` (13), `tests/conversation-link.test.tsx` (10), `apps/console/test/pages-adoption-behavior.test.tsx` (4), `tests/console-contact-links.test.tsx` (3), `tests/vite-api-url-honesty.test.tsx` (2), and one each in `pages-adoption-home-dashboard.test.tsx`, `pages-adoption-source.test.ts`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts`.
 - `apps/console/test/README.md:4` and the "RED idiom" comments in `guardrails-console.test.tsx` stop teaching "read the source as text" when either file is next edited.
@@ -219,9 +219,9 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 |---|---|
 | The path from a change to the cloud staging database has no mechanical stop: edited or clashing migrations pass CI, the staging push does not wait for CI, and main's rule lets the agents' own login skip checks | Slice 0 · "The cloud test database (staging) changes only after the tests pass…" |
 | The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Settled by [#119](https://github.com/devesh911/revenue-os/pull/119) (the Claude Code and Codex hooks refuse cloud database pushes and `.env` reads, `scripts/done-gate/tools.ts`, and Claude Code's settings deny them; `bun run db:migrate` deleted) |
-| The fixed 'local database only' safety check was copied, and four places still use the weak version | Slice 0 · "A test run can't delete data it did not create…" |
-| Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Slice 0 · "A test run can't delete data it did not create…" |
-| Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Slice 0 · "A test run can't delete data it did not create…" |
+| The fixed 'local database only' safety check was copied, and four places still use the weak version | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the test setup, db:reset, evals and the demo use scripts/local-url.ts) |
+| Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (tests/test-companies.ts; every job clean-up, the demo's included, touches only its own company) |
+| Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Partly settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (a run deletes only what it made and runs can start together); two whole-suite runs can still trip over each other through vapi-queue.test.ts's real job runner and the one shared dev login (STATE.md → What works today) |
 | The pattern files that AGENTS.md says 'bind' teach unauthenticated, role-less, wrong-signature code | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
 | The pattern docs agents are told to imitate describe code that does not exist, with no role check | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
 | docs/patterns examples are invented code that does not match the real APIs, and agents are told to imitate it | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
