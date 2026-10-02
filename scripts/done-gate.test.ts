@@ -25,7 +25,7 @@ import { identity } from "./done-gate/checkouts";
 import { parseDiff } from "./done-gate/diff";
 import { usesExport } from "./done-gate/export-users";
 import { areasOf, fixWhenTouchedProblems } from "./done-gate/fix-when-touched";
-import { mergeOf } from "./done-gate/merge-gate";
+import { mergeOf } from "./done-gate/merge-reading";
 import { secondCheck } from "./done-gate/pr";
 import { firstLineProblems } from "./done-gate/pr-first-line";
 import { names, ruleChangeProblems } from "./done-gate/rule-changes";
@@ -2105,7 +2105,7 @@ describe("the hook", () => {
     const head = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
     const short = head.slice(0, 7);
     const merge = (
-      command = "gh pr merge 7 --squash --delete-branch",
+      command = `gh pr merge 7 --squash --delete-branch --match-head-commit ${head}`,
       codex = false,
       pr = head,
       session = "s1",
@@ -2179,7 +2179,12 @@ describe("the hook", () => {
     write(dir, "services/worker/src/sms.ts", "const sms = 2;\n"); // unproven again
     commitAll(dir);
     const unproven = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
-    const fresh = merge(undefined, false, unproven, "s2"); // s2's first note of this checkout fails
+    const fresh = merge(
+      `gh pr merge 7 --squash --match-head-commit ${unproven}`,
+      false,
+      unproven,
+      "s2",
+    ); // s2's first note of this checkout fails
     expect(fresh.refused).toBe(true);
     expect(fresh.why).toContain(`${unproven.slice(0, 7)} has not passed`);
     expect(
@@ -2202,7 +2207,12 @@ describe("the hook", () => {
     const r = hook(
       dir,
       "PreToolUse",
-      { tool_name: "Bash", tool_input: { command: "gh pr merge 7 --squash" } },
+      {
+        tool_name: "Bash",
+        tool_input: {
+          command: `gh pr merge 7 --squash --match-head-commit ${head}`,
+        },
+      },
       fakeGh(head),
     );
     expect(r.told).toBe(

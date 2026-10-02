@@ -1,52 +1,16 @@
-// An agent's `gh pr merge` goes through only when the pull request's head commit was proven on this machine.
+// An agent's `gh pr merge` goes through only when it names the exact head commit of the pull request, and that commit
+// was proven on this machine (a partial proof, with no database tests, only once GitHub reports `checks` passed on it).
 
 import { spawnSync } from "node:child_process";
 import { checkoutsOf, toplevel } from "./checkouts";
 import { git } from "./git";
+import { checksNotPassed } from "./github-checks";
 import { type HookInput, say } from "./hook-io";
+import { mergeOf } from "./merge-reading";
 import { isProduct } from "./rules";
 import { gitOf, program, simpleCommands } from "./shell-words";
 import type { Store } from "./store";
 import { parseRuling } from "./verdict";
-
-// gh pr merge options that take a value; any other option is a switch.
-const GH_VALUE = new Set([
-  "-t",
-  "--subject",
-  "-b",
-  "--body",
-  "-F",
-  "--body-file",
-  "-A",
-  "--author-email",
-  "--match-head-commit",
-  "-R",
-  "--repo",
-]);
-
-/** PURE: a simple command's words → the `gh pr merge` it runs, if any: the pull request named, and its options. */
-export function mergeOf(words: string[]) {
-  const w = program(words);
-  if (w[0] !== "gh" || w[1] !== "pr") return;
-  const value = new Map<string, string>();
-  const on = new Set<string>();
-  const rest: string[] = [];
-  for (let i = 2; i < w.length; i++) {
-    const a = w[i] ?? "";
-    const eq = a.match(/^(--[\w-]+)=(.*)$/);
-    if (eq) value.set(eq[1] ?? "", eq[2] ?? "");
-    else if (GH_VALUE.has(a)) value.set(a, w[++i] ?? "");
-    else if (a.startsWith("-")) on.add(a);
-    else rest.push(a);
-  }
-  if (rest[0] !== "merge") return;
-  return {
-    pr: rest[1],
-    repo: value.get("-R") ?? value.get("--repo"),
-    head: value.get("--match-head-commit"),
-    on,
-  };
-}
 
 const runsGit = (words: string[], sub: string) => gitOf(words)?.sub === sub;
 const mergesThroughApi = (words: string[]) => {
@@ -71,7 +35,7 @@ const ownerRepo = (s = "") =>
     ?.slice(1)
     .join("/");
 
-/** Refuses the tool call, telling the agent why and Devesh the first line: a merge, or a command (tools.ts). */
+/** Refuses the tool call, telling the agent why and Devesh the first line: a merge, a command or an edit (hook.ts). */
 export const deny = (why: string, what = "merge") =>
   process.stdout.write(
     JSON.stringify({
@@ -85,9 +49,10 @@ export const deny = (why: string, what = "merge") =>
   );
 
 /**
- * An agent's `gh pr merge` goes through only for code proven on this machine: the pull request's head commit
- * passed `bun run gate`, and for product code the verifier ruled PASS on it. Merging is where work reaches main,
- * so it is checked here however the session got to it.
+ * An agent's `gh pr merge` goes through only for code proven on this machine: it names the pull request's head
+ * commit exactly (`--match-head-commit`, so nothing pushed later is merged), that commit passed `bun run gate`
+ * (a partial pass only once GitHub reports `checks` passed on it), and for product code the verifier ruled PASS on
+ * it. Merging is where work reaches main, so it is checked here however the session got to it.
  */
 export function mergeGate(
   repo: string,
@@ -99,8 +64,7 @@ export function mergeGate(
     typeof input.tool_input?.command === "string"
       ? input.tool_input.command
       : "";
-  if (!/\bgh\b/.test(command)) return;
-  const commands = simpleCommands(command);
+  const commands = simpleCommands(command); // read as the shell reads it: `g''h` is gh too
   if (commands.some(mergesThroughApi))
     return deny(
       "merge with `gh pr merge <number>`, which the done gate checks, not through `gh api`.",
@@ -118,12 +82,20 @@ export function mergeGate(
     return deny(
       "a push and a merge in one command leave no moment to check what is merged. Push, then run `gh pr merge <number>` on its own.",
     );
-  const other = m.repo ?? (m.pr?.includes("/pull/") ? m.pr : undefined);
+  const ours = ownerRepo(git(repo, ["remote", "get-url", "origin"], {}, true));
+  const named = m.repo ?? (m.pr?.includes("/pull/") ? m.pr : undefined);
+  const cwd = input.cwd ?? repo;
+  // With no repository named, gh merges in the folder's own: this one's unless the folder has remotes, all elsewhere.
+  const remotes = git(cwd, ["remote", "-v"], {}, true)
+    .split("\n")
+    .map((l) => l.split(/\s+/)[1] ?? "")
+    .filter(Boolean);
   if (
-    other
-      ? ownerRepo(other) !==
-        ownerRepo(git(repo, ["remote", "get-url", "origin"], {}, true))
-      : !checkoutsOf(repo).includes(toplevel(input.cwd ?? repo))
+    named
+      ? ownerRepo(named) !== ours
+      : !checkoutsOf(repo).includes(toplevel(cwd)) &&
+        remotes.length > 0 &&
+        !remotes.some((url) => ownerRepo(url) === ours)
   )
     return; // another repository's pull request
   const number = m.pr
@@ -146,7 +118,7 @@ export function mergeGate(
       "-q",
       '.headRefOid + " " + .baseRefOid',
     ],
-    { cwd: input.cwd ?? repo, encoding: "utf8", timeout: 20_000 },
+    { cwd, encoding: "utf8", timeout: 20_000 },
   );
   const [head = "", baseRef = ""] =
     view.status === 0 ? view.stdout.trim().split(" ") : [];
@@ -155,12 +127,9 @@ export function mergeGate(
       `it could not read pull request ${number}'s head commit (\`gh pr view\`: ${(view.stderr || "no answer").trim().split("\n")[0]}), so it can't check what would be merged.`,
     );
   const short = head.slice(0, 7);
-  if (
-    m.on.has("--auto") &&
-    !(m.head && m.head.length >= 7 && head.startsWith(m.head))
-  )
+  if (m.head?.toLowerCase() !== head)
     return deny(
-      `auto-merge would also merge whatever is pushed later, unchecked. Add \`--match-head-commit ${head}\`, or merge once the checks are green.`,
+      `name the exact commit it merges, so nothing pushed after this check is merged unchecked: pull request ${number}'s head commit is ${head}, so add \`--match-head-commit ${head}\`${m.head ? ` (not ${m.head})` : ""}.`,
     );
   const have = (rev: string) =>
     git(repo, ["rev-parse", "--verify", "--quiet", `${rev}^{tree}`], {}, true);
@@ -176,11 +145,21 @@ export function mergeGate(
     return deny(
       `its head commit ${short} is not in this repository, so nobody here has proven it. Fetch it; ${where.charAt(0).toLowerCase()}${where.slice(1)}, then merge.`,
     );
-  const checks = store.get("checked", tree) ?? store.get("partial", tree);
-  if (!checks)
+  const checked = store.get("checked", tree);
+  const partial = checked ? undefined : store.get("partial", tree);
+  if (!checked && !partial)
     return deny(
       `its head commit ${short} has not passed \`bun run gate\` on this machine. ${where} (and the verifier, for product code), then merge.`,
     );
+  // A partial pass (no Docker here, so no database tests) counts only once GitHub reports `checks` passed on it.
+  const missing =
+    partial && checksNotPassed(head, named ? ownerRepo(named) : ours, cwd);
+  if (missing)
+    return deny(
+      `its head commit ${short} passed \`bun run gate\` here only in part (${partial}), and ${missing}. Wait until \`gh pr checks ${number}\` shows \`checks\` passed, or run \`bun run gate\` on a machine with Docker, then merge.`,
+    );
+  const checks =
+    checked ?? `${partial} · GitHub reports \`checks\` passed on it`;
   // Against the base GitHub merges into (the local main may be behind), listed as the stop's rules list files.
   const base =
     (baseRef && git(repo, ["merge-base", head, baseRef], {}, true)) ||

@@ -13,7 +13,8 @@
 // Two moments are checked. A stop: the session's change, in each checkout it worked in and was the last to work
 // in (a hook before each command or edit notes them, and the state it found each in), must be proven; a checkout
 // it only looked at, switched or pulled is not its change. A merge: an agent's `gh pr merge` goes through only when
-// the pull request's head commit was proven here, so work committed, pushed and merged in one go is checked too.
+// it names the pull request's head commit (`--match-head-commit`) and that commit was proven here, so work
+// committed, pushed and merged in one go is checked too; any other way of merging is refused before it runs.
 // Proven means (1) the change against main breaks none of the done rules (done-gate/rules.ts), (2) every check
 // is green on this exact code, and (3) if product code changed, the verifier agent (and only it) ruled PASS on
 // this exact code; at a stop, a CANNOT_VERIFY naming what only Devesh can provide also lets the agent stop, told
@@ -46,7 +47,8 @@ function unloaded(input: HookInput, why: string) {
     typeof input.tool_input?.command === "string"
       ? input.tool_input.command
       : "";
-  if (!/\bgh\b/.test(command) || !/merge/i.test(command))
+  // Nothing here can read the command, so any that names merge with its quotes and backslashes taken out may merge.
+  if (!/merge/i.test(command.replace(/['"\\]/g, "")))
     return say(
       `Done gate ⚠ could not load (${why}): nothing done here is checked until it loads`,
     );

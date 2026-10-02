@@ -1,5 +1,6 @@
-// A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call what agents' tools
-// may not do, the merge check and the note of the checkout, the verifier's start and stop, and the judgement at a stop.
+// A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call the gate's own record
+// and hook, what agents' tools may not do, the merge check and the note of the checkout, the verifier's start and
+// stop, and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
@@ -7,6 +8,7 @@ import { dirname, join } from "node:path";
 import { toplevel, touch } from "./checkouts";
 import { type HookInput, runsIn } from "./hook-io";
 import { deny, mergeGate } from "./merge-gate";
+import { recordRefusal } from "./record-guard";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
 import { commandRefusal } from "./tools";
@@ -25,11 +27,19 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
     let refused: string | undefined;
     try {
       command = runsIn(input);
-      refused = commandRefusal(command);
+      refused = recordRefusal(command) ?? commandRefusal(command);
     } catch (e) {
       refused = `it could not check this command (${String(e).split("\n")[0]}).`;
     }
-    if (refused) return deny(refused, "command");
+    if (refused)
+      return deny(
+        refused,
+        /^(Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/.test(
+          input.tool_name ?? "",
+        )
+          ? "edit"
+          : "command",
+      );
   }
   // The gate of the checkout the agent is in; when that has none (a branch cut before the gate, another
   // repository, no checkout at all), the one this file belongs to, whose repository holds the session's record.

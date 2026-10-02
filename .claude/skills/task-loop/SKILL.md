@@ -36,8 +36,9 @@ description: Use when building a roadmap item — any session implementing the n
    no line to tick; its PR body's evidence is the record); update `STATE.md → What works today` if
    reality changed; add a `Decisions in force` line for any decision.
 10. Merge per PHASE (STATE.md line 1): SETUP = squash-merge one PR at a time after confirming
-    `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge. The done gate
-    refuses `gh pr merge <n>` unless the PR's head commit passed `bun run gate` and the verifier here.
+    `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge. Merge with
+    `gh pr merge <n> --squash --match-head-commit <the PR's full head commit>`; AGENTS.md → The loop,
+    step 5, says what the done gate checks before it lets that through.
 11. After merge, republish the tracker page (see AGENTS.md → The loop, step 6).
 12. If the last item of the slice landed, set the slice to `proof ready` and run its proof
     (`bun run proof <slice>` once Slice 0's proof runner lands). When every step passes, set the
