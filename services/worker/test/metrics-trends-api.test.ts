@@ -1,6 +1,6 @@
-// Task 51 acceptance (spec §12 — Analytics "Trends"): GET /orgs/:orgId/metrics/trends returns a
+// The console's Analytics "Trends": GET /orgs/:orgId/metrics/trends returns a
 // 30-day daily time series { day, new_leads, conversations_started, bookings }. Tenancy-critical
-// (a new org-scoped read endpoint), so this RED asserts every non-negotiable: 401 without a token,
+// (an org-scoped read endpoint), so this asserts every non-negotiable: 401 without a token,
 // 403 for a non-member, and — the load-bearing case — org B's activity NEVER counts in org A's
 // trends. Series semantics MUST mirror funnelMetrics (packages/db/src/screens.ts) exactly:
 //   new_leads             = contacts where deleted_at is null,          bucketed by created_at::date
@@ -8,9 +8,10 @@
 //   bookings              = outcomes where kind = 'booking',            bucketed by occurred_at::date
 // The fixture keeps every in-window row comfortably inside BOTH the tile's `>= now()-30d` cutoff and
 // the 30 calendar-day bucket window, so tile total == sum of the 30 daily values is assertable.
-// Real-DB suite (CI-owned): the worktree has no .env by rail, so this cannot run locally.
-import { beforeAll, describe, expect, it } from "bun:test";
+// Real-DB suite: runs with the local stack's settings (`bun run gate`, CI).
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -82,19 +83,21 @@ async function seedDay(
   }
 }
 
+const companies = testCompanies(admin);
+
+/** A company made through the product's own POST /orgs, which makes `token`'s user its admin. */
 async function bootstrapOrg(token: string, tag: string): Promise<string> {
-  const res = await api("/orgs", token, {
-    method: "POST",
-    body: JSON.stringify({
-      name: `Trends ${tag}`,
-      slug: `trends-${tag}-${Date.now()}`,
-      vertical: "real_estate",
-    }),
+  const { id } = await companies.add(`Trends ${tag}`, async (name, slug) => {
+    const res = await api("/orgs", token, {
+      method: "POST",
+      body: JSON.stringify({ name, slug, vertical: "real_estate" }),
+    });
+    const body = (await res.json()) as { id?: string };
+    if (res.status !== 201 || !body.id)
+      throw new Error(`org bootstrap failed: ${res.status}`);
+    return body.id;
   });
-  const body = (await res.json()) as { id?: string };
-  if (res.status !== 201 || !body.id)
-    throw new Error(`org bootstrap failed: ${res.status}`);
-  return body.id;
+  return id;
 }
 
 // Expected org-A tile totals (30-day window): new_leads = 3 live in-window contacts (today, -5d,
@@ -131,6 +134,11 @@ beforeAll(async () => {
   // Cross-tenant noise: a SEPARATE org with heavy activity today. None of it may leak into orgA.
   const orgB = await bootstrapOrg(userB.token, "b");
   await seedDay(orgB, 0, 5);
+});
+
+afterAll(async () => {
+  await companies.cleanup();
+  await admin.end();
 });
 
 const UTC = (day: string): number => Date.parse(`${day}T00:00:00Z`);

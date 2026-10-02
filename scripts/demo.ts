@@ -1,14 +1,12 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow-step field (data, not a
-// thenable) in the T26.2 definition JSON — the same suppression scheduler/handlers/interpret carry.
-// task-60 — the DEMO DRIVER surface (RED phase: implementation-free stub).
+// thenable) in the workflow definition JSON (packages/harness/src/workflow/schema.ts), the same
+// suppression the scheduler, handlers and interpreter carry.
 //
 // `bun run demo` sequences the FULL engine cycle locally with NO telephony and NO LLM cost, then
 // prints the run's journey. Everything it sequences already exists (startRun · scheduler.tick ·
 // the place_call handler with a stubbed VOICE sender · the real Vapi webhook receiver): the driver
-// only orders it and records a structured journey the CLI renders.
-//
-// This file is a TYPE-ONLY SURFACE for the RED test suite: the exported functions THROW so every
-// test fails on behaviour (never on an import/typo). GREEN (task-60 implementer) fills the bodies.
+// only orders it and records a structured journey the CLI renders
+// (services/worker/test/demo-driver.test.ts drives `demo()`).
 
 import type {
   GuardedAction,
@@ -33,7 +31,7 @@ import {
 import { startRun } from "../services/worker/src/runs";
 import { tick } from "../services/worker/src/scheduler";
 
-/** Ordered stages the driver records — one per milestone of the engine cycle (criterion 7). */
+/** Ordered stages the driver records — one per milestone of the engine cycle. */
 export type JourneyStage =
   | "enrolled"
   | "tick_advanced"
@@ -48,7 +46,7 @@ export interface JourneyEvent {
   detail: string;
 }
 
-/** The guard the send path MUST pass before any effect (moat #4). Tests inject a spy. */
+/** The guard the send path MUST pass before any effect (guardrails run before every send). Tests inject a spy. */
 export type GuardPort = (
   ctx: OrgCtx,
   action: GuardedAction,
@@ -60,8 +58,7 @@ export interface FetchApp {
 }
 
 /**
- * Injected seams for one demo run (criterion 5: NO real telephony, NO Anthropic, NO network beyond
- * localhost). `pool` is the app_service door; `app` is the real receiver; every effect port is a
+ * Injected seams for one demo run (NO real telephony, NO Anthropic, NO network beyond localhost). `pool` is the app_service door; `app` is the real receiver; every effect port is a
  * stub/fake supplied by the caller. `webhookSecret` is passed in — the driver NEVER reads .env.
  */
 export interface DemoDeps {
@@ -243,24 +240,26 @@ export async function demo(deps: DemoDeps): Promise<DemoResult> {
 // Composes REAL local deps and pretty-prints the journey. CLI-only deps (createPool, the real
 // guard, the real receiver app, pg) load via dynamic import INSIDE this block so the tested `demo()`
 // surface above stays free of them. The place_call QUEUE must already exist (created when the worker
-// runs — `bun run dev`); pg-boss itself is a worker dep `scripts/` cannot import. Refuses a non-local
-// DB (S13.3). It self-seeds a throwaway ACTIVE demo org (the real_estate seed ships DRAFT), so the
-// demo is self-contained and re-runnable. Usage: `bun scripts/demo.ts [disposition]`.
+// runs — `bun run dev`); pg-boss itself is a worker dep `scripts/` cannot import. Refuses a database
+// that is not on this machine (scripts/local-url.ts) before it loads or connects to anything. It
+// self-seeds a throwaway ACTIVE demo company (the real_estate seed ships DRAFT), so the demo is
+// self-contained and re-runnable, and its clean-up touches only that company's rows and queued jobs.
+// Usage: `bun scripts/demo.ts [disposition]`.
 if (import.meta.main) {
+  const { isLocalUrl } = await import("./local-url");
+  const dbUrl =
+    process.env.DATABASE_URL ||
+    "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
+  const adminUrl =
+    process.env.LOCAL_DB_URL ||
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+  if (!isLocalUrl(dbUrl) || !isLocalUrl(adminUrl)) {
+    throw new Error("demo refuses to run against a non-local database");
+  }
   const { createPool } = await import("../packages/db/src/client");
   const { guard } = await import("../packages/harness/src/index");
   const { default: app } = await import("../services/worker/src/index");
   const pg = (await import("pg")).default;
-
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
-  const adminUrl =
-    process.env.LOCAL_DB_URL ??
-    "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-  if (!/127\.0\.0\.1|localhost/.test(dbUrl)) {
-    throw new Error("demo refuses to run against a non-local database (S13.3)");
-  }
   const secret = process.env.VAPI_WEBHOOK_SECRET;
   if (!secret)
     throw new Error("demo needs VAPI_WEBHOOK_SECRET for the receiver");
@@ -270,7 +269,8 @@ if (import.meta.main) {
   const admin = new pg.Pool({ connectionString: adminUrl });
   const pool = createPool(dbUrl);
 
-  // The VERBATIM seeded `qualification` shape: call → route(branch) → book/handoff/callback tool.
+  // A hand copy of the seeded `qualification` shape (call, branch on the result, then the booking or
+  // callback tool); Slice 3's demo item replaces it with the sequence a real company gets.
   const def = {
     entry: "qualify_call",
     steps: {
@@ -391,10 +391,13 @@ if (import.meta.main) {
     `  run ${result.runId} → ${result.terminalStatus} at step '${result.terminalStep}'\n`,
   );
 
-  // Tidy the throwaway org (webhook_events now cascades on org delete — migration 017).
+  // Tidy the throwaway company and nothing else: its rows that don't cascade, its own queued jobs
+  // (through app_service, which owns pg-boss's tables), then the company with the rest.
   await admin.query(`delete from usage_events where org_id = $1`, [orgId]);
   await admin.query(`delete from audit_log where org_id = $1`, [orgId]);
-  await admin.query(`delete from pgboss.job where name = 'place_call'`);
+  await pool.query(`delete from pgboss.job where data ->> 'orgId' = $1`, [
+    orgId,
+  ]);
   await admin.query(`delete from orgs where id = $1`, [orgId]);
   await pool.end();
   await admin.end();

@@ -1,12 +1,13 @@
-// T4 — production tool catalog (RED). The test is the spec; every acceptance criterion below
-// derives one or more FAILING tests. Two tiers:
+// The production tool catalog (book_appointment, update_contact, send_confirmation). Two tiers:
 //   • ENV-FREE unit — Zod validation, injected-port dispatch, catalog registration. Stub the
 //     ctx.db door in-memory; no Postgres. These run in every worktree.
 //   • [CI-owned integration] — real rows PERSIST via withOrg + real RLS (rollback atomicity,
-//     cross-tenant denial). skipIf(no DATABASE_URL): env-free worktrees skip them by rail.
+//     cross-tenant denial). skipIf(no DATABASE_URL): they run wherever the local stack's
+//     settings are set (`bun run gate`, CI).
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { buildCatalog } from "../src/tools";
 import { bookAppointment } from "../src/tools/book-appointment";
 import {
@@ -52,10 +53,10 @@ const apptResponder = (apptId: string) => (text: string) =>
     ? { rows: [{ id: apptId }], rowCount: 1 }
     : { rows: [], rowCount: 1 };
 
-// ── Criterion 1: book_appointment ────────────────────────────────────────────────────────────
-describe("book_appointment (criterion 1)", () => {
+// ── book_appointment ─────────────────────────────────────────────────────────────────────────
+describe("book_appointment", () => {
   it("schema REJECTS malformed args (missing contactId, non-uuid, missing slot/time)", () => {
-    // T11 seatbelt: hallucinated/partial args must never reach execute().
+    // Tool arguments are validated before execute (AGENTS.md → Agent harness): hallucinated/partial args never reach it.
     expect(
       bookAppointment.schema.safeParse({
         startsAt: validBook.startsAt,
@@ -113,8 +114,8 @@ describe("book_appointment (criterion 1)", () => {
   });
 });
 
-// ── Criterion 2: update_contact ──────────────────────────────────────────────────────────────
-describe("update_contact (criterion 2)", () => {
+// ── update_contact ───────────────────────────────────────────────────────────────────────────
+describe("update_contact", () => {
   it("schema REJECTS malformed args (non-uuid id, empty update, unknown field)", () => {
     expect(
       updateContact.schema.safeParse({ contactId: "nope", firstName: "A" })
@@ -148,8 +149,8 @@ describe("update_contact (criterion 2)", () => {
   });
 });
 
-// ── Criterion 3: send_confirmation (injected guarded port) ─────────────────────────────────────
-describe("send_confirmation (criterion 3)", () => {
+// ── send_confirmation (injected guarded port) ────────────────────────────────────────────────
+describe("send_confirmation", () => {
   it("schema REJECTS malformed args (non-uuid id, empty body, bad channel)", () => {
     const tool = makeSendConfirmation({
       send: mock(async () => ({ ok: true })),
@@ -177,7 +178,7 @@ describe("send_confirmation (criterion 3)", () => {
     ).toBe(false);
   });
 
-  it("execute DISPATCHES through the injected sender port (moat #4 — the only send path) and returns its result", async () => {
+  it("execute DISPATCHES through the injected sender port (guardrails before every send — the only send path) and returns its result", async () => {
     const send = mock(async () => ({ ok: true }));
     const tool = makeSendConfirmation({ send });
     const res = await tool.execute(
@@ -208,8 +209,8 @@ describe("send_confirmation (criterion 3)", () => {
   });
 });
 
-// ── Criterion 4: registration + exposure to runTurn ────────────────────────────────────────────
-describe("catalog registration (criterion 4)", () => {
+// ── Registration + exposure to runTurn ───────────────────────────────────────────────────────
+describe("catalog registration", () => {
   const NAMES = [
     "book_appointment",
     "update_contact",
@@ -254,19 +255,10 @@ describe.skipIf(!hasDb)(
     // Pools built in beforeAll (never when skipped) — no idle handles in env-free worktrees.
     let admin: pg.Pool;
     let appService: pg.Pool;
+    let companies: ReturnType<typeof testCompanies>;
     let orgA = "";
     let orgB = "";
     let contactA = "";
-
-    async function cleanup() {
-      await admin.query(
-        `delete from usage_events where org_id in (select id from orgs where slug in ('t4-orga','t4-orgb'))`,
-      );
-      await admin.query(
-        `delete from audit_log where org_id in (select id from orgs where slug in ('t4-orga','t4-orgb'))`,
-      );
-      await admin.query(`delete from orgs where slug in ('t4-orga','t4-orgb')`);
-    }
 
     beforeAll(async () => {
       admin = new pg.Pool({
@@ -279,15 +271,9 @@ describe.skipIf(!hasDb)(
         process.env.DATABASE_URL ||
           "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
       );
-      await cleanup();
-      const a = await admin.query(
-        `insert into orgs (name, slug) values ('T4 A', 't4-orga') returning id`,
-      );
-      orgA = a.rows[0].id;
-      const b = await admin.query(
-        `insert into orgs (name, slug) values ('T4 B', 't4-orgb') returning id`,
-      );
-      orgB = b.rows[0].id;
+      companies = testCompanies(admin);
+      orgA = (await companies.add("Tools A")).id;
+      orgB = (await companies.add("Tools B")).id;
       const c = await admin.query(
         `insert into contacts (org_id, first_name) values ($1, 'OrgA-Owned') returning id`,
         [orgA],
@@ -296,7 +282,7 @@ describe.skipIf(!hasDb)(
     });
 
     afterAll(async () => {
-      await cleanup();
+      await companies.cleanup();
       await appService.end();
       await admin.end();
     });

@@ -1,15 +1,15 @@
-// Task 50 (spec §12 — console AgentsPage on real data): GET /orgs/:orgId/agents returns the org's
-// agents + workflows lists. Tenancy-critical NEW org-scoped read endpoint, so this RED is
-// orchestrator-reviewed: 401 without a token, 403 for a non-member, and org B's rows NEVER leak
-// into org A's response. It also pins the S5.8 lean wire shape (no system_prompt / voice_config /
-// language_config on agents; no definition on workflows) and the deterministic order (key asc,
-// then version desc).
+// GET /orgs/:orgId/agents (the console's Agents page on real data) returns the org's agents +
+// workflows lists. A tenancy-critical org-scoped read endpoint: 401 without a token, 403 for a
+// non-member, and org B's rows NEVER leak into org A's response. It also pins the lean wire shape
+// (docs/security.md S5.8: no system_prompt / voice_config / language_config on agents; no
+// definition on workflows) and the deterministic order (key asc, then version desc).
 //
-// Real local stack (supabase + real pg) — CI-owned. It CANNOT run in a fresh worktree: signup goes
-// through GoTrue (SUPABASE_URL / SUPABASE_ANON_KEY come from .env, absent by rail). Mirrors
-// services/worker/test/screens-api.test.ts exactly (signup, POST /orgs, admin pool seeds rows).
-import { beforeAll, describe, expect, it } from "bun:test";
+// Real local stack (supabase + real pg): signup goes through GoTrue, so it runs with the local
+// stack's settings (`bun run gate`, CI). Mirrors services/worker/test/screens-api.test.ts
+// (signup, POST /orgs through the shared test-company helper, admin pool seeds rows).
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -46,19 +46,21 @@ function api(path: string, token: string | null, init: RequestInit = {}) {
   );
 }
 
+const companies = testCompanies(admin);
+
+/** A company made through the product's own POST /orgs, which makes `token`'s user its admin. */
 async function makeOrg(token: string): Promise<string> {
-  const res = await api("/orgs", token, {
-    method: "POST",
-    body: JSON.stringify({
-      name: "Agents Org",
-      slug: `agents-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
-      vertical: "real_estate",
-    }),
+  const { id } = await companies.add("Agents Org", async (name, slug) => {
+    const res = await api("/orgs", token, {
+      method: "POST",
+      body: JSON.stringify({ name, slug, vertical: "real_estate" }),
+    });
+    const body = (await res.json()) as { id?: string };
+    if (res.status !== 201 || !body.id)
+      throw new Error(`org bootstrap failed: ${res.status}`);
+    return body.id;
   });
-  const body = (await res.json()) as { id?: string };
-  if (res.status !== 201 || !body.id)
-    throw new Error(`org bootstrap failed: ${res.status}`);
-  return body.id;
+  return id;
 }
 
 let userA: { token: string; userId: string };
@@ -67,7 +69,7 @@ let orgA = "";
 let orgB = "";
 // Distinctive key prefix isolates these fixtures from any global-template rows (org_id IS NULL,
 // readable by every member per migration 006) so the count/order asserts stay deterministic.
-const PREFIX = `t50-${Date.now()}-`;
+const PREFIX = `agents-api-${Date.now()}-`;
 
 beforeAll(async () => {
   userA = await signup("agents-a");
@@ -76,7 +78,7 @@ beforeAll(async () => {
   orgB = await makeOrg(userB.token);
 
   // orgA — two keys, one carrying two versions, to pin (key asc, version desc). Distinctive
-  // system_prompt / definition values so the lean-shape asserts prove S5.8 (internals never shipped).
+  // system_prompt / definition values so the lean-shape asserts prove internals are never shipped.
   await admin.query(
     `insert into agents (org_id, key, version, status, model, system_prompt)
      values ($1, $2, 1, 'active', 'model-alpha-v1', 'SECRET-PROMPT-ALPHA-1'),
@@ -112,14 +114,19 @@ async function readAgents(): Promise<{ agents: Row[]; workflows: Row[] }> {
   return (await res.json()) as { agents: Row[]; workflows: Row[] };
 }
 
-describe("auth gate (S1.5)", () => {
+afterAll(async () => {
+  await companies.cleanup();
+  await admin.end();
+});
+
+describe("auth gate (docs/security.md S1.5)", () => {
   it("GET /orgs/:orgId/agents without a token → 401", async () => {
     const res = await api(`/orgs/${orgA}/agents`, null);
     expect(res.status).toBe(401);
   });
 });
 
-describe("cross-org denial (M0) — the load-bearing tenancy asserts", () => {
+describe("cross-org denial — the load-bearing tenancy asserts", () => {
   it("non-member GET → 403, and no orgA row text leaks", async () => {
     const res = await api(`/orgs/${orgA}/agents`, userB.token);
     expect(res.status).toBe(403);
@@ -139,14 +146,14 @@ describe("cross-org denial (M0) — the load-bearing tenancy asserts", () => {
   });
 });
 
-describe("member reads the org's agents + workflows (task 50)", () => {
+describe("member reads the org's agents + workflows", () => {
   it("responds with { agents, workflows } arrays", async () => {
     const body = await readAgents();
     expect(Array.isArray(body.agents)).toBe(true);
     expect(Array.isArray(body.workflows)).toBe(true);
   });
 
-  it("agents carry the lean list fields and NOTHING internal (S5.8)", async () => {
+  it("agents carry the lean list fields and NOTHING internal (docs/security.md S5.8)", async () => {
     const mine = (await readAgents()).agents.filter((a) =>
       String(a.key).startsWith(PREFIX),
     );
@@ -162,7 +169,7 @@ describe("member reads the org's agents + workflows (task 50)", () => {
     }
   });
 
-  it("workflows carry the lean list fields and NO definition (S5.8)", async () => {
+  it("workflows carry the lean list fields and NO definition (docs/security.md S5.8)", async () => {
     const mine = (await readAgents()).workflows.filter((w) =>
       String(w.key).startsWith(PREFIX),
     );
@@ -193,7 +200,7 @@ describe("member reads the org's agents + workflows (task 50)", () => {
     expect(seq).toEqual([`${PREFIX}flow#2`, `${PREFIX}flow#1`]);
   });
 
-  it("never ships the seeded prompt / definition text on the wire (S5.8)", async () => {
+  it("never ships the seeded prompt / definition text on the wire (docs/security.md S5.8)", async () => {
     const txt = await (await api(`/orgs/${orgA}/agents`, userA.token)).text();
     expect(txt).not.toContain("SECRET-PROMPT-ALPHA");
     expect(txt).not.toContain("SECRET-PROMPT-BETA");

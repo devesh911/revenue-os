@@ -1,25 +1,14 @@
-// H10 (hole audit, Package 2 / task-58) — RED spec: the scheduled tick must actually DISCOVER the
-// orgs that have due runs. REAL-DB INTEGRATION, CI-OWNED (ci.yml supabase-local-stack): the defect
-// IS an RLS/role property, so it cannot be observed without the real local stack and the real
-// app_service role. Setup mirrors scheduler.test.ts.
+// The scheduled tick DISCOVERS the orgs that have due runs. Real local database: the property
+// under test is an RLS/role one, so it needs the real local stack and the real app_service role
+// (the local stack's settings: `bun run gate`, CI). Setup mirrors scheduler.test.ts.
 //
-// DEFECT (ground truth, read directly, main@4a3b3fe):
-//   • services/worker/src/jobs.ts:204-223 (`runScheduledTick`, the pg-boss cron target registered
-//     at :167-170) discovers orgs with
-//       select distinct org_id from workflow_runs where status in ('pending','waiting') and wake_at <= now()
-//     on `pool` — the RLS-BOUND app_service pool (services/worker/src/db.ts:5), with no
-//     request.org_id set. workflow_runs' select policy is
-//     `org_id = app.current_org_id() and app.is_member(org_id,'viewer')`
-//     (supabase/migrations/006_harness.sql:199-200), so the scan returns ZERO rows and the
-//     per-org fan-out at :216 iterates an empty list — forever.
-//   • Its own docblock admits it ("in production the fan-out is EMPTY until an RLS-exempt org
-//     enumerator lands"), and the catch at :213 turns the failure into a log line, so the tick
-//     reports healthy while scheduling nothing.
-//   • Measured on the local stack before writing this suite: with one org holding a due run,
-//     app_service sees 0 orgs, the superuser sees 1.
-//   • Nothing catches it: services/worker/test/scheduler.test.ts always calls tick(pool, orgId)
-//     with a test-supplied org id, and services/worker/test/wiring-jobs.test.ts asserts only that
-//     a pgboss.schedule row exists — the discovery step has never been executed in a test.
+// THE FIXED DEFECT: the cron tick (runScheduledTick in src/jobs.ts) once found due orgs with a
+// plain `select distinct org_id from workflow_runs …` on the RLS-bound app_service pool with no
+// org scope, so workflow_runs' select policy (006_harness.sql) returned ZERO rows and the per-org
+// fan-out iterated an empty list forever, while the tick reported healthy. Nothing caught it:
+// scheduler.test.ts always calls tick(pool, orgId) with a test-supplied org id, and
+// wiring-jobs.test.ts asserts only that a pgboss.schedule row exists. The fix is
+// supabase/migrations/016_due_org_ids.sql, called through discoverDueOrgs.
 //
 // PINNED here:
 //   1. the production discovery seam EXISTS and, executed the production way (the RLS-bound
@@ -34,15 +23,15 @@
 // NOT PINNED (deliberately): the MECHANISM — SECURITY DEFINER function, a dedicated enumerator
 //   role, a narrowed policy, or a persisted due-org index are all acceptable; this suite only
 //   calls the seam and reads the answer. NOTE FOR REVIEW: a SECURITY DEFINER enumerator would
-//   need a NEW MIGRATION (append-only, expand-contract) — the tester did not write one, and the
-//   choice is a Fable review point.
+//   need a NEW MIGRATION (append-only, expand-contract).
 //   The one thing a test cannot avoid naming is the seam itself: this suite looks for a function
 //   export called `discoverDueOrgs` on services/worker/src/scheduler.ts or services/worker/src/jobs.ts
 //   (either home is fine; jobs.ts is only importable with the CI env set, so the probe tolerates
-//   an unimportable module). A different name/home is a one-line change here, under review.
+//   an unimportable module). A different name/home is a one-line change here.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 
 const admin = new pg.Pool({
   connectionString:
@@ -92,22 +81,14 @@ let orgB = "";
 let orgC = ""; // has a run, but it is NOT due
 let runA = "";
 let runB = "";
-
-async function cleanup(): Promise<void> {
-  await admin.query(`delete from orgs where slug like 'org-discovery-test-%'`);
-}
+const companies = testCompanies(admin);
 
 /** One org with one workflow_run, due (wake_at = now) or not (wake_at far in the future). */
 async function seedOrgWithRun(
   label: string,
   due: boolean,
 ): Promise<{ orgId: string; runId: string }> {
-  const org = (
-    await admin.query(
-      `insert into orgs (name, slug) values ($1, $2) returning id`,
-      [`Discovery ${label}`, `org-discovery-test-${label}-${Date.now()}`],
-    )
-  ).rows[0].id as string;
+  const org = (await companies.add(`Discovery ${label}`)).id;
   const contact = (
     await admin.query(
       `insert into contacts (org_id, first_name) values ($1, $2) returning id`,
@@ -148,7 +129,6 @@ async function seedOrgWithRun(
 }
 
 beforeAll(async () => {
-  await cleanup();
   const a = await seedOrgWithRun("a", true);
   const b = await seedOrgWithRun("b", true);
   const c = await seedOrgWithRun("c", false);
@@ -160,12 +140,12 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await appPool.end();
   await admin.end();
 });
 
-describe("scheduled-tick org discovery (H10)", () => {
+describe("scheduled-tick org discovery", () => {
   it("the production discovery seam returns every org with a due run (cross-tenant fan-out)", async () => {
     const { fn, tried } = await loadDiscovery();
     // The seam must exist: without it the cron tick fans out over an empty list forever.

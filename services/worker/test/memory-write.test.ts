@@ -1,4 +1,4 @@
-// task-53 (Feed-2 M1 — memory-write): the `end-of-call-report` branch of the Vapi processor
+// Memory writing: the `end-of-call-report` branch of the Vapi processor
 // must ALSO fold the call summary into contact_memories, in the SAME transaction that completes
 // the conversation. Invariants pinned here: one row per report, exactly ONE live summary per
 // contact (the previous one gets superseded_by = the new row), silent skips when there is no
@@ -7,8 +7,10 @@
 // the admin (postgres) pool writes fixtures and reads RLS-exempt for assertions.
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { withOrg } from "@revenue-os/db";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { pool } from "../src/db";
 import app from "../src/index";
 import { processVapiEvents } from "../src/vapi/process";
@@ -21,8 +23,9 @@ const admin = new pg.Pool({
   max: 2,
 });
 
-const RUN = Date.now(); // webhook_events.dedupe_key is globally unique — keep call ids per-run
-const SLUGS = ["mem-write-a", "mem-write-b"];
+// webhook_events.dedupe_key is globally unique — keep call ids per-run, and per run started at the same moment
+const RUN = randomUUID();
+const companies = testCompanies(admin);
 const SUMMARY_1 =
   "Wants a 3BHK in Whitefield; budget 1.2cr; call back Saturday.";
 const SUMMARY_2 = "Visited the site; comparing floor plans; decides next week.";
@@ -31,35 +34,13 @@ let orgA = "";
 let orgB = "";
 let clock = 0; // distinct payload timestamps: the processor orders a batch by them
 
-async function cleanup() {
-  const scope = `(select id from orgs where slug = any($1))`;
-  // contact_memories first: superseded_by is a self-FK without cascade, so drop the chain
-  // ourselves rather than lean on delete-order inside the org cascade.
-  await admin.query(`delete from contact_memories where org_id in ${scope}`, [
-    SLUGS,
-  ]);
-  await admin.query(`delete from webhook_events where org_id in ${scope}`, [
-    SLUGS,
-  ]);
-  await admin.query(`delete from usage_events where org_id in ${scope}`, [
-    SLUGS,
-  ]);
-  await admin.query(`delete from audit_log where org_id in ${scope}`, [SLUGS]);
-  await admin.query(`delete from orgs where slug = any($1)`, [SLUGS]);
-}
-
 beforeAll(async () => {
-  await cleanup();
-  const orgs = await admin.query(
-    `insert into orgs (name, slug) values ('Memory Org A', 'mem-write-a'), ('Memory Org B', 'mem-write-b')
-     returning id, slug`,
-  );
-  orgA = orgs.rows.find((r) => r.slug === "mem-write-a").id;
-  orgB = orgs.rows.find((r) => r.slug === "mem-write-b").id;
+  orgA = (await companies.add("Memory Org A")).id;
+  orgB = (await companies.add("Memory Org B")).id;
 });
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await admin.end();
 });
 
@@ -130,7 +111,7 @@ async function eventStatuses(dedupeKeys: string[]) {
   return r.rows;
 }
 
-describe("end-of-call-report folds a summary into contact memory (M1)", () => {
+describe("end-of-call-report folds a summary into contact memory", () => {
   it("writes exactly one live summary row carrying the source conversation", async () => {
     const callId = `mem-happy-${RUN}`;
     const contact = await newContact(orgA, "Alice");
@@ -152,7 +133,7 @@ describe("end-of-call-report folds a summary into contact memory (M1)", () => {
     const rows = await memories(contact);
     expect(rows.length).toBe(1);
     expect(rows[0].kind).toBe("summary");
-    expect(rows[0].content).toBe(SUMMARY_1); // verbatim — M1 stores, it does not rewrite
+    expect(rows[0].content).toBe(SUMMARY_1); // verbatim — memory writing stores, it does not rewrite
     expect(rows[0].source_conversation_id).toBe(convo);
     expect(rows[0].org_id).toBe(orgA);
     expect(rows[0].embedding).toBeNull(); // embeddings are a later milestone
@@ -209,7 +190,7 @@ describe("end-of-call-report folds a summary into contact memory (M1)", () => {
 });
 
 // Each skip case rides in a batch with a contact-bearing CONTROL call: without the control a
-// "wrote nothing" assert is vacuously true today and would pin nothing after GREEN.
+// "wrote nothing" assert would be vacuously true and pin nothing.
 describe("silent skips (no memory, no error, conversation still updated)", () => {
   it("skips a conversation with no contact — unknown caller, same batch still folds the control", async () => {
     const anon = `mem-anon-${RUN}`; // no fixture row: the processor creates it, contact_id null
@@ -286,7 +267,7 @@ describe("silent skips (no memory, no error, conversation still updated)", () =>
 });
 
 describe("re-delivery and the other message branches", () => {
-  it("an exact replay + a second processor pass never double-write memory (S6.3)", async () => {
+  it("an exact replay + a second processor pass never double-write memory (docs/security.md S6.3)", async () => {
     const contact = await newContact(orgA, "Hari");
     const callId = `mem-dup-${RUN}`;
     await newCall(orgA, contact, callId);
@@ -391,7 +372,7 @@ describe("tenancy [cross-tenant denial] — contact_memories", () => {
         [contactA],
       ),
     );
-    expect(neighbour.rows.length).toBe(0); // RLS denial — the whole moat
+    expect(neighbour.rows.length).toBe(0); // RLS denial — the whole point of tenancy
 
     // and an UNSCOPED read from B returns B's rows only
     const unscoped = await withOrg(pool, orgB, (tx) =>

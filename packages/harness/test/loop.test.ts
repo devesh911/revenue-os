@@ -1,9 +1,10 @@
-// Task 7 acceptance (project-spec §12): the loop runs a scripted tool call — fake LLM,
-// real DB rows (T26.5: "stateless turn: crash-safe by construction; all effects are rows").
+// The agent loop runs a scripted tool call — fake LLM, real DB rows (a stateless turn is
+// crash-safe by construction: every effect is a row; AGENTS.md → Agent harness).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import pg from "pg";
 import { z } from "zod";
+import { testCompanies } from "../../../tests/test-companies";
 import { runTurn } from "../src/loop";
 import { ToolRegistry } from "../src/registry";
 import type { LlmProvider, LlmTurn, OrgCtx } from "../src/types";
@@ -19,28 +20,13 @@ const appService = createPool(
     "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
 );
 
+const companies = testCompanies(admin);
 let orgId = "";
 let contactId = "";
 let conversationId = "";
 
-// usage_events + audit_log deliberately have NO cascade (append-only forever) — test
-// cleanup must clear them before the org can go.
-async function cleanup() {
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug = 'harness-test')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug = 'harness-test')`,
-  );
-  await admin.query(`delete from orgs where slug = 'harness-test'`);
-}
-
 beforeAll(async () => {
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Harness Org', 'harness-test') returning id`,
-  );
-  orgId = org.rows[0].id;
+  orgId = (await companies.add("Harness Org")).id;
   const contact = await admin.query(
     `insert into contacts (org_id, first_name) values ($1, 'Before') returning id`,
     [orgId],
@@ -60,7 +46,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await appService.end();
   await admin.end();
 });
@@ -99,7 +85,7 @@ function makeRegistry() {
   });
   registry.register({
     name: "send_quote",
-    description: "Send a price quote (approval-gated by default — S8.5)",
+    description: "Send a price quote (approval-gated by default)",
     schema: z
       .object({ contactId: z.string().uuid(), amount: z.number() })
       .strict(),
@@ -109,7 +95,7 @@ function makeRegistry() {
   return registry;
 }
 
-describe("harness loop (T26.5)", () => {
+describe("harness loop", () => {
   it("runs a scripted tool call: executes, persists tool + assistant messages, meters, audits", async () => {
     const provider = fakeLlm([
       {
@@ -194,7 +180,7 @@ describe("harness loop (T26.5)", () => {
     expect(tasks.rows[0].n).toBe(1);
   });
 
-  it("a tool outside tools_allowed is refused even if registered (S8.1 capability boundary)", async () => {
+  it("a tool outside tools_allowed is refused even if registered (the agent's capability boundary)", async () => {
     const provider = fakeLlm([
       {
         toolCalls: [

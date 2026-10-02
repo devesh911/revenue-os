@@ -12,6 +12,7 @@ import {
   DEV_LOGIN_EMAIL,
   DEV_LOGIN_PASSWORD,
 } from "../../../scripts/dev-login";
+import { isLocalUrl } from "../../../scripts/local-url";
 
 const TokenResponse = z.object({ access_token: z.string().min(1) });
 const OrgsResponse = z.array(z.object({ id: z.uuid(), name: z.string() }));
@@ -23,6 +24,11 @@ export default async function globalSetup(): Promise<void> {
     VITE_API_URL: apiUrl,
   } = process.env;
   if (!supabaseUrl || !anonKey || !apiUrl) return;
+  // Before the dev login's password goes anywhere: both servers on this machine (the one check).
+  if (![supabaseUrl, apiUrl].every(isLocalUrl))
+    throw new Error(
+      "the browser checks' setup refuses a sign-in server or API not on this machine",
+    );
 
   // stdout ignored: the seed CLI prints the dev login line, and it has no place in test output.
   execFileSync("bun", ["run", "db:seed", "real_estate"], {

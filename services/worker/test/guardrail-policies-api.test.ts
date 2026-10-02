@@ -1,12 +1,13 @@
-// task-52 acceptance — GET + PUT /orgs/:orgId/guardrail-policies on real data. Tenancy-critical
+// GET + PUT /orgs/:orgId/guardrail-policies on real data. Tenancy-critical
 // (new org-scoped read/write on a new-table surface): every endpoint must 401 without a token,
-// 403 for a non-member, and never leak/mutate another org's rows. PUT is admin-only (S1.7) and its
+// 403 for a non-member, and never leak/mutate another org's rows. PUT is admin-only (docs/security.md S1.7) and its
 // strict Zod validation (packages/shared GuardrailPolicyInputSchema) is the safety boundary for the
 // FAIL-OPEN quiet_hours hook — a malformed config must be rejected (400) with NOTHING written.
-// Real GoTrue users, jose-verified JWTs, app_service DB path underneath. CI-owned (needs .env +
-// local supabase + real pg — cannot run in an env-free worktree).
-import { beforeAll, describe, expect, it } from "bun:test";
+// Real GoTrue users, jose-verified JWTs, app_service DB path underneath: runs with the local
+// stack's settings (`bun run gate`, CI).
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -43,15 +44,21 @@ function api(path: string, token: string | null, init: RequestInit = {}) {
   );
 }
 
-async function createOrg(token: string, slug: string): Promise<string> {
-  const res = await api("/orgs", token, {
-    method: "POST",
-    body: JSON.stringify({ name: slug, slug, vertical: "real_estate" }),
+const companies = testCompanies(admin);
+
+/** A company made through the product's own POST /orgs, which makes `token`'s user its admin. */
+async function createOrg(token: string, label: string): Promise<string> {
+  const { id } = await companies.add(label, async (name, slug) => {
+    const res = await api("/orgs", token, {
+      method: "POST",
+      body: JSON.stringify({ name, slug, vertical: "real_estate" }),
+    });
+    const body = (await res.json()) as { id?: string };
+    if (res.status !== 201 || !body.id)
+      throw new Error(`org bootstrap failed: ${res.status}`);
+    return body.id;
   });
-  const body = (await res.json()) as { id?: string };
-  if (res.status !== 201 || !body.id)
-    throw new Error(`org bootstrap failed: ${res.status}`);
-  return body.id;
+  return id;
 }
 
 async function invite(
@@ -102,8 +109,8 @@ beforeAll(async () => {
   viewer = await signup("gp-viewer");
   outsider = await signup("gp-outsider");
 
-  orgA = await createOrg(admin1.token, `gp-a-${Date.now()}`);
-  orgB = await createOrg(orgBadmin.token, `gp-b-${Date.now()}`);
+  orgA = await createOrg(admin1.token, "Guardrails A");
+  orgB = await createOrg(orgBadmin.token, "Guardrails B");
 
   // orgA: two known rows (mirrors the seed shapes). orgB: a DISTINCT quiet_hours row whose
   // start "08:00" is the cross-tenant leak canary — it must never appear in an orgA response.
@@ -121,6 +128,11 @@ beforeAll(async () => {
 
   await invite(admin1.token, orgA, operator.userId, "operator");
   await invite(admin1.token, orgA, viewer.userId, "viewer");
+});
+
+afterAll(async () => {
+  await companies.cleanup();
+  await admin.end();
 });
 
 describe("GET /orgs/:orgId/guardrail-policies — auth + tenancy", () => {
@@ -166,7 +178,7 @@ describe("GET /orgs/:orgId/guardrail-policies — auth + tenancy", () => {
   });
 });
 
-describe("PUT /orgs/:orgId/guardrail-policies — admin-only (S1.7)", () => {
+describe("PUT /orgs/:orgId/guardrail-policies — admin-only (docs/security.md S1.7)", () => {
   const body = () =>
     JSON.stringify({ key: "autonomy", config: { book_appointment: "auto" } });
 

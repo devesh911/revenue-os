@@ -8,7 +8,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - One entry has a latest date: the runbooks must be fixed by Slice 6's security walk.
 - Anything that needs Devesh (his Mac, his settings, his files) is in STATE.md → Waiting on Devesh, not here.
 - When an entry is fully fixed, strike it from this list in that same PR.
-- Cite code by file and function name, not by line number: line numbers go stale as soon as the file changes (entry 1 lists four test comments where they already have).
+- Cite code by file and function name, not by line number: line numbers go stale as soon as the file changes (entry 1 lists two test comments where they already have).
 - File and line references were checked against main at commit ef7c60d on 2026-09-29; entries 10 and 11, the additions to entries 1, 2, 4 and 8, and the findings table at the end were checked at 7d5e52e on 2026-10-01.
 
 ## Find your area
@@ -17,7 +17,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 |---|---|
 | Any file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
 | `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/db-design.md`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
-| `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts`, `scripts/dev-login.test.ts` | 3. Tests that read source code as text |
+| `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
 | `scripts/demo.ts`, `tests/`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
@@ -35,14 +35,13 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **Known spots on main:**
 - About 101 of 243 source files carry an old code. Bare `T2` to `T9` are the worst, because docs/tech-stack.md reuses those numbers for different topics (for example `packages/channels/src/types.ts:1` says "T5" meaning an old task, while tech-stack's T5 is the web framework).
-- `services/worker/src/jobs.ts:64` says a finished task "swaps the real adapter", but the stub is still live.
 - `services/worker/src/index.ts:35`: the readiness check (`/ready`) shows an internal to-do note to whoever calls it. Slice 1's readiness item replaces this reply; if you touch the file first, drop the note.
 - `services/worker/src/index.ts`, the comment on the `app.route("/", vapiWebhook)` line says it is protected by a "per-assistant shared secret on the raw body". It is one secret shared by every company, compared with the `x-vapi-secret` header (`services/worker/src/vapi/receive.ts`), not a signature of the body. Say that. (Added 2026-10-01: a leftover of a finding the last replan called settled.)
 - `services/worker/src/index.ts:62`: "TODO: mount packages/harness loop consumers", which `jobs.ts` already does.
 - `packages/harness/src/policies.ts:3-4` says the do-not-call, calling-hours, attempt-limit and spending-limit checks arrive later; the first three already exist there and the spending limit does not exist yet.
 - `packages/harness/src/types.ts:47` says company settings can tighten a tool's approval level; nothing does that.
 - `packages/harness/src/loop.ts:22-25`, `packages/db/src/screens.ts:1`, `scripts/guards.sh:2`.
-- Four test comments cite lines of `services/worker/src/scheduler.ts` that have since moved: `services/worker/test/scheduler-apply-poison.test.ts` (the query that picks due runs, in `tick`), `services/worker/test/send-wa-step-dedupe.test.ts` (the duplicate-protection key, in `enqueueJob`), `packages/harness/test/interpret-action-payloads.test.ts` (the outcome handling, in `applyInlineAction`) and `packages/harness/test/seed-workflow-definitions.test.ts` (the step-map check, in `processRun`). Name the function instead.
+- Two test comments cite lines of `services/worker/src/scheduler.ts` that have since moved: `packages/harness/test/interpret-action-payloads.test.ts` (the outcome handling, in `applyInlineAction`) and `packages/harness/test/seed-workflow-definitions.test.ts` (the step-map check, in `processRun`). Name the function instead.
 
 **From findings:**
 - Old ID codes in code comments point to archived docs, and the T-numbers collide with docs/tech-stack.md
@@ -85,7 +84,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - `tests/conversation-link.test.tsx`: keep its render test, moved to `apps/console/test/`; delete the rest.
 - `tests/transcript-xss.test.tsx`: delete; the lint rule against raw HTML injection already covers it.
 - `packages/harness/test/anthropic.test.ts` ("no SDK import" check): a lint rule that blocks importing the Anthropic SDK in `packages/`.
-- `scripts/dev-login.test.ts` (seed source check): run `bun run db:seed` and sign in.
 - Acceptable as they are (they check docs or settings, not product code): `apps/console/test/readme-coverage.test.ts`, `apps/console/test/ui-contract.test.tsx`, `scripts/guards.test.ts`.
 - "RED today" comments on main: `apps/console/test/pages-adoption-tasks-agents-settings.test.tsx` (13), `tests/conversation-link.test.tsx` (10), `apps/console/test/pages-adoption-behavior.test.tsx` (4), `tests/console-contact-links.test.tsx` (3), `tests/vite-api-url-honesty.test.tsx` (2), and one each in `pages-adoption-home-dashboard.test.tsx`, `pages-adoption-source.test.ts`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts`.
 - `apps/console/test/README.md:4` and the "RED idiom" comments in `guardrails-console.test.tsx` stop teaching "read the source as text" when either file is next edited.
@@ -220,9 +218,9 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 |---|---|
 | The path from a change to the cloud staging database has no mechanical stop: edited or clashing migrations pass CI, the staging push does not wait for CI, and main's rule lets the agents' own login skip checks | Settled by [#123](https://github.com/devesh911/revenue-os/pull/123) (CI refuses an edited, renamed, deleted or clashing migration, `scripts/done-gate/migrations.ts`; `.github/workflows/staging-migrations.yml` applies migrations only after `checks` has passed on the same commit) and by Devesh's GitHub settings (main's ruleset has no bypass, and since 2026-10-02 counts `checks` and `rules-from-main` only when GitHub Actions reports them) |
 | The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Settled by [#119](https://github.com/devesh911/revenue-os/pull/119) (the Claude Code and Codex hooks refuse cloud database pushes and `.env` reads, `scripts/done-gate/tools.ts`, and Claude Code's settings deny them; `bun run db:migrate` deleted) |
-| The fixed 'local database only' safety check was copied, and four places still use the weak version | Slice 0 · "A test run can't delete data it did not create…" |
-| Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Slice 0 · "A test run can't delete data it did not create…" |
-| Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Slice 0 · "A test run can't delete data it did not create…" |
+| The fixed 'local database only' safety check was copied, and four places still use the weak version | Settled by [#124](https://github.com/devesh911/revenue-os/pull/124) (the test setup, db:reset, evals and the demo use scripts/local-url.ts) |
+| Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Settled by [#124](https://github.com/devesh911/revenue-os/pull/124) (tests/test-companies.ts; every job clean-up, the demo's included, touches only its own company) |
+| Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Settled by [#124](https://github.com/devesh911/revenue-os/pull/124) (four whole-suite test runs started at once all pass and leave another company's data and the dev login's workspaces alone; what is still shared is in STATE.md → What works today, "Automated tests and CI") |
 | The pattern files that AGENTS.md says 'bind' teach unauthenticated, role-less, wrong-signature code | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
 | The pattern docs agents are told to imitate describe code that does not exist, with no role check | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
 | docs/patterns examples are invented code that does not match the real APIs, and agents are told to imitate it | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
@@ -292,7 +290,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today | Settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (the FAQ says what the pilot will do; entry 7 struck) |
 | Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout | Entry 8 |
 
-Totals: Slice 0 holds 8, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 9 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
+Totals: Slice 0 holds 5, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 12 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
 
 ---
 

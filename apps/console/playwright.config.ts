@@ -1,7 +1,6 @@
-// Playwright e2e for the console — the end-to-end test layer (docs/tech-stack.md T12, with the
-// environments in T22). PER-APP config (mirrors apps/console/tsconfig.json) — the repo-root slot
-// stays free for the marketing site's own e2e someday (docs/tech-stack.md T15). Driven from root
-// via `bun run e2e` (scripts are the interface):
+// Playwright browser checks, the end-to-end test layer (docs/tech-stack.md, "Testing" and "Environments & release
+// flow"). The console's per-app config (it mirrors apps/console/tsconfig.json), which also runs the marketing
+// site's checks (below). Driven from root via `bun run e2e` (scripts are the interface):
 // the script passes `-c apps/console/playwright.config.ts`, and testDir "e2e" resolves beside this
 // file → apps/console/e2e.
 //
@@ -37,6 +36,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI, // fail CI if a stray test.only was committed
   retries: process.env.CI ? 2 : 0, // 0 locally; trace is captured only on the first CI retry
+  // A test that passes only on a retry fails the run in CI: a flake is a failure to fix, not a green check
+  // (apps/console/test/flaky-retry.test.ts proves it).
+  failOnFlakyTests: !!process.env.CI,
   reporter: "list",
   use: {
     baseURL: "http://localhost:4173", // vite preview (strictPort in vite.config.ts)

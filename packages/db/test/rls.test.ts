@@ -1,8 +1,9 @@
-// Task 3 acceptance (project-spec §12): unit test proves cross-org read fails.
+// One company can't read another's rows: the backend role's row-level security, proved with a cross-company read.
 // Fixtures are created as `postgres` (table owner, RLS-exempt); the client under test
-// connects as `app_service` — the RLS-bound backend role (db-design §1, S1.2/S1.3).
+// connects as `app_service` — the RLS-bound backend role (docs/db-design.md, section 1).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { Pool } from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { createPool, withOrg } from "../src";
 
 // `||` not `??`: bun auto-loads .env where these can be declared-but-empty strings
@@ -14,19 +15,15 @@ const APP_SERVICE_URL =
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
 
 const admin = new Pool({ connectionString: LOCAL_DB_URL, max: 2 });
+const companies = testCompanies(admin);
 let appService: Pool;
 let orgA = "";
 let orgB = "";
 
 beforeAll(async () => {
-  // app_service LOGIN flip happens once in tests/setup.local.ts (bun test preload)
-  const res = await admin.query(
-    `insert into orgs (name, slug) values
-		   ('RLS Test Org A', 'rls-test-a'), ('RLS Test Org B', 'rls-test-b')
-		 returning id, slug`,
-  );
-  orgA = res.rows.find((r) => r.slug === "rls-test-a").id;
-  orgB = res.rows.find((r) => r.slug === "rls-test-b").id;
+  // app_service's login is turned on by tests/setup.local.ts (bun test preload) when a stack lacks it
+  orgA = (await companies.add("RLS Test Org A")).id;
+  orgB = (await companies.add("RLS Test Org B")).id;
   await admin.query(
     `insert into contacts (org_id, first_name) values ($1, 'Alice-A'), ($2, 'Bob-B')`,
     [orgA, orgB],
@@ -35,9 +32,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await admin.query(
-    `delete from orgs where slug in ('rls-test-a','rls-test-b')`,
-  );
+  await companies.cleanup();
   await appService?.end();
   await admin.end();
 });
@@ -84,7 +79,7 @@ describe("app_service client tenant isolation", () => {
     }
   });
 
-  it("withOrg rejects a non-uuid org id at the boundary (Zod, T11)", async () => {
+  it("withOrg rejects a non-uuid org id at the boundary (Zod)", async () => {
     expect(withOrg(appService, "not-a-uuid", async () => {})).rejects.toThrow();
   });
 

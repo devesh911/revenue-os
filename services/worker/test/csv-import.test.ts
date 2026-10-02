@@ -1,7 +1,9 @@
-// Task 9 acceptance (project-spec §12): upload → identities → dedupe on (org, phone);
+// Contact CSV import: upload → identities → dedupe on (org, phone);
 // duplicate rows MERGE into the existing contact instead of creating a new one.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -13,35 +15,36 @@ const admin = new pg.Pool({
   max: 1,
 });
 
+const companies = testCompanies(admin);
 let token = "";
 let orgId = "";
 
 beforeAll(async () => {
-  const email = `csv-${Date.now()}@example.com`;
+  const email = `csv-${randomUUID()}@example.com`;
   const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: "POST",
     headers: { "content-type": "application/json", apikey: ANON_KEY },
     body: JSON.stringify({ email, password: "test-password-123!" }),
   });
   token = ((await res.json()) as { access_token: string }).access_token;
-  const org = await app.fetch(
-    new Request("http://localhost/orgs", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        name: "CSV Org",
-        slug: `csv-${Date.now()}`,
-        vertical: "b2b_wholesale",
+  // Made through the product's own POST /orgs, which makes the signed-up user its admin.
+  ({ id: orgId } = await companies.add("CSV Org", async (name, slug) => {
+    const org = await app.fetch(
+      new Request("http://localhost/orgs", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name, slug, vertical: "b2b_wholesale" }),
       }),
-    }),
-  );
-  orgId = ((await org.json()) as { id: string }).id;
+    );
+    return ((await org.json()) as { id: string }).id;
+  }));
 });
 
 afterAll(async () => {
+  await companies.cleanup();
   await admin.end();
 });
 
@@ -126,7 +129,7 @@ describe("contact CSV import (ceramic path)", () => {
     expect(body).toEqual({ created: 0, merged: 0, invalid: 1 });
   });
 
-  it("rejects a CSV with no phone column before any writes (S5.1)", async () => {
+  it("rejects a CSV with no phone column before any writes (docs/security.md S5.1)", async () => {
     const res = await importCsv("first_name,city\nNobody,Nowhere\n");
     expect(res.status).toBe(400);
   });

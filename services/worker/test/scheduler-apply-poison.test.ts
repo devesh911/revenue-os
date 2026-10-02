@@ -1,38 +1,36 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow step FIELD (data, not a
-// thenable) in the T26.2 definition JSON — same suppression as scheduler.test.ts.
-// H5 (hole audit, Package 2 / task-58) — RED spec: a run poisoned in the APPLY phase must reach a
-// TERMINAL state, not retry forever. REAL-DB INTEGRATION, CI-OWNED (ci.yml supabase-local-stack):
-// needs Postgres (workflow_runs + tasks + FOR UPDATE SKIP LOCKED). No pg-boss here — the poison
-// definition emits only INLINE actions, so nothing is enqueued. Setup mirrors scheduler.test.ts.
+// thenable) in the workflow definition JSON — same suppression as scheduler.test.ts.
+// A run poisoned in the APPLY phase reaches a TERMINAL state, not an endless retry. Real local
+// database: needs Postgres (workflow_runs + tasks + FOR UPDATE SKIP LOCKED), so it runs with the
+// local stack's settings (`bun run gate`, CI). No pg-boss here — the poison definition emits only
+// INLINE actions, so nothing is enqueued. Setup mirrors scheduler.test.ts.
 //
-// DEFECT (ground truth, read directly, main@4a3b3fe):
-//   • services/worker/src/scheduler.ts dead-letters in PHASE 1 ONLY (:140-148 — a definition that
-//     fails to parse or dangles becomes status='failed' + last_error). A PHASE 2 failure (:153
-//     applyTransitions) propagates out of processRun, withOrg ROLLS THE WHOLE TX BACK
-//     (packages/db/src/client.ts:32-38), and tick catches it at :87-96, logs
-//     "tick: run apply rolled back", and `continue`s.
-//   • The rollback restores status='waiting' with the SAME wake_at — still <= now — so the very
-//     next tick re-selects the run (:71-75). Nothing counts apply failures, applies backoff, or
-//     ever transitions the run to a terminal status. The tick is scheduled every minute
-//     (services/worker/src/jobs.ts:170), so ONE poisoned run burns a tick slot and logs an error
-//     every minute FOREVER, and never becomes visible to an operator as a failed run.
-//   • Reachable from a schema-VALID definition: interpret.ts:173 routes every non-book_appointment
-//     tool to create_task, and tasks.kind/title are `not null` with a 5-value CHECK
-//     (supabase/migrations/006_harness.sql:87,90).
+// THE FIXED DEFECT: the scheduler (src/scheduler.ts) once dead-lettered only runs whose definition
+// failed to parse (processRun). An apply-phase failure (applyTransitions) rolled the whole
+// transaction back (withOrg, packages/db/src/client.ts), tick logged "tick: run apply rolled back"
+// and moved on, and the rollback left the run waiting with the same, still-due wake_at, so the
+// next tick picked it again, every minute, forever, never visible to an operator as failed. It is
+// reachable from a schema-VALID definition: interpret routes every tool but book_appointment to
+// create_task, and tasks.kind/title are `not null` with a CHECK (006_harness.sql).
 //
-// FAULT INJECTION (why a trigger): H7's fix validates action payloads, which closes the specific
-//   `task:{}` trigger the audit used. The defect under test here is the SCHEDULER's handling of
+// FAULT INJECTION (why a trigger): action payloads are validated now, which closes the specific
+//   `task:{}` trigger the audit used. The behaviour under test here is the SCHEDULER's handling of
 //   ANY deterministic apply failure, so the fault is injected at the DB with a BEFORE INSERT
 //   trigger that raises check_violation (23514 — the same SQLSTATE class the audit describes) for
-//   one sentinel title. It is created and dropped by this suite and fires for nothing else.
+//   one sentinel title, which only this suite's own workflows use, so it fires for nothing else.
+//   It is installed once per database and never dropped: on the local stack, Supabase's supautils
+//   extension (its drop_trigger_grants setting) makes every DROP TRIGGER by the postgres login take
+//   the strongest lock on all of auth's tables, which deadlocked sign-ups in test runs going at the
+//   same moment. Creating it takes no such lock, and runs starting together take turns on an
+//   advisory lock, so only the first creates it.
 //
 // PINNED here:
 //   1. a run whose apply phase throws deterministically reaches a TERMINAL state within a bounded
-//      number of ticks — a status the scheduler's own selection (:73) can never pick up again —
+//      number of ticks — a status the scheduler's own selection (tick) can never pick up again —
 //      and carries an operator-visible reason (last_error);
 //   2. nothing partial commits along the way (the rolled-back inline write never lands);
 //   3. the retry posture survives: a run that fails apply ONCE and then succeeds is NOT
-//      dead-lettered — it advances normally (STATE.md DECISIONS "T6 scheduler DB-error policy":
+//      dead-lettered — it advances normally (the scheduler's database-error policy:
 //      a DB error rolls back and the run is retried; only a POISON run may terminate);
 //   4. cross-tenant denial: ticking org A never dead-letters (or otherwise touches) org B's run.
 //
@@ -42,6 +40,7 @@
 //   injected clock by an hour each so a backoff-then-terminate fix is not failed on timing.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { tick } from "../src/scheduler";
 
 const admin = new pg.Pool({
@@ -57,22 +56,21 @@ const appPool = new pg.Pool({
   max: 4,
 });
 
-/** The statuses the scheduler's selection query can pick up (scheduler.ts:73). */
+/** The statuses the scheduler's selection query can pick up (tick in src/scheduler.ts). */
 const SCHEDULABLE = ["pending", "waiting"];
 /** The ceiling: a poisoned run must be terminal by here. The real N is the worker's call. */
 const MAX_TICKS = 12;
 /** Only tasks with this title prefix trip the injected fault. */
 const POISON_TITLE = "POISON-t58 apply always fails";
+/** The injected fault's trigger and function: one per database, shared by every run of this suite. */
+const FAULT = "test_fault_poison_task";
 
+const companies = testCompanies(admin);
 let orgId = "";
 let orgB = "";
 let contactId = "";
 let contactB = "";
 let wfSeq = 0;
-
-async function cleanup(): Promise<void> {
-  await admin.query(`delete from orgs where slug like 'apply-poison-test-%'`);
-}
 
 async function seedWorkflow(def: unknown, org = orgId): Promise<string> {
   wfSeq += 1;
@@ -157,36 +155,34 @@ async function tickUntilTerminal(
   return seen;
 }
 
-beforeAll(async () => {
-  await cleanup();
-  // Fault injection: a deterministic, constraint-class apply failure that no definition-level
-  // validation can prevent. Dropped in afterAll; matches only this suite's sentinel title.
-  await admin.query(`
-    create or replace function t58_poison_task() returns trigger language plpgsql as $$
-    begin
-      if new.title like 'POISON-t58%' then
-        raise exception 'poisoned task insert (task-58 fault injection)'
-          using errcode = '23514';
+/** Installs the fault (see FAULT INJECTION above): a task insert with the sentinel title fails with a check
+ *  violation. The function is rewritten each time, under the lock, so a changed body reaches every database. */
+const installFault = () =>
+  admin.query(`
+    do $$ begin
+      perform pg_advisory_xact_lock(hashtext('${FAULT}'));
+      create or replace function public.${FAULT}() returns trigger language plpgsql as $f$
+      begin
+        if new.title like 'POISON-t58%' then
+          raise exception 'poisoned task insert (apply-poison fault injection)'
+            using errcode = '23514';
+        end if;
+        return new;
+      end $f$;
+      if not exists (select 1 from pg_trigger
+                      where tgrelid = 'public.tasks'::regclass and tgname = '${FAULT}') then
+        create trigger ${FAULT} before insert on public.tasks
+          for each row execute function public.${FAULT}();
       end if;
-      return new;
-    end $$;
-  `);
-  await admin.query(`drop trigger if exists t58_poison_task on tasks`);
-  await admin.query(`
-    create trigger t58_poison_task before insert on tasks
-      for each row execute function t58_poison_task()
-  `);
+    end $$`);
 
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Apply Poison Org', $1) returning id`,
-    [`apply-poison-test-${Date.now()}`],
-  );
-  orgId = org.rows[0].id;
-  const b = await admin.query(
-    `insert into orgs (name, slug) values ('Apply Poison Org B', $1) returning id`,
-    [`apply-poison-test-b-${Date.now()}`],
-  );
-  orgB = b.rows[0].id;
+beforeAll(async () => {
+  // Fault injection: a deterministic, constraint-class apply failure that no definition-level
+  // validation can prevent. Left installed; matches only this suite's sentinel title.
+  await installFault();
+
+  orgId = (await companies.add("Apply Poison Org")).id;
+  orgB = (await companies.add("Apply Poison Org B")).id;
   contactId = (
     await admin.query(
       `insert into contacts (org_id, first_name) values ($1, 'Poison A') returning id`,
@@ -202,14 +198,12 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await cleanup();
-  await admin.query(`drop trigger if exists t58_poison_task on tasks`);
-  await admin.query(`drop function if exists t58_poison_task()`);
+  await companies.cleanup();
   await appPool.end();
   await admin.end();
 });
 
-describe("apply-phase poison runs terminate (H5)", () => {
+describe("apply-phase poison runs terminate", () => {
   it("a run whose APPLY phase throws every tick reaches a TERMINAL state, not an endless retry", async () => {
     const wf = await seedWorkflow(poisonDef());
     const runId = await seedRun(wf, { currentStep: "t" });
@@ -223,14 +217,14 @@ describe("apply-phase poison runs terminate (H5)", () => {
       status: run.status,
       ticks: statuses.length,
     }).toMatchObject({ terminal: true });
-    // …with a reason a human can see in the console (the dead-letter contract, scheduler.ts:8-10).
+    // …with a reason a human can see in the console (the dead-letter contract, src/scheduler.ts's header).
     expect(run.last_error).not.toBeNull();
     // …and nothing partial ever committed: every poisoned apply rolled its whole tx back.
     expect(await countTasks(runId)).toBe(0);
   }, 30_000);
 
   it("the tick keeps going and never throws while a poisoned run is burning down", async () => {
-    // criterion 6 of task-46 must survive the fix: one bad run may not abort the tick.
+    // one bad run may not abort the tick.
     const wf = await seedWorkflow(poisonDef());
     await seedRun(wf, { currentStep: "t" });
     await expect(
@@ -239,7 +233,7 @@ describe("apply-phase poison runs terminate (H5)", () => {
   }, 30_000);
 
   it("retry posture preserved: ONE apply failure is retried, not dead-lettered", async () => {
-    // STATE.md DECISIONS (T6 scheduler DB-error policy): a failed inline write rolls back and the
+    // The scheduler's database-error policy: a failed inline write rolls back and the
     // run is RETRIED. A transient DB error must not become a terminal run on its first occurrence.
     const wf = await seedWorkflow(poisonDef());
     const runId = await seedRun(wf, { currentStep: "t" });
@@ -287,4 +281,24 @@ describe("apply-phase poison runs terminate (H5)", () => {
     expect(b.completed_at).toBeNull();
     expect(await countTasks(runB)).toBe(0);
   }, 30_000);
+});
+
+describe("the injected fault", () => {
+  it("is installed once per database, and four runs installing it at the same moment all succeed", async () => {
+    // Without the advisory lock, rewriting one function from four connections at once fails with
+    // "tuple concurrently updated", so runs starting together would kill each other.
+    const installs = await Promise.allSettled(
+      [1, 2, 3, 4].map(() => installFault()),
+    );
+    const installed = await admin.query(
+      `select count(*)::int n from pg_trigger where tgrelid = 'tasks'::regclass and tgname = $1`,
+      [FAULT],
+    );
+    expect({
+      failed: installs.flatMap((r) =>
+        r.status === "rejected" ? [String(r.reason)] : [],
+      ),
+      installed: installed.rows[0].n,
+    }).toEqual({ failed: [], installed: 1 });
+  });
 });

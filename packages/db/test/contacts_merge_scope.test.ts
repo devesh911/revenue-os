@@ -1,11 +1,12 @@
-// Task 12 (audit-db-schema F1): the merge-update inside importContacts must be org-scoped
-// in its OWN where clause (docs/patterns/drizzle-query.md — "org_id in EVERY where; RLS is
-// the net, not the query plan"). The poisoned-identity fixture below is representable because
+// The merge-update inside importContacts must be org-scoped in its OWN where clause
+// (AGENTS.md → Conventions: `org_id` in every where clause as a second fence; RLS is
+// the net, not the query plan). The poisoned-identity fixture below is representable because
 // contact_identities.contact_id carries no org-match constraint to contacts: defense-in-depth
 // means the query refuses the cross-org write even if the RLS net were ever misconfigured.
 // Fixtures as `postgres` (RLS-exempt); code under test runs as `app_service` via withOrg.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { Pool } from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { createPool, importContacts } from "../src";
 
 const LOCAL_DB_URL =
@@ -16,6 +17,7 @@ const APP_SERVICE_URL =
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
 
 const admin = new Pool({ connectionString: LOCAL_DB_URL, max: 2 });
+const companies = testCompanies(admin);
 let appService: Pool;
 let orgC = "";
 let orgD = "";
@@ -25,13 +27,8 @@ const HAPPY_PHONE = "+15550120002";
 const ACTOR = "00000000-0000-0000-0000-000000000012";
 
 beforeAll(async () => {
-  const res = await admin.query(
-    `insert into orgs (name, slug) values
-		   ('Merge Scope Org C', 'merge-scope-c'), ('Merge Scope Org D', 'merge-scope-d')
-		 returning id, slug`,
-  );
-  orgC = res.rows.find((r) => r.slug === "merge-scope-c").id;
-  orgD = res.rows.find((r) => r.slug === "merge-scope-d").id;
+  orgC = (await companies.add("Merge Scope Org C")).id;
+  orgD = (await companies.add("Merge Scope Org D")).id;
 
   // Victim contact lives in org D…
   const victim = await admin.query(
@@ -51,14 +48,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // audit_log.org_id has no cascade (append-only forever) — clear it before the orgs
-  await admin.query(
-    `delete from audit_log where org_id in
-		   (select id from orgs where slug in ('merge-scope-c','merge-scope-d'))`,
-  );
-  await admin.query(
-    `delete from orgs where slug in ('merge-scope-c','merge-scope-d')`,
-  );
+  await companies.cleanup();
   await appService?.end();
   await admin.end();
 });
