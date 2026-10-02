@@ -24,16 +24,20 @@ const app = new pg.Pool({ connectionString: DB_URL, max: 2 }); // owns pg-boss's
 const companies = testCompanies(admin, app);
 const QUEUES = ["place_call", "send_wa"];
 
-// Test files that used to delete other companies' data: by a fixed name, by a name prefix, every company's
-// queued calls, or the dev login's workspace.
+// Test files that used to delete other companies' data: by a fixed name, by a name prefix, or every company's
+// queued calls. Not the dev-login tests: their one shared login can't be signed up for the first time by four
+// runs at once (tests/test-companies.test.ts proves clean-up never reaches the dev login's workspace), and not
+// vapi-queue.test.ts, whose real job runner works any company's queued jobs (STATE.md → What works today).
 const FILES = [
   "packages/db/test/rls.test.ts",
+  "packages/harness/test/loop.test.ts",
   "services/worker/test/scheduler.test.ts",
   "services/worker/test/m2-replay.test.ts",
   "services/worker/test/demo-driver.test.ts",
   "services/worker/test/send-wa-step-dedupe.test.ts",
   "services/worker/test/vapi-webhook.test.ts",
-  "scripts/dev-login.test.ts",
+  "services/worker/test/memory-write.test.ts",
+  "tests/eval-runs-rls.test.ts",
 ];
 
 let other = "";
@@ -141,6 +145,5 @@ it("four runs started at once all pass, and they and a demo run leave another co
     usage: 1,
     jobs: QUEUES,
   });
-  // Every dev-login workspace that was there before still is (a run's `bun run db:seed` may add it).
-  expect(await devWorkspace()).toEqual(expect.arrayContaining(devWorkspaces));
+  expect(await devWorkspace()).toEqual(devWorkspaces);
 }, 180_000);
