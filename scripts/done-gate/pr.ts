@@ -1,10 +1,12 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
-// every pull request with --head): the done rules, each rule change explained and recorded, no other workflow
-// able to report a check named rules-from-main or checks (the two main's ruleset requires), and no migration on main
-// changed or its number reused (migrations.ts).
+// every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
+// each fix-when-touched entry it touches answered, no other workflow able to report a check named rules-from-main
+// or checks (the two main's ruleset requires), and no migration on main changed or its number reused (migrations.ts).
 
+import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
+import { firstLineProblems } from "./pr-first-line";
 import { ruleChangeProblems } from "./rule-changes";
 import { rulesOn } from "./rules";
 import type { Snap } from "./snapshot";
@@ -80,8 +82,17 @@ export function secondCheck(workflows: Record<string, string>): string[] {
 const at = (snap: Snap, file: string) =>
   git(snap.repo, ["cat-file", "blob", `${snap.tree}:${file}`], {}, true);
 
-export function judgePr(snap: Snap, body: string, pr?: string) {
+/** `base` is main: its fix-when-touched table judges, never the branch's, and its ROADMAP.md says what is finished. */
+export function judgePr(
+  snap: Snap,
+  body: string,
+  pr?: string,
+  base = "origin/main",
+) {
   const { problems, notes } = rulesOn(snap);
+  const onBase = (file: string) =>
+    git(snap.repo, ["cat-file", "blob", `${base}:${file}`], {}, true);
+  const table = onBase(TABLE);
   const workflows = Object.fromEntries(
     git(
       snap.repo,
@@ -95,6 +106,12 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
   );
   return {
     problems: [
+      ...firstLineProblems(
+        body,
+        at(snap, "ROADMAP.md"),
+        onBase("ROADMAP.md"),
+        snap.files.includes("ROADMAP.md"),
+      ),
       ...problems,
       ...ruleChangeProblems(
         snap.files,
@@ -104,9 +121,10 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
         pr,
         snap.removed,
       ),
+      ...fixWhenTouchedProblems(snap.files, body, table),
       ...secondCheck(workflows),
       ...migrationProblems(snap),
     ],
-    notes,
+    notes: [...notes, ...unreadTable(table)],
   };
 }

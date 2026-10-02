@@ -310,6 +310,18 @@ it("STATE.md line 1 must be exactly PHASE: SETUP or PHASE: LIVE, and only SETUP 
   );
 });
 
+it("the banner gives every first line rules-from-main accepts, and the fix-when-touched line", () => {
+  const b = banner(cycle());
+  for (const form of [
+    '"Roadmap: Slice N — <item>"',
+    '"Roadmap: Slice N — replan: <what>"',
+    '"Roadmap: Side track — <what>"',
+    '"Roadmap: off-roadmap — <what>"',
+    "`Fix-when-touched: <entry number> · fixed | not applicable · <how or why>`",
+  ])
+    expect(b).toContain(form);
+});
+
 it("the pin sums up how to handle a new ask (AGENTS.md → The loop, step 1) in one short line", () => {
   const p = pin(cycle());
   expect(p.split("\n")).toHaveLength(1);

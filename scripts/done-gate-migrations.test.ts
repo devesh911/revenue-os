@@ -67,7 +67,18 @@ function project(
     join(dir, "scripts", "done-gate"),
     { recursive: true },
   );
+  // The gate reads ROADMAP.md with the tracker's parser.
+  mkdirSync(join(dir, "docs", "tracker"), { recursive: true });
+  copyFileSync(
+    join(import.meta.dir, "..", "docs", "tracker", "parse.js"),
+    join(dir, "docs", "tracker", "parse.js"),
+  );
   write(dir, "STATE.md", "# State\n");
+  write(
+    dir,
+    "docs/fix-when-touched.md",
+    "# Fix when touched\n\n## Find your area\n\n| If your PR touches… | Fix this too |\n|---|---|\n| `docs/runbooks/` | 5. Runbooks |\n",
+  ); // a table that asks about nothing these tests change
   for (const [file, sql] of Object.entries(migrations))
     write(dir, `${M}/${file}`, sql);
   write(dir, `${M}/README.md`, "How migrations are written.\n");
@@ -76,7 +87,7 @@ function project(
   sh(dir, ["git", "checkout", "-qb", "feat"]);
   return dir;
 }
-const BODY = "Roadmap: Slice 0 — x\n";
+const BODY = "Roadmap: off-roadmap — a migration test\n"; // a first line main's copy accepts with no ROADMAP.md
 /** Go back to main and judge the branch from main's checkout as data: the exit code and each problem listed. */
 const judge = (dir: string) => {
   sh(dir, ["git", "checkout", "-q", "main"]);
@@ -101,7 +112,7 @@ const judged = (dir: string) => {
   return judge(dir);
 };
 const PASSED =
-  "Pull request ✓ nothing in the change in feat since main breaks the done rules, and every rule change is explained and recorded\n";
+  "Pull request ✓ its first line names what it is, nothing in the change in feat since main breaks the done rules, every rule change is explained and recorded, and every fix-when-touched entry it touches is answered\n";
 const ON_MAIN = (file: string, how: string) =>
   `${M}/${file} is already on main, and this change ${how} it: a migration on main never changes (AGENTS.md hard rail 4); put the change in a new migration instead`;
 const REUSES = (file: string, n: string, twin: string) =>

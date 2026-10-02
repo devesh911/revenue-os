@@ -14,7 +14,7 @@ import {
   into,
   positionals,
   program,
-  simpleCommands,
+  readings,
   unredirected,
 } from "./shell-words";
 
@@ -47,19 +47,21 @@ export function toolRefusal(command: string, look: Look): string | undefined {
   return judge(command, look, command);
 }
 
-/** Judges each simple command of `line`; `text` is the whole command line, where a guarded word is looked for. */
+/** Judges each simple command of `line`, in each way shells read it; `text` is the whole command line, where a guarded word is looked for. */
 function judge(line: string, look: Look, text: string): string | undefined {
-  let dir = "";
-  for (const words of simpleCommands(line)) {
-    const w = unredirected(program(words));
-    const why =
-      hidden(w, look, text) ??
-      secretRefusal(words, w, dir, look.envFileIn) ??
-      loginRefusal(w) ??
-      cloud(w) ??
-      githubRefusal(w, dir, look.branchOf);
-    if (why) return why;
-    if (w[0] === "cd" || w[0] === "pushd") dir = into(dir, w[1] ?? "~");
+  for (const commands of readings(line)) {
+    let dir = "";
+    for (const words of commands) {
+      const w = unredirected(program(words));
+      const why =
+        hidden(w, look, text) ??
+        secretRefusal(words, w, dir, look.envFileIn) ??
+        loginRefusal(w) ??
+        cloud(w) ??
+        githubRefusal(w, dir, look.branchOf);
+      if (why) return why;
+      if (w[0] === "cd" || w[0] === "pushd") dir = into(dir, w[1] ?? "~");
+    }
   }
 }
 
