@@ -284,11 +284,21 @@ describe("a verifier ruling", () => {
     expect(half.reason).toContain(NOBODY); // the worktree: nobody looked at it
     expect(half.reason).not.toContain("the job never ran"); // v1's FAIL was never delivered by a stop
 
+    // A verifier that ran no command in any checkout rules on no code: its hand-back is refused, saying why.
     const idle = verifierRun(GATE, dir, {
       worksIn: [],
       report: "Ruling: PASS — b works",
     });
-    expect(idle.stops.at(-1)?.out.systemMessage).toContain("covers no code");
+    expect(refused(idle.handBack ?? { out: {} })).toBe(true);
+    expect(
+      idle.handBack?.out.hookSpecificOutput?.permissionDecisionReason,
+    ).toContain("you ran no command in any checkout");
+    const quiet = verifierRun(GATE, dir, {
+      auto: false,
+      worksIn: [],
+      report: "Ruling: PASS — b works",
+    });
+    expect(quiet.stops[0]?.out.systemMessage).toContain("covers no code");
     expect(stop(dir).sentBack).toBe(true);
 
     verifierRun(GATE, dir, { worksIn: [wt], report: "Ruling: PASS — b works" });

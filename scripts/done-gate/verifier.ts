@@ -75,7 +75,13 @@ export function verifierCall(input: HookInput, store: Store, session: string) {
       "hand-back",
     );
   const key = `${session}-${input.agent_id}`;
-  store.put("handed", key, JSON.stringify(held(ruling, store, key)));
+  const report = held(ruling, store, key);
+  if (!report.trees.length)
+    return deny(
+      "your ruling would cover no code: you ran no command in any checkout. Run your checks in the checkout that holds the change (its worktree, if it has one), then hand your report back again.",
+      "hand-back",
+    );
+  store.put("handed", key, JSON.stringify(report));
 }
 
 /** When the verifier starts: Devesh's words and the roadmap item's text, from records the building agent did not write. */
