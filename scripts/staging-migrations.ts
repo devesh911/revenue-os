@@ -87,6 +87,8 @@ const local = readdirSync(DIR)
   .flatMap((f) => f.match(NUMBERED)?.[1] ?? [])
   .sort();
 out("supabase", ["link", "--project-ref", ref]);
+// Asked for as JSON: the CLI (2.109.1) prints JSON by itself only when it detects an AI agent (AI_AGENT,
+// CLAUDECODE), and a table otherwise, as on GitHub's runner.
 const listing = out("supabase", [
   "migration",
   "list",
