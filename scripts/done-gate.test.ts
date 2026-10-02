@@ -2768,6 +2768,32 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     );
   });
 
+  it("refuses any job but ci.yml's `checks` that could report a check named checks, the other check main requires", () => {
+    const ci = ".github/workflows/ci.yml";
+    const read = "permissions: {contents: read}\njobs:\n";
+    const ours = { [ci]: `${read}  checks: {runs-on: x}\n` };
+    expect(secondCheck(ours)).toEqual([]);
+    for (const [file, job, yml] of [
+      [".github/workflows/x.yml", "checks", `${read}  checks: {runs-on: x}\n`],
+      [".github/workflows/x.yml", "a", `${read}  a:\n    name: Checks\n`],
+      [
+        ci,
+        "lint",
+        `${read}  checks: {runs-on: x}\n  lint:\n    name: checks\n`,
+      ],
+    ] as const)
+      expect(secondCheck({ ...ours, [file]: yml })).toEqual([
+        `${file}, job ${job}: its check could be named checks, the name only ${ci}'s job checks may report`,
+      ]);
+    const rulesCheck = ".github/workflows/rules-from-main.yml";
+    expect(
+      secondCheck({
+        ...ours,
+        [rulesCheck]: `${read}  rules-from-main:\n    name: checks\n`,
+      }),
+    ).toEqual([`${rulesCheck} must hold exactly one job, rules-from-main`]); // its job reports under its own name only
+  });
+
   /** A scratch repo whose main holds the gate and a Rule changes section, and a branch `feat` cut from it. */
   const project = () => {
     const dir = repo();
