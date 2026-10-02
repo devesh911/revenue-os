@@ -1,5 +1,5 @@
 // Turns on the local login of app_service, the role the product's database access runs as. The migrations
-// create it unable to log in (supabase/migrations/010_app_service_role.sql); on this machine it gets a throwaway
+// create it unable to log in (migration 010 in supabase/migrations); on this machine it gets a throwaway
 // password. Only when it can't log in yet: test runs used to rewrite it on every start, and runs started at the
 // same moment then failed with "tuple concurrently updated".
 import pg from "pg";

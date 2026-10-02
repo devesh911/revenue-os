@@ -1,5 +1,5 @@
 // `bun run db:reset`: `supabase db reset` re-applies every migration from scratch, which leaves app_service unable
-// to log in (supabase/migrations/010_app_service_role.sql; docs/decisions/D31-app-service-role-bootstrap.md), so
+// to log in (migration 010 in supabase/migrations; docs/decisions/D31-app-service-role-bootstrap.md), so
 // the tests and the worker could not connect. This wrapper runs the reset, then turns that local login back on,
 // so the database is ready for the tests in one step.
 //
