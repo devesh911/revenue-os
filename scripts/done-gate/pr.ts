@@ -3,6 +3,7 @@
 // able to report a check named rules-from-main.
 
 import { git } from "./git";
+import { migrationProblems } from "./migrations";
 import { ruleChangeProblems } from "./rule-changes";
 import { rulesOn } from "./rules";
 import type { Snap } from "./snapshot";
@@ -92,6 +93,7 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
         snap.removed,
       ),
       ...secondCheck(workflows),
+      ...migrationProblems(snap),
     ],
     notes,
   };

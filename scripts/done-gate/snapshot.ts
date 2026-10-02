@@ -19,6 +19,7 @@ import { stateDir } from "./store";
 export type Snap = {
   repo: string;
   tree: string;
+  from: string; // the commit the change starts from: where it left the base (the tree itself when there is no diff)
   files: string[];
   added: Added[];
   removed: Added[];
@@ -43,6 +44,7 @@ export function snapshot(
     return analyse(
       repo,
       tree,
+      from,
       git(repo, [...DIFF, from, head]),
       (args) =>
         git(repo, [...GREP, ...args, tree], {}, true)
@@ -76,6 +78,7 @@ export function snapshot(
     return analyse(
       repo,
       tree,
+      from,
       git(repo, [...DIFF, "--cached", from], env),
       (args) =>
         git(repo, [...GREP, "--cached", ...args], env, true)
@@ -97,6 +100,7 @@ export function snapshot(
 const NONE = (repo: string, tree: string): Snap => ({
   repo,
   tree,
+  from: tree,
   files: [],
   added: [],
   removed: [],
@@ -125,6 +129,7 @@ const DIFF = [
 function analyse(
   repo: string,
   tree: string,
+  from: string,
   diff: string,
   grepIn: (args: string[]) => string[],
   readFile: (f: string) => string,
@@ -171,5 +176,5 @@ function analyse(
         ].filter((f) => usesExport(read(f), f, file, name, reach.slice(1))),
       );
     }
-  return { repo, tree, files, added, removed, users };
+  return { repo, tree, from, files, added, removed, users };
 }
