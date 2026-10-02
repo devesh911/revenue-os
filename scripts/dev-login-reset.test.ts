@@ -1,9 +1,10 @@
-// A follow-up to the RED dev-login suite (kept in its own file so scripts/dev-login.test.ts stays
-// exactly as reviewed): "ensure" means the documented credentials always work on the local stack —
-// an existing dev user whose password was changed signs in with DEV_LOGIN_PASSWORD again afterwards.
-// DB-backed: real local GoTrue + Postgres.
+// A follow-up to the dev-login suite (scripts/dev-login.test.ts): "ensure" means the documented
+// credentials always work on the local stack — an existing dev user whose password was changed
+// signs in with DEV_LOGIN_PASSWORD again afterwards. DB-backed: real local GoTrue + Postgres. It
+// seeds a workspace of its own (the shared test-company helper), never the dev login's.
 import { afterAll, expect, it } from "bun:test";
 import pg from "pg";
+import { testCompanies } from "../tests/test-companies";
 import {
   DEV_LOGIN_EMAIL,
   DEV_LOGIN_PASSWORD,
@@ -17,9 +18,10 @@ const LOCAL_DB_URL =
   process.env.LOCAL_DB_URL ||
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const admin = new pg.Pool({ connectionString: LOCAL_DB_URL, max: 1 });
+const companies = testCompanies(admin);
 
 afterAll(async () => {
-  await admin.query(`delete from orgs where slug = 'seed-real-estate'`);
+  await companies.cleanup();
   await admin.end();
 });
 
@@ -37,7 +39,10 @@ it("resets a changed dev user password so DEV_LOGIN_PASSWORD signs in again", as
     supabaseUrl: SUPABASE_URL,
     anonKey: ANON_KEY,
     dbUrl: LOCAL_DB_URL,
-    orgIds: [(await seed("real_estate")).orgId],
+    orgIds: [
+      (await seed("real_estate", (await companies.add("Dev login reset")).slug))
+        .orgId,
+    ],
   };
   await ensureDevLogin(opts);
   await admin.query(

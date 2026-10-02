@@ -1,10 +1,10 @@
-// task-59 — criterion 8 / CLAUDE.md non-negotiable: eval_runs carries org_id and is invisible
-// cross-tenant. This is the tenancy rail the eval runner writes behind; it proves the RLS on the
-// table (migration 007_ops.sql), so unlike the runner specs it is EXPECTED TO PASS on current
-// main. Fixtures created as `postgres` (RLS-exempt owner); the client under test is app_service.
+// eval_runs carries org_id and is invisible cross-tenant (AGENTS.md hard rail 3, tenancy). This is
+// the tenancy rail the eval runner writes behind; it proves the RLS on the table (migration
+// 007_ops.sql). Fixtures created as `postgres` (RLS-exempt owner); the client under test is app_service.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import { Pool } from "pg";
+import { testCompanies } from "./test-companies";
 
 const LOCAL_DB_URL =
   process.env.LOCAL_DB_URL ||
@@ -14,19 +14,16 @@ const APP_SERVICE_URL =
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
 
 const admin = new Pool({ connectionString: LOCAL_DB_URL, max: 2 });
+const companies = testCompanies(admin);
 let appService: Pool;
 let orgA = "";
 let orgB = "";
 let runAId = "";
 
 async function seedOrgRun(
-  slug: string,
+  name: string,
 ): Promise<{ orgId: string; runId?: string }> {
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ($1, $1) returning id`,
-    [slug],
-  );
-  const orgId = org.rows[0].id;
+  const orgId = (await companies.add(name)).id;
   const agent = await admin.query(
     `insert into agents (org_id, key, version, status, model, system_prompt)
      values ($1, 'rls-eval-agent', 1, 'draft', 'claude-sonnet-4-6', 'x') returning id`,
@@ -46,30 +43,21 @@ async function seedOrgRun(
 }
 
 beforeAll(async () => {
-  await cleanup();
-  const a = await seedOrgRun("eval-rls-a");
-  const b = await seedOrgRun("eval-rls-b");
+  const a = await seedOrgRun("Eval RLS A");
+  const b = await seedOrgRun("Eval RLS B");
   orgA = a.orgId;
   orgB = b.orgId;
   runAId = a.runId ?? "";
   appService = createPool(APP_SERVICE_URL);
 });
 
-async function cleanup() {
-  const sub = `select id from orgs where slug in ('eval-rls-a','eval-rls-b')`;
-  await admin.query(`delete from eval_runs where org_id in (${sub})`);
-  await admin.query(
-    `delete from orgs where slug in ('eval-rls-a','eval-rls-b')`,
-  );
-}
-
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await appService?.end();
   await admin.end();
 });
 
-describe("eval_runs tenant isolation (criterion 8)", () => {
+describe("eval_runs tenant isolation", () => {
   it("withOrg(A) sees org A's eval_runs", async () => {
     const rows = await withOrg(appService, orgA, (tx) =>
       tx.query(`select id from eval_runs`).then((r) => r.rows),

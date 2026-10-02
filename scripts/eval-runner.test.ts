@@ -1,16 +1,17 @@
-// task-59 RED — the eval RUNNER, driven against the REAL local stack (real DB rows, real harness
-// runTurn), with the two LLM-shaped seams (provider + persona player) INJECTED as mocks. Tests
-// NEVER call Anthropic: the real provider is wired only at runtime via ANTHROPIC_API_KEY.
-// REAL-DB INTEGRATION, CI-OWNED — a fresh worktree has no .env by rail.
+// The eval RUNNER, driven against the REAL local stack (real DB rows, real harness runTurn), with
+// the two LLM-shaped seams (provider + persona player) INJECTED as mocks. Tests NEVER call
+// Anthropic: the real provider is wired only at runtime via ANTHROPIC_API_KEY. Real local
+// database: runs with the local stack's settings (`bun run gate`, CI).
 //
-// Covers acceptance criteria 1 (loading/malformed), 2 (driving via injected provider+player),
-// 3 (sends captured not delivered), 4 (assertions engine, integration side), 5 (persistence),
-// 6 (exit discipline + summary), 7 (--scenario scoping). Criterion 8 (RLS) lives in
-// tests/eval-runs-rls.test.ts; the pure assertion semantics live in eval-assertions.test.ts.
+// Covers loading/malformed rows, driving via injected provider+player, sends captured not
+// delivered, the assertions engine (integration side), persistence, exit discipline + summary,
+// and --scenario scoping. Row-level security on eval runs lives in tests/eval-runs-rls.test.ts;
+// the pure assertion semantics live in eval-assertions.test.ts.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import type { LlmProvider, LlmTurn, SendPort } from "@revenue-os/harness";
 import pg from "pg";
+import { testCompanies } from "../tests/test-companies";
 import {
   type CapturedSend,
   type EvalDeps,
@@ -31,25 +32,16 @@ const appService = createPool(
     "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
 );
 
+const companies = testCompanies(admin);
 let orgId = "";
 let agentId = "";
 let contactId = "";
 
-const SLUG = "eval-runner-test";
 const TOOLS = [
   "book_appointment",
   "update_contact",
   "send_confirmation",
 ] as const;
-
-async function cleanup() {
-  const sub = `select id from orgs where slug = '${SLUG}'`;
-  // eval_runs / usage_events / audit_log have no on-delete cascade — clear before the org.
-  await admin.query(`delete from eval_runs where org_id in (${sub})`);
-  await admin.query(`delete from usage_events where org_id in (${sub})`);
-  await admin.query(`delete from audit_log where org_id in (${sub})`);
-  await admin.query(`delete from orgs where slug = '${SLUG}'`);
-}
 
 async function insertScenario(
   key: string,
@@ -65,12 +57,7 @@ async function insertScenario(
 }
 
 beforeAll(async () => {
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Eval Runner Org', $1) returning id`,
-    [SLUG],
-  );
-  orgId = org.rows[0].id;
+  orgId = (await companies.add("Eval Runner Org")).id;
   const agent = await admin.query(
     `insert into agents (org_id, key, version, status, model, system_prompt, tools_allowed)
      values ($1, 'eval-agent', 1, 'draft', 'claude-sonnet-4-6', 'You are a scheduler.', $2)
@@ -102,12 +89,12 @@ beforeAll(async () => {
     '{"turns":["asks a question"]}',
     '{"expect_outcome":"site_visit_booked"}',
   );
-  // criterion 1: a malformed persona (missing required name) must fail ONLY its own scenario.
+  // a malformed persona (missing required name) must fail ONLY its own scenario.
   await insertScenario("malformed_persona", "{}", '{"turns":["hi"]}', "{}");
 });
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await appService.end();
   await admin.end();
 });
@@ -156,8 +143,8 @@ function baseDeps(provider: LlmProvider, send: SendPort): EvalDeps {
   };
 }
 
-// ── Criterion 1: scenario loading + malformed-row tolerance ────────────────────────────────
-describe("loadScenarios (criterion 1)", () => {
+// ── Scenario loading + malformed-row tolerance ──────────────────────────────────────────────
+describe("loadScenarios", () => {
   it("Zod-parses valid rows and returns them", async () => {
     const res = await withOrg(appService, orgId, (tx) =>
       loadScenarios({ orgId, db: tx }),
@@ -181,8 +168,8 @@ describe("loadScenarios (criterion 1)", () => {
   });
 });
 
-// ── Criterion 2: conversation driving via INJECTED provider + persona player ───────────────
-describe("runScenario conversation driving (criterion 2)", () => {
+// ── Conversation driving via INJECTED provider + persona player ─────────────────────────────
+describe("runScenario conversation driving", () => {
   it("drives contact turns from the injected player and agent turns through the real runTurn with the injected provider", async () => {
     const provider = textLlm();
     const { send } = makeCaptureSend();
@@ -212,8 +199,8 @@ describe("runScenario conversation driving (criterion 2)", () => {
   });
 });
 
-// ── Criterion 3: sends are CAPTURED in eval mode, never delivered ──────────────────────────
-describe("runScenario send capture (criterion 3)", () => {
+// ── Sends are CAPTURED in eval mode, never delivered ────────────────────────────────────────
+describe("runScenario send capture", () => {
   it("a scenario whose agent calls send_confirmation records the send and performs no real delivery", async () => {
     const provider = fakeLlm([
       {
@@ -245,8 +232,8 @@ describe("runScenario send capture (criterion 3)", () => {
   });
 });
 
-// ── Criteria 4 + 5: assertions engine (integration side) + persistence ─────────────────────
-describe("runScenario assertions + persistence (criteria 4, 5)", () => {
+// ── Assertions engine (integration side) + persistence ──────────────────────────────────────
+describe("runScenario assertions + persistence", () => {
   it("expect_outcome PASSES when the agent produces the outcome, and persists one eval_runs row", async () => {
     const provider = fakeLlm([
       {
@@ -294,7 +281,7 @@ describe("runScenario assertions + persistence (criteria 4, 5)", () => {
     expect(rows.rows[0].transcript_ref).toBe(result.conversationId);
     expect(rows.rows[0].agent_id).toBe(agentId);
     expect(rows.rows[0].org_id).toBe(orgId);
-    // scores jsonb carries per-assertion detail (criterion 5 "at minimum")
+    // scores jsonb carries per-assertion detail (the minimum persistence promises)
     expect(JSON.stringify(rows.rows[0].scores)).toContain("site_visit_booked");
   });
 
@@ -322,13 +309,13 @@ describe("runScenario assertions + persistence (criteria 4, 5)", () => {
   });
 });
 
-// ── Criterion 4 (must_capture, integration): the `captured` map is READ BACK from the contact
+// ── must_capture, integration: the `captured` map is READ BACK from the contact
 //    ROW (ground truth), never echoed from tool-call args. update_contact's real .strict() schema
 //    writes first_name/last_name (verified in packages/harness/src/tools/update-contact.ts:9-18;
 //    it CANNOT write budget_min/preferred_location — no such columns, unknown keys rejected). So
 //    must_capture names the snake_case DB COLUMNS while the tool args are camelCase — arg-echo
 //    (firstName/lastName) therefore cannot satisfy must_capture, which is the discriminator.
-describe("runScenario must_capture ground truth (criterion 4)", () => {
+describe("runScenario must_capture ground truth", () => {
   it("passes must_capture only when the named fields are present on the contact ROW the agent wrote (read-back, not arg-echo)", async () => {
     const provider = fakeLlm([
       {
@@ -373,8 +360,8 @@ describe("runScenario must_capture ground truth (criterion 4)", () => {
   });
 });
 
-// ── Criteria 6 + 7: exit discipline, summary, and --scenario scoping ───────────────────────
-describe("runEvals exit discipline + scoping (criteria 6, 7)", () => {
+// ── Exit discipline, summary, and --scenario scoping ────────────────────────────────────────
+describe("runEvals exit discipline + scoping", () => {
   it("exits 1 when any scenario fails and prints one summary line per scenario key", async () => {
     const provider = textLlm(); // no tools → every expect_outcome scenario fails
     const { send } = makeCaptureSend();
@@ -407,7 +394,7 @@ describe("runEvals exit discipline + scoping (criteria 6, 7)", () => {
     expect(out.exitCode).toBe(0);
   });
 
-  it("--scenario <key> runs exactly one scenario (criterion 7)", async () => {
+  it("--scenario <key> runs exactly one scenario", async () => {
     const provider = textLlm();
     const { send } = makeCaptureSend();
     const out = await withOrg(appService, orgId, (tx) =>

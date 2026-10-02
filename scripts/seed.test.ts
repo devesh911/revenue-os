@@ -1,9 +1,10 @@
-// Task 5 acceptance (project-spec §12): after `db:seed <pack>`, dispositions / pipelines /
+// After `db:seed <pack>`, dispositions / pipelines /
 // guardrails / agent v1 / workflow v1 / field definitions / eval personas exist — idempotently.
 import { afterAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { ConversationIdSchema } from "../packages/shared/src/schemas";
+import { testCompanies } from "../tests/test-companies";
 import { type Pack, seed } from "./seed";
 
 const admin = new pg.Pool({
@@ -12,24 +13,21 @@ const admin = new pg.Pool({
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   max: 2,
 });
-// Every workspace this file makes, and only those: other sessions share this database and use the
-// dev login's seed-real-estate / seed-b2b-wholesale meanwhile, so the tests never seed or delete them.
-const mine: string[] = [];
+// Every workspace this file makes, and only those (the shared test-company helper): other sessions
+// share this database and use the dev login's seed-real-estate / seed-b2b-wholesale meanwhile, so
+// the tests never seed or delete them.
+const companies = testCompanies(admin);
 
 afterAll(async () => {
-  await admin.query(
-    `delete from orgs where id = any($1::uuid[]) and slug like 'seed-test-%'`,
-    [mine],
-  );
+  await companies.cleanup();
   await admin.end();
 });
 
 /** Seeds `pack` into a fresh workspace of this file's own; `again` re-seeds that same workspace. */
 async function workspace(pack: Pack) {
-  const slug = `seed-test-${randomUUID()}`;
+  const { slug } = await companies.add("Seed test");
   const again = () => seed(pack, slug);
   const { orgId } = await again();
-  mine.push(orgId);
   return { orgId, again };
 }
 
@@ -64,7 +62,7 @@ async function counts(orgId: string) {
   };
 }
 
-describe("seed packs (db-design §9)", () => {
+describe("seed packs (docs/db-design.md, vertical packs)", () => {
   it("real_estate pack populates the vertical template", async () => {
     const { orgId } = await workspace("real_estate");
     const c = await counts(orgId);
@@ -100,7 +98,7 @@ describe("seed packs (db-design §9)", () => {
     expect(c.personas).toBe(10);
   });
 
-  it("seeded agent v1 and workflow v1 are drafts (eval gate before activation — moat inv. 5)", async () => {
+  it("seeded agent v1 and workflow v1 are drafts (evals pass before a version goes live)", async () => {
     const { orgId } = await workspace("real_estate");
     const r = await admin.query(
       `select (select status from agents where org_id = $1 and version = 1) as agent,
@@ -116,7 +114,7 @@ describe("seed packs (db-design §9)", () => {
     const { slug } = (
       await admin.query(`select slug from orgs where id = $1`, [orgId])
     ).rows[0];
-    expect(slug).toStartWith("seed-test-");
+    expect(slug).toStartWith("test-");
   });
 
   it("rejects unknown packs", async () => {
@@ -145,16 +143,8 @@ const rowIds = async (orgId: string) =>
   ).rows;
 const exists = async (table: string, id: string) =>
   (await admin.query(`select 1 from ${table} where id = $1`, [id])).rowCount;
-const newOrg = async () => {
-  const { id } = (
-    await admin.query(
-      `insert into orgs (name, slug) values ('Seed test — other workspace', $1) returning id`,
-      [`seed-test-other-${randomUUID()}`],
-    )
-  ).rows[0];
-  mine.push(id);
-  return id as string;
-};
+const newOrg = async () =>
+  (await companies.add("Seed test — other workspace")).id;
 
 // The console demo rows (contacts and their conversations, messages, tasks, outcomes). Before
 // this was fixed every run inserted another full copy, so the dev login saw each person twice.

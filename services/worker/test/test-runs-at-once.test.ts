@@ -141,5 +141,6 @@ it("four runs started at once all pass, and they and a demo run leave another co
     usage: 1,
     jobs: QUEUES,
   });
-  expect(await devWorkspace()).toEqual(devWorkspaces);
+  // Every dev-login workspace that was there before still is (a run's `bun run db:seed` may add it).
+  expect(await devWorkspace()).toEqual(expect.arrayContaining(devWorkspaces));
 }, 180_000);

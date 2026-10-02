@@ -1,9 +1,9 @@
-// Task 15 acceptance (spec §12 E: four console screens on real data) — API surface for the
-// screens: tasks / contacts / conversations lists + the six funnel metrics. Tenancy-critical
-// (new org-scoped read endpoints), so this RED is orchestrator-authored: every endpoint must
+// The API surface for four console screens on real data: tasks / contacts / conversations lists
+// + the six funnel metrics. Tenancy-critical (org-scoped read endpoints): every endpoint must
 // 401 without a token, 403 for a non-member, and never leak another org's rows.
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -41,6 +41,7 @@ function api(path: string, token: string | null, init: RequestInit = {}) {
 }
 
 const ENDPOINTS = ["tasks", "contacts", "conversations", "metrics"] as const;
+const companies = testCompanies(admin);
 
 let userA: { token: string; userId: string };
 let userB: { token: string; userId: string };
@@ -52,18 +53,17 @@ let activeConvId = "";
 beforeAll(async () => {
   userA = await signup("screens-a");
   userB = await signup("screens-b");
-  const res = await api("/orgs", userA.token, {
-    method: "POST",
-    body: JSON.stringify({
-      name: "Screens Org",
-      slug: `screens-${Date.now()}`,
-      vertical: "real_estate",
-    }),
-  });
-  const body = (await res.json()) as { id?: string };
-  if (res.status !== 201 || !body.id)
-    throw new Error(`org bootstrap failed: ${res.status}`);
-  orgA = body.id;
+  // Made through the product's own POST /orgs, which makes user A its admin.
+  ({ id: orgA } = await companies.add("Screens Org", async (name, slug) => {
+    const res = await api("/orgs", userA.token, {
+      method: "POST",
+      body: JSON.stringify({ name, slug, vertical: "real_estate" }),
+    });
+    const body = (await res.json()) as { id?: string };
+    if (res.status !== 201 || !body.id)
+      throw new Error(`org bootstrap failed: ${res.status}`);
+    return body.id;
+  }));
 
   // Fixture rows straight into the org (owner connection; RLS is exercised by the read path).
   const contact = await admin.query(
@@ -95,7 +95,7 @@ beforeAll(async () => {
     [orgA, contactId, active.rows[0].id],
   );
 
-  // task 17: a second contact with ZERO conversations. Created outside the 30-day window so it
+  // A second contact with ZERO conversations. Created outside the 30-day window so it
   // does NOT change the funnel new_leads count (kept at 1) — its latest_conversation_id is null.
   const noConvo = await admin.query(
     `insert into contacts (org_id, first_name, last_name, lifecycle_stage, created_at)
@@ -105,7 +105,12 @@ beforeAll(async () => {
   contactNoConvoId = noConvo.rows[0].id;
 });
 
-describe("auth gate (S1.5) on every screen endpoint", () => {
+afterAll(async () => {
+  await companies.cleanup();
+  await admin.end();
+});
+
+describe("auth gate (docs/security.md S1.5) on every screen endpoint", () => {
   for (const ep of ENDPOINTS) {
     it(`GET /orgs/:orgId/${ep} without a token → 401`, async () => {
       const res = await api(`/orgs/${orgA}/${ep}`, null);
@@ -114,7 +119,7 @@ describe("auth gate (S1.5) on every screen endpoint", () => {
   }
 });
 
-describe("cross-org denial (M0) on every screen endpoint", () => {
+describe("cross-org denial on every screen endpoint", () => {
   for (const ep of ENDPOINTS) {
     it(`non-member GET /orgs/:orgId/${ep} → 403, no rows`, async () => {
       const res = await api(`/orgs/${orgA}/${ep}`, userB.token);
@@ -188,12 +193,12 @@ describe("member reads real rows", () => {
   });
 });
 
-// Task 17 (transcript links, docs/sdlc.md §3): the contacts row carries the id of the contact's
+// Transcript links: the contacts row carries the id of the contact's
 // most recent conversation by started_at so the Contacts screen can deep-link to its transcript.
 // Same org-scoped screens path (no new endpoint / no new auth surface) — the auth + cross-org
 // denial blocks above already gate GET /orgs/:orgId/contacts, and the id is a subquery over
 // conversations inside listContacts' withOrg scope, so conversations RLS keeps it same-org.
-describe("task 17: contacts carry latest_conversation_id (deep-link to newest transcript)", () => {
+describe("contacts carry latest_conversation_id (deep-link to newest transcript)", () => {
   it("a contact with two conversations → the newest by started_at", async () => {
     const res = await api(`/orgs/${orgA}/contacts`, userA.token);
     expect(res.status).toBe(200);
