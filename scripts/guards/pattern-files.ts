@@ -220,4 +220,6 @@ const problems = patterns.flatMap((p) =>
     : [`${p} is a link, which this guard never reads`],
 );
 if (problems.length) fail(problems);
-console.log(`  PASS (${patterns.length} pattern file${patterns.length === 1 ? "" : "s"})`);
+console.log(
+  `  PASS (${patterns.length} pattern file${patterns.length === 1 ? "" : "s"})`,
+);

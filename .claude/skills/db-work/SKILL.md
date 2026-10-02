@@ -15,8 +15,8 @@ description: Use BEFORE any migration, schema, RLS policy, index, seed, or packa
 7. **Learned since (dynamic — run it, don't skip):** `grep -inE 'migration|rls|db-design|schema|index|seed|42501|42704' lessons.md` and read `STATE.md → Decisions in force`. AGENTS.md, then STATE.md → Decisions in force, decide; a lesson that contradicts this file means this skill needs a refresh.
 
 ## Review-blocking (AGENTS.md hard rails)
-- New table ⇒ `org_id` + policies in the same migration + `tests/rls_coverage.sql` expectation + a cross-tenant denial test (S1.1/S1.4).
-- All DML through `packages/db` `withOrg()` (S1.3). Raw pool access or `service_role` anywhere in app code = blocker (S1.2).
+- New table ⇒ `org_id` + policies in the same migration + `tests/rls_coverage.sql` expectation + a cross-tenant denial test (docs/security.md S1.1, S1.4).
+- All DML through `packages/db` `withOrg()` (docs/security.md S1.3). Raw pool access or `service_role` anywhere in app code = blocker (docs/security.md S1.2).
 - Append-only tables get `sel` + `ins` policies only. Outcomes are append-only rows with attribution, never status strings.
 - DDL lives only in `supabase/migrations/`, append-only: a new migration per change, never an edit, rename or delete of one already on main, never a number another migration has (`rules-from-main` refuses each, `scripts/done-gate/migrations.ts`). App queries are parameterised `tx.query` inside `withOrg`, `org_id` in every where, never string concatenation.
 

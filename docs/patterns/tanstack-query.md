@@ -44,7 +44,8 @@ is still written here by hand rather than taken from packages/shared; Slice 5 ·
 once, in packages/shared…" moves it there, and a new feature should take its response shape from packages/shared
 once that lands.
 
-Rules: query keys come from the feature's own `queryKeys` · every response is parsed by `api()` with a Zod schema ·
-a save's body is parsed with the same packages/shared schema the route parses, before it is sent · a save
-invalidates the queries it changed · the API's data is read only through the hooks in a feature's `api.ts`, never
+Rules: query keys come only from the feature's own key factory, its `queryKeys` · every response is parsed by
+`api()` with a Zod schema · a save's body is parsed with the same packages/shared schema the route parses, before it
+is sent · a save invalidates the queries it changed, and no screen updates optimistically before the API answers
+(STATE.md → Decisions in force) · the API's data is read only through the hooks in a feature's `api.ts`, never
 fetched in `useEffect`.

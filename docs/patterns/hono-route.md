@@ -15,8 +15,8 @@ What is true today, so you know what a route must still do by hand:
   that forgets it serves any company's data, which is why the shared check comes first.
 - Database work goes through `withOrg(pool, orgId, (tx) => …)` (`packages/db/src/client.ts`), and an audit row is
   written with `audit(tx, orgId, entry)` (`packages/db/src/audit.ts`) inside the same transaction as the change.
-- Errors: `app.onError` in `services/worker/src/index.ts` answers a Zod failure with 400 and anything unexpected
-  with 500, logging the detail and sending the client none of it.
+- Errors: `app.onError` in `services/worker/src/index.ts` answers a Zod failure with 400, a unique-constraint
+  violation with 409 and anything unexpected with 500, logging the detail and sending the client none of it.
 
 Rules: signed in before anything · request input parsed with its schema from packages/shared before any logic ·
 the member's role checked before any read or write, the company id in the web address never trusted alone ·

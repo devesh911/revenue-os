@@ -51,12 +51,12 @@ Tailwind deletes CSS's two hard problems at scale — naming and consistency —
 ## T5 · API framework — **Hono on Bun**
 
 Tiny, Web-standards-based (`Request`/`Response`), first-class Bun support, runtime-portable (Node/Bun/Workers — keeps G3 and D22 doors open). Serves console BFF + webhook receivers **in the same process as the worker** at V1.
-**"Is Claude fluent in Hono?"** Yes — heavily used by 2026, and its surface is mostly Web standards the model knows cold. Belt-and-braces convention regardless: **`docs/patterns/` holds one canonical example per tool** (`hono-route.md`, `pgboss-worker.md`, `drizzle-query.md`, `zod-boundary.md`); CLAUDE.md directs Claude Code to imitate local patterns over global memory. AI agents copy the repo more reliably than the internet; the repo is ours.
+**"Is Claude fluent in Hono?"** Yes — heavily used by 2026, and its surface is mostly Web standards the model knows cold. Belt-and-braces convention regardless: **`docs/patterns/` holds the examples to copy**, each an excerpt of real code or marked "do not copy" with the roadmap line that brings the real code (AGENTS.md → Docs; `bun run guards` checks every excerpt against its file); AGENTS.md directs agents to imitate local patterns over global memory. AI agents copy the repo more reliably than the internet; the repo is ours.
 
-## T6 · DB access — **Drizzle ORM on the `pg` driver + raw SQL migrations**
+## T6 · DB access — **parameterised SQL on the `pg` driver + raw SQL migrations**
 
-Drizzle for typed queries (AI-written queries fail at compile time when schema shifts); sanctioned `sql` template where raw is clearer; all DDL in `supabase/migrations/` (already written in db-design.md).
-**Driver unification:** pg-boss requires `pg` (node-postgres) → Drizzle uses its node-postgres adapter so the stack has **exactly one Postgres driver**. One pool, one config, one compat surface to watch on Bun.
+Every query is parameterised SQL through `tx.query` inside `withOrg` (`packages/db/src/client.ts`; `docs/patterns/drizzle-query.md` shows one). Drizzle was planned for typed queries, but no query uses it. All DDL lives in `supabase/migrations/`, each change a new migration written for it, never copied from db-design.md.
+**Driver unification:** pg-boss requires `pg` (node-postgres), and the queries use it too, so the stack has **exactly one Postgres driver**. One pool, one config, one compat surface to watch on Bun.
 
 ## T7 · Jobs & durability — **pg-boss (muscle) + `workflow_runs` (memory)**
 
@@ -275,7 +275,7 @@ No streaming voice loop in our code (Vapi's job) · no in-memory agent state (ro
 
 ## T16 · Database platform — Supabase Postgres, hardened
 
-Schema = `db-design.md` (authoritative). Stack-level facts: **Mumbai region**; driver = `pg` (T6); connection via Supavisor transaction pooling; RLS on 100% of tables (CI-gated); backend connects as the non-bypassing `app_service` role — the `service_role` key exists only in migration/CI secrets, never app code. **Platform hardening — PostgREST Data API exposure set to none, network restrictions on direct DB access, private storage buckets — lives in `security.md` S2** and in `db-design.md` §14.
+Schema = the migrations in `supabase/migrations/` (`db-design.md` holds the design intent, never DDL to copy). Stack-level facts: **Mumbai region**; driver = `pg` (T6); connection via Supavisor transaction pooling; RLS on 100% of tables (CI-gated); backend connects as the non-bypassing `app_service` role — the `service_role` key exists only in migration/CI secrets, never app code. **Platform hardening — PostgREST Data API exposure set to none, network restrictions on direct DB access, private storage buckets — lives in `security.md` S2** and in `db-design.md` §14.
 
 ## T17 · Object storage — Supabase Storage (private buckets, signed URLs)
 
@@ -347,9 +347,8 @@ GitHub encrypted secrets (CI) · VPS `.env` chmod 600, never in the image · Sup
 | Package | Where | Why | Rejected alternative |
 |---|---|---|---|
 | `hono` | api | routing/middleware, Web-standard, portable | express (callback-era) |
-| `pg` | worker | THE Postgres driver (shared by Drizzle + pg-boss) | postgres.js (would mean two drivers) |
+| `pg` | worker | THE Postgres driver (shared by the queries and pg-boss) | postgres.js (would mean two drivers) |
 | `pg-boss` | worker | queue mechanics on Postgres | BullMQ (drags in Redis); hand-rolled (Appendix A) |
-| `drizzle-orm` | worker/api | typed SQL-shaped queries | prisma (heavy, RLS-awkward); kysely (coin-flip, lower AI density) |
 | `zod` | everywhere | boundary validation = the LLM seatbelt | valibot (fine, less density) |
 | `pino` | worker/api | structured JSON logs + redaction | console.log (unstructured) |
 | `jose` | api | JWT verification server-side | supabase-js server-side (heavier than needed) |
@@ -362,7 +361,7 @@ GitHub encrypted secrets (CI) · VPS `.env` chmod 600, never in the image · Sup
 | `@sentry/bun`, `@sentry/react` | worker/api, console | T13 error tracking | — |
 | `tailwindcss` | console, www (build-time) | T4 | — |
 
-**Dev/build:** `typescript`, `@biomejs/biome` (lint+format, replaces ESLint+Prettier), `vite`, `@vitejs/plugin-react`, `bun-types`, `drizzle-kit`, `@testing-library/react` + `happy-dom` (component tests), `playwright` (smoke), `astro` (www). Supabase CLI + gitleaks as binaries/actions, not npm deps.
+**Dev/build:** `typescript`, `@biomejs/biome` (lint+format, replaces ESLint+Prettier), `vite`, `@vitejs/plugin-react`, `bun-types`, `@testing-library/react` + `happy-dom` (component tests), `playwright` (smoke), `astro` (www). Supabase CLI + gitleaks as binaries/actions, not npm deps.
 
 **Explicitly rejected (so they don't reopen):** axios (fetch) · lodash (platform) · moment/luxon/dayjs (`Intl` + small tz helpers in `packages/shared`; revisit only on real pain) · dotenv (Bun native) · nodemon/tsx (`bun --watch`) · ESLint+Prettier (Biome) · express/fastify (Hono) · Redis (Postgres is queue/cache/pubsub here) · GraphQL/tRPC (REST + shared Zod).
 
