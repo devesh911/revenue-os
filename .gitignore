@@ -9,4 +9,6 @@ test-results
 orchestrator/
 .env.local
 .claude/worktrees/
+# Each checkout's own Claude Code permissions, which the app writes; lint reads this file, not a global one
+**/.claude/settings.local.json
 docker/certs/
