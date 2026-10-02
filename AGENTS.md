@@ -134,9 +134,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
    verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
    word for word). PR body: the first line is `Roadmap: Slice N —
-   <item>` (the item's text as ROADMAP.md has it, whole or up to its first colon; a note in brackets may
-   follow), `Roadmap: Slice N — replan: <what>` (a PR that changes ROADMAP.md and builds nothing), `Roadmap:
-   Side track — <what>` or `Roadmap: off-roadmap — <what>`, each with an em dash; then what / why /
+   <item>` (an item of the current slice, or one of Devesh's, by its text as ROADMAP.md has it, whole or up
+   to its first colon; a note in brackets may follow; an item main already has ticked only in a follow-up
+   that adds to its evidence), `Roadmap: Slice N — replan: <what>` (a PR that changes ROADMAP.md and ticks
+   no item: it builds nothing), `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`, each
+   with an em dash; then what / why /
    evidence (the gate's line, the verifier's ruling, how the result was seen working), with a
    `Rule change:` line per changed rule file (hard rail 7) and a `Fix-when-touched:` line per entry of
    docs/fix-when-touched.md whose area the PR touches (step 6). `rules-from-main` refuses a PR without
