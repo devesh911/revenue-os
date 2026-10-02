@@ -16,7 +16,7 @@ kind of mistake impossible or caught, so nobody has to remember it.
       mistake can't be written: one shared function instead of copies, and delete the other way of
       doing it.
    2. *Make CI reject it.* Add a test, a Biome rule, a check in `scripts/guards.sh` or a rule in
-      `scripts/done-gate.ts`. Prove it catches the mistake: put the mistake back, show the check
+      `scripts/done-gate/rules.ts`. Prove it catches the mistake: put the mistake back, show the check
       failing, then remove it again. Paste both runs in the PR.
    3. *Teach the verifier.* For what only a look at the running product can catch, add a line under
       "Known ways work looks done but isn't" in `.claude/agents/verifier.md`.

@@ -215,7 +215,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | the inner `run` of `interpret` (walks the fixed step map) | `packages/harness/src/workflow/interpret.ts` | 27 | none: the step map is frozen and deleted in Slice 3, so this exemption goes with the file; a refactor that keeps its behaviour is allowed |
 | `importContacts` (CSV import) | `packages/db/src/contacts.ts` | 22 | Slice 1's WhatsApp opt-in item (import records the opt-in) or do-not-call item (imported lists) |
 
-Scores from biome 2.5.3 (the pinned version) on main at d44c77c; none of the four files changed by 7d5e52e. The other five functions over 20 are all in the done gate (`scripts/done-gate/`), outside the limit's scope (source under apps, services and packages).
+Scores from biome 2.5.3 (the pinned version) on main at d44c77c; none of the four files changed by 7d5e52e. Six more functions over 20 are in the done gate (`scripts/done-gate/`: `stop`, `simpleCommands`, `mergeGate`, `cli`, `snapshot`, `touch`), outside the limit's scope (source under apps, services and packages).
 
 **From findings:** none of the 73. It comes from the structure review of 2026-09-30.
 

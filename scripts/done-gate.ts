@@ -22,27 +22,12 @@
 // never checked twice.
 //
 // The code lives in scripts/done-gate/, one job per file (docs/patterns/one-job-per-file.md). This file stays the
-// entry the hooks and `bun run gate` call: it hands a hook event to the file that handles it, and a command to
-// cli.ts.
+// entry the hooks and `bun run gate` call: it hands a hook event to hook.ts and a command to cli.ts. It loads them
+// only inside its error handling, so a file there that fails to load (a renamed export, a missing file) is told to
+// Devesh and refuses a merge, never skipping a check in silence.
 
-import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { toplevel, touch } from "./done-gate/checkouts";
-import { cli } from "./done-gate/cli";
-import { type HookInput, say } from "./done-gate/hook-io";
-import { deny, mergeGate } from "./done-gate/merge-gate";
-import { stop } from "./done-gate/stop";
-import { Store, stateDir } from "./done-gate/store";
-import { verifierDone } from "./done-gate/verifier";
-
-export { parseDiff } from "./done-gate/diff";
-export { usesExport } from "./done-gate/export-users";
-export { mergeOf } from "./done-gate/merge-gate";
-export { checkRules, RULE_FILES } from "./done-gate/rules";
-export { onSharedStack } from "./done-gate/shared-stack";
-export { simpleCommands } from "./done-gate/shell-words";
-export { notRun } from "./done-gate/tests-ran";
+import { dirname } from "node:path";
+import type { HookInput } from "./done-gate/hook-io";
 
 // Hooks can start with a bare PATH; bun, gh, supabase, psql and docker live in these.
 process.env.PATH = [
@@ -52,78 +37,51 @@ process.env.PATH = [
   "/usr/local/bin",
 ].join(":");
 
-/** `codex`: run by .codex/hooks.json (`hook codex`) rather than Claude Code's .claude/settings.json. */
-async function hook(input: HookInput, codex: boolean) {
-  const event = input.hook_event_name;
-  // The gate of the checkout the agent is in; when that has none (a branch cut before the gate, another
-  // repository, no checkout at all), the one this file belongs to, whose repository holds the session's record.
-  const shell = toplevel(input.cwd ?? process.cwd());
-  const repo =
-    shell && existsSync(join(shell, "scripts", "done-gate.ts"))
-      ? shell
-      : toplevel(import.meta.dir);
-  if (!repo) return;
-  const own = join(repo, "scripts", "done-gate.ts");
-  if (
-    event !== "PreToolUse" &&
-    realpathSync(own) !== realpathSync(import.meta.path)
-  ) {
-    // Hooks load this file from the project root; always judge with the gate that belongs to the code.
-    const r = spawnSync(
-      process.execPath,
-      [own, "hook", ...(codex ? ["codex"] : [])],
-      {
-        input: JSON.stringify(input),
-        stdio: ["pipe", "inherit", "inherit"],
-      },
+const say = (systemMessage: string) =>
+  process.stdout.write(JSON.stringify({ systemMessage }));
+
+/** Before a tool call, with the gate's code unloadable: refuse anything that may merge, and say so for the rest. */
+function unloaded(input: HookInput, why: string) {
+  const command =
+    typeof input.tool_input?.command === "string"
+      ? input.tool_input.command
+      : "";
+  if (!/\bgh\b/.test(command) || !/merge/i.test(command))
+    return say(
+      `Done gate ⚠ could not load (${why}): nothing done here is checked until it loads`,
     );
-    process.exit(r.status ?? 0);
-  }
-  const store = new Store(stateDir(repo));
-  const session = input.session_id ?? "unknown";
-  switch (event) {
-    case "SessionStart":
-      return touch(repo, input, store, session);
-    case "PreToolUse":
-      try {
-        mergeGate(repo, input, store, codex);
-      } catch (e) {
-        deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
-      }
-      return touch(repo, input, store, session); // a failure here stays quiet: no tool call waits on it
-    case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
-      if (input.agent_type === "verifier")
-        store.put(
-          "verifier",
-          `${session}-${input.agent_id ?? "main"}`,
-          String(Date.now()),
-        );
-      return;
-    case "SubagentStop":
-      if (input.agent_type === "verifier")
-        verifierDone(repo, input, store, session);
-      return;
-    case "Stop":
-    case "TeammateIdle":
-      return stop(input, repo, store, session, codex);
-  }
+  const reason = `it could not load the done gate (${why}), so it can't check this merge. Fix the gate first.`;
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `The done gate refused this merge: ${reason}`,
+      },
+      systemMessage: `Done gate ✗ merge refused: ${reason}`,
+    }),
+  );
 }
 
 if (import.meta.main) {
   const [cmd = "check", ...args] = process.argv.slice(2);
   if (cmd === "hook") {
     let input: HookInput = {};
+    let loaded = false;
     try {
       input = JSON.parse((await Bun.stdin.text()) || "{}") as HookInput;
-      await hook(input, args[0] === "codex");
+      const { hook } = await import("./done-gate/hook");
+      loaded = true;
+      await hook(input, args[0] === "codex", import.meta.path);
     } catch (e) {
-      // Only a stop is a check; a failure to note a checkout before a tool call stays quiet.
+      const why = String(e).split("\n")[0] ?? "";
+      // Only a stop is a check; a failure to note a checkout before a tool call stays quiet, once the gate loaded.
       if (input.hook_event_name !== "PreToolUse")
-        say(
-          `Done gate ⚠ could not run (${String(e).split("\n")[0]}); this stop was NOT checked`,
-        );
+        say(`Done gate ⚠ could not run (${why}); this stop was NOT checked`);
+      else if (!loaded) unloaded(input, why);
     }
     process.exit(0);
   }
+  const { cli } = await import("./done-gate/cli");
   await cli(cmd, args);
 }

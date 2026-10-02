@@ -20,15 +20,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import {
-  checkRules,
-  mergeOf,
-  onSharedStack,
-  parseDiff,
-  RULE_FILES,
-  simpleCommands,
-  usesExport,
-} from "./done-gate";
+import { parseDiff } from "./done-gate/diff";
+import { usesExport } from "./done-gate/export-users";
+import { mergeOf } from "./done-gate/merge-gate";
+import { checkRules, RULE_FILES } from "./done-gate/rules";
+import { onSharedStack } from "./done-gate/shared-stack";
+import { simpleCommands } from "./done-gate/shell-words";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
@@ -1184,6 +1181,54 @@ describe("the hook", () => {
     }
   });
 
+  it("refuses a merge and says nothing is checked, never going quiet, when a file of the gate fails to load", () => {
+    const dir = repo();
+    const words = join(dir, "scripts", "done-gate", "shell-words.ts");
+    writeFileSync(
+      words,
+      readFileSync(words, "utf8").replace(
+        "export function simpleCommands(",
+        "export function simpleCommandz(",
+      ),
+    );
+    // The checkout's own copy, as a session started there runs it.
+    const own = (event: string, command?: string) =>
+      sh(
+        dir,
+        ["bun", "scripts/done-gate.ts", "hook"],
+        {},
+        JSON.stringify({
+          hook_event_name: event,
+          session_id: "s1",
+          cwd: dir,
+          ...(command ? { tool_name: "Bash", tool_input: { command } } : {}),
+        }),
+      );
+    const merge = own("PreToolUse", "gh pr merge 5 --squash");
+    expect(merge.status).toBe(0);
+    expect(JSON.parse(merge.stdout)).toMatchObject({
+      hookSpecificOutput: {
+        permissionDecision: "deny",
+        permissionDecisionReason: expect.stringContaining(
+          "it could not load the done gate (SyntaxError: Export named 'simpleCommands' not found",
+        ),
+      },
+    });
+    expect(JSON.parse(own("PreToolUse", "ls").stdout)).toEqual({
+      systemMessage: expect.stringContaining(
+        "Done gate ⚠ could not load (SyntaxError: Export named 'simpleCommands' not found",
+      ),
+    });
+    for (const event of ["Stop", "SessionStart"])
+      expect(JSON.parse(own(event).stdout).systemMessage).toMatch(
+        /^Done gate ⚠ could not run \(SyntaxError: .*\); this stop was NOT checked$/,
+      );
+    rmSync(join(dir, "scripts", "done-gate"), { recursive: true });
+    expect(JSON.parse(own("Stop").stdout).systemMessage).toContain(
+      "Done gate ⚠ could not run (",
+    );
+  });
+
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");
@@ -1955,7 +2000,7 @@ describe("the shared local stack (one database and port 4173 for every worktree)
       dir,
       "hold.ts",
       `import { appendFileSync, rmSync, writeFileSync } from "node:fs";
-import { onSharedStack } from "./scripts/done-gate.ts";
+import { onSharedStack } from "./scripts/done-gate/shared-stack.ts";
 while (Date.now() < ${go});
 await onSharedStack(".", async () => {
   try { writeFileSync("holding", "", { flag: "wx" }); } catch { appendFileSync("log", "two holders at once\\n"); }
