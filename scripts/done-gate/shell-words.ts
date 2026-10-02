@@ -67,8 +67,33 @@ export const program = (words: string[]) => {
   let i = 0;
   while (
     /^[A-Za-z_]\w*=/.test(words[i] ?? "") ||
-    ["env", "command", "exec", "time", "nohup", "sudo"].includes(words[i] ?? "")
+    ["env", "command", "exec", "time", "nohup", "sudo", "npx", "bunx"].includes(
+      words[i] ?? "",
+    )
   )
     i++;
   return words.slice(i).map((w, k) => (k ? w : w.replace(/^.*\//, "")));
+};
+
+/** A simple command's words without its redirections (`> out`, `2>&1`, `<in`), which are not its arguments. */
+export const unredirected = (words: string[]) =>
+  words.filter(
+    (w, i) => !/^\d*[<>]/.test(w) && !/^\d*[<>]+&?$/.test(words[i - 1] ?? ""),
+  );
+
+/** The git subcommand a simple command runs, the words after it, and the folders `git -C` moves to, if it runs git. */
+export const gitOf = (words: string[]) => {
+  const w = program(words);
+  if (w[0] !== "git") return;
+  const dirs: string[] = [];
+  let i = 1;
+  while ((w[i] ?? "").startsWith("-")) {
+    if (w[i] === "-C") dirs.push(w[i + 1] ?? "");
+    i += ["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(
+      w[i] ?? "",
+    )
+      ? 2
+      : 1;
+  }
+  return { sub: w[i], args: w.slice(i + 1), dirs };
 };

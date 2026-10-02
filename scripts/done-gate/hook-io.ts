@@ -6,6 +6,7 @@ export type HookInput = {
   cwd?: string;
   agent_type?: string;
   agent_id?: string;
+  tool_name?: string;
   tool_input?: Record<string, unknown>;
   background_tasks?: unknown[];
   session_crons?: unknown[];

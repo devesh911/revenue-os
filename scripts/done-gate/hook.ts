@@ -1,5 +1,5 @@
-// A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call the merge check
-// and the note of the checkout, the verifier's start and stop, and the judgement at a stop.
+// A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call what agents' tools
+// may not do, the merge check and the note of the checkout, the verifier's start and stop, and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
@@ -9,6 +9,7 @@ import type { HookInput } from "./hook-io";
 import { deny, mergeGate } from "./merge-gate";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
+import { commandRefusal } from "./tools";
 import { verifierDone } from "./verifier";
 
 /**
@@ -43,13 +44,22 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
   switch (event) {
     case "SessionStart":
       return touch(repo, input, store, session);
-    case "PreToolUse":
+    case "PreToolUse": {
+      let refused: string | undefined;
       try {
-        mergeGate(repo, input, store, codex);
+        refused = commandRefusal(input);
       } catch (e) {
-        deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
+        refused = `it could not check this command (${String(e).split("\n")[0]}).`; // so it refuses it
       }
+      if (refused) deny(refused, "command");
+      else
+        try {
+          mergeGate(repo, input, store, codex);
+        } catch (e) {
+          deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
+        }
       return touch(repo, input, store, session); // a failure here stays quiet: no tool call waits on it
+    }
     case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
       if (input.agent_type === "verifier")
         store.put(

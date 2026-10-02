@@ -26,6 +26,7 @@ import { mergeOf } from "./done-gate/merge-gate";
 import { checkRules, RULE_FILES } from "./done-gate/rules";
 import { onSharedStack } from "./done-gate/shared-stack";
 import { simpleCommands } from "./done-gate/shell-words";
+import { toolRefusal } from "./done-gate/tools";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
@@ -528,6 +529,355 @@ describe("reading a shell command: which gh pr merge it runs", () => {
         )[0] ?? [],
       ),
     ).toMatchObject({ pr: "https://github.com/o/r/pull/5", head: "abc1234" });
+  });
+});
+
+// What agents' own tools may not do (done-gate/tools.ts): each command the roadmap item names, and the tricky
+// ways of writing one, is refused for the right reason, and every step of the loop still goes through.
+
+// The branch each folder a command may push from is on: the session's own (""), and three others.
+const branchOf = (dir: string) =>
+  dir.endsWith("main-checkout")
+    ? "main"
+    : dir.endsWith("detached")
+      ? undefined
+      : dir
+        ? "fix/other"
+        : "feat/tools";
+
+const CLOUD = "cloud database";
+const SECRET = "a file of secrets";
+const LOGIN = "GitHub login";
+const HIDDEN = "hides what gh does";
+const PUSH = "push only a feat/, fix/ or claude/ branch";
+const LOOP = "not one of the loop's own GitHub steps";
+const API = "`gh api` may only read";
+const WEB = "only GET requests";
+
+// Each command that must be refused, and a phrase its reason must hold.
+const REFUSED: [string, string][] = [
+  // The cloud database.
+  ["supabase db push", CLOUD],
+  ["supabase db push --include-all", CLOUD],
+  ["supabase --workdir supabase db push", CLOUD],
+  ["bunx supabase db push", CLOUD],
+  ["cd supabase && supabase db push", CLOUD],
+  ["supabase migration repair --status applied 20260101000000", CLOUD],
+  ["supabase db reset --linked", CLOUD],
+  [
+    "supabase db reset --db-url postgresql://u@db.example.supabase.co/postgres",
+    CLOUD,
+  ],
+  ["supabase migration up --linked", CLOUD],
+  ["supabase link --project-ref abcdef", CLOUD],
+  // A .env file, read any way, and the other files that hold Devesh's login.
+  ["cat .env", SECRET],
+  ["cat ./.env.local", SECRET],
+  ["less apps/console/.env.local", SECRET],
+  ["head -5 services/worker/.env", SECRET],
+  ["tail -n 3 .env.staging", SECRET],
+  ["grep KEY .env", SECRET],
+  ["grep -rn SUPABASE .env.local docs", SECRET],
+  ["grep -f .env -r src", SECRET],
+  ["source .env", SECRET],
+  [". ./.env", SECRET],
+  ["set -a; . .env; set +a", SECRET],
+  ["cp .env /tmp/x", SECRET],
+  ["base64 < .env", SECRET],
+  ["base64 <.env", SECRET],
+  ["cat .env*", SECRET],
+  ['cat "$HOME/revenue-os/.env"', SECRET],
+  ["bun --env-file=.env run x.ts", SECRET],
+  ["git show HEAD:.env", SECRET],
+  ["echo $(cat .env)", SECRET],
+  ["python3 -c \"print(open('.env').read())\"", SECRET],
+  [
+    "bun -e \"console.log(await Bun.file('apps/console/.env.local').text())\"",
+    SECRET,
+  ],
+  ["cat ~/.config/gh/hosts.yml", SECRET],
+  ["cat ~/.git-credentials", SECRET],
+  // Devesh's GitHub login.
+  ["gh auth token", LOGIN],
+  ["gh auth status -t", LOGIN],
+  ["gh auth status --show-token", LOGIN],
+  ["gh auth login --with-token < token.txt", LOGIN],
+  ["gh auth refresh -s admin:org", LOGIN],
+  ["gh auth setup-git", LOGIN],
+  ["gh auth switch -u someone", LOGIN],
+  ["echo $(gh auth token)", LOGIN],
+  ["git credential fill", LOGIN],
+  ["printf 'protocol=https\\nhost=github.com\\n' | git credential fill", LOGIN],
+  ["git credential-osxkeychain get", LOGIN],
+  ["security find-generic-password -s gh:github.com -w", LOGIN],
+  ["security find-internet-password -s github.com -w", LOGIN],
+  ["security dump-keychain -d", LOGIN],
+  // Every gh command outside the loop's own steps, however it is spelled.
+  ["gh release create v1.0.0", LOOP],
+  ["gh workflow run deploy.yml", LOOP],
+  ["gh run rerun 123", LOOP],
+  ["gh run cancel 123", LOOP],
+  ["gh secret set TOKEN", LOOP],
+  ["gh secret list", LOOP],
+  ["gh variable set X --body y", LOOP],
+  ["gh repo edit --visibility public", LOOP],
+  ["gh repo delete o/r --yes", LOOP],
+  ["gh alias set co 'pr checkout'", LOOP],
+  ["gh pr checkout 12", LOOP],
+  ["gh pr close 12", LOOP],
+  ["gh pr review 12 --approve", LOOP],
+  ["gh issue create --title x", LOOP],
+  ["gh issue view 1", LOOP],
+  ["gh label create x", LOOP],
+  ["gh ruleset delete 1", LOOP],
+  ["gh", LOOP],
+  ["GH_REPO=o/r gh release create v1", LOOP],
+  ["/opt/homebrew/bin/gh release create v1", LOOP],
+  ["command gh release create v1", LOOP],
+  ['"gh" "release" create v1', LOOP],
+  ["g\\h release create v1", LOOP],
+  ["cd ../w && gh release create v1", LOOP],
+  ["(gh workflow run x)", LOOP],
+  ["gh pr view 12 && gh run rerun 9", LOOP],
+  // gh api: reads only.
+  [
+    "gh api -X POST repos/o/r/statuses/abc -f state=success -f context=checks",
+    API,
+  ],
+  ["gh api repos/o/r/statuses/abc -f state=success -f context=checks", API],
+  ["gh api --method PUT repos/o/r/pulls/7/merge", API],
+  ["gh api -XPATCH repos/o/r", API],
+  ["gh api --method=DELETE repos/o/r/git/refs/heads/x", API],
+  ["gh api -X post repos/o/r/issues", API],
+  ["gh api repos/o/r/dispatches --input payload.json", API],
+  ["gh api -F name=x repos/o/r/labels", API],
+  ["gh api --field name=x repos/o/r/labels", API],
+  ["gh api --raw-field=name=x repos/o/r/labels", API],
+  ["gh api -X GET repos/o/r/pulls -f state=open", API],
+  ["gh api -iX POST repos/o/r/issues", API],
+  [
+    "gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"x\"}) { clientMutationId } }'",
+    API,
+  ],
+  ["gh api graphql -F query=@q.graphql", API],
+  ["gh api graphql -f query=@q.graphql", API],
+  ["gh api graphql --input q.json", API],
+  ["gh api graphql -F owner=@who.txt -f query='{ viewer { login } }'", API],
+  // gh hidden behind a shell, eval, xargs or an alias: refused even for a read.
+  ["sh -c 'gh pr view 12'", HIDDEN],
+  ['bash -lc "gh release create v1"', HIDDEN],
+  ["zsh -c 'gh workflow run x'", HIDDEN],
+  ["eval gh release create v1", HIDDEN],
+  ['eval "gh auth token"', HIDDEN],
+  ["echo 12 | xargs gh pr close", HIDDEN],
+  ["xargs -I{} gh pr close {} < prs.txt", HIDDEN],
+  ["alias g=gh", HIDDEN],
+  ["alias ship='gh release create'", HIDDEN],
+  ["bash <<'EOF'\ngh release create v1\nEOF", HIDDEN],
+  ["echo 'gh release create v1' | sh", HIDDEN],
+  // What a shell is handed to run is judged as a command.
+  ["sh -c 'cat .env'", SECRET],
+  ['bash -c "supabase db push"', CLOUD],
+  ['eval "git push origin main"', PUSH],
+  // git push: a feat/, fix/ or claude/ branch to origin, nothing else.
+  ["git push origin main", PUSH],
+  ["git push origin HEAD:main", PUSH],
+  ["git push origin feat/x:main", PUSH],
+  ["git push origin refs/heads/main", PUSH],
+  ["git push origin docs/x", PUSH],
+  ["cd ../main-checkout && git push", PUSH],
+  ["git -C ../main-checkout push -u origin HEAD", PUSH],
+  ["cd ../detached && git push", PUSH],
+  ["git push --force", PUSH],
+  ["git push -f origin feat/x", PUSH],
+  ["git push -uf origin feat/x", PUSH],
+  ["git push --force-with-lease origin feat/x", PUSH],
+  ["git push --force-with-lease=feat/x:abc123 origin feat/x", PUSH],
+  ["git push origin +feat/x", PUSH],
+  ["git push --tags", PUSH],
+  ["git push --follow-tags origin feat/x", PUSH],
+  ["git push origin v1.0.0", PUSH],
+  ["git push origin tag v1.0.0", PUSH],
+  ["git push origin refs/tags/v1.0.0", PUSH],
+  ["git push --mirror", PUSH],
+  ["git push --all origin", PUSH],
+  ["git push --delete origin feat/x", PUSH],
+  ["git push -d origin feat/x", PUSH],
+  ["git push origin :feat/x", PUSH],
+  ["git push upstream feat/x", PUSH],
+  ["git push https://github.com/o/r feat/x", PUSH],
+  // Writes to GitHub by curl, wget or fetch.
+  [
+    'curl -X POST https://api.github.com/repos/o/r/statuses/abc -d \'{"state":"success"}\'',
+    WEB,
+  ],
+  ["curl -XPOST https://api.github.com/repos/o/r/issues", WEB],
+  ["curl -sX PUT https://api.github.com/repos/o/r/pulls/7/merge", WEB],
+  ["curl --request PATCH https://api.github.com/repos/o/r", WEB],
+  ["curl -d '{}' https://api.github.com/repos/o/r/dispatches", WEB],
+  ["curl --data-binary @x.json https://api.github.com/repos/o/r/issues", WEB],
+  ["curl -sSd @x.json https://api.github.com/repos/o/r/issues", WEB],
+  [
+    "curl -F file=@x https://uploads.github.com/repos/o/r/releases/1/assets",
+    WEB,
+  ],
+  ["curl -T x.zip https://uploads.github.com/repos/o/r/releases/1/assets", WEB],
+  ["curl --upload-file x.zip https://uploads.github.com/x", WEB],
+  ["curl --json '{}' https://api.github.com/repos/o/r/issues", WEB],
+  ["wget --post-data 'a=b' https://api.github.com/repos/o/r/issues", WEB],
+  ["wget --method=DELETE https://github.com/o/r", WEB],
+  [
+    "bun -e \"await fetch('https://api.github.com/repos/o/r/statuses/abc', { method: 'POST', body: '{}' })\"",
+    WEB,
+  ],
+  [
+    "node -e \"fetch('https://api.github.com/repos/o/r',{method:'DELETE'})\"",
+    WEB,
+  ],
+];
+
+// The loop's own steps, reads, and text that only mentions a refused command: all must go through.
+const ALLOWED = [
+  // Pushing the session's branch.
+  "git push -u origin feat/x",
+  "git push origin HEAD:feat/x",
+  "git push --set-upstream origin fix/y",
+  "git push origin claude/z",
+  "git push origin refs/heads/feat/x",
+  "git push",
+  "git push -u origin HEAD",
+  "git push -u origin feat/x 2>&1 | tail -5",
+  "git push -q origin feat/x > /tmp/push.log",
+  "cd ../other && git push",
+  "git -C ../other push",
+  // Pull requests, runs, the repository and its rulesets.
+  "gh pr create --base main --head feat/x --title 'Add x' --body-file /tmp/body.md",
+  "gh pr edit 12 --body-file /tmp/body.md",
+  'gh pr comment 12 --body "Evidence: gh auth token and gh release create are refused"',
+  "gh pr ready 12",
+  "gh pr checks 12 --watch",
+  "gh pr view 12 --json headRefOid,state",
+  "gh pr list --state open --json number,url,body --jq '.[] | select(.body | startswith(\"Roadmap: off-roadmap\")) | .url'",
+  "gh pr merge 12 --squash --delete-branch",
+  "gh pr merge --squash",
+  "gh pr -R o/r merge 9",
+  "gh pr diff 12",
+  "gh pr status",
+  "gh run list --limit 5",
+  "gh run view 123 --log-failed",
+  "gh run watch 123",
+  "gh repo view --json name,defaultBranchRef",
+  "gh ruleset list",
+  "gh ruleset view 1",
+  "gh ruleset check main",
+  "GH_PAGER=cat gh pr view 12",
+  "/opt/homebrew/bin/gh pr list",
+  "command gh run list",
+  "cd ../w && gh pr checks 12 --watch",
+  "gh pr view 12 --json body -q .body > /tmp/body.md",
+  // gh api reads.
+  "gh api repos/o/r/rulesets",
+  "gh api -X GET repos/o/r/commits/abc/status",
+  "gh api --method=GET repos/o/r/pulls",
+  "gh api --method get repos/o/r/pulls --paginate --jq '.[].number'",
+  "gh api repos/o/r/pulls/7 2>/dev/null",
+  "gh api graphql -f query='{ viewer { login } }'",
+  "gh api graphql -F owner=o -f query='query($owner: String!) { repositoryOwner(login: $owner) { id } }'",
+  // Text that names a refused command is not running it.
+  'git commit -qm "refuse gh auth token, gh release create and supabase db push"',
+  "git commit -F - <<'EOF'\ngh release create v1 is refused now\ngh auth token too\ncat .env as well\nEOF\ngit log -1",
+  'grep -rn "gh release create" scripts',
+  'grep -rn ".env" docs AGENTS.md',
+  "rg -n '\\.env' scripts",
+  'echo "run gh pr view to read it"',
+  // The template with no secrets, and git, bun and the local database as the loop uses them.
+  "cat .env.example",
+  "cat apps/console/.env.example",
+  "cp .env.example /tmp/example",
+  "git fetch origin",
+  "git worktree add .claude/worktrees/x -b feat/x origin/main",
+  "git branch -d feat/old",
+  "git log --oneline -5",
+  "git diff main --stat",
+  "git status",
+  "bun run gate",
+  "bun test scripts/done-gate.test.ts",
+  "supabase start",
+  "supabase status -o env",
+  "supabase db reset",
+  "supabase migration new add_x",
+  "supabase migration list",
+  // Reading GitHub, and writing anywhere else.
+  "curl -s https://api.github.com/repos/o/r",
+  "curl -fsSL https://github.com/o/r/raw/main/README.md",
+  "curl -X GET https://api.github.com/repos/o/r/pulls",
+  "curl -X POST http://127.0.0.1:4173/api/contacts -d '{}'",
+  "wget https://github.com/o/r/archive/main.zip",
+  "bun -e \"console.log(await (await fetch('https://api.github.com/repos/o/r')).json())\"",
+  // Shells, eval, xargs and aliases that don't run gh.
+  "sh -c 'bun test'",
+  "bash scripts/guards.sh",
+  "eval echo hi",
+  "ls | xargs -n1 echo",
+  "alias ll='ls -l'",
+  "security list-keychains",
+];
+
+describe("toolRefusal: what agents' own tools may not do", () => {
+  it("refuses every command the roadmap item names, however it is written, for the right reason", () => {
+    const wrong = REFUSED.flatMap(([command, why]) => {
+      const got = toolRefusal(command, branchOf);
+      return got?.includes(why)
+        ? []
+        : [`${command}\n    expected: ${why}\n    got: ${got ?? "(allowed)"}`];
+    });
+    expect(wrong).toEqual([]);
+  });
+
+  it("lets every step of the loop through, and text that only mentions a refused command", () => {
+    const refused = ALLOWED.flatMap((command) => {
+      const got = toolRefusal(command, branchOf);
+      return got ? [`${command}\n    refused: ${got}`] : [];
+    });
+    expect(refused).toEqual([]);
+  });
+
+  it("refuses when it can't tell which branch a bare push would push", () => {
+    expect(toolRefusal("git push", () => undefined)).toContain(PUSH);
+  });
+});
+
+describe("Claude Code's own settings", () => {
+  it("deny the cloud database pushes, the login reads, and every .env file but the template, at any depth", () => {
+    const { deny } = (
+      JSON.parse(
+        readFileSync(
+          join(import.meta.dir, "..", ".claude", "settings.json"),
+          "utf8",
+        ),
+      ) as { permissions: { deny: string[] } }
+    ).permissions;
+    expect(deny).toEqual(
+      expect.arrayContaining([
+        "Bash(supabase db push:*)",
+        "Bash(supabase migration repair:*)",
+        "Bash(supabase db reset --linked:*)",
+        "Bash(gh auth token:*)",
+        "Bash(git credential fill:*)",
+        "Bash(security find-generic-password:*)",
+        "Bash(security find-internet-password:*)",
+        "Read(.env)",
+        "Read(.env.*)",
+        "Edit(.env)",
+        "Edit(.env.*)",
+        "Write(.env)",
+        "Write(.env.*)",
+      ]),
+    );
+    // A `!` rule carves out of the rules listed before it in the same file (Claude Code's permissions docs).
+    expect(deny.indexOf("Read(!.env.example)")).toBeGreaterThan(
+      deny.indexOf("Read(.env.*)"),
+    );
   });
 });
 
@@ -1114,6 +1464,77 @@ describe("the hook", () => {
     expect(JSON.parse(codex(dir, "Stop").stdout)).toMatchObject({
       decision: "block",
       reason: expect.stringContaining("switches the type checker off"),
+    });
+  });
+
+  it("refuses a command outside the loop's own steps before it runs, in Claude Code and in Codex, and lets the loop's own through", () => {
+    const dir = repo();
+    write(dir, "services/README.md", "the worker\n");
+    commitOld(dir);
+    const bash = (command: string) => ({
+      tool_name: "Bash",
+      tool_input: { command },
+    });
+    // Claude Code: a bare push from main is refused, read from the branch the checkout is really on.
+    expect(hook(dir, "PreToolUse", bash("git push"))).toEqual({
+      ...QUIET,
+      told: expect.stringMatching(
+        /^Done gate ✗ command refused: agents push only a feat\/, fix\/ or claude\/ branch .*`main`/,
+      ),
+    });
+    sh(dir, ["git", "checkout", "-qb", "feat/tools"]);
+    expect(hook(dir, "PreToolUse", bash("git push"))).toEqual(QUIET);
+    // Codex: the same hook, its deny in the shape Codex reads; a patch is text, never a command.
+    const refused = JSON.parse(
+      codex(dir, "PreToolUse", bash("gh release create v1")).stdout,
+    );
+    expect(refused).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: expect.stringContaining(
+          "The done gate refused this command: `gh release create` is not one of the loop's own GitHub steps",
+        ),
+      },
+      systemMessage: expect.stringMatching(/^Done gate ✗ command refused: /),
+    });
+    for (const allowed of [
+      bash("gh pr view 12 --json state"),
+      {
+        tool_name: "apply_patch",
+        tool_input: {
+          command:
+            "*** Begin Patch\n*** Add File: notes.md\n+gh release create v1 is refused\n*** End Patch\n",
+        },
+      },
+    ])
+      expect(codex(dir, "PreToolUse", allowed)).toEqual({
+        status: 0,
+        stdout: "",
+      });
+  });
+
+  it("refuses the command when its check fails, rather than letting it through unchecked", () => {
+    const dir = repo();
+    write(dir, "services/README.md", "the worker\n");
+    write(
+      dir,
+      "scripts/done-gate/tools.ts",
+      'export function commandRefusal(): string | undefined {\n  throw new Error("broken");\n}\n',
+    );
+    commitOld(dir);
+    expect(
+      JSON.parse(
+        codex(dir, "PreToolUse", {
+          tool_name: "Bash",
+          tool_input: { command: "ls" },
+        }).stdout,
+      ).hookSpecificOutput,
+    ).toEqual({
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason:
+        "The done gate refused this command: it could not check this command (Error: broken).",
     });
   });
 

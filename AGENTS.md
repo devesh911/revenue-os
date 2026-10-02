@@ -16,8 +16,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 
 ## Hard rails (never, no exceptions)
 1. **Secrets** — never read or write `.env*` values; never put tokens in chat, commits or logs.
-2. **Cloud** — no prod deploys; no `supabase link`, `supabase db push` or `bun run db:migrate`
-   from agent sessions. Every merge to main already applies new migrations to cloud staging
+2. **Cloud** — no prod deploys; no `supabase link` or `supabase db push` from agent sessions (the
+   hooks refuse both, and migration repair and a reset of the linked database: `scripts/done-gate/tools.ts`
+   says what agents' own tools may not do). Every merge to main already applies new migrations to cloud staging
    (`.github/workflows/deploy.yml`), so merging a migration *is* a cloud push: treat it that way.
 3. **Tenancy** — every new tenant table ships with `org_id` + RLS + a cross-tenant denial test in
    the same PR (RLS is enforced on all tables by `tests/rls_coverage.sql`; denial tests do not yet
@@ -42,7 +43,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    Slice 0's rule-change item lands and Devesh makes it a required check, `rules-from-main` judges every PR with main's
    copy of the rules, and docs/runbooks/rules-check-way-back.md says what Devesh does if that copy misfires. Agents
    use Devesh's own GitHub login, so GitHub's settings only stop accidents; the hooks enforce what agents must not do
-   (Slice 0's tools item adds the refusals still missing).
+   (`scripts/done-gate/tools.ts`).
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
