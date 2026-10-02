@@ -1154,6 +1154,36 @@ describe("the hook", () => {
     });
   });
 
+  it("warns at every one of its hooks, instead of going quiet, in a checkout without the gate", () => {
+    const bare = mkdtempSync(join(tmpdir(), "done-gate-none-"));
+    dirs.push(bare);
+    sh(bare, ["git", "init", "-q"]);
+    const commands = [".claude/settings.json", ".codex/hooks.json"].flatMap(
+      (file) =>
+        Object.values(
+          (
+            JSON.parse(
+              readFileSync(join(import.meta.dir, "..", file), "utf8"),
+            ) as { hooks: Record<string, { hooks: { command: string }[] }[]> }
+          ).hooks,
+        )
+          .flat()
+          .flatMap((g) => g.hooks.map((h) => h.command))
+          .filter((c) => c.includes("done-gate")),
+    );
+    expect(commands).toHaveLength(9); // six Claude Code events, three Codex ones
+    for (const command of commands) {
+      const r = sh(bare, ["/bin/sh", "-c", command], {
+        CLAUDE_PROJECT_DIR: bare,
+      });
+      expect(r.status).toBe(0);
+      expect(JSON.parse(r.stdout)).toEqual({
+        systemMessage:
+          "Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked",
+      });
+    }
+  });
+
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");

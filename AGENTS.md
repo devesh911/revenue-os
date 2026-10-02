@@ -89,7 +89,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   agent and human.
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
   reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
-  `scripts/done-gate.ts` lists it with why.
+  `scripts/done-gate/tests-ran.ts` lists it with why.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.
