@@ -287,7 +287,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Skills tell agents that lessons.md outranks them, but lessons.md is 36 KB of mostly resolved history that calls itself 'not law'; its lessons should become checks | Entry 4 |
 | Skills restate facts that have drifted; two of five skills are switched off locally; a stale untracked .agents skill copy remains | Entry 4 (the switched-off skills: Devesh's "Finish clearing the retired orchestrator from your Mac" item in STATE.md → Waiting on Devesh) |
 | The retired orchestrator is still wired into the go-live and incident runbooks, and its watchdog is still installed on Devesh's Mac | Entry 5, at the latest in Slice 6 · "Before go-live, every control in docs/security.md is ticked…" (the watchdog: Devesh's "Finish clearing the retired orchestrator from your Mac" item in STATE.md → Waiting on Devesh) |
-| The tracker page Devesh uses to see progress is 3 days stale; the manual republish step was skipped | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the page shows the commit and date it was published from; entry 6 struck) |
+| The tracker page Devesh uses to see progress is 3 days stale; the manual republish step was skipped | Settled by [#118](https://github.com/devesh911/revenue-os/pull/118) (the page shows the commit and date it was published from; entry 6 struck) |
 | The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today | Settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (the FAQ says what the pilot will do; entry 7 struck) |
 | Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout | Entry 8 |
 
