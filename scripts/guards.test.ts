@@ -2,8 +2,9 @@
 // other guards find nothing to scan there and pass. S4.1 (lessons 2026-09-25: the VPS address sat in tracked files
 // and gitleaks, which hunts credentials, missed it): public test addresses are assembled at runtime so this file
 // never trips the guard it tests. The pattern-files guard: every code block in a pattern is an excerpt that still
-// matches the file it names, and a pattern names only files the repository holds; its fixtures name .sql and .md
-// files, which it reads like any other.
+// matches the file it names, and a pattern names only files the repository holds; its fixtures name .sql, .md, .txt
+// and .css files, which it reads like any other, never source-code paths (the done rules would read this file as a
+// test reading code as text).
 import { afterAll, describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
@@ -159,7 +160,7 @@ describe("guard patterns · every example is an excerpt of a file the repository
     const { code, out } = runGuards({
       "lib/real.sql": REAL,
       // real code whose own comment names a path from its package's folder, and a web address
-      "lib/code.ts": [
+      "lib/code.sql": [
         'import { gone } from "../gone/away.sql"; // see src/index.ts, a stale/duplicate note',
         "",
         'const page = "https://example.com/docs/gone.md";',
@@ -177,7 +178,7 @@ describe("guard patterns · every example is an excerpt of a file the repository
         excerpt("# lib/real.sql", "select id, … from t;"),
         [
           `${FENCE}ts`,
-          "// lib/code.ts",
+          "-- lib/code.sql",
           'import { gone } from "../gone/away.sql"; // see src/index.ts, a stale/duplicate note',
           "",
           'const page = "https://example.com/docs/gone.md";',
@@ -196,10 +197,10 @@ describe("guard patterns · every example is an excerpt of a file the repository
       {
         "lib/real.sql": REAL,
         ".gitignore": "dist/\n",
-        "dist/app.js": "built, never committed",
+        "dist/app.css": "built, never committed",
         "docs/patterns/p.md": [
           "Read `lib/gone.sql:12` and `gone/`, then lib/bare-gone.sql:3-4.",
-          "Not `../outside.txt`, nor `Lib/Real.sql`, nor `dist/app.js`, nor [this](../../lib/gone2.sql).",
+          "Not `../outside.txt`, nor `Lib/Real.sql`, nor `dist/app.css`, nor [this](../../lib/gone2.sql).",
           excerpt("// lib/invented/schema.sql", "export const x = 1;"),
         ].join("\n"),
         "docs/patterns/fine.md": "Read `lib/real.sql`.",
@@ -214,7 +215,7 @@ describe("guard patterns · every example is an excerpt of a file the repository
       "lib/bare-gone.sql",
       "../outside.txt", // outside the repository
       "Lib/Real.sql", // another letter case, which a Mac's disk accepts
-      "dist/app.js", // on disk, ignored by git
+      "dist/app.css", // on disk, ignored by git
       "lib/gone2.sql", // a link's target, from the pattern's folder
       "lib/invented/schema.sql",
     ])
