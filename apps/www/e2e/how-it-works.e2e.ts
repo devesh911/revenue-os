@@ -42,6 +42,36 @@ const selected = (page: Page) =>
   tabs(page).evaluateAll((ts) =>
     ts.findIndex((t) => t.getAttribute("aria-selected") === "true"),
   );
+// What a click shows is polled (up to 2 s), never slept on: the redraw takes 70-110 ms on a
+// laptop and over half a second on a slow CPU, so a fixed 100 ms wait and one look failed on
+// a busy CI runner (main, 2026-10-02). Whether "at once" holds is checked by noFade instead.
+async function onShowSoon(...els: Locator[]) {
+  await expect
+    .poll(
+      async () => {
+        for (const el of els) if (!(await onShow(el))) return String(el);
+        return "all on show";
+      },
+      { timeout: 2_000 },
+    )
+    .toBe("all on show");
+}
+// Under reduced motion the panes swap with no fade: the motion floor (styles.css) takes
+// their 300 ms transition and its delay to nothing, however slow the machine.
+const noFade = (page: Page) =>
+  how(page)
+    .locator("[data-pane]")
+    .evaluateAll((panes) =>
+      panes.every((p) => {
+        const s = getComputedStyle(p);
+        const secs = (v: string) =>
+          v.split(",").map((x) => Number.parseFloat(x));
+        return (
+          secs(s.transitionDuration).every((d) => d <= 0.001) &&
+          secs(s.transitionDelay).every((d) => d === 0)
+        );
+      }),
+    );
 
 // Bring the window on screen (instantly: the page scrolls smoothly by default), wait
 // for its scroll reveal to finish and, with motion, until the steps are playing.
@@ -145,11 +175,11 @@ test.describe("How it works, with motion (1440 × 900)", () => {
     expect(await selected(page)).toBe(at);
 
     await tabs(page).nth(3).click();
-    await page.waitForTimeout(150);
-    for (const t of [intentEvidence.callNow.title, chip])
-      expect(await onShow(study(page).getByText(t, { exact: true })), t).toBe(
-        true,
-      );
+    await onShowSoon(
+      ...[intentEvidence.callNow.title, chip].map((t) =>
+        study(page).getByText(t, { exact: true }),
+      ),
+    );
     await advance(page, 20_000);
     expect(await selected(page)).toBe(3);
   });
@@ -201,27 +231,25 @@ test.describe("How it works, under reduced motion", () => {
     expect(await onShow(brief(page).getByText(callBrief.footer.stamp))).toBe(
       true,
     );
+    expect(await noFade(page)).toBe(true);
 
     await tabs(page).nth(3).click();
-    await page.waitForTimeout(100);
-    for (const t of [intentEvidence.callNow.title, chip, "78"])
-      expect(await onShow(study(page).getByText(t, { exact: true })), t).toBe(
-        true,
-      );
+    await onShowSoon(
+      ...[intentEvidence.callNow.title, chip, "78"].map((t) =>
+        study(page).getByText(t, { exact: true }),
+      ),
+    );
 
     await tabs(page).nth(4).click();
-    await page.waitForTimeout(100);
-    for (const t of [callBrief.plan.steps.at(-1)?.text, callBrief.footer.stamp])
-      expect(
-        await onShow(brief(page).getByText(t ?? "", { exact: true })),
-        t,
-      ).toBe(true);
+    await onShowSoon(
+      ...[callBrief.plan.steps.at(-1)?.text ?? "", callBrief.footer.stamp].map(
+        (t) => brief(page).getByText(t, { exact: true }),
+      ),
+    );
 
     // step 2 ends on the brief's fifth caption: on show, whole, with no caret
     await tabs(page).nth(1).click();
-    await page.waitForTimeout(100);
-    const caption = callBrief.captions[4]?.text ?? "";
-    expect(await onShow(brief(page).getByText(caption)), caption).toBe(true);
+    await onShowSoon(brief(page).getByText(callBrief.captions[4]?.text ?? ""));
   });
 
   for (const width of [1024, 1280, 1440])
@@ -261,7 +289,9 @@ test.describe("How it works, under reduced motion", () => {
 
     await showWindow(page, false);
     await tabs(page).nth(3).click();
-    await page.waitForTimeout(100);
+    await onShowSoon(
+      study(page).getByText(intentEvidence.callNow.title, { exact: true }),
+    );
     const pane = await study(page).boundingBox();
     const pin = await study(page).locator("[data-pin]").boundingBox();
     expect(pane && pin).toBeTruthy();
