@@ -79,7 +79,7 @@ describe("app_service client tenant isolation", () => {
     }
   });
 
-  it("withOrg rejects a non-uuid org id at the boundary (Zod, T11)", async () => {
+  it("withOrg rejects a non-uuid org id at the boundary (Zod)", async () => {
     expect(withOrg(appService, "not-a-uuid", async () => {})).rejects.toThrow();
   });
 

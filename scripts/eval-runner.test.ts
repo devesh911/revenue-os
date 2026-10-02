@@ -311,7 +311,7 @@ describe("runScenario assertions + persistence", () => {
 
 // ── must_capture, integration: the `captured` map is READ BACK from the contact
 //    ROW (ground truth), never echoed from tool-call args. update_contact's real .strict() schema
-//    writes first_name/last_name (verified in packages/harness/src/tools/update-contact.ts:9-18;
+//    writes first_name/last_name (verified in the schema of updateContact, packages/harness/src/tools/update-contact.ts;
 //    it CANNOT write budget_min/preferred_location — no such columns, unknown keys rejected). So
 //    must_capture names the snake_case DB COLUMNS while the tool args are camelCase — arg-echo
 //    (firstName/lastName) therefore cannot satisfy must_capture, which is the discriminator.

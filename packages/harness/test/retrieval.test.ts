@@ -220,7 +220,7 @@ describe("retrieveMemories — tenancy", () => {
   });
 });
 
-// ── Criterion 3: token budget — whole rows dropped, never truncated ─────────────────────────
+// ── Token budget — whole rows dropped, never truncated ──────────────────────────────────────
 /** Exactly 1200 chars = 300 tokens under the chars/4 heuristic. */
 const big = (tag: string) => `${tag} ${"x".repeat(1200 - tag.length - 1)}`;
 const BIG_ROWS: MemRow[] = [

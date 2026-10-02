@@ -156,7 +156,7 @@ async function memoryRows(contactId: string) {
   return r.rows;
 }
 
-// ── Criterion 1: the loop closes — call 1 writes it, call 2's prompt carries it ───────────────
+// ── The loop closes — call 1 writes it, call 2's prompt carries it ───────────────
 describe("memory — the loop closes across calls", () => {
   it("a call's summary reaches the NEXT call's system prompt, inside the labeled frame", async () => {
     const contact = await newContact(orgA, "Nadia");
@@ -195,7 +195,7 @@ describe("memory — the loop closes across calls", () => {
   });
 });
 
-// ── Criterion 2: lineage across calls — only the newest summary is ever spoken ────────────────
+// ── Lineage across calls — only the newest summary is ever spoken ────────────────
 describe("memory — superseded memory never reaches the prompt", () => {
   it("after a second report supersedes the first, the prompt carries ONLY the new summary", async () => {
     const contact = await newContact(orgA, "Omar");
@@ -276,7 +276,7 @@ describe("memory — hostile memory is inert end-to-end", () => {
   });
 });
 
-// ── Criterion 4: the ≤800-token budget, end to end ───────────────────────────────────────────
+// ── The ≤800-token budget, end to end ───────────────────────────────────────────
 /** Exactly 1200 chars = 300 tokens under the chars/4 heuristic. */
 const big = (tag: string) => `${tag} ${"x".repeat(1200 - tag.length - 1)}`;
 const BIG_PREF = big("PREF-ROW");
@@ -318,7 +318,7 @@ describe("memory — the assembled block respects the token budget", () => {
   });
 });
 
-// ── Criterion 5: tenancy end to end [cross-tenant denial] ────────────────────────────────────
+// ── Tenancy end to end [cross-tenant denial] ────────────────────────────────────
 describe("memory — cross-tenant denial through the real pipeline", () => {
   it("neither org's assembled prompt ever carries the other's memory", async () => {
     const secretA = `ORGA-ONLY ${SUMMARY_1}`;
@@ -347,7 +347,7 @@ describe("memory — cross-tenant denial through the real pipeline", () => {
   });
 });
 
-// ── Criterion 6: composition with the Feed-1 workflow block ──────────────────────────────────
+// ── Composition with the workflow's why-I'm-calling block ──────────────────────────────────
 describe("memory — composes with the why-I'm-calling block", () => {
   it("keeps the whyBlock→base join byte-exact and puts memory below it", async () => {
     const contact = await newContact(orgA, "Uma");

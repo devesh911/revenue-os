@@ -129,7 +129,7 @@ describe("contact CSV import (ceramic path)", () => {
     expect(body).toEqual({ created: 0, merged: 0, invalid: 1 });
   });
 
-  it("rejects a CSV with no phone column before any writes (S5.1)", async () => {
+  it("rejects a CSV with no phone column before any writes (docs/security.md S5.1)", async () => {
     const res = await importCsv("first_name,city\nNobody,Nowhere\n");
     expect(res.status).toBe(400);
   });
