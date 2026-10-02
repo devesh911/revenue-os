@@ -33,6 +33,11 @@ const ALLOW = "done-gate: allow";
 // companies and jobs of another test run on the shared database, or of the dev login's workspace.
 const DELETES_SHARED =
   /\b(?:delete\s+from|truncate(?:\s+table)?)\s+(?:only\s+)?(?:public\.)?(?:orgs|pgboss\.\w+)\b|\bdrop\s+schema\s+(?:if\s+exists\s+)?pgboss\b/i;
+// In a test, a trigger dropped. On the local stack Supabase's supautils extension (its drop_trigger_grants setting)
+// makes every DROP TRIGGER by the postgres login take the strongest lock on all of auth's tables, so it deadlocks
+// with a sign-up in another test run going at the same moment. A test installs its trigger once per database and
+// leaves it (services/worker/test/scheduler-apply-poison.test.ts).
+const DROPS_TRIGGER = /\bdrop\s+trigger\b/i;
 const SKIP =
   /(?<![\w$.!])(it|test|describe)(?:\s*\.\s*[\w$]+)*?\s*(?:\.\s*|\[\s*["'`])(?:skip|only|todo|skipIf|runIf|todoIf|if|fixme|fail|failing)\b|\bx(?:it|test|describe)\b/g;
 
@@ -120,6 +125,8 @@ function lineProblem(
     !/\bpgboss\.\w+\s+where\s+id\s*=\s*\$\d/i.test(stmt)
   )
     return "deletes companies or queued jobs other than through tests/test-companies.ts, which deletes only what this test made; a broader delete removes another test run's (delete a job only by its id)";
+  if (TEST.test(file) && DROPS_TRIGGER.test(stmt))
+    return "drops a trigger, which on the local stack locks every auth table and deadlocks another test run's sign-ups; install a test's trigger once per database and leave it (as services/worker/test/scheduler-apply-poison.test.ts does)";
   if (TEST.test(file))
     return readsSource &&
       /\b(readFileSync|readFile|Bun\.file)\s*\(/.test(text) &&

@@ -354,6 +354,26 @@ describe("checkRules", () => {
       expect(problemsOf(add(file, line))).toEqual([]);
   });
 
+  it("blocks a test that drops a trigger, which locks every auth table on the local stack", () => {
+    const test = "services/worker/test/fault.test.ts";
+    for (const line of [
+      "await admin.query(`drop trigger if exists poison_task on tasks`);",
+      "        execute format('DROP TRIGGER IF EXISTS %I ON tasks', t);",
+    ])
+      expect(problemsOf(add(test, line))).toEqual([
+        `${test}:1 drops a trigger, which on the local stack locks every auth table and deadlocks another test run's sign-ups; install a test's trigger once per database and leave it (as services/worker/test/scheduler-apply-poison.test.ts does)`,
+      ]);
+    for (const [file, line] of [
+      [test, "        create trigger fault before insert on public.tasks"],
+      [test, "// never drop trigger here: it locks every auth table"],
+      [
+        "services/worker/src/fault.ts",
+        "await db.query(`drop trigger if exists fault on tasks`);",
+      ],
+    ] as const)
+      expect(problemsOf(add(file, line))).toEqual([]);
+  });
+
   it("blocks a throwing placeholder on a product path unless STATE.md lists it as Stub", () => {
     const stub = add(
       "services/worker/src/jobs.ts",
