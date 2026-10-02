@@ -1,8 +1,8 @@
-// task-59 (P4) — the eval CLI. Thin shell by design: argv → runEvals → process.exit. All the
-// testable logic lives in ./eval-runner (imported by the RED suite); this file only wires the
-// runtime seams the tests inject as mocks — the REAL Anthropic provider (from ANTHROPIC_API_KEY),
-// a v1 persona player that replays script.turns in order, and the eval-mode capture send.
-// Refuses a non-local DB, exactly like scripts/seed.ts (S13.3/S11.5 — no prod eval writes here).
+// `bun run evals`, the eval command line. Thin shell by design: arguments → runEvals → process.exit. All the
+// testable logic lives in ./eval-runner (scripts/eval-runner.test.ts); this file only wires the runtime parts the
+// tests replace with fakes: the real Anthropic provider (from ANTHROPIC_API_KEY), a v1 persona player that replays
+// script.turns in order, and the eval-mode capture send. Refuses a database that is not on this machine, with the
+// same check as scripts/seed.ts (scripts/local-url.ts): no eval ever writes to staging or production from here.
 import { createPool, withOrg } from "@revenue-os/db";
 import { createAnthropicProvider } from "@revenue-os/harness";
 import {
@@ -11,6 +11,7 @@ import {
   type PersonaPlayer,
   runEvals,
 } from "./eval-runner";
+import { isLocalUrl } from "./local-url";
 
 /** --flag <value> / --flag=value; bare flags are ignored (we take only the ones we know). */
 function argValue(flag: string): string | undefined {
@@ -29,7 +30,7 @@ async function main(): Promise<void> {
   const url =
     process.env.DATABASE_URL ||
     "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
-  if (!/127\.0\.0\.1|localhost/.test(url)) {
+  if (!isLocalUrl(url)) {
     throw new Error("evals refuses to run against a non-local database");
   }
   const apiKey = process.env.ANTHROPIC_API_KEY;

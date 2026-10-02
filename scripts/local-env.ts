@@ -2,7 +2,7 @@
 // the LOCAL Supabase stack (`supabase status -o env`), so nobody hand-copies keys. Only the ten
 // LOCAL_ENV_KEYS are ever set: the privileged key and other status secrets never reach the child,
 // and status output is captured, never echoed. Keys the caller already set (non-empty) win.
-import { APP_SERVICE_LOCAL_PASSWORD } from "./db-reset";
+import { APP_SERVICE_LOCAL_PASSWORD } from "./app-service-login";
 import { isLocalUrl } from "./local-url";
 
 export const LOCAL_ENV_KEYS = [
