@@ -19,7 +19,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts`, `scripts/dev-login.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
-| `docs/tracker/` | 6. Tracker page shows where it was published from |
 | `scripts/demo.ts`, `tests/`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
 | Local branches, `.claude/worktrees/`, `.gitignore` | 8. Leftover branches and worktrees |
 | `packages/harness/src/policies.ts`, `packages/harness/src/workflow/`, `services/worker/src/scheduler.ts`, `services/worker/src/runs.ts`, `services/worker/src/handlers/place-call.ts`, `packages/db/src/screens.ts`, `services/worker/src/routes/screens.ts`, `apps/console/src/features/screens/`, `apps/console/src/pages/Settings/`, `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/db/src/orgs.ts`, `scripts/demo.ts`, `services/worker/test/handlers.test.ts`, `scripts/guards.sh` | 10. Files with more than one job |
@@ -133,15 +132,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **From findings:**
 - The retired orchestrator is still wired into the go-live and incident runbooks, and its watchdog is still installed on Devesh's Mac
-
-### 6. Tracker page shows where it was published from
-
-**Fix:** The tracker page shows the commit and date it was published from, beside its "Updated:" line, so Devesh can see at a glance when it has fallen behind main.
-
-**When:** the next PR that changes `docs/tracker/`. AGENTS.md → The loop, step 6, already requires republishing after ROADMAP.md or STATE.md change on main.
-
-**From findings:**
-- The tracker page Devesh uses to see progress is 3 days stale; the manual republish step was skipped
 
 ## Local checkout
 
@@ -297,12 +287,12 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Skills tell agents that lessons.md outranks them, but lessons.md is 36 KB of mostly resolved history that calls itself 'not law'; its lessons should become checks | Entry 4 |
 | Skills restate facts that have drifted; two of five skills are switched off locally; a stale untracked .agents skill copy remains | Entry 4 (the switched-off skills: Devesh's "Finish clearing the retired orchestrator from your Mac" item in STATE.md → Waiting on Devesh) |
 | The retired orchestrator is still wired into the go-live and incident runbooks, and its watchdog is still installed on Devesh's Mac | Entry 5, at the latest in Slice 6 · "Before go-live, every control in docs/security.md is ticked…" (the watchdog: Devesh's "Finish clearing the retired orchestrator from your Mac" item in STATE.md → Waiting on Devesh) |
-| The tracker page Devesh uses to see progress is 3 days stale; the manual republish step was skipped | Entry 6 |
+| The tracker page Devesh uses to see progress is 3 days stale; the manual republish step was skipped | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the page shows the commit and date it was published from; entry 6 struck) |
 | The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today | Settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (the FAQ says what the pilot will do; entry 7 struck) |
 | Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout | Entry 8 |
 
-Totals: Slice 0 holds 9, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 7 are settled or partly settled by merged PRs; 11 are entries here. Total 73.
+Totals: Slice 0 holds 9, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 8 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
 
 ---
 
-10 entries, from 11 findings and the structure review.
+9 entries, from 10 findings and the structure review.

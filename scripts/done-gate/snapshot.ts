@@ -26,9 +26,32 @@ export type Snap = {
 
 /**
  * The exact code in the worktree (tracked + untracked, minus ignored) as a tree id, plus its diff from where
- * HEAD left `base`. Without a `base`, origin/main, or HEAD in a checkout that has none.
+ * HEAD left `base`. Without a `base`, origin/main, or HEAD in a checkout that has none. With `head`, the code of
+ * that commit instead, against where it left `base` (origin/main without one): read as data, never checked out.
  */
-export function snapshot(repo: string, withDiff = true, base?: string): Snap {
+export function snapshot(
+  repo: string,
+  withDiff = true,
+  base?: string,
+  head?: string,
+): Snap {
+  if (head) {
+    const tree = git(repo, ["rev-parse", "--verify", `${head}^{tree}`]);
+    if (!withDiff)
+      return { repo, tree, files: [], added: [], users: new Map() };
+    const from = git(repo, ["merge-base", head, base ?? "origin/main"]);
+    return analyse(
+      repo,
+      tree,
+      git(repo, [...DIFF, from, head]),
+      (args) =>
+        git(repo, [...GREP, ...args, tree], {}, true)
+          .split("\n")
+          .filter(Boolean)
+          .map((l) => l.slice(tree.length + 1)), // "<tree>:<path>"
+      (f) => git(repo, ["cat-file", "blob", `${tree}:${f}`], {}, true),
+    );
+  }
   const index = join(stateDir(repo), `index-${process.pid}`);
   const real = git(repo, [
     "rev-parse",
@@ -51,75 +74,90 @@ export function snapshot(repo: string, withDiff = true, base?: string): Snap {
     const from = base
       ? git(repo, ["merge-base", "HEAD", base])
       : git(repo, ["merge-base", "HEAD", "origin/main"], {}, true) || "HEAD";
-    const diffArgs = [
-      "-c",
-      "core.quotePath=off",
-      "diff",
-      "--cached",
-      "--unified=0",
-      "--no-color",
-      "--no-renames",
-    ];
-    const { files, added } = parseDiff(
-      git(repo, [...diffArgs, "--no-ext-diff", from], env),
-    );
-    const users = new Map<string, string[]>(); // "file name" → files using the export
-    const texts = new Map<string, string>();
-    const read = (f: string) => {
-      if (!texts.has(f))
+    return analyse(
+      repo,
+      tree,
+      git(repo, [...DIFF, "--cached", from], env),
+      (args) =>
+        git(repo, [...GREP, "--cached", ...args], env, true)
+          .split("\n")
+          .filter(Boolean),
+      (f) => {
         try {
-          texts.set(f, readFileSync(join(repo, f), "utf8"));
+          return readFileSync(join(repo, f), "utf8");
         } catch {
-          texts.set(f, ""); // e.g. a symlink to a folder
+          return ""; // e.g. a symlink to a folder
         }
-      return texts.get(f) ?? "";
-    };
-    // Files holding a string: only candidates, usesExport decides.
-    const grep = (s: string, word = false) =>
-      git(
-        repo,
-        ["-c", "core.quotePath=off", "grep", "--cached", "-lIF"]
-          .concat(word ? ["-w"] : [])
-          .concat(["-e", s]),
-        env,
-        true,
-      )
-        .split("\n")
-        .filter(Boolean);
-    let stars: [string, string[]][] | undefined; // files that `export * from`, and from where
-    let namespaced: string[] | undefined; // files that may `import * as`
-    for (const [i, { file }] of added.entries())
-      for (const name of exportsOf(statementAt(added, i).code)) {
-        if (users.has(`${file} ${name}`)) continue;
-        stars ??= grep("export *").map((f) => [
-          f,
-          [...uncommented(read(f)).matchAll(STAR_FROM)].map((m) => m[1] ?? ""),
-        ]);
-        const reach = [file]; // file, then every barrel that re-exports it, however deep
-        for (const to of reach)
-          for (const [b, specs] of stars)
-            if (!reach.includes(b) && specs.some((s) => leadsTo(s, b, to)))
-              reach.push(b);
-        namespaced ??= grep("* as");
-        // A default export's importers name its module, or its package for a package's entry file.
-        const words =
-          name === "default"
-            ? [
-                modulePath(file).split("/").at(-1) ?? "",
-                file.match(
-                  /^packages\/([^/]+)\/src\/index\.[cm]?[jt]sx?$/,
-                )?.[1] ?? "",
-              ].filter(Boolean)
-            : [name];
-        users.set(
-          `${file} ${name}`,
-          [
-            ...new Set([...words.flatMap((w) => grep(w, true)), ...namespaced]),
-          ].filter((f) => usesExport(read(f), f, file, name, reach.slice(1))),
-        );
-      }
-    return { repo, tree, files, added, users };
+      },
+    );
   } finally {
     rmSync(index, { force: true });
   }
+}
+
+const GREP = ["-c", "core.quotePath=off", "grep"];
+const DIFF = [
+  "-c",
+  "core.quotePath=off",
+  "diff",
+  "--unified=0",
+  "--no-color",
+  "--no-renames",
+  "--no-ext-diff",
+];
+
+/**
+ * The diff's files and added lines, and for each export it adds, the files that use it. `grepIn(options)` runs
+ * `git grep` with them over the code being judged and lists the files it names; `readFile` reads one of them.
+ */
+function analyse(
+  repo: string,
+  tree: string,
+  diff: string,
+  grepIn: (args: string[]) => string[],
+  readFile: (f: string) => string,
+): Snap {
+  const { files, added } = parseDiff(diff);
+  const users = new Map<string, string[]>(); // "file name" → files using the export
+  const texts = new Map<string, string>();
+  const read = (f: string) => {
+    if (!texts.has(f)) texts.set(f, readFile(f));
+    return texts.get(f) ?? "";
+  };
+  // Files holding a string: only candidates, usesExport decides.
+  const grep = (s: string, word = false) =>
+    grepIn(["-lIF"].concat(word ? ["-w"] : []).concat(["-e", s]));
+  let stars: [string, string[]][] | undefined; // files that `export * from`, and from where
+  let namespaced: string[] | undefined; // files that may `import * as`
+  for (const [i, { file }] of added.entries())
+    for (const name of exportsOf(statementAt(added, i).code)) {
+      if (users.has(`${file} ${name}`)) continue;
+      stars ??= grep("export *").map((f) => [
+        f,
+        [...uncommented(read(f)).matchAll(STAR_FROM)].map((m) => m[1] ?? ""),
+      ]);
+      const reach = [file]; // file, then every barrel that re-exports it, however deep
+      for (const to of reach)
+        for (const [b, specs] of stars)
+          if (!reach.includes(b) && specs.some((s) => leadsTo(s, b, to)))
+            reach.push(b);
+      namespaced ??= grep("* as");
+      // A default export's importers name its module, or its package for a package's entry file.
+      const words =
+        name === "default"
+          ? [
+              modulePath(file).split("/").at(-1) ?? "",
+              file.match(
+                /^packages\/([^/]+)\/src\/index\.[cm]?[jt]sx?$/,
+              )?.[1] ?? "",
+            ].filter(Boolean)
+          : [name];
+      users.set(
+        `${file} ${name}`,
+        [
+          ...new Set([...words.flatMap((w) => grep(w, true)), ...namespaced]),
+        ].filter((f) => usesExport(read(f), f, file, name, reach.slice(1))),
+      );
+    }
+  return { repo, tree, files, added, users };
 }

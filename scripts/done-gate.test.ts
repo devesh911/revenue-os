@@ -26,6 +26,8 @@ import { mergeOf } from "./done-gate/merge-gate";
 import { checkRules, RULE_FILES } from "./done-gate/rules";
 import { onSharedStack } from "./done-gate/shared-stack";
 import { simpleCommands } from "./done-gate/shell-words";
+import { secondCheck } from "./done-gate/pr";
+import { names, ruleChangeProblems } from "./done-gate/rule-changes";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
@@ -444,37 +446,69 @@ describe("checkRules", () => {
     ]);
   });
 
-  it("names Devesh as code owner of every file it treats as deciding what done means", () => {
+  it("treats as rule files exactly the files under CODEOWNERS' rule-file heading, both ways", () => {
     const root = join(import.meta.dir, "..");
     const owned = join(mkdtempSync(join(tmpdir(), "done-gate-owners-")), "p");
     dirs.push(dirname(owned));
-    // CODEOWNERS patterns follow .gitignore's rules, so git itself can say which files they match.
+    // The patterns from the "# Rule files" comment to the end. CODEOWNERS patterns follow .gitignore's rules, so
+    // git itself can say which files they match.
+    const codeowners = readFileSync(
+      join(root, ".github", "CODEOWNERS"),
+      "utf8",
+    );
     writeFileSync(
       owned,
-      readFileSync(join(root, ".github", "CODEOWNERS"), "utf8")
+      codeowners
+        .slice(codeowners.indexOf("# Rule files"))
         .split("\n")
         .map((l) => l.replace(/#.*/, "").trim().split(/\s+/)[0] ?? "")
         .filter(Boolean)
         .join("\n"),
     );
-    const rules = sh(root, ["git", "ls-files"])
-      .stdout.split("\n")
-      .filter((f) => RULE_FILES.test(f));
-    expect(rules).toContain("bunfig.toml");
-    const matched = sh(
-      root,
-      [
-        "git",
-        "-c",
-        `core.excludesFile=${owned}`,
-        "check-ignore",
-        "--no-index",
-        "--stdin",
-      ],
-      {},
-      rules.join("\n"),
-    ).stdout;
-    expect(rules.filter((f) => !matched.split("\n").includes(f))).toEqual([]);
+    // Every tracked file, and a few that could be added (a new skill, a package's settings, the marketing
+    // site's browser settings), with the plan files that must stay out.
+    const paths = [
+      ...sh(root, ["git", "ls-files"]).stdout.split("\n").filter(Boolean),
+      ".claude/skills/new/SKILL.md",
+      "packages/db/tsconfig.json",
+      "apps/www/playwright.config.ts",
+      "docs/AGENTS.md",
+    ];
+    const matched = new Set(
+      sh(
+        root,
+        [
+          "git",
+          "-c",
+          `core.excludesFile=${owned}`,
+          "check-ignore",
+          "--no-index",
+          "--stdin",
+        ],
+        {},
+        paths.join("\n"),
+      ).stdout.split("\n"),
+    );
+    const rules = paths.filter((f) => RULE_FILES.test(f));
+    expect(rules).toEqual(
+      expect.arrayContaining([
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".claude/skills/task-loop/SKILL.md",
+        "scripts/cycle-hook.sh",
+        "scripts/cycle.ts",
+        ".gitleaks.toml",
+        "apps/console/package.json",
+        "apps/www/biome.json",
+        "apps/www/playwright.config.ts",
+      ]),
+    );
+    expect(rules).not.toContain("ROADMAP.md");
+    expect(rules).not.toContain("STATE.md");
+    expect(rules.filter((f) => !matched.has(f))).toEqual([]); // a rule file CODEOWNERS lacks
+    expect(paths.filter((f) => matched.has(f) && !RULE_FILES.test(f))).toEqual(
+      [],
+    ); // a file under the heading that is no rule file
   });
 });
 
@@ -1823,6 +1857,334 @@ describe("bun run gate rules (CI runs it on every pull request)", () => {
       expect(r.out).toContain("git merge-base failed");
     }
     expect(rules(dir, "--base").status).toBe(2); // usage
+  });
+});
+
+describe("bun run gate pr: main's copy of the rules judges a pull request (rules-from-main runs it)", () => {
+  const PR = "7";
+  const STATE = (...rows: string[]) =>
+    [
+      "# State",
+      "",
+      "## Decisions in force",
+      "",
+      "- 2026-10-01 · an old decision",
+      "",
+      "## Rule changes",
+      "",
+      "Newest first.",
+      "",
+      ...rows,
+      "",
+    ].join("\n");
+  /** The lines a change adds to STATE.md, numbered as in `state`. */
+  const addedTo = (state: string, ...rows: string[]) =>
+    rows.map((text) => ({
+      file: "STATE.md",
+      line: state.split("\n").indexOf(text) + 1,
+      text,
+    }));
+  const record = (rule: string, pr = PR) =>
+    `- 2026-10-02 · [#${pr}](https://github.com/devesh911/revenue-os/pull/${pr}) · ${rule} · tighter`;
+
+  it("asks nothing of a change that touches no rule file", () => {
+    expect(
+      ruleChangeProblems(["services/worker/src/a.ts"], [], "", ""),
+    ).toEqual([]);
+  });
+
+  it("refuses a rule change its body doesn't explain or STATE.md doesn't record", () => {
+    expect(
+      ruleChangeProblems(
+        [".github/workflows/ci.yml"],
+        [],
+        "Roadmap: x",
+        STATE(),
+        PR,
+      ),
+    ).toEqual([
+      expect.stringContaining(
+        "the PR body explains no change to .github/workflows/ci.yml: add one line per changed rule",
+      ),
+      expect.stringContaining(
+        "STATE.md → Rule changes gains no line for #7 naming .github/workflows/ci.yml",
+      ),
+    ]);
+  });
+
+  it("accepts a line per rule that names each file by its path, its file name or a folder holding it", () => {
+    const rows = [
+      record("scripts/done-gate/ and scripts/done-gate.ts"),
+      record("biome.json"),
+    ];
+    const state = STATE(...rows);
+    expect(
+      ruleChangeProblems(
+        ["scripts/done-gate/rules.ts", "scripts/done-gate.ts", "biome.json"],
+        addedTo(state, ...rows),
+        "Roadmap: x\n\nRule change: scripts/done-gate/ and scripts/done-gate.ts · tighter · reads a commit as data\nRule change: biome.json · neutral · no change in what it fails",
+        state,
+        PR,
+      ),
+    ).toEqual([]);
+  });
+
+  it("counts a name only as a whole word: a folder inside a longer path, or one app's file, names no other file", () => {
+    expect(names("scripts/done-gate/ and more", "scripts/cycle.ts")).toBe(
+      false,
+    );
+    expect(names("apps/console/biome.json", "apps/www/biome.json")).toBe(false);
+    expect(names("the done gate", "scripts/done-gate.ts")).toBe(false);
+    expect(names("every biome.json", "apps/www/biome.json")).toBe(true);
+    expect(
+      names(
+        ".claude/skills/ (the task-loop skill)",
+        ".claude/skills/task-loop/SKILL.md",
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a badly written line, a record for another pull request, and one added outside Rule changes", () => {
+    const other = record(".github/workflows/ci.yml", "6");
+    const misplaced = record(".github/workflows/ci.yml");
+    const state = STATE(other).replace(
+      "- 2026-10-01 · an old decision",
+      `- 2026-10-01 · an old decision\n${misplaced}`,
+    );
+    expect(
+      ruleChangeProblems(
+        [".github/workflows/ci.yml"],
+        addedTo(state, other, misplaced),
+        "Rule change: ci.yml · stricter · checks more",
+        state,
+        PR,
+      ),
+    ).toEqual([
+      'the PR body\'s line "Rule change: ci.yml · stricter · checks more" is not written as `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`, where <rule> names the file by its path, its file name or a folder holding it (such as scripts/done-gate/)',
+      `STATE.md → Rule changes: "${other}" names #6, not this pull request (#7)`,
+      expect.stringContaining(
+        "the PR body explains no change to .github/workflows/ci.yml",
+      ),
+      expect.stringContaining("STATE.md → Rule changes gains no line for #7"),
+    ]);
+  });
+
+  it("refuses a second check named rules-from-main, by job id or by name, anywhere but our one job", () => {
+    const ours = "jobs:\n  rules-from-main:\n    runs-on: ubuntu-latest\n";
+    const path = ".github/workflows/rules-from-main.yml";
+    expect(secondCheck({ [path]: ours })).toBeUndefined();
+    expect(
+      secondCheck({
+        [path]: ours,
+        ".github/workflows/ci.yml":
+          "jobs:\n  checks:\n    name: rules-from-main\n",
+      }),
+    ).toContain("defined 2 times");
+    expect(
+      secondCheck({
+        [path]: ours,
+        ".github/workflows/x.yml": "jobs:\n  rules-from-main: # mine\n",
+      }),
+    ).toContain(".github/workflows/x.yml");
+    expect(
+      secondCheck({ [path]: `${ours}  other:\n    name: "rules-from-main"\n` }),
+    ).toContain("defined 2 times");
+  });
+
+  /** A scratch repo whose main holds the gate and a Rule changes section, and a branch `feat` cut from it. */
+  const project = () => {
+    const dir = repo();
+    write(dir, "STATE.md", STATE());
+    write(
+      dir,
+      ".github/workflows/ci.yml",
+      "jobs:\n  checks:\n    runs-on: x\n",
+    );
+    commitOld(dir);
+    sh(dir, ["git", "checkout", "-qb", "feat"]);
+    return dir;
+  };
+  /** Commit the branch, go back to main, and judge the branch from main's checkout as data. */
+  const judged = (dir: string, body?: string, ...args: string[]) => {
+    commitAll(dir);
+    sh(dir, ["git", "checkout", "-q", "main"]);
+    const env: Record<string, string> = { PR_NUMBER: PR };
+    if (body !== undefined) env.PR_BODY = body;
+    const r = sh(
+      dir,
+      [
+        "bun",
+        "scripts/done-gate.ts",
+        "pr",
+        "--base",
+        "main",
+        "--head",
+        "feat",
+        ...args,
+      ],
+      env,
+    );
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  const explained = (rule: string) =>
+    `Roadmap: Slice 0 — x\n\nRule change: ${rule} · looser · a reason\n`;
+
+  it("judges a branch with main's copy of the gate, so a branch that loosens its own copy is still refused", () => {
+    const dir = project();
+    const rules = join(dir, "scripts", "done-gate", "rules.ts");
+    writeFileSync(
+      rules,
+      readFileSync(rules, "utf8").replace(
+        "/@ts-(ignore|nocheck)\\b/.test(text)",
+        "/never matches/.test(text)",
+      ),
+    );
+    write(dir, "services/worker/src/a.ts", "// @ts-ignore\nconst a = 1;\n");
+    const row = record("scripts/done-gate/");
+    write(dir, "STATE.md", STATE(row));
+    // The branch's own copy, run in the branch, passes it:
+    expect(
+      sh(dir, ["bun", "scripts/done-gate.ts", "rules", "--base", "main"])
+        .status,
+    ).toBe(0);
+    const r = judged(dir, explained("scripts/done-gate/"));
+    expect(r.out).toContain(
+      "Pull request ✗ 1 problem(s) in the change in feat since main:\n- services/worker/src/a.ts:1 switches the type checker off",
+    );
+    expect(r.status).toBe(1);
+    expect(sh(dir, ["git", "status", "--porcelain"]).stdout).toBe(""); // read as data: nothing checked out
+  });
+
+  it("refuses an unexplained rule change, and passes it once explained and recorded", () => {
+    const dir = project();
+    write(
+      dir,
+      ".github/workflows/ci.yml",
+      "jobs:\n  checks:\n    runs-on: y\n",
+    );
+    const r = judged(dir, "Roadmap: Slice 0 — x\n");
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(
+      "the PR body explains no change to .github/workflows/ci.yml",
+    );
+    expect(r.out).toContain("STATE.md → Rule changes gains no line for #7");
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    write(dir, "STATE.md", STATE(record(".github/workflows/ci.yml")));
+    expect(judged(dir, explained("ci.yml"))).toEqual({
+      status: 0,
+      out: 'Pull request ✓ nothing in the change in feat since main breaks the done rules, and every rule change is explained and recorded\n⚠ changed what "done" means: .github/workflows/ci.yml\n',
+    });
+  });
+
+  it("finds who uses an export in the branch's own code, not main's", () => {
+    const dir = project();
+    write(dir, "services/worker/src/new.ts", "export const fresh = 1;\n");
+    write(
+      dir,
+      "services/worker/src/use.ts",
+      'import { fresh } from "./new";\nconsole.log(fresh);\n',
+    );
+    expect(judged(dir, "Roadmap: x\n").status).toBe(0);
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    write(dir, "services/worker/src/use.ts", "console.log(1);\n");
+    expect(judged(dir, "Roadmap: x\n").out).toContain(
+      "services/worker/src/new.ts:1 exports fresh, but nothing outside tests uses it",
+    );
+  });
+
+  it("refuses a branch that adds its own check named rules-from-main", () => {
+    const dir = project();
+    write(
+      dir,
+      ".github/workflows/ci.yml",
+      "jobs:\n  rules-from-main:\n    runs-on: y\n",
+    );
+    write(dir, "STATE.md", STATE(record(".github/workflows/ci.yml")));
+    const r = judged(dir, explained(".github/workflows/ci.yml"));
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(
+      "a check named rules-from-main is defined 1 times (.github/workflows/ci.yml)",
+    );
+  });
+
+  it("needs the body, and a number that is a number", () => {
+    const dir = project();
+    write(dir, "services/worker/src/a.ts", "const a = 1;\n");
+    expect(judged(dir).status).toBe(2);
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    const r = sh(dir, ["bun", "scripts/done-gate.ts", "pr", "--base", "main"], {
+      PR_BODY: "x",
+      PR_NUMBER: "7; rm -rf /",
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("give its body in PR_BODY");
+  });
+
+  it("runs from rules-from-main.yml as GitHub runs it: main checked out, the pull request fetched as data", () => {
+    const yml = readFileSync(
+      join(
+        import.meta.dir,
+        "..",
+        ".github",
+        "workflows",
+        "rules-from-main.yml",
+      ),
+      "utf8",
+    );
+    // What it may hold: main's copy only, read-only, no secrets, no environment, no credentials kept.
+    expect(yml).toContain(
+      "on:\n  pull_request_target:\n    types: [opened, synchronize, reopened, edited]\n",
+    );
+    expect(yml).toContain("jobs:\n  rules-from-main:\n");
+    expect(yml.match(/^\s+ref: (.+)$/gm)).toEqual(["          ref: main"]);
+    expect(yml).toContain("persist-credentials: false");
+    expect(yml.match(/^\s*(contents|[\w-]+): (read|write|none)$/gm)).toEqual([
+      "  contents: read",
+      "      contents: read",
+    ]);
+    for (const banned of [
+      /secrets\./,
+      /environment:/,
+      /\bhead\.(sha|ref)\b/,
+      /bun (install|run)/,
+      /^\s+pull_request:/m,
+    ])
+      expect(yml).not.toMatch(banned);
+    const runs = [...yml.matchAll(/^\s+run: (.+)$/gm)].map(([, c = ""]) => c);
+    expect(runs).toHaveLength(2);
+    for (const c of runs) expect(c).not.toContain("${{"); // the body and number arrive as environment variables
+    // Its two commands, run as GitHub would: a clone of main stands in for the checkout, and the pull request's
+    // head sits at refs/pull/7/head on the origin.
+    const dir = project();
+    write(
+      dir,
+      ".github/workflows/ci.yml",
+      "jobs:\n  checks:\n    runs-on: y\n",
+    );
+    commitAll(dir);
+    const origin = mkdtempSync(join(tmpdir(), "done-gate-origin-"));
+    dirs.push(origin);
+    sh(origin, ["git", "init", "-q", "--bare"]);
+    sh(dir, ["git", "push", "-q", origin, "main", `feat:refs/pull/${PR}/head`]);
+    const runner = join(mkdtempSync(join(tmpdir(), "done-gate-runner-")), "w");
+    dirs.push(dirname(runner));
+    sh(dirname(runner), ["git", "clone", "-q", origin, runner]);
+    const step = (body: string) =>
+      runs.map((c) =>
+        sh(runner, ["/bin/sh", "-c", c], { PR_NUMBER: PR, PR_BODY: body }),
+      );
+    const [fetched, refused] = step("Roadmap: Slice 0 — x\n");
+    expect(fetched?.status).toBe(0);
+    expect(refused?.status).toBe(1);
+    expect(refused?.stdout).toContain(
+      "the PR body explains no change to .github/workflows/ci.yml",
+    );
+    expect(existsSync(join(runner, ".github", "workflows", "ci.yml"))).toBe(
+      true,
+    );
+    expect(
+      readFileSync(join(runner, ".github", "workflows", "ci.yml"), "utf8"),
+    ).toContain("runs-on: x"); // main's, not the branch's
   });
 });
 

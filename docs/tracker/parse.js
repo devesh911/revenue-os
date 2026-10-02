@@ -156,12 +156,13 @@ export function parseState(md) {
     return m ? { done: m[1] === "x", text: m[2] } : null;
   };
   const waiting = (sec["Waiting on Devesh"] || []).map(checks).filter(Boolean);
-  const decisions = (sec["Decisions in force"] || [])
-    .filter((l) => /^- /.test(l))
-    .map((l) => l.slice(2));
+  const list = (h) =>
+    (sec[h] || []).filter((l) => /^- /.test(l)).map((l) => l.slice(2));
+  const decisions = list("Decisions in force");
+  const ruleChanges = list("Rule changes");
   if (!rows.length)
     problems.push('STATE.md: the "What works today" table is empty or missing');
-  return { phase, updated, rows, waiting, decisions, problems };
+  return { phase, updated, rows, waiting, decisions, ruleChanges, problems };
 }
 
 // The rule at the top of ROADMAP.md: the lowest-numbered slice that is not done, not proof ready,

@@ -31,18 +31,20 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    never a silent drop.
 6. **Webhooks** — authenticate before trusting, dedupe with a database constraint, store and
    return fast; side effects happen in workers.
-7. **main is PR-only with CI green** (required check: `checks`). Merge authority follows the
-   PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge independent PRs one at a
-   time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. A change to a rule file (any path that `RULE_FILES` in the done gate matches: the done gate,
-   CI, lint and type settings, the hooks, the verifier and the package scripts; until Slice 0's rule-change item adds
-   them to that list, the skills, AGENTS.md and CLAUDE.md count too) needs nobody's approval to start and is explained
-   before it merges: its PR body says which rule changed, whether it tightens or loosens it, and why; the agent shows
-   Devesh that explanation in chat, then, in SETUP, merges it itself on observed-green checks like any other PR. Once
-   Slice 0's rule-change item lands and Devesh makes it a required check, `rules-from-main` judges every PR with main's
-   copy of the rules, and docs/runbooks/rules-check-way-back.md says what Devesh does if that copy misfires. Agents
-   use Devesh's own GitHub login, so GitHub's settings only stop accidents; the hooks enforce what agents must not do
-   (Slice 0's tools item adds the refusals still missing).
+7. **main is PR-only with CI green** (required checks: `checks`, and `rules-from-main` once Devesh makes it
+   required). Merge authority follows the PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge
+   independent PRs one at a time on observed-green checks with real evidence, after confirming base == main; LIVE =
+   only humans merge. A rule file is any path `RULE_FILES` in `scripts/done-gate/rules.ts` matches (the done gate,
+   CI, the hooks, the verifier, the skills, the plan hooks, lint, type and test settings, every package.json,
+   AGENTS.md and CLAUDE.md). A change to one needs nobody's approval to start and is explained before it merges:
+   its PR body has one line per changed rule, `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`,
+   naming each changed file by its path, its file name or a folder holding it, and the same PR adds a line per
+   changed rule to STATE.md → Rule changes; the agent shows Devesh that explanation in chat, then, in SETUP, merges
+   it itself on observed-green checks like any other PR. `rules-from-main` judges every PR with main's copy of the
+   rules (`bun run gate pr`) and refuses one whose rule changes are not explained and recorded; the local hooks
+   judge with the checkout's own copy, a convenience, never the judge. docs/runbooks/rules-check-way-back.md says
+   what Devesh does if main's copy misfires. Agents use Devesh's own GitHub login, so GitHub's settings only stop
+   accidents; the hooks enforce what agents must not do (Slice 0's tools item adds the refusals still missing).
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
@@ -82,8 +84,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   Codex's `/hooks`) but has no verifier agent, so a green product change stops once, marked NOT
   independently verified: ask Claude to run the verifier, or check it yourself. Humans run `bun run gate`.
   The gate stops careless or premature "done", not an agent that sets out to forge it: Devesh's
-  own attention and GitHub's required checks (`checks`, and `rules-from-main` once Slice 0's rule-change item
-  lands and Devesh makes it a required check, which runs main's copy of the rules) are the backstops, and `STATE.md → What works
+  own attention and GitHub's required checks (`checks`, and `rules-from-main` once Devesh makes it a required
+  check, which runs main's copy of the rules) are the backstops, and `STATE.md → What works
   today` lists the gate's known holes.
 - CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
   agent and human.
@@ -134,8 +136,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
    word for word). PR body: the first line is `Roadmap: Slice N —
    <item>`, `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`; then what / why /
-   evidence (the gate's line, the verifier's ruling, how the result was seen working). Watch CI:
-   `gh pr checks <n> --watch`. Green means observed green on GitHub.
+   evidence (the gate's line, the verifier's ruling, how the result was seen working), with a
+   `Rule change:` line per changed rule file (hard rail 7). `PR_BODY="$(cat body.md)" bun run gate pr`
+   judges the body as `rules-from-main` will. Watch CI: `gh pr checks <n> --watch`. Green means observed
+   green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
    three or more open task PRs, stop taking new work. Merge with `gh pr merge <number>`, one per
    command: the done gate refuses it unless the PR's head commit, exactly, passed `bun run gate` on this
@@ -147,8 +151,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    Any area the PR touches that has an entry in `docs/fix-when-touched.md` gets that fix in the same PR.
    A genuine surprise gets one factual line in `lessons.md`. After ROADMAP.md or STATE.md change
    on main, republish the tracker page (Claude: Artifact publish of `docs/tracker/index.html`
-   with files `ROADMAP.md`, `STATE.md` and `parse.js` from `docs/tracker/parse.js`, `url` = the
-   tracker link above).
+   with files `ROADMAP.md`, `STATE.md`, `parse.js` from `docs/tracker/parse.js` and `published.txt` from
+   `git log -1 --format='%h on %cs' origin/main` written to a scratch file, `url` = the tracker link above).
 
 ## When Devesh corrects you
 Fix it, then turn that kind of mistake into a check so it can't come back: the prevent-repeat skill
