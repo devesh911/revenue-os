@@ -446,7 +446,7 @@ describe("scheduler tick + run writer", () => {
     // call_1(no_answer) routed to call_2, and call_2 — being FRESH — placed a call and parked
     expect(run.current_step).toBe("call_2");
     expect(run.status).toBe("waiting");
-    // THE P0 ASSERTION: the stale disposition was CLEARED on advance (call_2 saw NO disposition)
+    // The key assertion: the stale disposition was CLEARED on advance (call_2 saw NO disposition)
     expect(run.state.lastDisposition ?? null).toBeNull();
     // proof call_2 saw a FRESH call — a place_call job for call_2, not a stale route to giveup
     expect((await jobsFor(`${runId}:call_2:0`)).length).toBe(1);

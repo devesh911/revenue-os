@@ -30,11 +30,15 @@ export function testCompanies(db: Db, jobs?: Db) {
               [full, slug],
             )
           ).rows[0]?.id;
-      const mine = await db.query(
-        `select 1 from orgs where id = $1 and slug = $2`,
-        [id, slug],
-      );
-      if (!id || !mine.rowCount)
+      const mine =
+        id &&
+        (
+          await db.query(`select 1 from orgs where id = $1 and slug = $2`, [
+            id,
+            slug,
+          ])
+        ).rowCount;
+      if (!id || !mine)
         throw new Error(`company ${id} was not made under slug ${slug}`);
       made.push(id);
       return { id, slug };

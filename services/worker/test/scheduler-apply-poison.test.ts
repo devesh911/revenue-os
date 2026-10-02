@@ -18,7 +18,8 @@
 //   ANY deterministic apply failure, so the fault is injected at the DB with a BEFORE INSERT
 //   trigger that raises check_violation (23514 — the same SQLSTATE class the audit describes) for
 //   one sentinel title. It is created and dropped by this suite, under a name of this run's own so
-//   a test run started at the same moment never drops it mid-test, and fires for nothing else.
+//   a test run started at the same moment never drops it mid-test, and fires for nothing else. The
+//   name carries the run's start time, so one a killed run left behind is dropped an hour later.
 //
 // PINNED here:
 //   1. a run whose apply phase throws deterministically reaches a TERMINAL state within a bounded
@@ -59,8 +60,11 @@ const SCHEDULABLE = ["pending", "waiting"];
 const MAX_TICKS = 12;
 /** Only tasks with this title prefix trip the injected fault. */
 const POISON_TITLE = "POISON-t58 apply always fails";
-/** The injected fault's trigger and function name, this run's own (a generated identifier, never input). */
-const FAULT = `poison_task_${randomUUID().replaceAll("-", "")}`;
+/** A fault's trigger and function name, for a run started at `startedAt` (generated, never input). */
+const faultName = (startedAt: number) =>
+  `poison_task_${startedAt}_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
+/** The injected fault, this run's own. */
+const FAULT = faultName(Math.floor(Date.now() / 1000));
 
 const companies = testCompanies(admin);
 let orgId = "";
@@ -152,11 +156,10 @@ async function tickUntilTerminal(
   return seen;
 }
 
-beforeAll(async () => {
-  // Fault injection: a deterministic, constraint-class apply failure that no definition-level
-  // validation can prevent. Dropped in afterAll; matches only this suite's sentinel title.
+/** Installs the fault under `name`: a task insert with the sentinel title fails with a check violation. */
+async function injectFault(name: string) {
   await admin.query(`
-    create function ${FAULT}() returns trigger language plpgsql as $$
+    create function ${name}() returns trigger language plpgsql as $$
     begin
       if new.title like 'POISON-t58%' then
         raise exception 'poisoned task insert (apply-poison fault injection)'
@@ -166,9 +169,37 @@ beforeAll(async () => {
     end $$;
   `);
   await admin.query(`
-    create trigger ${FAULT} before insert on tasks
-      for each row execute function ${FAULT}()
+    create trigger ${name} before insert on tasks
+      for each row execute function ${name}()
   `);
+}
+
+/** Drops the faults of runs killed before their afterAll, once an hour old; a running suite's is younger. */
+async function sweepKilledFaults() {
+  await admin.query(`
+    do $$ declare t text; begin
+      for t in select tgname from pg_trigger
+                where tgrelid = 'tasks'::regclass and tgname ~ '^poison_task_[0-9]+_[0-9a-f]+$'
+                  and split_part(tgname, '_', 3)::bigint < extract(epoch from now()) - 3600
+      loop
+        execute format('drop trigger if exists %I on tasks', t);
+        execute format('drop function if exists %I()', t);
+      end loop;
+    end $$`);
+}
+
+const faults = async () =>
+  (
+    await admin.query(
+      `select tgname from pg_trigger where tgrelid = 'tasks'::regclass and tgname like 'poison_task_%'`,
+    )
+  ).rows.map((r) => r.tgname);
+
+beforeAll(async () => {
+  // Fault injection: a deterministic, constraint-class apply failure that no definition-level
+  // validation can prevent. Dropped in afterAll; matches only this suite's sentinel title.
+  await sweepKilledFaults();
+  await injectFault(FAULT);
 
   orgId = (await companies.add("Apply Poison Org")).id;
   orgB = (await companies.add("Apply Poison Org B")).id;
@@ -272,4 +303,15 @@ describe("apply-phase poison runs terminate", () => {
     expect(b.completed_at).toBeNull();
     expect(await countTasks(runB)).toBe(0);
   }, 30_000);
+});
+
+describe("the injected fault", () => {
+  it("one a killed run left an hour ago is swept, and this run's own is not", async () => {
+    const left = faultName(Math.floor(Date.now() / 1000) - 3700);
+    await injectFault(left);
+    await sweepKilledFaults();
+    const now = await faults();
+    expect(now).not.toContain(left);
+    expect(now).toContain(FAULT);
+  });
 });

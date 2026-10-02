@@ -143,14 +143,17 @@ describe("org bootstrap + tenant isolation", () => {
   });
 
   it("rejects an unknown-shape body before any logic (docs/security.md S5.1)", async () => {
-    const res = await api("/orgs", userA.token, {
-      method: "POST",
-      body: JSON.stringify({
-        name: "X",
-        slug: `x-${Date.now()}`,
-        sneaky: true,
-      }),
+    // Through the helper, so a regression that accepts the body still has its company cleaned up.
+    let status = 0;
+    const made = companies.add("Sneaky", async (name, slug) => {
+      const res = await api("/orgs", userA.token, {
+        method: "POST",
+        body: JSON.stringify({ name, slug, sneaky: true }),
+      });
+      status = res.status;
+      return res.ok ? ((await res.json()) as { id: string }).id : "";
     });
-    expect(res.status).toBe(400);
+    await expect(made).rejects.toThrow(/not made/);
+    expect(status).toBe(400);
   });
 });

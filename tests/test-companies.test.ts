@@ -134,4 +134,11 @@ describe("testCompanies", () => {
     await mine.cleanup();
     expect((await rows(other.id)).org).toBe(1);
   });
+
+  it("refuses a route that made no company, such as one that rejected the request", async () => {
+    const mine = testCompanies(admin);
+    await expect(mine.add("Rejected", async () => "")).rejects.toThrow(
+      /not made/,
+    );
+  });
 });

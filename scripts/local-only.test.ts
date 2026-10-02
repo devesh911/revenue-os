@@ -1,9 +1,10 @@
-// Every script that writes to a database, and the test setup, refuse one that is not on this machine, with the
-// one check (scripts/local-url.ts): a look-alike host or a `?host=` override must not get through, as it did
-// through the older copies that only searched the address for "127.0.0.1" or "localhost".
+// Every script that writes to a database, the test setup and the browser checks' setup refuse one that is not on
+// this machine, with the one check (scripts/local-url.ts): a look-alike host or a `?host=` override must not get
+// through, as it did through the older copies that only searched the address for "127.0.0.1" or "localhost".
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import globalSetup from "../apps/console/e2e/global-setup";
 import { buildResetPlan } from "./db-reset";
 
 const repo = join(import.meta.dir, "..");
@@ -25,8 +26,8 @@ function run(cmd: string[], env: Record<string, string>) {
 }
 
 describe.each(NOT_LOCAL)("a database at %s is refused", (url) => {
-  it("by the test setup, as the superuser address or the app's", () => {
-    for (const key of ["LOCAL_DB_URL", "DATABASE_URL"]) {
+  it("by the test setup, as the superuser address, the app's or the sign-in server's", () => {
+    for (const key of ["LOCAL_DB_URL", "DATABASE_URL", "SUPABASE_URL"]) {
       const r = run(["test", "scripts/local-url.test.ts"], { [key]: url });
       expect(r.out).toContain("refuses to run against a non-local database");
       expect(r.status).not.toBe(0);
@@ -48,6 +49,29 @@ describe.each(NOT_LOCAL)("a database at %s is refused", (url) => {
       const r = run(["scripts/demo.ts"], { [key]: url });
       expect(r.out).toContain("refuses to run against a non-local database");
       expect(r.status).not.toBe(0);
+    }
+  });
+});
+
+describe.each(
+  NOT_LOCAL.map((url) => url.replace("postgresql", "http")),
+)("a sign-in server or API at %s is refused by the browser checks' setup", (url) => {
+  it("before it seeds or signs in", async () => {
+    for (const key of ["SUPABASE_URL", "VITE_API_URL"]) {
+      const before = { ...process.env };
+      Object.assign(process.env, {
+        SUPABASE_URL: "http://127.0.0.1:54321",
+        SUPABASE_ANON_KEY: "anon",
+        VITE_API_URL: "http://127.0.0.1:8787",
+        [key]: url,
+      });
+      try {
+        await expect(globalSetup()).rejects.toThrow(/not on this machine/);
+      } finally {
+        for (const k of ["SUPABASE_URL", "SUPABASE_ANON_KEY", "VITE_API_URL"])
+          if (before[k] === undefined) delete process.env[k];
+          else process.env[k] = before[k];
+      }
     }
   });
 });

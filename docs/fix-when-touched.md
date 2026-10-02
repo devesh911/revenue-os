@@ -34,7 +34,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **Known spots on main:**
 - About 101 of 243 source files carry an old code. Bare `T2` to `T9` are the worst, because docs/tech-stack.md reuses those numbers for different topics (for example `packages/channels/src/types.ts:1` says "T5" meaning an old task, while tech-stack's T5 is the web framework).
-- `services/worker/src/jobs.ts:64` says a finished task "swaps the real adapter", but the stub is still live.
 - `services/worker/src/index.ts:35`: the readiness check (`/ready`) shows an internal to-do note to whoever calls it. Slice 1's readiness item replaces this reply; if you touch the file first, drop the note.
 - `services/worker/src/index.ts`, the comment on the `app.route("/", vapiWebhook)` line says it is protected by a "per-assistant shared secret on the raw body". It is one secret shared by every company, compared with the `x-vapi-secret` header (`services/worker/src/vapi/receive.ts`), not a signature of the body. Say that. (Added 2026-10-01: a leftover of a finding the last replan called settled.)
 - `services/worker/src/index.ts:62`: "TODO: mount packages/harness loop consumers", which `jobs.ts` already does.
@@ -84,7 +83,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - `tests/conversation-link.test.tsx`: keep its render test, moved to `apps/console/test/`; delete the rest.
 - `tests/transcript-xss.test.tsx`: delete; the lint rule against raw HTML injection already covers it.
 - `packages/harness/test/anthropic.test.ts` ("no SDK import" check): a lint rule that blocks importing the Anthropic SDK in `packages/`.
-
 - Acceptable as they are (they check docs or settings, not product code): `apps/console/test/readme-coverage.test.ts`, `apps/console/test/ui-contract.test.tsx`, `scripts/guards.test.ts`.
 - "RED today" comments on main: `apps/console/test/pages-adoption-tasks-agents-settings.test.tsx` (13), `tests/conversation-link.test.tsx` (10), `apps/console/test/pages-adoption-behavior.test.tsx` (4), `tests/console-contact-links.test.tsx` (3), `tests/vite-api-url-honesty.test.tsx` (2), and one each in `pages-adoption-home-dashboard.test.tsx`, `pages-adoption-source.test.ts`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts`.
 - `apps/console/test/README.md:4` and the "RED idiom" comments in `guardrails-console.test.tsx` stop teaching "read the source as text" when either file is next edited.
@@ -221,7 +219,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Settled by [#119](https://github.com/devesh911/revenue-os/pull/119) (the Claude Code and Codex hooks refuse cloud database pushes and `.env` reads, `scripts/done-gate/tools.ts`, and Claude Code's settings deny them; `bun run db:migrate` deleted) |
 | The fixed 'local database only' safety check was copied, and four places still use the weak version | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the test setup, db:reset, evals and the demo use scripts/local-url.ts) |
 | Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (tests/test-companies.ts; every job clean-up, the demo's included, touches only its own company) |
-| Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Partly settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (a run deletes only what it made and runs can start together); two whole-suite runs can still trip over each other through vapi-queue.test.ts's real job runner and the one shared dev login (STATE.md → What works today) |
+| Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (four whole-suite test runs started at once all pass and leave another company's data and the dev login's workspaces alone; what is still shared is in STATE.md → What works today, "Automated tests and CI") |
 | The pattern files that AGENTS.md says 'bind' teach unauthenticated, role-less, wrong-signature code | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
 | The pattern docs agents are told to imitate describe code that does not exist, with no role check | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
 | docs/patterns examples are invented code that does not match the real APIs, and agents are told to imitate it | Slice 0 · "Examples that teach unsafe code are removed or marked…" |
@@ -291,7 +289,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today | Settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (the FAQ says what the pilot will do; entry 7 struck) |
 | Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout | Entry 8 |
 
-Totals: Slice 0 holds 8, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 9 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
+Totals: Slice 0 holds 5, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 12 are settled or partly settled by merged PRs; 10 are entries here. Total 73.
 
 ---
 
