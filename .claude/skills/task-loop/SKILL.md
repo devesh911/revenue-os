@@ -22,11 +22,12 @@ description: Use when building a roadmap item — any session implementing the n
 4. **Failing test first**, at the layer you touch. For security, RLS, migration or guard work,
    review the failing tests line by line before writing the implementation.
 5. Implement **with its production caller** — a capability nothing real calls is not done.
-6. `bun run gate` run bare (never piped). Env-dependent suites: CI is the verdict.
+6. `bun run gate` run bare (never piped). Every check passes in `bun run gate` here first, and CI
+   confirms it.
 7. Show it working: run it from a real entry point (API call, script against the local stack,
    `bun run see <console path>`) and capture the evidence. Then run the verifier agent with
-   Devesh's request word for word; the done gate won't let you stop on product code without its PASS,
-   or its CANNOT_VERIFY naming what only Devesh can provide (he is told it is NOT verified).
+   Devesh's request word for word (when he gave none, the roadmap item's text, word for word); the
+   done gate won't let you stop on product code without its PASS, or its CANNOT_VERIFY naming what only Devesh can provide (he is told it is NOT verified).
 8. PR body: first line `Roadmap: Slice N — <item>`, `Roadmap: Side track — <what>` or
    `Roadmap: off-roadmap — <what>`; then what / why / evidence. `gh pr checks <n> --watch` — the
    required `checks` must be observed green on GitHub; absent or red means stop.
@@ -37,8 +38,13 @@ description: Use when building a roadmap item — any session implementing the n
     `gh pr view <n> --json baseRefName` is main; never loop merges. LIVE = never merge. The done gate
     refuses `gh pr merge <n>` unless the PR's head commit passed `bun run gate` and the verifier here.
 11. After merge, republish the tracker page (see AGENTS.md → The loop, step 6).
-12. If the last item of the slice landed, set the slice to `proof ready` and ask Devesh to watch
-    the proof. Never fill in `Seen by Devesh:` yourself.
+12. If the last item of the slice landed, set the slice to `proof ready` and run its proof
+    (`bun run proof <slice>` once Slice 0's proof runner lands). When every step passes, set the
+    slice to `done` and write the date and the passing run's link after `Seen by Devesh:` (the run
+    posts its short report to the "Proof reports" GitHub issue, which reaches Devesh); if a step
+    fails, add an item naming the failure and set the slice back to `in progress`; a step reported
+    as waiting on something in `STATE.md → Waiting on Devesh` changes nothing (AGENTS.md →
+    Definition of done).
 
 ## Never (any phase)
 Edit applied migrations · touch `.env`/secrets · force-push · add a dependency without a
@@ -53,9 +59,9 @@ the repo (prospect lists, videos, research, naming, real people's data; the repo
 and test data is fine to commit).
 
 ## Parallel waves (optional, when items are file-disjoint)
-One worktree per item under `.claude/worktrees/` (never in lint scope); worktrees verify env-free and
-CI decides; landing stays serial, base == main each time; at most one migration-writing item per wave.
+One worktree per item under `.claude/worktrees/` (never in lint scope); every check passes in
+`bun run gate` here first, and CI confirms it; landing stays serial, base == main each time; at most one migration-writing item per wave.
 
 ## Learned since this skill was written (run it, don't skip)
 `grep -inE 'gates|CI|pipe|worktree|queue|exit code' lessons.md` and read `STATE.md → Decisions in force`.
-A newer lesson or decision outranks this file.
+Where they disagree with this file, AGENTS.md decides, then STATE.md → Decisions in force.

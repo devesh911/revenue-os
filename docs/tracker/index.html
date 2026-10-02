@@ -146,7 +146,7 @@ details.fold ul.plain{margin-top:10px}
 
   <section>
     <h2>Roadmap</h2>
-    <p class="muted" style="max-width:80ch">Each slice ends in a proof Devesh watches happen. A slice is done only when its "Seen by Devesh" line carries his date.</p>
+    <p class="muted" style="max-width:80ch">Each slice ends in a proof a script runs against the real product. When every step passes, the agent sets the slice to done and writes the passing run's date and link after "Seen by Devesh"; each run's short report is posted to the "Proof reports" issue on GitHub, and Devesh may reopen a slice.</p>
     <div class="slices" id="slices"></div>
   </section>
 
@@ -211,14 +211,14 @@ function render(){
        <h2>Slice ${current.n}: ${inline(current.title)} <span class="pill ${sCls(current.Status)}">${esc(current.Status)}</span></h2>
        <div class="bar" aria-hidden="true"><span style="width:${total ? Math.round(100*done/total) : 0}%"></span></div>
        <dl class="facts"><dt>Items</dt><dd>${done} of ${total} done</dd>
-       <dt>Next item</dt><dd>${next ? inline(next.text) : "None left for agents: set the slice to proof ready and ask Devesh to watch the proof"}</dd>
+       <dt>Next item</dt><dd>${next ? inline(next.text) : "None left for agents: set the slice to proof ready and run its proof"}</dd>
        <dt>Proof</dt><dd>${inline(current.Proof || "")}</dd>
        <dt>Blocked by</dt><dd>${inline(current["Blocked by"] || "")}</dd>
        <dt>Seen by Devesh</dt><dd class="${seenOk(seen) ? "seen-yes" : "seen-no"}">${inline(seenOk(seen) ? seen : "not yet")}</dd></dl>`;
   } else {
     const allDone = R.slices.every(s => s.Status === "done");
     document.getElementById("now").innerHTML = `<div class="eyebrow">Current slice</div><h2>${allDone ? "Every slice is done" : "No slice can be built right now"}</h2>` +
-      (allDone ? "" : `<p class="muted">Every unfinished slice is waiting for Devesh: to watch its proof, or for what its "Blocked by" line names.</p>`);
+      (allDone ? "" : `<p class="muted">Every unfinished slice is waiting: for its proof run, or for what its "Blocked by" line names.</p>`);
   }
 
   const counts = STATUS.map(s => ({ ...s, n: S.rows.filter(r => r[2] === s.key).length }));

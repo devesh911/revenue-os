@@ -110,6 +110,9 @@ it("the banner lists format problems and says when no slice can be built", () =>
   );
   expect(b).toContain("is ticked without evidence");
   expect(b).toContain("No slice can be built");
+  expect(b).toContain("run its proof");
+  expect(b).toContain("the passing run's link");
+  expect(b).not.toContain("Devesh to watch");
 });
 
 it("a branch with no recorded item is told how to record one", () => {

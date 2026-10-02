@@ -54,15 +54,28 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   working (command output, screenshot, database rows). Land every capability together with the
   code that calls it; a function nothing calls is not done. Off-roadmap and Side-track PRs are
   not roadmap items: (1) and (2) still apply, and their evidence lives in the PR body.
-- **A slice is done** only when Devesh has watched its proof. Agents set a slice to
-  `proof ready` and ask him to look; only Devesh fills in `Seen by Devesh:` with a date.
+- **A slice is done** when its proof runs automatically and passes; Devesh does not need to act.
+  Every slice's `Proof:` line is written as steps a script can run and check against the real
+  product (`bun run proof <slice>`, which Slice 0's last item, the proof runner, builds). When the
+  slice's last item lands, the agent sets it to `proof ready`; when every step passes, the agent
+  sets it to `done` and writes the date and the passing run's link after `Seen by Devesh:` (the
+  proof runner item renames that field `Proof passed:`). Each run's short report (what was done,
+  what was seen, screenshots, and a recording or transcript where a call or chat is involved) is
+  posted to the standing "Proof reports" GitHub issue, so GitHub notifies Devesh; he may look at it
+  or ignore it, and a done slice reopens if he says so. GitHub re-runs the proofs of `proof ready`
+  and `done` slices after each deploy to main and once a day. If a step fails, the agent adds an
+  item naming the failure and the slice (even a done one) goes back to `in progress`. A step that
+  cannot run because something in `STATE.md → Waiting on Devesh` is missing (a test number, a key,
+  a login) is reported as waiting and names that Waiting item; the slice and its items stay as
+  they are.
 - Passing tests are required and never sufficient. Tests with fakes prove logic, not the product.
 - **The done gate enforces this, so nobody has to remember it.** Whenever a Claude agent stops,
   `scripts/done-gate.ts` checks what its session changed in each checkout it worked in (and was the last
   to work in): first the rules against fake-done (throwing
   stubs, exports nothing calls, silenced checks, skipped tests, tests that read source code), then every
   check on the exact code, then, if product code changed, a ruling from the verifier agent
-  (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words: PASS,
+  (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words (when
+  he gave none, the roadmap item's text, word for word): PASS,
   or CANNOT_VERIFY naming what only Devesh can provide (a real phone number, an account, a key),
   which reaches him marked NOT verified. Until then the agent is sent back to work, and Devesh sees
   each verdict. Codex runs the same gate when a turn ends (`.codex/hooks.json`, once trusted in
@@ -118,7 +131,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
    gitleaks, `bun audit` and a Docker build; CI is the verdict.
 4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
-   verifier agent with Devesh's request word for word. PR body: the first line is `Roadmap: Slice N —
+   verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
+   word for word). PR body: the first line is `Roadmap: Slice N —
    <item>`, `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`; then what / why /
    evidence (the gate's line, the verifier's ruling, how the result was seen working). Watch CI:
    `gh pr checks <n> --watch`. Green means observed green on GitHub.
@@ -143,7 +157,7 @@ made again.
 
 ## Escalate to Devesh only for
 Credentials · money · external accounts · irreversible or outward-facing actions · genuine
-product-direction forks · marking a slice done. Everything else: pick the boring option,
+product-direction forks. Everything else: pick the boring option,
 record one line in `STATE.md → Decisions in force`, keep moving.
 
 ## Docs
