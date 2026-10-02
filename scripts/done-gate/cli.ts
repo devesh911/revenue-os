@@ -97,12 +97,13 @@ export async function cli(cmd: string, args: string[]) {
       changeOf("Pull request", repo, base, head),
       body,
       pr,
+      base,
     );
     const what = `the change${head ? ` in ${head}` : ""} since ${base}`;
     console.log(
       (problems.length
         ? `Pull request ✗ ${problems.length} problem(s) in ${what}:\n${problems.map((p) => `- ${p}`).join("\n")}`
-        : `Pull request ✓ nothing in ${what} breaks the done rules, and every rule change is explained and recorded`) +
+        : `Pull request ✓ its first line names what it is, nothing in ${what} breaks the done rules, every rule change is explained and recorded, and every fix-when-touched entry it touches is answered`) +
         notes.map((n) => `\n⚠ ${n}`).join(""),
     );
     process.exit(problems.length ? 1 : 0);

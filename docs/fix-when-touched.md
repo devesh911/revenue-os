@@ -3,7 +3,8 @@
 This list is the clean-up that gets no roadmap slice: stale comments, unused code, tests that check the wrong thing, out-of-date agent instructions and docs, files that do more than one job, and leftover branches. Each entry is fixed in the same PR as any change that touches its area, never as a project of its own. It lives at `docs/fix-when-touched.md`, and AGENTS.md → The loop, step 6, sends every PR here.
 
 **How to use it**
-- Find the folder you are editing in the table below, and do that entry's fix for the files your PR touches. Your PR still names its own roadmap item on its first line; the PR body adds one line saying which entry here it also fixed, or why that entry does not apply to this change. Once Slice 0's PR-first-line item lands, CI fails a PR that changes a path in the table's left column without that line, so keep every path there in backticks.
+- Find the folder you are editing in the table below, and do that entry's fix for the files your PR touches. Your PR still names its own roadmap item on its first line; for each entry whose area it touches, the PR body adds a line of its own, `Fix-when-touched: <entry number> · fixed · <what you fixed>` or `Fix-when-touched: <entry number> · not applicable · <why>`, for example `Fix-when-touched: 1 · fixed · dropped the old task codes in scripts/demo.ts`. A line inside an HTML comment or a code block counts for nothing.
+- `rules-from-main` fails a PR that changes a file the table's left column covers without that line, and names the entries and the files that called for them. Only the paths in backticks count, so keep every path there in backticks: one ending in "/" covers everything under that folder, any other covers that one file, at any letter case. It reads this table as main has it, so a PR that edits the table is judged by the table as it was before the edit.
 - One entry has a latest date: the runbooks must be fixed by Slice 6's security walk.
 - Anything that needs Devesh (his Mac, his settings, his files) is in STATE.md → Waiting on Devesh, not here.
 - When an entry is fully fixed, strike it from this list in that same PR.
@@ -14,7 +15,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 | If your PR touches… | Fix this too |
 |---|---|
-| Any source file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
+| Any file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
 | `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/db-design.md`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
 | `tests/`, `apps/console/test/`, `packages/harness/test/anthropic.test.ts`, `scripts/dev-login.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |

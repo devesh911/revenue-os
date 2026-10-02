@@ -1,8 +1,10 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
-// every pull request with --head): the done rules, each rule change explained and recorded, and no other workflow
-// able to report a check named rules-from-main.
+// every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
+// each fix-when-touched entry it touches answered, and no other workflow able to report a check named rules-from-main.
 
+import { fixWhenTouchedProblems, TABLE } from "./fix-when-touched";
 import { git } from "./git";
+import { firstLineProblems } from "./pr-first-line";
 import { ruleChangeProblems } from "./rule-changes";
 import { rulesOn } from "./rules";
 import type { Snap } from "./snapshot";
@@ -67,7 +69,13 @@ export function secondCheck(workflows: Record<string, string>): string[] {
 const at = (snap: Snap, file: string) =>
   git(snap.repo, ["cat-file", "blob", `${snap.tree}:${file}`], {}, true);
 
-export function judgePr(snap: Snap, body: string, pr?: string) {
+/** `base` is main: its fix-when-touched table judges, never the branch's. */
+export function judgePr(
+  snap: Snap,
+  body: string,
+  pr?: string,
+  base = "origin/main",
+) {
   const { problems, notes } = rulesOn(snap);
   const workflows = Object.fromEntries(
     git(
@@ -82,6 +90,11 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
   );
   return {
     problems: [
+      ...firstLineProblems(
+        body,
+        at(snap, "ROADMAP.md"),
+        snap.files.includes("ROADMAP.md"),
+      ),
       ...problems,
       ...ruleChangeProblems(
         snap.files,
@@ -90,6 +103,11 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
         at(snap, "STATE.md"),
         pr,
         snap.removed,
+      ),
+      ...fixWhenTouchedProblems(
+        snap.files,
+        body,
+        git(snap.repo, ["cat-file", "blob", `${base}:${TABLE}`], {}, true),
       ),
       ...secondCheck(workflows),
     ],

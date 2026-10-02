@@ -20,10 +20,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
+import { parseRoadmap } from "../docs/tracker/parse.js";
 import { parseDiff } from "./done-gate/diff";
 import { usesExport } from "./done-gate/export-users";
+import { areasOf, fixWhenTouchedProblems } from "./done-gate/fix-when-touched";
 import { mergeOf } from "./done-gate/merge-gate";
 import { secondCheck } from "./done-gate/pr";
+import { firstLineProblems } from "./done-gate/pr-first-line";
 import { names, ruleChangeProblems } from "./done-gate/rule-changes";
 import { checkRules, RULE_FILES } from "./done-gate/rules";
 import { onSharedStack } from "./done-gate/shared-stack";
@@ -2736,15 +2739,24 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     );
   });
 
-  /** A scratch repo whose main holds the gate and a Rule changes section, and a branch `feat` cut from it. */
-  const project = () => {
+  /**
+   * A scratch repo whose main holds the gate, a Rule changes section, a roadmap whose Slice 0 has the item "x", and
+   * `files`, and a branch `feat` cut from it.
+   */
+  const project = (files: Record<string, string> = {}) => {
     const dir = repo();
     write(dir, "STATE.md", STATE());
+    write(
+      dir,
+      "ROADMAP.md",
+      "# Roadmap\n\n## Slice 0: Safe work\nStatus: in progress\n\n- [ ] x (agent)\n",
+    );
     write(
       dir,
       ".github/workflows/ci.yml",
       "permissions: {contents: read}\njobs:\n  checks:\n    runs-on: x\n",
     );
+    for (const [file, text] of Object.entries(files)) write(dir, file, text);
     commitOld(dir);
     sh(dir, ["git", "checkout", "-qb", "feat"]);
     return dir;
@@ -2817,7 +2829,7 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     write(dir, "STATE.md", STATE(record(".github/workflows/ci.yml")));
     expect(judged(dir, explained("ci.yml"))).toEqual({
       status: 0,
-      out: 'Pull request ✓ nothing in the change in feat since main breaks the done rules, and every rule change is explained and recorded\n⚠ changed what "done" means: .github/workflows/ci.yml\n',
+      out: 'Pull request ✓ its first line names what it is, nothing in the change in feat since main breaks the done rules, every rule change is explained and recorded, and every fix-when-touched entry it touches is answered\n⚠ changed what "done" means: .github/workflows/ci.yml\n',
     });
   });
 
@@ -2829,10 +2841,10 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
       "services/worker/src/use.ts",
       'import { fresh } from "./new";\nconsole.log(fresh);\n',
     );
-    expect(judged(dir, "Roadmap: x\n").status).toBe(0);
+    expect(judged(dir, "Roadmap: Slice 0 — x\n").status).toBe(0);
     sh(dir, ["git", "checkout", "-q", "feat"]);
     write(dir, "services/worker/src/use.ts", "console.log(1);\n");
-    expect(judged(dir, "Roadmap: x\n").out).toContain(
+    expect(judged(dir, "Roadmap: Slice 0 — x\n").out).toContain(
       "services/worker/src/new.ts:1 exports fresh, but nothing outside tests uses it",
     );
   });
@@ -2868,7 +2880,7 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     expect(own.stdout).toContain(
       "services/worker/src/a.ts:1 switches the type checker off",
     );
-    const r = judged(dir, "Roadmap: x\n");
+    const r = judged(dir, "Roadmap: Slice 0 — x\n");
     expect(r.out).toContain(
       "services/worker/src/a.ts:1 switches the type checker off",
     );
@@ -2886,6 +2898,78 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     });
     expect(r.status).toBe(2);
     expect(r.stderr).toContain("give its body in PR_BODY");
+  });
+
+  it("refuses a body whose first line names no roadmap item, Side track or off-roadmap work, and says the forms", () => {
+    const dir = project();
+    write(dir, "services/worker/src/a.ts", "const a = 1;\n");
+    const r = judged(dir, "## What\nA thing.\n");
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(
+      'Pull request ✗ 1 problem(s) in the change in feat since main:\n- the PR body\'s first line "## What" is not one of the forms AGENTS.md → The loop, step 4, gives: `Roadmap: Slice N — <item>`',
+    );
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    expect(judged(dir, "Roadmap: Slice 0 — y\n").out).toContain(
+      'the PR body\'s first line names "y", which is no item of Slice 0 in ROADMAP.md',
+    );
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    expect(judged(dir, "Roadmap: Slice 0 — x\n").status).toBe(0);
+  });
+
+  it("names an item of ROADMAP.md as the branch leaves it, so a replan's own item counts", () => {
+    const dir = project();
+    write(
+      dir,
+      "ROADMAP.md",
+      "# Roadmap\n\n## Slice 0: Safe work\nStatus: in progress\n\n- [ ] x (agent)\n- [ ] Moved here: from a later slice (agent)\n",
+    );
+    expect(judged(dir, "Roadmap: Slice 0 — Moved here\n").status).toBe(0);
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    expect(judged(dir, "Roadmap: Slice 0 — replan: move one item\n")).toEqual({
+      status: 0,
+      out: expect.stringContaining("Pull request ✓"),
+    });
+  });
+
+  it("asks for each fix-when-touched entry whose area the change touches, reading the table as main has it", () => {
+    const table = (...rows: string[]) =>
+      [
+        "# Fix when touched",
+        "",
+        "## Find your area",
+        "",
+        "| If your PR touches… | Fix this too |",
+        "|---|---|",
+        ...rows,
+        "",
+        "## Product code",
+        "",
+      ].join("\n");
+    const one =
+      "| Any file in `services/` or `scripts/x.ts` | 1. Comments that say untrue things |";
+    const dir = project({ "docs/fix-when-touched.md": table(one) });
+    write(dir, "services/worker/src/a.ts", "const a = 1;\n");
+    write(dir, "scripts/x.ts", "const x = 1;\n");
+    // The branch strikes entry 1 and adds an entry of its own: main's table still judges it.
+    write(
+      dir,
+      "docs/fix-when-touched.md",
+      table("| `services/` | 12. A new entry |"),
+    );
+    const body = "Roadmap: Slice 0 — x\n";
+    const r = judged(dir, body);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(
+      "- docs/fix-when-touched.md entry 1 (Comments that say untrue things) covers scripts/x.ts, services/worker/src/a.ts: add the line `Fix-when-touched: 1 · fixed · <what you fixed>` or `Fix-when-touched: 1 · not applicable · <why>` to the PR body",
+    );
+    expect(r.out).not.toContain("entry 12");
+    sh(dir, ["git", "checkout", "-q", "feat"]);
+    expect(
+      judged(
+        dir,
+        `${body}\nFix-when-touched: 1 · not applicable · both files are new and cite no old codes\n`,
+      ).status,
+    ).toBe(0);
   });
 
   it("runs from rules-from-main.yml as GitHub runs it: main checked out, the pull request fetched as data", () => {
@@ -2968,6 +3052,218 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     expect(
       readFileSync(join(runner, ".github", "workflows", "ci.yml"), "utf8"),
     ).toContain("runs-on: x"); // main's, not the branch's
+  });
+});
+
+describe("the PR body's first line names what the pull request is (AGENTS.md → The loop, step 4)", () => {
+  const ROADMAP = [
+    "# Roadmap",
+    "",
+    "## Slice 0: One source of truth",
+    "Status: in progress",
+    "",
+    "- [x] Keep agents on the plan: a Claude Code session started at the repo or a worktree root is shown the current slice and item, and each of its prompts carries a one-line reminder (agent) · evidence: [#105](https://github.com/devesh911/revenue-os/pull/105), seen",
+    "- [x] The done gate is split into a folder before the items that rewrite it: its code moves into scripts/done-gate/ (agent) · evidence: [#117](https://github.com/devesh911/revenue-os/pull/117)",
+    "- [x] A change to a rule file is explained, judged by main's copy of the rules, and recorded: a rule file is any path matched by `RULE_FILES` (agent) · evidence: [#118](https://github.com/devesh911/revenue-os/pull/118)",
+    "- [ ] Every PR body's first line names its roadmap item; both checks run in `rules-from-main` (the rule-change item), so a branch can't switch them off (agent)",
+    "",
+    "## Slice 2: Real WhatsApp",
+    "Status: not started",
+    "",
+    "- [ ] A blocked lead can choose to hear from us again (Devesh)",
+    "",
+    "## Side track: the landing page",
+    "",
+  ].join("\n");
+  const judge = (first: string, replans = false) =>
+    firstLineProblems(`${first}\n\n## What\n`, ROADMAP, replans);
+
+  it("accepts real first lines: an item whole or up to its first colon, a note in brackets, the Side track, off-roadmap", () => {
+    for (const first of [
+      "Roadmap: Slice 0 — Keep agents on the plan: a Claude Code session started at the repo or a worktree root is shown the current slice and item, and each of its prompts carries a one-line reminder", // #105
+      "Roadmap: Slice 0 — The done gate is split into a folder before the items that rewrite it", // #117
+      "Roadmap: Slice 0 — A change to a rule file is explained, judged by main's copy of the rules, and recorded (its first run on GitHub)", // #120
+      "Roadmap: Slice 0 — Every PR body's first line names its roadmap item; both checks run in rules-from-main (the rule-change item), so a branch can't switch them off", // backticks left out
+      "Roadmap: Slice 0 — keep agents on the plan  ",
+      "Roadmap: Slice 2 — A blocked lead can choose to hear from us again",
+      "Roadmap: Side track — the landing page's reduced-motion browser checks wait for what they check", // #114
+      "Roadmap: off-roadmap — running a demo seed pack again no longer duplicates its rows", // #107
+    ])
+      expect([first, judge(first)]).toEqual([first, []]);
+    expect(
+      firstLineProblems(
+        "Roadmap: off-roadmap — x\r\n\r\n## What\r\n",
+        ROADMAP,
+        false,
+      ),
+    ).toEqual([]);
+  });
+
+  it("accepts a replan of a slice only from a pull request that changes ROADMAP.md", () => {
+    const first =
+      "Roadmap: Slice 0 — replan: slices close on an automatic proof run"; // #116
+    expect(judge(first, true)).toEqual([]);
+    expect(judge(first)).toEqual([
+      "the PR body's first line says it replans Slice 0, but the pull request doesn't change ROADMAP.md: name the roadmap item it builds, the Side track or off-roadmap work instead",
+    ]);
+  });
+
+  it("refuses any other first line, saying the exact forms", () => {
+    const FORMS =
+      "`Roadmap: Slice N — <item>` (the item's text as ROADMAP.md has it, whole or up to its first colon, a note in brackets allowed after it), `Roadmap: Slice N — replan: <what>` (a pull request that changes ROADMAP.md), `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`, each with an em dash (—)";
+    const notAForm = (first: string) =>
+      `the PR body's first line "${first}" is not one of the forms AGENTS.md → The loop, step 4, gives: ${FORMS}`;
+    for (const first of [
+      "## What", // #85 to #104
+      "",
+      "Roadmap: x",
+      "Roadmap: Slice 0 - The done gate is split into a folder before the items that rewrite it",
+      "Roadmap: Side track — ",
+      "roadmap: off-roadmap — x",
+      " Roadmap: off-roadmap — x",
+      "Roadmap: Slice zero — x",
+    ])
+      expect([first, judge(first)]).toEqual([
+        first,
+        [notAForm(first.trimEnd())],
+      ]);
+    expect(judge(`Roadmap: off-roadmap — ${"y".repeat(200)}`)).toEqual([]);
+    expect(judge(`x${"y".repeat(200)}`)[0]).toContain(
+      `"x${"y".repeat(98)}…" is not one of the forms`,
+    );
+    expect(firstLineProblems("", ROADMAP, false)).toEqual([notAForm("")]);
+    for (const [first, why] of [
+      [
+        "Roadmap: Slice 0 — replan after the fourth outside review: gate split first", // #113
+        `names "replan after the fourth outside review: gate split first", which is no item of Slice 0 in ROADMAP.md`,
+      ],
+      [
+        "Roadmap: Slice 0 — The done gate", // a beginning that stops short of the first colon
+        'names "The done gate", which is no item of Slice 0 in ROADMAP.md',
+      ],
+      [
+        "Roadmap: Slice 0 — A blocked lead can choose to hear from us again", // Slice 2's item
+        'names "A blocked lead can choose to hear from us again", which is no item of Slice 0 in ROADMAP.md',
+      ],
+      ["Roadmap: Slice 1 — x", "names Slice 1, which ROADMAP.md does not have"],
+    ])
+      expect(judge(first)).toEqual([
+        expect.stringContaining(`the PR body's first line ${why}`),
+      ]);
+    expect(judge("Roadmap: Slice 0 — The done gate")[0]).toEndWith(FORMS);
+  });
+
+  it("can name every item of the real ROADMAP.md, as the tracker reads it, by its text up to its first colon", () => {
+    const real = readFileSync(
+      join(import.meta.dir, "..", "ROADMAP.md"),
+      "utf8",
+    );
+    const { slices } = parseRoadmap(real);
+    expect(slices.length).toBeGreaterThan(0);
+    for (const s of slices)
+      for (const i of s.items) {
+        const first = `Roadmap: Slice ${s.n} — ${i.text.split(/: /)[0]}`;
+        expect([first, firstLineProblems(first, real, false)]).toEqual([
+          first,
+          [],
+        ]);
+      }
+  });
+});
+
+describe("docs/fix-when-touched.md: a pull request answers each entry whose area it touches", () => {
+  const TABLE = [
+    "## Find your area",
+    "",
+    "| If your PR touches… | Fix this too |",
+    "|---|---|",
+    "| Any file in `packages/` or `scripts/` | 1. Comments that say untrue things |",
+    "| `packages/db/`, `scripts/demo.ts`, Local branches | 2. Unused code |",
+    "| `services/worker/src/runs.ts` | 10. Files with more than one job |",
+    "",
+    "## Product code",
+    "",
+    "| Not | 3. this table |",
+  ].join("\n");
+  const files = [
+    "packages/db/src/a.ts",
+    "scripts/demo.ts",
+    "services/worker/src/runs.ts",
+    "services/worker/src/runs.test.ts",
+    "README.md",
+  ];
+
+  it("reads the table's left column: a folder covers everything under it, a file covers itself, at any letter case", () => {
+    expect(fixWhenTouchedProblems(files, "", TABLE)).toEqual([
+      "docs/fix-when-touched.md entry 1 (Comments that say untrue things) covers packages/db/src/a.ts, scripts/demo.ts: add the line `Fix-when-touched: 1 · fixed · <what you fixed>` or `Fix-when-touched: 1 · not applicable · <why>` to the PR body",
+      "docs/fix-when-touched.md entry 2 (Unused code) covers packages/db/src/a.ts, scripts/demo.ts: add the line `Fix-when-touched: 2 · fixed · <what you fixed>` or `Fix-when-touched: 2 · not applicable · <why>` to the PR body",
+      "docs/fix-when-touched.md entry 10 (Files with more than one job) covers services/worker/src/runs.ts: add the line `Fix-when-touched: 10 · fixed · <what you fixed>` or `Fix-when-touched: 10 · not applicable · <why>` to the PR body",
+    ]);
+    expect(
+      fixWhenTouchedProblems(["Packages/X.ts", "packagesx/a.ts"], "", TABLE),
+    ).toEqual([expect.stringContaining("entry 1 (")]);
+    expect(fixWhenTouchedProblems(["README.md"], "", TABLE)).toEqual([]);
+    expect(fixWhenTouchedProblems(files, "", "# no table\n")).toEqual([]);
+  });
+
+  it("accepts one line per entry, fixed or not applicable with a reason; one GitHub doesn't show counts for nothing", () => {
+    const body = [
+      "Roadmap: Slice 0 — x",
+      "",
+      "Fix-when-touched: 1 · fixed · dropped the old task codes in scripts/demo.ts",
+      "Fix-when-touched: 2 · not applicable · nothing unused in these files",
+      "<!--",
+      "Fix-when-touched: 10 · not applicable · hidden",
+      "-->",
+      "```",
+      "Fix-when-touched: 10 · not applicable · hidden",
+      "```",
+    ].join("\n");
+    expect(fixWhenTouchedProblems(files, body, TABLE)).toEqual([
+      expect.stringContaining("entry 10 (Files with more than one job)"),
+    ]);
+    expect(
+      fixWhenTouchedProblems(
+        files,
+        `${body}\nFix-when-touched: 10 · not applicable · runs.ts is only renamed\n`,
+        TABLE,
+      ),
+    ).toEqual([]);
+  });
+
+  it("refuses a line not written in the format, naming the format", () => {
+    const HOW =
+      "`Fix-when-touched: <entry number> · fixed · <what you fixed>` or `Fix-when-touched: <entry number> · not applicable · <why>`";
+    for (const line of [
+      "Fix-when-touched: 10 · done · split it",
+      "Fix-when-touched: 10 · fixed",
+      "Fix-when-touched: 1, 10 · fixed · both",
+      "Fix-when-touched: entry 10 · fixed · split it",
+    ])
+      expect(
+        fixWhenTouchedProblems(["services/worker/src/runs.ts"], line, TABLE),
+      ).toEqual([
+        `the PR body's line "${line}" is not written as ${HOW}`,
+        expect.stringContaining("entry 10 ("),
+      ]);
+  });
+
+  it("reads every row of the real table: each has an entry number and at least one path in backticks", () => {
+    const real = readFileSync(
+      join(import.meta.dir, "..", "docs", "fix-when-touched.md"),
+      "utf8",
+    );
+    const rows = real
+      .split("## Find your area")[1]
+      ?.split("\n## ")[0]
+      ?.split("\n")
+      .filter((l) => l.startsWith("|") && !/^\|[-\s|]+\|$/.test(l)).length;
+    const areas = areasOf(real);
+    expect(areas.length).toBe((rows ?? 0) - 1); // less the header row
+    for (const a of areas) {
+      expect(a.n).toMatch(/^\d+$/);
+      expect(a.paths.length).toBeGreaterThan(0);
+    }
   });
 });
 

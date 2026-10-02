@@ -134,10 +134,13 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
    verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
    word for word). PR body: the first line is `Roadmap: Slice N —
-   <item>`, `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`; then what / why /
+   <item>` (the item's text as ROADMAP.md has it, whole or up to its first colon; a note in brackets may
+   follow), `Roadmap: Slice N — replan: <what>` (a PR that changes ROADMAP.md and builds nothing), `Roadmap:
+   Side track — <what>` or `Roadmap: off-roadmap — <what>`, each with an em dash; then what / why /
    evidence (the gate's line, the verifier's ruling, how the result was seen working), with a
-   `Rule change:` line per changed rule file (hard rail 7). `PR_BODY="$(cat body.md)" bun run gate pr`
-   judges the body as `rules-from-main` will. Watch CI: `gh pr checks <n> --watch`. Green means observed
+   `Rule change:` line per changed rule file (hard rail 7) and a `Fix-when-touched:` line per entry of
+   docs/fix-when-touched.md whose area the PR touches (step 6). `rules-from-main` refuses a PR without
+   them; `PR_BODY="$(cat body.md)" bun run gate pr` judges the body as it will. Watch CI: `gh pr checks <n> --watch`. Green means observed
    green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
    three or more open task PRs, stop taking new work. Merge with `gh pr merge <number>`, one per
@@ -147,7 +150,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
    to tick; its PR body's what / why / evidence is the record), updates `STATE.md → What works
    today` if reality changed, and adds a line to `STATE.md → Decisions in force` for any decision.
-   Any area the PR touches that has an entry in `docs/fix-when-touched.md` gets that fix in the same PR.
+   Any area the PR touches that has an entry in `docs/fix-when-touched.md` gets that fix in the same PR,
+   or its body says why it doesn't apply, in the format that file's "How to use it" gives.
    A genuine surprise gets one factual line in `lessons.md`. After ROADMAP.md or STATE.md change
    on main, republish the tracker page (Claude: Artifact publish of `docs/tracker/index.html`
    with files `ROADMAP.md`, `STATE.md`, `parse.js` from `docs/tracker/parse.js` and `published.txt` from

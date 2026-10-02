@@ -1,6 +1,6 @@
 name: rules-from-main
-# Main's copy of the rules judges every pull request: the done rules, each rule change explained and recorded,
-# and no second check named rules-from-main (scripts/done-gate/pr.ts). `pull_request_target` always runs the
+# Main's copy of the rules judges every pull request: everything scripts/done-gate/pr.ts lists, its body's first
+# line and the done rules among them. `pull_request_target` always runs the
 # workflow file from main, never the branch's copy, so a branch can't loosen the rules that judge it. That trigger
 # also hands the job a token with write access to the base repository unless told otherwise, so this job reads the
 # pull request only as data: it checks out main alone, fetches the pull request's commits without checking them
