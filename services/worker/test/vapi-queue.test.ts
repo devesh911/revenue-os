@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { pool } from "../src/db";
 import app from "../src/index";
 import { startJobs, stopJobs } from "../src/jobs";
 
@@ -18,7 +19,8 @@ const admin = new pg.Pool({
   max: 1,
 });
 
-const companies = testCompanies(admin);
+// The worker's own pool owns pg-boss's tables: clean-up also clears this company's undrained nudges.
+const companies = testCompanies(admin, pool);
 let orgId = "";
 // Call ids are unique across every company: one of this run's own, so two test runs at once never share it.
 const callId = `qcall-${randomUUID()}`;
@@ -82,9 +84,9 @@ async function waitForDrain(timeoutMs = 15_000): Promise<void> {
   }
 }
 
-describe("vapi pipeline via pg-boss (P2 wiring)", () => {
+describe("vapi pipeline via pg-boss", () => {
   it("drains receiver-inserted events into conversation + seq-ordered messages — no direct processor call", async () => {
-    // out of order on purpose: t3 arrives before t2 (the CLAUDE.md Vapi gotcha)
+    // out of order on purpose: t3 arrives before t2 (the Vapi gotcha in AGENTS.md)
     expect(
       (
         await post(

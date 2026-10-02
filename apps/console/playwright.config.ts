@@ -37,6 +37,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI, // fail CI if a stray test.only was committed
   retries: process.env.CI ? 2 : 0, // 0 locally; trace is captured only on the first CI retry
+  // A test that passes only on a retry fails the run in CI: a flake is a failure to fix, not a green check
+  // (apps/console/test/flaky-retry.test.ts proves it).
+  failOnFlakyTests: !!process.env.CI,
   reporter: "list",
   use: {
     baseURL: "http://localhost:4173", // vite preview (strictPort in vite.config.ts)
