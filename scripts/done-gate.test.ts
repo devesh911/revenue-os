@@ -136,7 +136,33 @@ describe("parseDiff", () => {
         { file: "apps/x/src/a.ts", line: 4, text: "const y = 2;" },
         { file: "apps/x/src/a.ts", line: 5, text: "+i;" },
       ],
+      removed: [{ file: "old.ts", line: 1, text: "gone" }],
     });
+  });
+
+  it('reads a path whole whatever it holds: a quote, a backslash, " b/", or letters beyond ASCII', () => {
+    const dir = repo();
+    const odd = [
+      'services/worker/src/q"x.ts',
+      "services/worker/src/a\\b.ts",
+      ".claude/skills/a b/SKILL.md",
+      "services/worker/src/rülés.ts",
+    ];
+    for (const f of odd) write(dir, f, "export const x = 1;\n");
+    sh(dir, ["git", "add", "-A"]);
+    const diff = sh(dir, [
+      "git",
+      "-c",
+      "core.quotePath=off",
+      "diff",
+      "--cached",
+      "--unified=0",
+      "--no-renames",
+      "HEAD",
+    ]).stdout;
+    const { files, added } = parseDiff(diff);
+    expect([...files].sort()).toEqual([...odd].sort());
+    expect(added.map((a) => a.file).sort()).toEqual([...odd].sort());
   });
 });
 
@@ -470,9 +496,18 @@ describe("checkRules", () => {
     const paths = [
       ...sh(root, ["git", "ls-files"]).stdout.split("\n").filter(Boolean),
       ".claude/skills/new/SKILL.md",
+      ".claude/commands/x.md",
+      ".claude/settings.local.json",
+      "apps/www/.claude/settings.json",
+      "apps/www/CLAUDE.md",
       "packages/db/tsconfig.json",
+      "packages/db/biome.jsonc",
       "apps/www/playwright.config.ts",
-      "docs/AGENTS.md",
+      "scripts/guards/ip.sh",
+      ".gitattributes",
+      ".gitleaksignore",
+      ".mcp.json",
+      "docs/patterns/new.md",
     ];
     const matched = new Set(
       sh(
@@ -501,8 +536,20 @@ describe("checkRules", () => {
         "apps/console/package.json",
         "apps/www/biome.json",
         "apps/www/playwright.config.ts",
+        "apps/www/.claude/settings.json",
+        "apps/www/CLAUDE.md",
+        ".gitattributes",
+        ".gitleaksignore",
+        "packages/db/biome.jsonc",
       ]),
     );
+    // Every line under the heading names Devesh as the owner: a line with no owner leaves the file unowned.
+    const heading = codeowners
+      .slice(codeowners.indexOf("# Rule files"))
+      .split("\n")
+      .filter((l) => l.trim() && !l.startsWith("#"));
+    expect(heading.filter((l) => !/^\S+\s+@devesh911$/.test(l))).toEqual([]);
+    expect(rules).not.toContain("docs/patterns/new.md");
     expect(rules).not.toContain("ROADMAP.md");
     expect(rules).not.toContain("STATE.md");
     expect(rules.filter((f) => !matched.has(f))).toEqual([]); // a rule file CODEOWNERS lacks
@@ -1938,10 +1985,14 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     expect(names("every biome.json", "apps/www/biome.json")).toBe(true);
     expect(
       names(
-        ".claude/skills/ (the task-loop skill)",
+        ".claude/skills/task-loop/ (the task-loop skill)",
         ".claude/skills/task-loop/SKILL.md",
       ),
     ).toBe(true);
+    expect(names(".github/ (all of CI)", ".github/workflows/ci.yml")).toBe(
+      false,
+    ); // only the folder a file sits in names it
+    expect(names(".github/workflows/", ".github/workflows/ci.yml")).toBe(true);
   });
 
   it("refuses a badly written line, a record for another pull request, and one added outside Rule changes", () => {
@@ -1960,7 +2011,7 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
         PR,
       ),
     ).toEqual([
-      'the PR body\'s line "Rule change: ci.yml · stricter · checks more" is not written as `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`, where <rule> names the file by its path, its file name or a folder holding it (such as scripts/done-gate/)',
+      'the PR body\'s line "Rule change: ci.yml · stricter · checks more" is not written as `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`, where <rule> names the file by its path, its file name or the folder it sits in (such as scripts/done-gate/)',
       `STATE.md → Rule changes: "${other}" names #6, not this pull request (#7)`,
       expect.stringContaining(
         "the PR body explains no change to .github/workflows/ci.yml",
@@ -1969,26 +2020,92 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     ]);
   });
 
-  it("refuses a second check named rules-from-main, by job id or by name, anywhere but our one job", () => {
-    const ours = "jobs:\n  rules-from-main:\n    runs-on: ubuntu-latest\n";
+  it("counts no line GitHub doesn't show: one in an HTML comment or a code block explains nothing", () => {
+    const row = record("ci.yml");
+    const state = STATE(row);
+    for (const hidden of [
+      "Tidy-up only.\n<!--\nRule change: ci.yml · neutral · tidy\n-->",
+      "Tidy-up only.\n```\nRule change: ci.yml · neutral · tidy\n```",
+      "Tidy-up only.\n<!-- left open\nRule change: ci.yml · neutral · tidy",
+    ])
+      expect(
+        ruleChangeProblems(
+          [".github/workflows/ci.yml"],
+          addedTo(state, row),
+          hidden,
+          state,
+          PR,
+        ),
+      ).toEqual([
+        expect.stringContaining(
+          "the PR body explains no change to .github/workflows/ci.yml",
+        ),
+      ]);
+  });
+
+  it("refuses a change that removes or rewrites an earlier record, so Rule changes only grows", () => {
+    const old = record("biome.json", "5");
+    expect(
+      ruleChangeProblems(["STATE.md"], [], "", STATE(), PR, [
+        { file: "STATE.md", line: 11, text: old },
+        { file: "STATE.md", line: 5, text: "- 2026-10-01 · an old decision" },
+      ]),
+    ).toEqual([
+      `STATE.md → Rule changes only grows: this change removes or rewrites the record "${old}"`,
+    ]);
+  });
+
+  it("refuses any other workflow that could report a check named rules-from-main, however its YAML is written", () => {
     const path = ".github/workflows/rules-from-main.yml";
-    expect(secondCheck({ [path]: ours })).toBeUndefined();
+    const ours = {
+      [path]:
+        "permissions: {contents: read}\njobs:\n  rules-from-main:\n    runs-on: x\n",
+    };
+    const read = "permissions: {contents: read}\n";
+    const other = (yml: string) =>
+      secondCheck({ ...ours, ".github/workflows/x.yml": yml });
+    expect(secondCheck(ours)).toEqual([]);
+    for (const [how, yml] of [
+      [
+        "an indented job id",
+        `${read}jobs:\n    rules-from-main:\n      runs-on: x\n`,
+      ],
+      ["a quoted job id", `${read}jobs:\n  "rules-from-main": {runs-on: x}\n`],
+      ["flow style", `${read}jobs: {rules-from-main: {runs-on: x}}\n`],
+      ["a name", `${read}jobs:\n  a:\n    name: Rules-From-Main\n`],
+      [
+        "folded text",
+        `${read}jobs:\n  a:\n    name: >-\n      rules-from-main\n`,
+      ],
+      [
+        "an anchor",
+        `x: &n rules-from-main\n${read}jobs:\n  a:\n    name: *n\n`,
+      ],
+      [
+        "an expression",
+        `${read}jobs:\n  a:\n    name: rules-from-\${{ 'main' }}\n`,
+      ],
+    ])
+      expect([how, other(yml)]).toEqual([
+        how,
+        [expect.stringContaining("its check could be named rules-from-main")],
+      ]);
+    expect(other("jobs:\n  a:\n    permissions: {checks: write}\n")).toEqual([
+      expect.stringContaining("its token could write checks or statuses"),
+    ]);
+    expect(other("permissions: write-all\njobs:\n  a: {}\n")).toHaveLength(1);
+    expect(other("jobs:\n  a: {runs-on: x}\n")).toHaveLength(1); // no permissions: the default may write
+    expect(other("jobs: [\n")).toEqual([
+      expect.stringContaining("can't be read as YAML"),
+    ]);
     expect(
-      secondCheck({
-        [path]: ours,
-        ".github/workflows/ci.yml":
-          "jobs:\n  checks:\n    name: rules-from-main\n",
-      }),
-    ).toContain("defined 2 times");
-    expect(
-      secondCheck({
-        [path]: ours,
-        ".github/workflows/x.yml": "jobs:\n  rules-from-main: # mine\n",
-      }),
-    ).toContain(".github/workflows/x.yml");
-    expect(
-      secondCheck({ [path]: `${ours}  other:\n    name: "rules-from-main"\n` }),
-    ).toContain("defined 2 times");
+      other(
+        `${read}jobs:\n  a:\n    steps:\n      - name: rules-from-main\n        with: {name: rules-from-main}\n`,
+      ),
+    ).toEqual([]); // a step or an artifact of that name reports no check
+    expect(secondCheck({ [path]: `${ours[path]}  b: {runs-on: x}\n` })).toEqual(
+      [`${path} must hold exactly one job, rules-from-main`],
+    );
   });
 
   /** A scratch repo whose main holds the gate and a Rule changes section, and a branch `feat` cut from it. */
@@ -1998,7 +2115,7 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     write(
       dir,
       ".github/workflows/ci.yml",
-      "jobs:\n  checks:\n    runs-on: x\n",
+      "permissions: {contents: read}\njobs:\n  checks:\n    runs-on: x\n",
     );
     commitOld(dir);
     sh(dir, ["git", "checkout", "-qb", "feat"]);
@@ -2060,7 +2177,7 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     write(
       dir,
       ".github/workflows/ci.yml",
-      "jobs:\n  checks:\n    runs-on: y\n",
+      "permissions: {contents: read}\njobs:\n  checks:\n    runs-on: y\n",
     );
     const r = judged(dir, "Roadmap: Slice 0 — x\n");
     expect(r.status).toBe(1);
@@ -2103,8 +2220,31 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     const r = judged(dir, explained(".github/workflows/ci.yml"));
     expect(r.status).toBe(1);
     expect(r.out).toContain(
-      "a check named rules-from-main is defined 1 times (.github/workflows/ci.yml)",
+      ".github/workflows/ci.yml, job rules-from-main: its check could be named rules-from-main",
     );
+  });
+
+  it("sees every added line however .gitattributes marks it, in main's copy and in the branch's own", () => {
+    const dir = repo();
+    write(dir, ".gitattributes", "*.ts -diff binary\n");
+    commitOld(dir); // main hides .ts files from diffs
+    sh(dir, ["git", "checkout", "-qb", "feat"]);
+    write(dir, "services/worker/src/a.ts", "// @ts-ignore\nconst a = 1;\n");
+    const own = sh(dir, [
+      "bun",
+      "scripts/done-gate.ts",
+      "rules",
+      "--base",
+      "main",
+    ]);
+    expect(own.stdout).toContain(
+      "services/worker/src/a.ts:1 switches the type checker off",
+    );
+    const r = judged(dir, "Roadmap: x\n");
+    expect(r.out).toContain(
+      "services/worker/src/a.ts:1 switches the type checker off",
+    );
+    expect(r.status).toBe(1);
   });
 
   it("needs the body, and a number that is a number", () => {
@@ -2145,11 +2285,15 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     for (const banned of [
       /secrets\./,
       /environment:/,
-      /\bhead\.(sha|ref)\b/,
+      /\bhead\.ref\b/,
       /bun (install|run)/,
       /^\s+pull_request:/m,
     ])
       expect(yml).not.toMatch(banned);
+    // The commit judged is the one the event is about, handed over as data.
+    expect(yml.match(/^.*\bhead\.sha\b.*$/gm)).toEqual([
+      `          HEAD_SHA: \${{ github.event.pull_request.head.sha }}`,
+    ]);
     const runs = [...yml.matchAll(/^\s+run: (.+)$/gm)].map(([, c = ""]) => c);
     expect(runs).toHaveLength(2);
     for (const c of runs) expect(c).not.toContain("${{"); // the body and number arrive as environment variables
@@ -2159,7 +2303,7 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     write(
       dir,
       ".github/workflows/ci.yml",
-      "jobs:\n  checks:\n    runs-on: y\n",
+      "permissions: {contents: read}\njobs:\n  checks:\n    runs-on: y\n",
     );
     commitAll(dir);
     const origin = mkdtempSync(join(tmpdir(), "done-gate-origin-"));
@@ -2169,10 +2313,21 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     const runner = join(mkdtempSync(join(tmpdir(), "done-gate-runner-")), "w");
     dirs.push(dirname(runner));
     sh(dirname(runner), ["git", "clone", "-q", "-b", "main", origin, runner]); // as the checkout's `ref: main`
-    const step = (body: string) =>
+    const sha = (ref: string) =>
+      sh(dir, ["git", "rev-parse", ref]).stdout.trim();
+    const step = (body: string, head = sha("feat")) =>
       runs.map((c) =>
-        sh(runner, ["/bin/sh", "-c", c], { PR_NUMBER: PR, PR_BODY: body }),
+        sh(runner, ["/bin/sh", "-c", c], {
+          PR_NUMBER: PR,
+          PR_BODY: body,
+          HEAD_SHA: head,
+        }),
       );
+    const [moved] = step("x", sha("main")); // the pull request moved on after the event
+    expect(moved?.status).toBe(1);
+    expect(moved?.stdout).toContain(
+      "its newer commit is judged by its own run",
+    );
     const [fetched, refused] = step("Roadmap: Slice 0 — x\n");
     expect(fetched?.status).toBe(0);
     expect(refused?.status).toBe(1);

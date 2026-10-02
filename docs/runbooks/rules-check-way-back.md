@@ -11,14 +11,15 @@ by main's copy too. This page is the way back. Only Devesh can do it, because it
 - `checks` (the repository's own tests, run on the branch's code) is green on the fix.
 
 ## What to do (about five minutes)
-1. An agent opens the fix as its own pull request: the change to `scripts/done-gate/` that corrects the rule,
-   with a test that fails before the fix. Its `checks` must be green. Its body says which rule changed and why,
+1. An agent opens the fix as its own pull request: the change to `scripts/done-gate/` or to
+   `.github/workflows/rules-from-main.yml` that corrects the rule, with a test that fails before the fix. Its `checks` must be green. Its body says which rule changed and why,
    like any rule change.
-2. GitHub → Settings → Rules → Rulesets → main-protection → Require status checks to pass: remove
+2. GitHub → Settings → Rules → Rulesets → main-protection (S13.1) → Require status checks to pass: remove
    `rules-from-main` from the list, then Save changes.
 3. Merge only that fix pull request, with squash.
 4. Back in the same place, add `rules-from-main` again with GitHub Actions as its source, then Save changes.
-5. Push any change to one open pull request, or re-run its `rules-from-main` check, and see it pass.
+5. Push any change to one open pull request and see its new `rules-from-main` run pass. (Re-running an old run
+   would use the workflow file of that old run, not main's fixed one.)
 
 While the check is off, merge nothing else. Never use an administrator bypass instead: main's ruleset has none,
 and the check must come back on as soon as the fix is in.

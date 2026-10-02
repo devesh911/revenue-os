@@ -1,5 +1,5 @@
 // A pull request that changes a rule file says in its body which rule changed, which way and why, and adds the
-// same to STATE.md → Rule changes (AGENTS.md hard rail 7).
+// same to STATE.md → Rule changes, which only grows (AGENTS.md hard rail 7).
 
 import type { Added } from "./diff";
 import { RULE_FILES } from "./rules";
@@ -10,18 +10,18 @@ const SAID = new RegExp(`^Rule change: (.+?) · (?:${WAY}) · \\S`);
 const RECORDED = new RegExp(
   `^- \\d{4}-\\d{2}-\\d{2} · \\[#(\\d+)\\]\\(https://github\\.com/[\\w.-]+/[\\w.-]+/pull/\\1\\) · (.+) · (?:${WAY})\\b`,
 );
-const HOW = `\`Rule change: <rule> · tighter | looser | neutral | mixed · <why>\`, where <rule> names the file by its path, its file name or a folder holding it (such as scripts/done-gate/)`;
+const HOW = `\`Rule change: <rule> · tighter | looser | neutral | mixed · <why>\`, where <rule> names the file by its path, its file name or the folder it sits in (such as scripts/done-gate/)`;
 
 /**
- * PURE: does `text` name `file` by its path, its file name, or a folder holding it written with its "/", each as a
- * whole word ("scripts/" inside "scripts/done-gate/" names no file of scripts/)?
+ * PURE: does `text` name `file` by its path, its file name, or the folder it sits in written with its "/", each as
+ * a whole word? A folder further up names nothing: ".github/" does not name .github/workflows/ci.yml.
  */
 export const names = (text: string, file: string) => {
-  const parts = file.split("/");
+  const at = file.lastIndexOf("/");
   return [
     file,
-    parts.at(-1) ?? file,
-    ...parts.slice(1).map((_, i) => `${parts.slice(0, i + 1).join("/")}/`),
+    file.slice(at + 1),
+    ...(at > 0 ? [file.slice(0, at + 1)] : []),
   ].some((n) =>
     new RegExp(
       `(?<![\\w./-])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w/-])`,
@@ -29,10 +29,17 @@ export const names = (text: string, file: string) => {
   );
 };
 
+/** PURE: a PR body as GitHub shows it: no HTML comments, no fenced code blocks, where a line could hide. */
+const shown = (body: string) =>
+  body
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, "")
+    .replace(/^ {0,3}(```|~~~)[\s\S]*?(?:^ {0,3}\1|(?![\s\S]))/gm, "");
+
 /**
- * PURE: the change's files and added lines, the PR body, STATE.md as the change leaves it, and the PR's number
- * when known → what is missing for each changed rule file: a line in the body saying how it changed and why, and
- * a line the change adds to STATE.md → Rule changes for this PR.
+ * PURE: the change's files, added and removed lines, the PR body, STATE.md as the change leaves it, and the PR's
+ * number when known → what is missing for each changed rule file (a line in the body, as GitHub shows it, saying
+ * how it changed and why, and a line the change adds to STATE.md → Rule changes for this PR), and any record of an
+ * earlier rule change the change removes or rewrites.
  */
 export function ruleChangeProblems(
   files: string[],
@@ -40,11 +47,19 @@ export function ruleChangeProblems(
   body: string,
   state: string,
   pr?: string,
+  removed: Added[] = [],
 ): string[] {
+  const problems = removed
+    .filter((r) => r.file === "STATE.md" && RECORDED.test(r.text))
+    .map(
+      (r) =>
+        `STATE.md → Rule changes only grows: this change removes or rewrites the record "${r.text}"`,
+    );
   const changed = files.filter((f) => RULE_FILES.test(f));
-  if (!changed.length) return [];
-  const problems: string[] = [];
-  const said = body.split(/\r?\n/).filter((l) => l.startsWith("Rule change:"));
+  if (!changed.length) return problems;
+  const said = shown(body)
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith("Rule change:"));
   for (const l of said)
     if (!SAID.test(l))
       problems.push(`the PR body's line "${l}" is not written as ${HOW}`);

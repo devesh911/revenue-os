@@ -1,6 +1,6 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
-// every pull request with --head): the done rules, each rule change explained and recorded, and no second
-// check named rules-from-main.
+// every pull request with --head): the done rules, each rule change explained and recorded, and no other workflow
+// able to report a check named rules-from-main.
 
 import { git } from "./git";
 import { ruleChangeProblems } from "./rule-changes";
@@ -9,20 +9,61 @@ import type { Snap } from "./snapshot";
 
 const WORKFLOWS = ".github/workflows/";
 const OURS = `${WORKFLOWS}rules-from-main.yml`;
-// A job whose id or name is rules-from-main: GitHub reports either as the check's name.
-const NAMED =
-  /^ {2}rules-from-main:\s*(?:#.*)?$|^\s+name:\s*["']?rules-from-main["']?\s*(?:#.*)?$/gm;
+const NAME = "rules-from-main";
+type Job = { name?: unknown; permissions?: unknown };
 
-/** PURE: the pull request's workflow files → a problem when one besides ours defines a check named rules-from-main. */
-export function secondCheck(workflows: Record<string, string>) {
-  const where = Object.entries(workflows).flatMap(([file, text]) =>
-    (text.match(NAMED) ?? []).map(() => file),
-  );
-  if (where.length > 1 || where.some((f) => f !== OURS))
-    return `a check named rules-from-main is defined ${where.length} times (${where.join(", ")}); only ${OURS}'s one job may carry that name, which main's ruleset requires`;
+/** Can a job's token write checks or statuses? `write-all`, either scope at write, or no permissions anywhere. */
+const writesChecks = (permissions: unknown) =>
+  permissions === undefined ||
+  permissions === "write-all" ||
+  (typeof permissions === "object" &&
+    permissions !== null &&
+    ["checks", "statuses"].some(
+      (k) => (permissions as Record<string, unknown>)[k] === "write",
+    ));
+
+/**
+ * PURE: the pull request's workflow files → problems when any besides ours could report a check named
+ * rules-from-main, which main's ruleset requires: a job of that id or name (read as YAML, so quoting, anchors and
+ * folded text change nothing), a job whose name is an expression, which can't be read until it runs, or a job whose
+ * token can write checks or statuses. Ours must hold exactly one job, of that id.
+ */
+export function secondCheck(workflows: Record<string, string>): string[] {
+  const problems: string[] = [];
+  for (const [file, text] of Object.entries(workflows)) {
+    try {
+      const doc = Bun.YAML.parse(text) as {
+        jobs?: Record<string, Job>;
+        permissions?: unknown;
+      } | null;
+      const jobs = doc?.jobs ?? {};
+      if (file !== OURS)
+        for (const [id, job] of Object.entries(jobs)) {
+          const name = String(job?.name ?? id);
+          if (
+            [id, name].some((n) => n.toLowerCase() === NAME) ||
+            /\$\{\{/.test(name)
+          )
+            problems.push(
+              `${file}, job ${id}: its check could be named ${NAME}, the name only ${OURS} may report (a job's name must be plain text)`,
+            );
+          if (writesChecks(job?.permissions ?? doc?.permissions))
+            problems.push(
+              `${file}, job ${id}: its token could write checks or statuses, and so report a check named ${NAME}; give it permissions without checks or statuses write`,
+            );
+        }
+      else if (Object.keys(jobs).join() !== NAME)
+        problems.push(`${OURS} must hold exactly one job, ${NAME}`);
+    } catch (e) {
+      problems.push(
+        `${file} can't be read as YAML (${String(e).split("\n")[0]}), so its checks can't be judged`,
+      );
+    }
+  }
+  return problems;
 }
 
-/** The snapshot's code, read from git: a file the change leaves (empty when it has none) and the workflow files. */
+/** The snapshot's code, read from git: a file the change leaves (empty when it has none). */
 const at = (snap: Snap, file: string) =>
   git(snap.repo, ["cat-file", "blob", `${snap.tree}:${file}`], {}, true);
 
@@ -31,15 +72,14 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
   const workflows = Object.fromEntries(
     git(
       snap.repo,
-      ["ls-tree", "-r", "--name-only", snap.tree, "--", WORKFLOWS],
+      ["ls-tree", "-r", "-z", "--name-only", snap.tree, "--", WORKFLOWS],
       {},
       true,
     )
-      .split("\n")
-      .filter((f) => /\.ya?ml$/.test(f))
+      .split("\0")
+      .filter((f) => /\.ya?ml$/i.test(f))
       .map((f) => [f, at(snap, f)]),
   );
-  const second = secondCheck(workflows);
   return {
     problems: [
       ...problems,
@@ -49,8 +89,9 @@ export function judgePr(snap: Snap, body: string, pr?: string) {
         body,
         at(snap, "STATE.md"),
         pr,
+        snap.removed,
       ),
-      ...(second ? [second] : []),
+      ...secondCheck(workflows),
     ],
     notes,
   };

@@ -34,11 +34,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 7. **main is PR-only with CI green** (required checks: `checks`, and `rules-from-main` once Devesh makes it
    required). Merge authority follows the PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge
    independent PRs one at a time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. A rule file is any path `RULE_FILES` in `scripts/done-gate/rules.ts` matches (the done gate,
-   CI, the hooks, the verifier, the skills, the plan hooks, lint, type and test settings, every package.json,
-   AGENTS.md and CLAUDE.md). A change to one needs nobody's approval to start and is explained before it merges:
+   only humans merge. A rule file is any path `RULE_FILES` in `scripts/done-gate/rules.ts` matches. A change to one needs nobody's approval to start and is explained before it merges:
    its PR body has one line per changed rule, `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`,
-   naming each changed file by its path, its file name or a folder holding it, and the same PR adds a line per
+   naming each changed file by its path, its file name or the folder it sits in, and the same PR adds a line per
    changed rule to STATE.md → Rule changes; the agent shows Devesh that explanation in chat, then, in SETUP, merges
    it itself on observed-green checks like any other PR. `rules-from-main` judges every PR with main's copy of the
    rules (`bun run gate pr`) and refuses one whose rule changes are not explained and recorded; the local hooks

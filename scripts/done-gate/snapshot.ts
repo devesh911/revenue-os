@@ -21,6 +21,7 @@ export type Snap = {
   tree: string;
   files: string[];
   added: Added[];
+  removed: Added[];
   users: Map<string, string[]>;
 };
 
@@ -37,8 +38,7 @@ export function snapshot(
 ): Snap {
   if (head) {
     const tree = git(repo, ["rev-parse", "--verify", `${head}^{tree}`]);
-    if (!withDiff)
-      return { repo, tree, files: [], added: [], users: new Map() };
+    if (!withDiff) return NONE(repo, tree);
     const from = git(repo, ["merge-base", head, base ?? "origin/main"]);
     return analyse(
       repo,
@@ -46,7 +46,7 @@ export function snapshot(
       git(repo, [...DIFF, from, head]),
       (args) =>
         git(repo, [...GREP, ...args, tree], {}, true)
-          .split("\n")
+          .split("\0")
           .filter(Boolean)
           .map((l) => l.slice(tree.length + 1)), // "<tree>:<path>"
       (f) => git(repo, ["cat-file", "blob", `${tree}:${f}`], {}, true),
@@ -69,8 +69,7 @@ export function snapshot(
   try {
     git(repo, ["add", "-A"], env);
     const tree = git(repo, ["write-tree"], env);
-    if (!withDiff)
-      return { repo, tree, files: [], added: [], users: new Map() };
+    if (!withDiff) return NONE(repo, tree);
     const from = base
       ? git(repo, ["merge-base", "HEAD", base])
       : git(repo, ["merge-base", "HEAD", "origin/main"], {}, true) || "HEAD";
@@ -80,7 +79,7 @@ export function snapshot(
       git(repo, [...DIFF, "--cached", from], env),
       (args) =>
         git(repo, [...GREP, "--cached", ...args], env, true)
-          .split("\n")
+          .split("\0")
           .filter(Boolean),
       (f) => {
         try {
@@ -95,11 +94,24 @@ export function snapshot(
   }
 }
 
-const GREP = ["-c", "core.quotePath=off", "grep"];
+const NONE = (repo: string, tree: string): Snap => ({
+  repo,
+  tree,
+  files: [],
+  added: [],
+  removed: [],
+  users: new Map(),
+});
+// The change's own .gitattributes must not hide it (`*.ts -diff`, `binary`) nor run a program on it, so the
+// attributes come from the empty tree, and no text conversion runs.
+const NO_ATTRIBUTES = "--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904"; // the empty tree
+const GREP = [NO_ATTRIBUTES, "-c", "core.quotePath=off", "grep", "-z"];
 const DIFF = [
+  NO_ATTRIBUTES,
   "-c",
   "core.quotePath=off",
   "diff",
+  "--no-textconv",
   "--unified=0",
   "--no-color",
   "--no-renames",
@@ -117,7 +129,7 @@ function analyse(
   grepIn: (args: string[]) => string[],
   readFile: (f: string) => string,
 ): Snap {
-  const { files, added } = parseDiff(diff);
+  const { files, added, removed } = parseDiff(diff);
   const users = new Map<string, string[]>(); // "file name" → files using the export
   const texts = new Map<string, string>();
   const read = (f: string) => {
@@ -159,5 +171,5 @@ function analyse(
         ].filter((f) => usesExport(read(f), f, file, name, reach.slice(1))),
       );
     }
-  return { repo, tree, files, added, users };
+  return { repo, tree, files, added, removed, users };
 }
