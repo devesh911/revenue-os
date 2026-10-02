@@ -317,6 +317,43 @@ describe("checkRules", () => {
     ).toEqual([]);
   });
 
+  it("blocks a test that deletes companies or queued jobs other than through tests/test-companies.ts", () => {
+    const test = "services/worker/test/cleanup.test.ts";
+    for (const line of [
+      "await admin.query(`delete from orgs where slug like 'test-%'`);",
+      "await admin.query(`delete from orgs where slug in ('seed-real-estate', 'seed-b2b-wholesale')`);",
+      "await app.query(`DELETE FROM pgboss.job WHERE name = 'place_call'`);",
+      "await app.query(`truncate table pgboss.job`);",
+      "await admin.query(`drop schema if exists pgboss cascade`);",
+    ])
+      expect(problemsOf(add(test, line))).toEqual([
+        `${test}:1 deletes companies or queued jobs other than through tests/test-companies.ts, which deletes only what this test made; a broader delete removes another test run's (delete a job only by its id)`,
+      ]);
+    for (const [file, line] of [
+      [
+        test,
+        "await app.query(`delete from pgboss.job where id = $1`, [job.id]);",
+      ],
+      [
+        test,
+        "await admin.query(`delete from contacts where org_id = $1`, [id]);",
+      ],
+      [
+        test,
+        "await admin.query(`drop schema if exists pgboss_test_1_ab cascade`);",
+      ],
+      [
+        "tests/test-companies.ts",
+        "await db.query(`delete from orgs where id = any($1::uuid[])`, [ids]);",
+      ],
+      [
+        "scripts/demo.ts",
+        "await admin.query(`delete from orgs where id = $1`, [orgId]);",
+      ],
+    ] as const)
+      expect(problemsOf(add(file, line))).toEqual([]);
+  });
+
   it("blocks a throwing placeholder on a product path unless STATE.md lists it as Stub", () => {
     const stub = add(
       "services/worker/src/jobs.ts",
@@ -542,6 +579,8 @@ describe("checkRules", () => {
         ".gitattributes",
         ".gitleaksignore",
         "packages/db/biome.jsonc",
+        "scripts/local-url.ts",
+        "scripts/app-service-login.ts",
       ]),
     );
     // Every line under the heading names Devesh as the owner: a line with no owner leaves the file unowned.

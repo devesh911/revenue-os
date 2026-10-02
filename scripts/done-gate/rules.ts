@@ -20,13 +20,18 @@ const SOURCE_PATH =
 // request explains it and records it (rule-changes.ts). ROADMAP.md and STATE.md stay out, because every pull
 // request changes them.
 export const RULE_FILES =
-  /^(\.github\/|\.codex\/|scripts\/(guards(\.sh$|\/)|done-gate|cycle-hook\.sh$|cycle\.ts$|local-env\.ts$)|tests\/(rls_coverage\.sql|setup[^/]*\.ts)$|\.mcp\.json$)|(^|\/)(\.claude\/(settings[^/]*\.json$|agents\/|skills\/|commands\/)|(AGENTS|CLAUDE)\.md$|\.gitleaks(\.toml|ignore)$|\.gitattributes$|package\.json$|bunfig\.toml$|biome\.jsonc?$|tsconfig[^/]*\.json$|playwright\.config\.ts$)/i;
+  /^(\.github\/|\.codex\/|scripts\/(guards(\.sh$|\/)|done-gate|cycle-hook\.sh$|cycle\.ts$|local-env\.ts$|local-url\.ts$|app-service-login\.ts$)|tests\/(rls_coverage\.sql|setup[^/]*\.ts)$|\.mcp\.json$)|(^|\/)(\.claude\/(settings[^/]*\.json$|agents\/|skills\/|commands\/)|(AGENTS|CLAUDE)\.md$|\.gitleaks(\.toml|ignore)$|\.gitattributes$|package\.json$|bunfig\.toml$|biome\.jsonc?$|tsconfig[^/]*\.json$|playwright\.config\.ts$)/i;
 const ALLOW = "done-gate: allow";
 // In a test file, a test switched off or singled out: skip/only/todo, their conditional forms (skipIf, runIf,
 // todoIf, if), Playwright's fixme and fail, bun's failing, after any modifiers (concurrent, serial, describe),
 // called or picked as a value (`cond ? describe : describe.skip`, test["skip"]), and xit/xtest/xdescribe. The
 // runner's name is captured, so a line's own variable of that name (`(it) => it.skip`) is left alone. What no
 // pattern sees (an alias, a destructured skip) the tests check still catches: see MAY_SKIP.
+// In a test, a delete of companies or queued jobs. tests/test-companies.ts does that for every test, deleting only
+// what the test made; anything broader (`where slug like 'test-%'`, `where name = 'place_call'`) also deletes the
+// companies and jobs of another test run on the shared database, or of the dev login's workspace.
+const DELETES_SHARED =
+  /\b(?:delete\s+from|truncate(?:\s+table)?)\s+(?:only\s+)?(?:public\.)?(?:orgs|pgboss\.\w+)\b|\bdrop\s+schema\s+(?:if\s+exists\s+)?pgboss\b/i;
 const SKIP =
   /(?<![\w$.!])(it|test|describe)(?:\s*\.\s*[\w$]+)*?\s*(?:\.\s*|\[\s*["'`])(?:skip|only|todo|skipIf|runIf|todoIf|if|fixme|fail|failing)\b|\bx(?:it|test|describe)\b/g;
 
@@ -107,6 +112,13 @@ function lineProblem(
     return "switches the type checker off without a reason; fix the cause instead";
   if (TEST.test(file) && skips(text))
     return "skips or singles out a test; every test must run";
+  if (
+    TEST.test(file) &&
+    file !== "tests/test-companies.ts" &&
+    DELETES_SHARED.test(stmt) &&
+    !/\bpgboss\.\w+\s+where\s+id\s*=\s*\$\d/i.test(stmt)
+  )
+    return "deletes companies or queued jobs other than through tests/test-companies.ts, which deletes only what this test made; a broader delete removes another test run's (delete a job only by its id)";
   if (TEST.test(file))
     return readsSource &&
       /\b(readFileSync|readFile|Bun\.file)\s*\(/.test(text) &&

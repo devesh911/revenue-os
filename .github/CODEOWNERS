@@ -21,6 +21,8 @@ scripts/guards/**                   @devesh911
 scripts/cycle-hook.sh               @devesh911
 scripts/cycle.ts                    @devesh911
 scripts/local-env.ts                @devesh911
+scripts/local-url.ts                @devesh911
+scripts/app-service-login.ts        @devesh911
 tests/rls_coverage.sql              @devesh911
 tests/setup*.ts                     @devesh911
 /.mcp.json                          @devesh911
