@@ -23,11 +23,11 @@ import { dirname, join, relative } from "node:path";
 import { parseDiff } from "./done-gate/diff";
 import { usesExport } from "./done-gate/export-users";
 import { mergeOf } from "./done-gate/merge-gate";
+import { secondCheck } from "./done-gate/pr";
+import { names, ruleChangeProblems } from "./done-gate/rule-changes";
 import { checkRules, RULE_FILES } from "./done-gate/rules";
 import { onSharedStack } from "./done-gate/shared-stack";
 import { simpleCommands } from "./done-gate/shell-words";
-import { secondCheck } from "./done-gate/pr";
-import { names, ruleChangeProblems } from "./done-gate/rule-changes";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
