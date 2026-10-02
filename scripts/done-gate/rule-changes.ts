@@ -30,7 +30,7 @@ export const names = (text: string, file: string) => {
 };
 
 /** PURE: a PR body as GitHub shows it: no HTML comments, no fenced code blocks, where a line could hide. */
-const shown = (body: string) =>
+export const shown = (body: string) =>
   body
     .replace(/<!--[\s\S]*?(?:-->|$)/g, "")
     .replace(/^ {0,3}(```|~~~)[\s\S]*?(?:^ {0,3}\1|(?![\s\S]))/gm, "");
