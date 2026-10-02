@@ -6,8 +6,6 @@
 //   bun run gate rules [--base <ref>]             only the rules, on the change since HEAD left <ref> (origin/main)
 //   bun run gate tests [e2e]                      bun's tests (or the browser checks); fails if any test didn't run
 //   bun run gate pause "<question>"               the next stop asks Devesh something; it is not "done"
-//   bun run gate verdict pass|fail "<what you saw>"   the verifier agent's ruling, or
-//   bun run gate verdict cannot-verify "<what only Devesh can provide>"
 //   bun run see /o/:org/contacts [more paths]     sign in as the dev login; save what each page shows
 //
 // Two moments are checked. A stop: the session's change, in each checkout it worked in and was the last to work
@@ -15,8 +13,8 @@
 // it only looked at, switched or pulled is not its change. A merge: an agent's `gh pr merge` goes through only when
 // the pull request's head commit was proven here, so work committed, pushed and merged in one go is checked too.
 // Proven means (1) the change against main breaks none of the done rules (done-gate/rules.ts), (2) every check
-// is green on this exact code, and (3) if product code changed, the verifier agent (and only it) ruled PASS on
-// this exact code; at a stop, a CANNOT_VERIFY naming what only Devesh can provide also lets the agent stop, told
+// is green on this exact code, and (3) if product code changed, the verifier agent ruled PASS on this exact code
+// in its own delivered report (done-gate/verifier.ts); at a stop, a CANNOT_VERIFY naming what only Devesh can provide also lets the agent stop, told
 // to him as NOT verified, and then only Devesh merges. Codex has no verifier agent, so its green product change stops once,
 // marked NOT independently verified. Results are kept per code state in .git/done-gate, so the same code is
 // never checked twice.

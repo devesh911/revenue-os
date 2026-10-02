@@ -64,7 +64,7 @@ export const extra = (root: string, tree: string) =>
  * Before a tool call, note each checkout the session is about to work in, and that it is the last to work there:
  * the checkout of its folder, of a file it edits, one a command enters (`cd`, `git -C`) or names by path. The
  * state a checkout is found in (the first time, or after another session worked there) is the baseline: only
- * what changes after it can be this session's.
+ * what changes after it can be this session's. Returns the checkouts it noted.
  */
 export function touch(
   repo: string,
@@ -119,6 +119,7 @@ export function touch(
   }
   if (!store.get("started", session))
     store.put("started", session, String(Math.floor(Date.now() / 1000)));
+  return [...hits];
 }
 
 /** The checkouts a stop answers for: those the session noted, and the one its shell is in. */

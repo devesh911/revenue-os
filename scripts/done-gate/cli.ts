@@ -1,5 +1,5 @@
-// `bun run gate` and `bun run see` from a terminal: every check, the rules alone, the tests, a pause, a ruling,
-// or what a signed-in person sees.
+// `bun run gate` and `bun run see` from a terminal: every check, the rules alone, the tests, a pause, or what a
+// signed-in person sees. The verifier's ruling is not among them: only its own delivered report counts (verifier.ts).
 
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,9 +12,9 @@ import { onSharedStack } from "./shared-stack";
 import { snapshot } from "./snapshot";
 import { Store, stateDir } from "./store";
 import { allTestsRun } from "./tests-ran";
-import { parseRuling, prove, type Ruling } from "./verdict";
+import { parseRuling, prove } from "./verdict";
 
-const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>" | verdict pass|fail "<what you saw>" | verdict cannot-verify "<what only Devesh can provide>"]
+const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>"]
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
        pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data`;
 
@@ -127,23 +127,6 @@ export async function cli(cmd: string, args: string[]) {
     store.put("pause", snapshot(repo, false).tree, text);
     console.log(
       "Paused. Your next stop reaches Devesh as a question, with the change marked NOT verified.",
-    );
-  } else if (
-    cmd === "verdict" &&
-    ["pass", "fail", "cannot-verify"].includes(args[0] ?? "") &&
-    args.slice(1).join(" ").trim()
-  ) {
-    const ruling: Ruling = {
-      verdict: args[0] as Ruling["verdict"],
-      note: args.slice(1).join(" ").trim(),
-    };
-    store.add(
-      "pending",
-      snapshot(repo, false).tree,
-      `${JSON.stringify({ ...ruling, at: Date.now() })}\n`,
-    );
-    console.log(
-      `Ruling noted: ${ruling.verdict.toUpperCase()}: ${ruling.note}\nIt counts only when it comes from the verifier agent, and only for the code exactly as it is now.`,
     );
   } else if (cmd === "see" && text) {
     const out = mkdtempSync(join(tmpdir(), "revenue-os-see-"));
