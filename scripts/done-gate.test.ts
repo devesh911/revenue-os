@@ -859,6 +859,14 @@ const REFUSED: [string, string][] = [
   [`echo \${x:-"}" <<EOF}\ngh release create v1\nEOF`, LOOP],
   ["# it's fine\ngh release create v1\n# done'", LOOP],
   ["# a comment; gh release create v1", LOOP], // a shell that takes no comments (zsh -i) runs it
+  // A backslash before a new line joins the lines; a heredoc's delimiter is its whole word, quotes removed; a `<<`
+  // in arithmetic starts no heredoc in bash, zsh or ksh, while dash, which has no `((`, reads it as one.
+  ["g\\\nh release create v1", LOOP],
+  ["\\\ngh release create v1", LOOP],
+  ['cat <<E"O"F\ngh release create v1\nEOF\ngh release create v1', LOOP],
+  ["(( x = 1 << 2 ))\ngh release create v1\n2", LOOP],
+  ["for ((i=0; i<<2; i++)); do :; done\ngh release create v1\n2", LOOP],
+  ["(( x = 1 << 2 ))\nit's\n2\ngh release create v1", LOOP], // dash reads the heredoc, then runs gh
   // Nor do wrappers with options: each is skipped with its options, and timeout with its duration.
   ["env -i gh release create v1", LOOP],
   ["env -u HOME gh release create v1", LOOP],
@@ -1054,6 +1062,11 @@ const ALLOWED = [
   's=$(gh run view 1 --json status -q .status)\ncase "$s" in\n  (*queued*|*in_progress*) echo wait ;;\n  *) echo done ;;\nesac',
   'case "$s" in a) gh run watch 1;& *b*) gh run view 1;| *c*) echo c;;& *d*) echo d;; esac',
   'gh pr view 5; if [ -n "$x" ]; then case $x in *a*|*b*) echo ab;; esac; fi',
+  // A heredoc's body is text however its delimiter is spelled, and `let`'s `<<` really starts one.
+  "cat <<'E F'\ngh release create v1 is text\nE F\ngit log -1",
+  "cat <<$X\ngh release create v1 is text\n$X\ngit log -1",
+  "let x=1<<2\ngh release create v1 is text\n2",
+  "echo 'a\\\nb' && git log -1",
   // A comment's quote is text.
   "# wait for the run's checks\nfor id in $(gh run list -L 3 --json databaseId -q '.[].databaseId'); do gh run view \"$id\" --json status -q '.status | ascii_upcase' | grep -q '^COMPLETED*'; done",
   "timeout 600 gh pr checks 12 --watch",
