@@ -5,7 +5,7 @@ import { checkoutsOf, toplevel } from "./checkouts";
 import { git } from "./git";
 import { type HookInput, say } from "./hook-io";
 import { isProduct } from "./rules";
-import { program, simpleCommands } from "./shell-words";
+import { gitOf, program, simpleCommands } from "./shell-words";
 import type { Store } from "./store";
 import { parseRuling } from "./verdict";
 
@@ -48,17 +48,7 @@ export function mergeOf(words: string[]) {
   };
 }
 
-const runsGit = (words: string[], sub: string) => {
-  const w = program(words);
-  let i = 1;
-  while ((w[i] ?? "").startsWith("-"))
-    i += ["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(
-      w[i] ?? "",
-    )
-      ? 2
-      : 1;
-  return w[0] === "git" && w[i] === sub;
-};
+const runsGit = (words: string[], sub: string) => gitOf(words)?.sub === sub;
 const mergesThroughApi = (words: string[]) => {
   const w = program(words);
   return (
@@ -81,15 +71,16 @@ const ownerRepo = (s = "") =>
     ?.slice(1)
     .join("/");
 
-export const deny = (why: string) =>
+/** Refuses the tool call, telling the agent why and Devesh the first line: a merge, or a command (tools.ts). */
+export const deny = (why: string, what = "merge") =>
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        permissionDecisionReason: `The done gate refused this merge: ${why}`,
+        permissionDecisionReason: `The done gate refused this ${what}: ${why}`,
       },
-      systemMessage: `Done gate ✗ merge refused: ${why.split("\n")[0]}`,
+      systemMessage: `Done gate ✗ ${what} refused: ${why.split("\n")[0]}`,
     }),
   );
 

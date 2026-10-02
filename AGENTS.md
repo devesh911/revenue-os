@@ -16,8 +16,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 
 ## Hard rails (never, no exceptions)
 1. **Secrets** — never read or write `.env*` values; never put tokens in chat, commits or logs.
-2. **Cloud** — no prod deploys; no `supabase link`, `supabase db push` or `bun run db:migrate`
-   from agent sessions. Every merge to main already applies new migrations to cloud staging
+2. **Cloud** — no prod deploys; no `supabase link` or `supabase db push` from agent sessions (the
+   hooks refuse both, and migration repair and a reset of the linked database: `scripts/done-gate/tools.ts`
+   says what agents' own tools may not do). Every merge to main already applies new migrations to cloud staging
    (`.github/workflows/deploy.yml`), so merging a migration *is* a cloud push: treat it that way.
 3. **Tenancy** — every new tenant table ships with `org_id` + RLS + a cross-tenant denial test in
    the same PR (RLS is enforced on all tables by `tests/rls_coverage.sql`; denial tests do not yet
@@ -34,15 +35,15 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 7. **main is PR-only with CI green** (required checks: `checks`, and `rules-from-main` once Devesh makes it
    required). Merge authority follows the PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge
    independent PRs one at a time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. A rule file is any path `RULE_FILES` in `scripts/done-gate/rules.ts` matches. A change to one needs nobody's approval to start and is explained before it merges:
-   its PR body has one line per changed rule, `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`,
-   naming each changed file by its path, its file name or the folder it sits in, and the same PR adds a line per
-   changed rule to STATE.md → Rule changes; the agent shows Devesh that explanation in chat, then, in SETUP, merges
+   only humans merge. A rule file is any path `RULE_FILES` in `scripts/done-gate/rules.ts` matches. A change to one
+   needs nobody's approval to start and is explained before it merges: its PR body has one line per changed rule,
+   `Rule change: <rule> · tighter | looser | neutral | mixed · <why>`, naming each changed file by its path, its
+   file name or the folder it sits in, and the same PR adds a line per changed rule to STATE.md → Rule changes; the agent shows Devesh that explanation in chat, then, in SETUP, merges
    it itself on observed-green checks like any other PR. `rules-from-main` judges every PR with main's copy of the
    rules (`bun run gate pr`) and refuses one whose rule changes are not explained and recorded; the local hooks
    judge with the checkout's own copy, a convenience, never the judge. docs/runbooks/rules-check-way-back.md says
    what Devesh does if main's copy misfires. Agents use Devesh's own GitHub login, so GitHub's settings only stop
-   accidents; the hooks enforce what agents must not do (Slice 0's tools item adds the refusals still missing).
+   accidents; the hooks enforce what agents must not do (`scripts/done-gate/tools.ts`).
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
