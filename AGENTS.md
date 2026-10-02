@@ -32,8 +32,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    never a silent drop.
 6. **Webhooks** — authenticate before trusting, dedupe with a database constraint, store and
    return fast; side effects happen in workers.
-7. **main is PR-only with CI green** (required checks: `checks`, and `rules-from-main` once Devesh makes it
-   required). Merge authority follows the PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge
+7. **main is PR-only with CI green** (required checks: `checks`, and `rules-from-main`, which runs main's
+   copy of the rules). Merge authority follows the PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge
    independent PRs one at a time on observed-green checks with real evidence, after confirming base == main; LIVE =
    only humans merge. A rule file is any path `RULE_FILES` in `scripts/done-gate/rules.ts` matches. A change to one
    needs nobody's approval to start and is explained before it merges: its PR body has one line per changed rule,
@@ -83,8 +83,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   Codex's `/hooks`) but has no verifier agent, so a green product change stops once, marked NOT
   independently verified: ask Claude to run the verifier, or check it yourself. Humans run `bun run gate`.
   The gate stops careless or premature "done", not an agent that sets out to forge it: Devesh's
-  own attention and GitHub's required checks (`checks`, and `rules-from-main` once Devesh makes it a required
-  check, which runs main's copy of the rules) are the backstops, and `STATE.md → What works
+  own attention and GitHub's required checks (`checks`, and `rules-from-main`, which runs main's copy of the
+  rules) are the backstops, and `STATE.md → What works
   today` lists the gate's known holes.
 - CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
   agent and human.
