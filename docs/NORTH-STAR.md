@@ -50,7 +50,8 @@ the front door; the product is the funnel behind them.
 ## Principles
 
 1. **Done means seen working.** A thing is done when it runs from a real entry point on real
-   inputs and someone has watched it happen. Passing tests are necessary, never sufficient.
+   inputs and it has been seen happening: by a script that checks the real product (a slice's proof
+   run) or by a person. Passing tests are necessary, never sufficient.
 2. **Vertical slices, not layers.** Build one thin path end to end — lead in, decision,
    message out, result recorded — before widening anything.
 3. **No hidden stubs.** Any part that is faked or not wired is listed as such in `STATE.md`.

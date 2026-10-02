@@ -99,8 +99,8 @@ export function banner(c: Cycle): string {
     `CURRENT CYCLE, read from ROADMAP.md on ${c.from}. The plan lives in the repo, not in this chat.`,
     `Phase: ${phase} (${phase === "SETUP" ? "agents may merge on observed-green checks" : "only humans merge"}; STATE.md line 1).`,
     cur
-      ? `Current slice: Slice ${cur.n}: ${cur.title} (${cur.Status}, ${cur.items.filter((i) => i.done).length} of ${cur.items.length} items done).\nProof Devesh will watch: ${cur.Proof ?? ""}\nNext item: ${next ? next.text : "none left for agents. Set the slice to proof ready and ask Devesh to watch the proof."}`
-      : "No slice can be built now: each unfinished slice is proof ready (waiting for Devesh to watch it) or blocked. Tell Devesh; do not start other work.",
+      ? `Current slice: Slice ${cur.n}: ${cur.title} (${cur.Status}, ${cur.items.filter((i) => i.done).length} of ${cur.items.length} items done).\nProof (a script runs it; the slice is done when every step passes): ${cur.Proof ?? ""}\nNext item: ${next ? next.text : "none left for agents. Set the slice to proof ready and run its proof (AGENTS.md → Definition of done)."}`
+      : "No slice can be built now: each unfinished slice is proof ready (run its proof: when every step passes, set it to done; when one fails, add an item naming the failure) or blocked. Tell Devesh what blocks it; do not start other work.",
     !c.item
       ? `${c.branch ? `This branch (${c.branch})` : "This checkout"} has no roadmap item. Build only on a branch made for one item, off origin/main, and record it: ${record(name)}.`
       : !k
@@ -110,7 +110,7 @@ export function banner(c: Cycle): string {
           : `This branch (${c.branch}) builds ${k.kind}: ${k.what}. It has no roadmap line to tick; the PR body's what / why / evidence is the record.`,
     'New asks (AGENTS.md → The loop, step 1). A question or look-up: answer it; no branch switch, no code. Work that does not belong in the repo (prospect lists, videos, research, naming, data about real people; fake seed and test data is fine): do it in a scratch folder outside the repo, never commit it, no branch. Marketing-site work: the Side track, no replan, one open PR at most. An item already on the roadmap in a later slice: a replan that moves its line into the current slice in the same PR. Any other build ask: reply "off-roadmap PR, or replan?" and build nothing until Devesh picks; a message that already starts with "off-roadmap" or "replan" has picked. At most one off-roadmap PR is open at a time: if one is open, link it and ask Devesh to merge or close it, or to replan.',
     'Every PR body starts with "Roadmap: Slice N — <item>", "Roadmap: Side track — <what>" or "Roadmap: off-roadmap — <what>".',
-    'Done means seen working (AGENTS.md → Definition of done). Only Devesh writes a date after "Seen by Devesh:".',
+    'Done means seen working (AGENTS.md → Definition of done). A slice is done when its proof runs and passes: the agent writes the date and the passing run\'s link after "Seen by Devesh:".',
   ];
   if (found.length)
     lines.push(
