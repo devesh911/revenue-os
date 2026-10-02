@@ -26,10 +26,16 @@ export const checkoutsOf = (repo: string) =>
 export const keyOf = (session: string, root: string) =>
   `${session}-${Bun.hash(root).toString(36)}`;
 export const idOf = (root: string) => Bun.hash(root).toString(36);
-/** Which checkout sits at `root`: a worktree removed and added again at the same path is another one. */
-const identity = (root: string) => {
+/**
+ * Which checkout sits at `root`: a worktree removed and added again at the same path is another one. Linux reuses a
+ * deleted file's inode number at once, so a worktree's `.git` file (a one-line pointer git never rewrites in normal
+ * work) is also told apart by when it last changed; the main checkout's `.git` is a folder whose times change with
+ * every git command, and is never removed and added again, so its inode number alone names it.
+ */
+export const identity = (root: string) => {
   try {
-    return `${root}\n${statSync(join(root, ".git")).ino}`;
+    const git = statSync(join(root, ".git"));
+    return `${root}\n${git.ino}${git.isFile() ? `:${git.ctimeMs}` : ""}`;
   } catch {
     return root;
   }
