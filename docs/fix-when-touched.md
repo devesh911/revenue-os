@@ -228,7 +228,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Finding | Where it went |
 |---|---|
 | The path from a change to the cloud staging database has no mechanical stop: edited or clashing migrations pass CI, the staging push does not wait for CI, and main's rule lets the agents' own login skip checks | Slice 0 · "The cloud test database (staging) changes only after the tests pass…" |
-| The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Slice 0 · "Agents' own tools can't touch the cloud database or read secrets…" |
+| The rules against pushing to the cloud database and reading secrets are written down but not enforced; `bun run db:migrate` is a loaded footgun | Settled by [#119](https://github.com/devesh911/revenue-os/pull/119) (the Claude Code and Codex hooks refuse cloud database pushes and `.env` reads, `scripts/done-gate/tools.ts`, and Claude Code's settings deny them; `bun run db:migrate` deleted) |
 | The fixed 'local database only' safety check was copied, and four places still use the weak version | Slice 0 · "A test run can't delete data it did not create…" |
 | Every database test copy-pastes its own company setup; 7 use fixed names and delete-by-name, and 4 places delete every queued job | Slice 0 · "A test run can't delete data it did not create…" |
 | Test runs collide on the one shared database: parallel agents crash each other and delete each other's data | Slice 0 · "A test run can't delete data it did not create…" |
@@ -301,7 +301,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | The landing page tells buyers in the present tense that voice, WhatsApp and do-not-call checks work today | Settled by [#111](https://github.com/devesh911/revenue-os/pull/111) (the FAQ says what the pilot will do; entry 7 struck) |
 | Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout | Entry 8 |
 
-Totals: Slice 0 holds 9, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 7 are settled or partly settled by merged PRs; 11 are entries here. Total 73.
+Totals: Slice 0 holds 8, Slice 1 holds 20, Slice 3 holds 12 (9 moved), Slice 4 holds 5 (3 moved), Slice 5 holds 6 (4 moved), Slice 6 holds 3; 8 are settled or partly settled by merged PRs; 11 are entries here. Total 73.
 
 ---
 
