@@ -1,16 +1,16 @@
 // A follow-up to the dev-login suite (scripts/dev-login.test.ts): "ensure" means the documented
 // credentials always work on the local stack — an existing dev user whose password was changed
 // signs in with DEV_LOGIN_PASSWORD again afterwards. DB-backed: real local GoTrue + Postgres. It
-// seeds a workspace of its own (the shared test-company helper), never the dev login's.
-import { afterAll, expect, it } from "bun:test";
+// holds the dev login's lock (tests/dev-login-lock.ts) while it changes the password, so another
+// test run never signs in with the dev login in between, and it makes the dev login admin of no workspace.
+import { afterAll, beforeAll, expect, it } from "bun:test";
 import pg from "pg";
-import { testCompanies } from "../tests/test-companies";
+import { holdDevLogin } from "../tests/dev-login-lock";
 import {
   DEV_LOGIN_EMAIL,
   DEV_LOGIN_PASSWORD,
   ensureDevLogin,
 } from "./dev-login";
-import { seed } from "./seed";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
@@ -18,10 +18,14 @@ const LOCAL_DB_URL =
   process.env.LOCAL_DB_URL ||
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const admin = new pg.Pool({ connectionString: LOCAL_DB_URL, max: 1 });
-const companies = testCompanies(admin);
+let devLogin: Awaited<ReturnType<typeof holdDevLogin>>;
+
+beforeAll(async () => {
+  devLogin = await holdDevLogin(LOCAL_DB_URL);
+});
 
 afterAll(async () => {
-  await companies.cleanup();
+  await devLogin.release();
   await admin.end();
 });
 
@@ -39,10 +43,7 @@ it("resets a changed dev user password so DEV_LOGIN_PASSWORD signs in again", as
     supabaseUrl: SUPABASE_URL,
     anonKey: ANON_KEY,
     dbUrl: LOCAL_DB_URL,
-    orgIds: [
-      (await seed("real_estate", (await companies.add("Dev login reset")).slug))
-        .orgId,
-    ],
+    orgIds: [],
   };
   await ensureDevLogin(opts);
   await admin.query(

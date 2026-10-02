@@ -1,4 +1,4 @@
-// pg-boss wiring (tech-stack T7/T26.4): receivers enqueue, this consumer drains.
+// The worker's job runner (pg-boss; docs/tech-stack.md, "Jobs & durability"): receivers enqueue, this consumer drains.
 // RLS shapes the design — app_service cannot discover orgs cross-tenant, so the org id
 // rides the JOB and the processor re-scopes itself via withOrg. A lost enqueue is safe
 // by construction: processVapiEvents drains ALL 'received' events for the org, so any
@@ -36,7 +36,7 @@ import { processVapiEvents } from "./vapi/process";
 export const WEBHOOK_PROCESS_VAPI = "webhook.process.vapi";
 const CALL_POST_QUEUE = "call.post"; // place_call's dead-letter SINK (handleCallPost drains it)
 const TICK_QUEUE = "scheduler.tick"; // the durable pg-boss schedule that fires the scheduler tick
-// A job payload is a boundary (S5.1): validate the tenancy field before a handler re-scopes on it.
+// A job payload is a boundary (docs/security.md S5.1): validate the tenancy field before a handler re-scopes on it.
 const JobEnvelope = z.object({ orgId: OrgIdSchema });
 
 /**
@@ -55,13 +55,13 @@ export function makeProvider(env: Env): LlmProvider | null {
 }
 
 // Live telephony (Vapi voice + Meta WhatsApp senders), the call-outcome port, the confirmation
-// send seam, and the LLM provider when no key is set are all STUBBED here: production boot wires
-// the SHAPE, T9 (the M2 replay) swaps in the real adapters / FakeVoice / FakeWa. Every stub THROWS
-// when invoked so a misconfigured effect fails LOUDLY rather than silently no-op'ing; boot stays
-// green because a stub is a plain object, constructed without a throw.
-// ponytail: live-telephony stub — real Vapi/Meta senders + outcome port land in T9.
+// send seam, and the LLM provider when no key is set are all STUBBED here, each listed as Stub in
+// STATE.md → What works today: production boot wires the SHAPE, and the call replay test
+// (test/m2-replay.test.ts) hands the handlers fakes instead. Every stub THROWS when invoked so a
+// misconfigured effect fails LOUDLY rather than silently no-op'ing; boot stays green because a
+// stub is a plain object, constructed without a throw.
 function notWired(what: string): never {
-  throw new Error(`${what} not wired (stub — T9 swaps the real adapter)`);
+  throw new Error(`${what} not wired (stub, listed in STATE.md)`); // done-gate: allow reworded only; each stub here is a Stub row in STATE.md
 }
 const VOICE_STUB: VoiceSenderPort = {
   place: () => notWired("voice sender (Vapi)"),
@@ -77,7 +77,14 @@ const UNCONFIGURED_PROVIDER: LlmProvider = {
 
 let boss: PgBoss | null = null;
 
-export async function startJobs(): Promise<void> {
+/**
+ * Starts the job runner. `settings` overrides pg-boss's own: a test passes a schema of its own and no clock
+ * (test/fixtures/test-job-schema.ts), so the runner it starts never works another company's queued jobs or ticks
+ * every company's due runs. The worker itself passes nothing.
+ */
+export async function startJobs(
+  settings: { schema?: string; schedule?: boolean } = {},
+): Promise<void> {
   if (boss) return;
   const b = new PgBoss({
     connectionString: env.DATABASE_URL,
@@ -86,11 +93,12 @@ export async function startJobs(): Promise<void> {
     // not on the database, so pg-boss must not attempt CREATE SCHEMA (verified: it
     // fails with 42501 otherwise).
     createSchema: false,
+    ...settings,
   });
   b.on("error", (err) => logger.error({ err }, "pg-boss"));
   await b.start();
-  // T26.4 retry posture: 3 tries, 60s apart, 15-minute expiry; permanently failed
-  // jobs stay queryable in pgboss.job (dead-letter review task lands with the harness).
+  // Retry posture (docs/tech-stack.md, "Jobs & durability — the exact wiring"): 3 tries, 60s
+  // apart, 15-minute expiry; permanently failed jobs stay queryable in pgboss.job.
   await b.createQueue(WEBHOOK_PROCESS_VAPI, {
     retryLimit: 3,
     retryDelay: 60,
@@ -98,14 +106,14 @@ export async function startJobs(): Promise<void> {
   });
   await b.work(WEBHOOK_PROCESS_VAPI, async (jobs) => {
     for (const job of jobs) {
-      const { orgId } = JobEnvelope.parse(job.data); // a job payload is a boundary (S5.1)
+      const { orgId } = JobEnvelope.parse(job.data); // a job payload is a boundary
       await processVapiEvents(pool, orgId);
     }
   });
 
-  // --- T8: external-action queues + their T7 handlers ---------------------------------------
+  // --- the external-action queues and their handlers (src/handlers/) -------------------------
   // The call.post dead-letter SINK first so place_call can reference it as its deadLetter. Each
-  // action queue is policy 'short': the T6 singleton_key dedup rides pgboss.job's job_i1 index
+  // action queue is policy 'short': the scheduler's singleton_key dedup rides pgboss.job's job_i1 index
   // (state='created' AND policy='short') and scheduler.enqueueJob writes 'short' — any other policy
   // would break exactly-once.
   await b.createQueue(CALL_POST_QUEUE);
@@ -119,8 +127,8 @@ export async function startJobs(): Promise<void> {
   }
 
   // Shared handler deps. A missing key yields a stub provider (boot stays green — see makeProvider),
-  // and live telephony / send seams are stubbed until T9. The guard pipeline is the real one (moat
-  // #4 — no send bypasses it). Each work loop parses the payload's org id as a boundary (S5.1).
+  // and live telephony / send seams are the stubs above. The guard pipeline is the real one
+  // (guardrails run before every send). Each work loop parses the payload's org id as a boundary.
   const provider = makeProvider(env) ?? UNCONFIGURED_PROVIDER;
   const registry = buildCatalog({ send: UNWIRED_SEND });
 
@@ -160,9 +168,9 @@ export async function startJobs(): Promise<void> {
     }
   });
 
-  // --- T8: the scheduler tick, scheduled DURABLY via pg-boss (survives restarts, unlike a
+  // --- the scheduler tick, scheduled DURABLY via pg-boss (survives restarts, unlike a
   // per-process setInterval a redeploy would silently drop). 1-minute cron is pg-boss's finest
-  // granularity — fine for day-scale runs; the M2 replay (T9) drives tick() per-org directly.
+  // granularity — fine for day-scale runs; the call replay test drives tick() per-org directly.
   await b.createQueue(TICK_QUEUE);
   await b.work(TICK_QUEUE, async () => {
     await runScheduledTick();
@@ -196,7 +204,7 @@ export async function enqueueVapiProcess(orgId: string): Promise<void> {
  * per-org `tick`. Discovery is the RLS-exempt `app.due_org_ids()` enumerator (migration 016) —
  * ids only, no row payload — so the fan-out is genuinely cross-tenant while every subsequent read
  * stays org-scoped through withOrg. A discovery failure means "tick what's visible" (nothing),
- * never a crashed tick. The M2 replay (T9) drives tick() per-org directly.
+ * never a crashed tick. The call replay test drives tick() per-org directly.
  */
 async function runScheduledTick(): Promise<void> {
   const now = new Date();

@@ -37,8 +37,10 @@ const appPool = createPool(
 );
 
 const companies = testCompanies(admin);
-// Provider refs are unique across every company: a run of its own, so two test runs at once never share one.
-const HAPPY_REF = `vapi-call-happy-${randomUUID()}`;
+// Provider refs are unique across every company (conversations' provider and provider_ref): each one this run's
+// own, so two test runs started at once never share one.
+const REF = randomUUID();
+const HAPPY_REF = `vapi-call-happy-${REF}`;
 let orgId = "";
 let orgB = ""; // a second tenant for the cross-tenant denial case
 let contactId = "";
@@ -266,7 +268,7 @@ describe("place_call handler", () => {
       sender: {
         place: async () => {
           log.push("send");
-          return { providerRef: "should-not-happen" };
+          return { providerRef: `should-not-happen-${REF}` };
         },
       },
       provider: fakeLlm([{ text: "x", usage: { in: 1, out: 1 } }]),
@@ -297,7 +299,7 @@ describe("place_call handler", () => {
       sender: {
         place: async () => {
           sendCount += 1;
-          return { providerRef: `vapi-${sendCount}` };
+          return { providerRef: `vapi-${sendCount}-${REF}` };
         },
       },
       provider: fakeLlm([{ text: "hello", usage: { in: 5, out: 3 } }]),
@@ -342,7 +344,7 @@ describe("place_call handler", () => {
       sender: {
         place: async () => {
           sendCount += 1;
-          return { providerRef: "nope" };
+          return { providerRef: `nope-${REF}` };
         },
       },
       provider: fakeLlm([{ text: "x", usage: { in: 1, out: 1 } }]),
@@ -377,7 +379,7 @@ describe("place_call handler", () => {
       sender: {
         place: async () => {
           sendCount += 1;
-          return { providerRef: "leak" };
+          return { providerRef: `leak-${REF}` };
         },
       },
       provider: fakeLlm([{ text: "x", usage: { in: 1, out: 1 } }]),
@@ -423,7 +425,7 @@ describe("send_wa handler", () => {
         send: async (p) => {
           log.push("send");
           captured = p;
-          return { providerRef: "wamid.1" };
+          return { providerRef: `wamid.1-${REF}` };
         },
       },
     };
@@ -464,7 +466,7 @@ describe("send_wa handler", () => {
       sender: {
         send: async () => {
           waCount += 1;
-          return { providerRef: `wamid.${waCount}` };
+          return { providerRef: `wamid.${waCount}-${REF}` };
         },
       },
     };
@@ -501,7 +503,7 @@ describe("send_wa handler", () => {
       sender: {
         send: async () => {
           log.push("send");
-          return { providerRef: "should-not-happen" };
+          return { providerRef: `should-not-happen-${REF}` };
         },
       },
     };

@@ -2,14 +2,15 @@
 // Spec of this suite: events posted to the receiver must land in conversations/messages
 // through the QUEUE ALONE — processVapiEvents is never called here. Same webhook semantics
 // (docs/security.md S6) as vapi-webhook.test.ts (out-of-order arrival, dedupe-by-constraint,
-// store-and-skip).
+// store-and-skip). The real job runner runs in a pg-boss schema of this test's own
+// (fixtures/test-job-schema.ts), so it never works another company's queued jobs.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
-import { pool } from "../src/db";
 import app from "../src/index";
 import { startJobs, stopJobs } from "../src/jobs";
+import { testJobSchema } from "./fixtures/test-job-schema";
 
 const SECRET = process.env.VAPI_WEBHOOK_SECRET || "local-test-secret";
 const admin = new pg.Pool({
@@ -19,19 +20,21 @@ const admin = new pg.Pool({
   max: 1,
 });
 
-// The worker's own pool owns pg-boss's tables: clean-up also clears this company's undrained nudges.
-const companies = testCompanies(admin, pool);
+const companies = testCompanies(admin);
+let jobs: Awaited<ReturnType<typeof testJobSchema>>;
 let orgId = "";
 // Call ids are unique across every company: one of this run's own, so two test runs at once never share it.
 const callId = `qcall-${randomUUID()}`;
 
 beforeAll(async () => {
   orgId = (await companies.add("Vapi Queue Org")).id;
-  await startJobs(); // real pg-boss on the real local DB — mocks lie
+  jobs = await testJobSchema(admin);
+  await startJobs(jobs.settings); // real pg-boss on the real local DB — mocks lie
 }, 30_000); // cold start installs pg-boss's own schema objects
 
 afterAll(async () => {
   await stopJobs();
+  await jobs.drop(); // with this test's undrained nudges
   await companies.cleanup();
   await admin.end();
 });

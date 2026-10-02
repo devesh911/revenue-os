@@ -3,11 +3,13 @@
 // admin of the seeded orgs; then the console's email+password sign-in lands them on an org page.
 // DB-backed: real local GoTrue + Postgres, and the real worker app for GET /orgs (like
 // services/worker/test/orgs.test.ts). The tests seed into workspaces of their own (the shared
-// test-company helper) and never delete the dev login's own workspace.
+// test-company helper), never into the dev login's own, and hold the dev login's lock
+// (tests/dev-login-lock.ts) while they run, so another test run's dev-login tests wait their turn.
 import { afterAll, describe, expect, it, spyOn } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import pg from "pg";
+import { holdDevLogin } from "../tests/dev-login-lock";
 import { testCompanies } from "../tests/test-companies";
 import { type Pack, seed } from "./seed";
 
@@ -37,6 +39,8 @@ const LOCAL_OPTS = {
 
 const admin = new pg.Pool({ connectionString: LOCAL_DB_URL, max: 2 });
 const companies = testCompanies(admin);
+// Held from here to the end of the file, so nothing below sees another run change the dev login.
+const devLogin = await holdDevLogin(LOCAL_DB_URL);
 
 /** Seeds `pack` into a workspace of this file's own, never the dev login's. */
 const seedOwn = async (pack: Pack) =>
@@ -53,6 +57,7 @@ const devUserPreexisted =
 
 afterAll(async () => {
   await companies.cleanup();
+  await devLogin.release();
   await admin.end();
 });
 
@@ -134,11 +139,10 @@ describe("ensureDevLogin against the local stack", () => {
     "creates the dev user via /auth/v1/signup with the anon key when absent",
     async () => {
       const { ensureDevLogin, DEV_LOGIN_EMAIL } = await load();
-      const { orgId } = await seedOwn("real_estate");
       const fetchSpy = spyOn(globalThis, "fetch");
       let userId = "";
       try {
-        ({ userId } = await ensureDevLogin({ ...LOCAL_OPTS, orgIds: [orgId] }));
+        ({ userId } = await ensureDevLogin({ ...LOCAL_OPTS, orgIds: [] }));
         const calls = fetchSpy.mock.calls.map(([input, init]) => ({
           url: urlOf(input),
           apikey: new Headers(
@@ -219,25 +223,32 @@ describe("ensureDevLogin against the local stack", () => {
 });
 
 describe("db:seed CLI creates the dev login", () => {
-  // The command a developer runs: it seeds the dev login's own workspace (seeding is idempotent,
-  // and nothing here deletes it), makes the dev login its admin, and prints the email to sign in with.
-  it("`bun run db:seed real_estate` makes the dev login, admin of the seeded workspace, and prints its email", async () => {
+  // The command a developer runs, pointed at a workspace of this file's own: it seeds it, makes the dev login its
+  // admin, and prints the email to sign in with. Never at the dev login's own workspace, whose seed clean-up
+  // deletes hand-made copies of the seed's people (supabase/seeds/real_estate.sql).
+  it("`bun run db:seed real_estate <slug>` makes the dev login, admin of the seeded workspace, and prints its email", async () => {
     const { DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD } = await load();
-    const cli = spawnSync(process.execPath, ["run", "db:seed", "real_estate"], {
-      cwd: join(import.meta.dir, ".."),
-      encoding: "utf8",
-    });
+    const own = await companies.add("Dev login CLI");
+    const cli = spawnSync(
+      process.execPath,
+      ["run", "db:seed", "real_estate", own.slug],
+      { cwd: join(import.meta.dir, ".."), encoding: "utf8" },
+    );
     expect(cli.status).toBe(0);
     expect(cli.stdout).toContain(DEV_LOGIN_EMAIL);
     expect(
       (await passwordGrant(DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD)).status,
     ).toBe(200);
-    const role = await admin.query(
-      `select m.role::text as role from org_members m
-         join orgs o on o.id = m.org_id join auth.users u on u.id = m.user_id
-        where o.slug = 'seed-real-estate' and u.email = $1`,
-      [DEV_LOGIN_EMAIL],
+    const userId = (
+      await admin.query(`select id from auth.users where email = $1`, [
+        DEV_LOGIN_EMAIL,
+      ])
+    ).rows[0]?.id;
+    expect(await membership(own.id, userId)).toEqual([{ role: "admin" }]);
+    const seeded = await admin.query(
+      `select count(*)::int n from contacts where org_id = $1`,
+      [own.id],
     );
-    expect(role.rows).toEqual([{ role: "admin" }]);
+    expect(seeded.rows[0].n).toBeGreaterThan(0);
   }, 30_000);
 });
