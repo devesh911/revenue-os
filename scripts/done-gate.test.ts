@@ -21,6 +21,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { currentSlice, nextItem, parseRoadmap } from "../docs/tracker/parse.js";
+import { identity } from "./done-gate/checkouts";
 import { parseDiff } from "./done-gate/diff";
 import { usesExport } from "./done-gate/export-users";
 import { areasOf, fixWhenTouchedProblems } from "./done-gate/fix-when-touched";
@@ -2316,17 +2317,36 @@ describe("the hook", () => {
     expect(hook(review, "Stop")).toEqual(QUIET);
   });
 
+  it("tells a worktree's .git file made again apart even with the same inode number, as Linux hands out", () => {
+    const dir = repo();
+    const b = worktree(dir, "feat/b");
+    const before = identity(b);
+    // Linux gives a file made after a delete the deleted file's inode number at once (seen 50 of 50 times in a
+    // Linux container). Writing the file again in place is the same case on any machine: same inode, a new file.
+    const git = join(b, ".git");
+    const text = readFileSync(git, "utf8");
+    Bun.sleepSync(5);
+    writeFileSync(git, text);
+    expect(identity(b)).not.toBe(before);
+    // The main checkout's .git is a folder that every git command changes: its identity must not move with it.
+    const main = identity(dir);
+    write(dir, "notes.md", "a change\n");
+    commitAll(dir);
+    expect(identity(dir)).toBe(main);
+  });
+
   it("treats a worktree removed and added again at the same path as a new checkout", () => {
     const dir = repo();
     const b = worktree(dir, "feat/b");
     write(b, "services/worker/src/b.ts", "const b = 1;\n");
     commitAll(b);
     hook(dir, "SessionStart");
+    // A folder of its own: one named by the clock could be another run's at the same moment.
     const check = join(
-      realpathSync(dirname(b)),
-      `done-gate-check-${Date.now()}`,
+      realpathSync(mkdtempSync(join(tmpdir(), "done-gate-check-"))),
+      "wt",
     );
-    dirs.push(check);
+    dirs.push(dirname(check));
     sh(dir, ["git", "worktree", "add", "-q", "--detach", check, "main"]);
     hook(dir, "PreToolUse", {
       tool_name: "Bash",
