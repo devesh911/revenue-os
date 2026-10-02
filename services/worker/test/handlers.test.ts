@@ -1,12 +1,12 @@
-// T7 (task-47) — job handlers + the agent.turn runTurn bridge. REAL-DB INTEGRATION, CI-OWNED
-// (ci.yml supabase-local-stack): needs Postgres (workflow_runs / conversations / messages /
-// usage_events / tasks + RLS via withOrg). Handlers are invoked DIRECTLY with a job payload
-// (no pg-boss here — the handlers do not enqueue). These do NOT run in the worktree (no .env by
-// rail); typecheck + lint are the only env-free gates. Every `it` derives from exactly one
-// acceptance criterion (labelled in its title). Correctness-critical & IDEMPOTENCY-CRITICAL: the
-// reload-no-op (exactly-once), guard-BEFORE-send (moat #4), and lastDisposition-fold assertions
+// The job handlers + the agent.turn runTurn bridge, against the real local database: needs
+// Postgres (workflow_runs / conversations / messages / usage_events / tasks + RLS via withOrg), so
+// it runs with the local stack's settings (`bun run gate`, CI). Handlers are invoked DIRECTLY with
+// a job payload (no pg-boss here — the handlers do not enqueue). Correctness-critical &
+// IDEMPOTENCY-CRITICAL: the reload-no-op (exactly-once), guard-BEFORE-send (guardrails run before
+// every send), and lastDisposition-fold assertions
 // are exact and unfakeable (spies share a call-log; duplicate deliveries assert a single effect).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { createPool } from "@revenue-os/db";
 import {
   type LlmProvider,
@@ -14,6 +14,7 @@ import {
   ToolRegistry,
 } from "@revenue-os/harness";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { handleAgentTurn } from "../src/handlers/agent-turn";
 import { handleCallPost } from "../src/handlers/call-post";
 import {
@@ -35,22 +36,14 @@ const appPool = createPool(
     "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
 );
 
+const companies = testCompanies(admin);
+// Provider refs are unique across every company: a run of its own, so two test runs at once never share one.
+const HAPPY_REF = `vapi-call-happy-${randomUUID()}`;
 let orgId = "";
 let orgB = ""; // a second tenant for the cross-tenant denial case
 let contactId = "";
 let agentId = ""; // an active "closer" agent for orgId (place_call / agent.turn load its config)
 let wfSeq = 0;
-
-// usage_events + audit_log are append-only (NO cascade) — clear them before the org can go.
-async function cleanup(): Promise<void> {
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug like 'handlers-test-%')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug like 'handlers-test-%')`,
-  );
-  await admin.query(`delete from orgs where slug like 'handlers-test-%'`);
-}
 
 async function seedWorkflow(def: unknown, org = orgId): Promise<string> {
   wfSeq += 1;
@@ -176,23 +169,14 @@ function fakeLlm(turns: LlmTurn[]): LlmProvider {
 }
 
 beforeAll(async () => {
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Handlers Org', $1) returning id`,
-    [`handlers-test-${Date.now()}`],
-  );
-  orgId = org.rows[0].id;
-  const b = await admin.query(
-    `insert into orgs (name, slug) values ('Handlers Org B', $1) returning id`,
-    [`handlers-test-b-${Date.now()}`],
-  );
-  orgB = b.rows[0].id;
+  orgId = (await companies.add("Handlers Org")).id;
+  orgB = (await companies.add("Handlers Org B")).id;
   const c = await admin.query(
     `insert into contacts (org_id, first_name) values ($1, 'Asha') returning id`,
     [orgId],
   );
   contactId = c.rows[0].id;
-  // phone identity (E.164) so the send handlers can resolve `to` in GREEN
+  // phone identity (E.164) so the send handlers can resolve `to`
   await admin.query(
     `insert into contact_identities (org_id, contact_id, kind, value, is_primary)
      values ($1, $2, 'whatsapp', '+919876500000', true)`,
@@ -202,7 +186,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await appPool.end();
   await admin.end();
 });
@@ -219,7 +203,7 @@ const CALL_WF = {
   },
 };
 
-describe("place_call handler (task-47) [criterion 1]", () => {
+describe("place_call handler", () => {
   it("reloads a fresh call step, guards BEFORE the send, records the conversation, drives the turn (messages+usage), FOLDS the outcome and re-arms", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, { currentStep: "c", state: { contactId } });
@@ -233,7 +217,7 @@ describe("place_call handler (task-47) [criterion 1]", () => {
       sender: {
         place: async () => {
           log.push("send");
-          return { providerRef: "vapi-call-happy" };
+          return { providerRef: HAPPY_REF };
         },
       },
       provider: fakeLlm([
@@ -252,13 +236,13 @@ describe("place_call handler (task-47) [criterion 1]", () => {
       action: { kind: "place_call", contactId, agentKey: "closer" },
     });
 
-    // moat #4 — the guard ran, and strictly BEFORE the send
+    // guardrails before every send — the guard ran, and strictly BEFORE the send
     expect(log).toEqual(["guard", "send"]);
     // a voice conversation was recorded, carrying the provider ref
     const convo = await getConversation(runId);
     expect(convo).toBeDefined();
     expect(convo.channel).toBe("voice");
-    expect(convo.provider_ref).toBe("vapi-call-happy");
+    expect(convo.provider_ref).toBe(HAPPY_REF);
     // the turn was driven -> transcript + usage landed (the runTurn bridge)
     expect(await countMessages(convo.id)).toBeGreaterThan(0);
     expect(await countUsage(convo.id)).toBeGreaterThan(0);
@@ -269,7 +253,7 @@ describe("place_call handler (task-47) [criterion 1]", () => {
     expect(run.current_step).toBe("c"); // unchanged — the next tick routes the re-entry
   });
 
-  it("a blocking guard verdict prevents the send: no conversation, no fold (moat #4)", async () => {
+  it("a blocking guard verdict prevents the send: no conversation, no fold", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, { currentStep: "c", state: { contactId } });
     const log: string[] = [];
@@ -416,7 +400,7 @@ describe("place_call handler (task-47) [criterion 1]", () => {
   });
 });
 
-describe("send_wa handler (task-47) [criterion 2]", () => {
+describe("send_wa handler", () => {
   it("guards BEFORE the send and MERGES run/contact vars into the template vars (never goes out empty)", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, {
@@ -455,10 +439,10 @@ describe("send_wa handler (task-47) [criterion 2]", () => {
       },
     });
 
-    expect(log).toEqual(["guard", "send"]); // moat #4 — guard before send
+    expect(log).toEqual(["guard", "send"]); // guard before send
     const cap = captured;
     if (cap === null) throw new Error("sender.send was never called");
-    // the T5->T7 contract: run/contact vars MERGED with the step's template vars, non-empty
+    // the scheduler-to-handler contract: run/contact vars MERGED with the step's template vars, non-empty
     expect(cap.vars).toMatchObject({
       name: "Asha",
       city: "Pune",
@@ -501,7 +485,7 @@ describe("send_wa handler (task-47) [criterion 2]", () => {
     expect(waCount).toBe(1); // sent exactly once
   });
 
-  it("a blocking guard verdict prevents the WhatsApp send (moat #4)", async () => {
+  it("a blocking guard verdict prevents the WhatsApp send", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, {
       currentStep: "end",
@@ -529,11 +513,11 @@ describe("send_wa handler (task-47) [criterion 2]", () => {
     });
 
     expect(log).toContain("guard");
-    expect(log).not.toContain("send"); // moat: no send on a blocking verdict
+    expect(log).not.toContain("send"); // no send on a blocking verdict
   });
 });
 
-describe("agent.turn (run_agent_turn) handler (task-47) [criterion 3]", () => {
+describe("agent.turn (run_agent_turn) handler", () => {
   it("invokes the runTurn bridge: an agent message + a usage row land on the conversation", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, {
@@ -589,7 +573,7 @@ describe("agent.turn (run_agent_turn) handler (task-47) [criterion 3]", () => {
   });
 });
 
-describe("call.post dead-letter handler (task-47) [criterion 4]", () => {
+describe("call.post dead-letter handler", () => {
   it("records a failed/exhausted call for human review and NEVER crashes the queue", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, { currentStep: "c", state: { contactId } });

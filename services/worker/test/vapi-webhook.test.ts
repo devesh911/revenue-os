@@ -1,10 +1,12 @@
-// Task 8 (local slice): webhook receiver (S6 — verify RAW body secret, insert-with-dedupe,
-// 202-fast) + async processor (upsert conversation by provider_ref, order messages by seq
-// even when events arrive OUT OF ORDER — the Vapi gotcha in CLAUDE.md).
+// The Vapi webhook receiver (docs/security.md S6 — check the shared secret header,
+// insert-with-dedupe, 202-fast) + async processor (upsert conversation by provider_ref, order
+// messages by seq even when events arrive OUT OF ORDER — the Vapi gotcha in AGENTS.md).
 // Fixtures are synthetic; recording REAL payloads replaces them during the Vapi spike
-// (needs VAPI_API_KEY — Devesh). That is this task's remaining acceptance item.
+// (needs VAPI_API_KEY — Devesh).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { pool } from "../src/db";
 import app from "../src/index";
 import { processVapiEvents } from "../src/vapi/process";
@@ -17,32 +19,17 @@ const admin = new pg.Pool({
   max: 1,
 });
 
+const companies = testCompanies(admin);
 let orgId = "";
-const callId = `call-${Date.now()}`;
-
-async function cleanup() {
-  await admin.query(
-    `delete from webhook_events where org_id in (select id from orgs where slug = 'vapi-test')`,
-  );
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug = 'vapi-test')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug = 'vapi-test')`,
-  );
-  await admin.query(`delete from orgs where slug = 'vapi-test'`);
-}
+// Call ids are unique across every company: one of this run's own, so two test runs at once never share it.
+const callId = `call-${randomUUID()}`;
 
 beforeAll(async () => {
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Vapi Org', 'vapi-test') returning id`,
-  );
-  orgId = org.rows[0].id;
+  orgId = (await companies.add("Vapi Org")).id;
 });
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await admin.end();
 });
 
@@ -76,7 +63,7 @@ function transcriptEvent(
   };
 }
 
-describe("vapi webhook receiver (S6)", () => {
+describe("vapi webhook receiver (docs/security.md S6)", () => {
   it("rejects a missing or wrong secret and stores nothing", async () => {
     expect((await post({ message: { type: "transcript" } }, null)).status).toBe(
       401,
@@ -91,7 +78,7 @@ describe("vapi webhook receiver (S6)", () => {
     expect(r.rows[0].n).toBe(0);
   });
 
-  it("malformed JSON with a valid secret is a clean 400, never a 5xx (S5.8)", async () => {
+  it("malformed JSON with a valid secret is a clean 400, never a 5xx (docs/security.md S5.8)", async () => {
     // repro from the 2026-07-11 local E2E spike: JSON.parse threw before safeParse,
     // landing in onError as a logged internal -> 500 (invites provider retry storms)
     const res = await app.fetch(
@@ -108,7 +95,7 @@ describe("vapi webhook receiver (S6)", () => {
     expect(await res.json()).toEqual({ error: "invalid_payload" });
   });
 
-  it("accepts a signed event fast (202) and dedupes exact replays (S6.3)", async () => {
+  it("accepts a signed event fast (202) and dedupes exact replays (docs/security.md S6.3)", async () => {
     const ev = transcriptEvent(
       1,
       "assistant",
@@ -180,7 +167,7 @@ describe("vapi webhook receiver (S6)", () => {
     expect(done.rows[0].n).toBe(4);
   });
 
-  it("stores-and-skips unknown event types — never guesses (S6.5)", async () => {
+  it("stores-and-skips unknown event types — never guesses (docs/security.md S6.5)", async () => {
     await post(
       {
         message: {

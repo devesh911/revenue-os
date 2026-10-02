@@ -1,20 +1,20 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow step field (data, not
-// a thenable) in the T26.2 definition JSON, e.g. { kind:"whatsapp", template:"...", then:"..." };
+// a thenable) in the workflow definition JSON, e.g. { kind:"whatsapp", template:"...", then:"..." };
 // the interpreter reads step.then. Same suppression as packages/harness/src/workflow/schema.ts.
-// Task T6 (task-46) acceptance — scheduler tick + run writer. REAL-DB INTEGRATION, CI-OWNED
-// (ci.yml supabase-local-stack): needs Postgres (workflow_runs + partitioned pgboss.job +
-// FOR UPDATE SKIP LOCKED) and pg-boss's installed schema. These do NOT run in the worktree
-// (no .env by rail) — typecheck + lint are the only env-free gates. Every `it` derives from
-// exactly one acceptance criterion (labelled in its title). Correctness-critical: the
-// atomicity, SKIP LOCKED, singleton_key and place_call-doesn't-advance assertions are exact.
+// The scheduler tick + run writer, against the real local database: needs Postgres
+// (workflow_runs + partitioned pgboss.job + FOR UPDATE SKIP LOCKED) and pg-boss's installed
+// schema, so it runs with the local stack's settings (`bun run gate`, CI). Correctness-critical:
+// the atomicity, SKIP LOCKED, singleton_key and place_call-doesn't-advance assertions are exact.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
+import { testCompanies } from "../../../tests/test-companies";
 import { startRun } from "../src/runs";
 import { tick } from "../src/scheduler";
 
-// app_service is the RLS-bound backend role withOrg connects as (S1.2). Seeds + assertions use
-// the superuser (admin) pool, which bypasses RLS — the functions under test use appPool.
+// app_service is the RLS-bound backend role withOrg connects as (docs/security.md S1.2). Seeds +
+// assertions use the superuser (admin) pool, which bypasses RLS — the functions under test use
+// appPool, which also owns pg-boss's tables, so it reads and clears this file's queued jobs.
 const DB_URL =
   process.env.DATABASE_URL ||
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
@@ -26,7 +26,7 @@ const admin = new pg.Pool({
 });
 const appPool = new pg.Pool({ connectionString: DB_URL, max: 4 });
 // pg-boss installs pgboss.* tables at start() (migration 015 ships only the schema). External
-// actions enqueue to a queue named after the action kind (the T6->T7 contract); 'short' policy
+// actions enqueue to a queue named after the action kind (the scheduler-to-handler contract); 'short' policy
 // gives the singleton_key dedupe (job_i1: unique on (name, singleton_key) while state='created').
 const boss = new PgBoss({
   connectionString: DB_URL,
@@ -34,18 +34,11 @@ const boss = new PgBoss({
   createSchema: false,
 });
 const QUEUES = ["place_call", "send_wa"];
+const companies = testCompanies(admin, appPool);
 
 let orgId = "";
 let contactId = "";
 let wfSeq = 0;
-
-async function cleanup(): Promise<void> {
-  await admin.query(
-    `delete from pgboss.job where name in ('place_call', 'send_wa')`,
-  );
-  // org delete cascades workflow_runs / workflows / contacts / tasks / outcomes (FK on delete cascade)
-  await admin.query(`delete from orgs where slug like 'scheduler-test-%'`);
-}
 
 /** Seed a workflows row (definition jsonb) and return its id. */
 async function seedWorkflow(def: unknown, org = orgId): Promise<string> {
@@ -99,7 +92,7 @@ async function getRun(id: string) {
 
 /** pg-boss v12 column is singleton_key (snake_case). Returns every job row for the key. */
 async function jobsFor(singletonKey: string) {
-  const r = await admin.query(
+  const r = await appPool.query(
     `select name, data, singleton_key from pgboss.job where singleton_key = $1`,
     [singletonKey],
   );
@@ -124,18 +117,8 @@ beforeAll(async () => {
     }
   }
   // boss.start() (as app_service) installs + OWNS pg-boss's tables (migration 015: the migration
-  // role can't own them). The admin pool is `postgres` — BYPASSRLS but NOT a superuser here — so
-  // it can't SELECT/DELETE pgboss.job (jobsFor()/cleanup()) without a grant from the owner. Grant
-  // it here AS app_service (appPool), the owner. Idempotent; must precede the first cleanup().
-  await appPool.query(
-    "grant select, delete on pgboss.job, pgboss.job_common to postgres",
-  );
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Scheduler Org', $1) returning id`,
-    [`scheduler-test-${Date.now()}`],
-  );
-  orgId = org.rows[0].id;
+  // role can't own them), so jobsFor() and the clean-up go through appPool, the owner.
+  orgId = (await companies.add("Scheduler Org")).id;
   const c = await admin.query(
     `insert into contacts (org_id, first_name) values ($1, 'Sched Test') returning id`,
     [orgId],
@@ -144,14 +127,14 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await boss.stop({ graceful: true, timeout: 5_000 });
   await appPool.end();
   await admin.end();
 });
 
-describe("scheduler tick + run writer (task-46)", () => {
-  it("startRun inserts a run at the entry step: schedulable, state seeded, attempts={} [criterion 1]", async () => {
+describe("scheduler tick + run writer", () => {
+  it("startRun inserts a run at the entry step: schedulable, state seeded, attempts={}", async () => {
     const def = {
       entry: "hello",
       steps: {
@@ -169,10 +152,10 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect(run.state.contactId).toBe(contactId); // state seeded with the contact
     expect(run.attempts).toEqual({}); // empty object — per-channel arrays fill later
     expect(["pending", "waiting"]).toContain(run.status); // schedulable; 'running' is never persisted
-    expect(run.wake_at).not.toBeNull(); // due, so the criterion-2 selection can pick it up
+    expect(run.wake_at).not.toBeNull(); // due, so tick's selection of due runs can pick it up
   });
 
-  it("tick advances a run: external action -> pgboss.job (singleton_key runId:step:idx), inline action in the SAME tx [criterion 2]", async () => {
+  it("tick advances a run: external action -> pgboss.job (singleton_key runId:step:idx), inline action in the SAME tx", async () => {
     // whatsapp (send_wa, external) chains to a book_appointment tool (write_outcome, inline) -> end
     const def = {
       entry: "wa",
@@ -211,7 +194,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect((await getRun(runId)).status).toBe("completed");
   });
 
-  it("tick is atomic: a failure mid-advance rolls back the enqueue too — one commit or none [criterion 2 atomicity]", async () => {
+  it("tick is atomic: a failure mid-advance rolls back the enqueue too — one commit or none", async () => {
     // positive control: a healthy run proves the tick actually enqueues (guards vs a silent no-op)
     const healthyWf = await seedWorkflow(CALL_WF);
     const healthyRun = await seedRun(healthyWf, {
@@ -255,7 +238,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect(run.status).not.toBe("completed");
   });
 
-  it("place_call PARKS the run: waiting, current_step unchanged, one voice attempt recorded [criterion 3]", async () => {
+  it("place_call PARKS the run: waiting, current_step unchanged, one voice attempt recorded", async () => {
     const workflowId = await seedWorkflow(CALL_WF);
     const runId = await seedRun(workflowId, {
       currentStep: "c",
@@ -276,7 +259,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect(jobs[0].data.action.kind).toBe("place_call");
   });
 
-  it("send_wa ADVANCES in the same tick and appends a whatsapp attempt timestamp [criterion 3]", async () => {
+  it("send_wa ADVANCES in the same tick and appends a whatsapp attempt timestamp", async () => {
     // whatsapp emits send_wa AND arms the next step in one transition; here it chains to a 2h wait
     const def = {
       entry: "wa",
@@ -308,7 +291,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect(jobs[0].name).toBe("send_wa");
   });
 
-  it("singleton_key dedupes: two ticks over the same due run enqueue EXACTLY ONE job [criterion 4]", async () => {
+  it("singleton_key dedupes: two ticks over the same due run enqueue EXACTLY ONE job", async () => {
     const workflowId = await seedWorkflow(CALL_WF);
     const runId = await seedRun(workflowId, {
       currentStep: "c",
@@ -330,7 +313,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect((await jobsFor(`${runId}:c:0`)).length).toBe(1); // still exactly one job
   });
 
-  it("FOR UPDATE SKIP LOCKED: a run locked by a concurrent tx is skipped, not double-processed [criterion 5]", async () => {
+  it("FOR UPDATE SKIP LOCKED: a run locked by a concurrent tx is skipped, not double-processed", async () => {
     const workflowId = await seedWorkflow(CALL_WF);
     const runId = await seedRun(workflowId, {
       currentStep: "c",
@@ -362,7 +345,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect((await jobsFor(`${runId}:c:0`)).length).toBe(1);
   });
 
-  it("dangling then/on target: interpret throws 'unknown step' -> the run is FAILED, the tick does NOT throw [criterion 6]", async () => {
+  it("dangling then/on target: interpret throws 'unknown step' -> the run is FAILED, the tick does NOT throw", async () => {
     // whatsapp chains to run('ghost'); 'ghost' is absent -> interpret throws before any transition
     const def = {
       entry: "wa",
@@ -385,7 +368,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect((await jobsFor(`${runId}:wa:0`)).length).toBe(0); // threw before any transition -> nothing enqueued
   });
 
-  it("clock seam: the injected ctx.now decides dueness (the M2 SimClock drives the tick) [criterion 7]", async () => {
+  it("clock seam: the injected ctx.now decides dueness (the replay's SimClock drives the tick)", async () => {
     const workflowId = await seedWorkflow(CALL_WF);
     const wakeAt = new Date("2030-01-01T12:00:00.000Z"); // far from the wall clock — only ctx.now can matter
     const runId = await seedRun(workflowId, {
@@ -406,12 +389,7 @@ describe("scheduler tick + run writer (task-46)", () => {
 
   it("tenancy: tick(orgA) never processes another org's due run [cross-tenant denial]", async () => {
     // org B with its own due run — withOrg(orgA) must not see or advance it
-    const orgB = (
-      await admin.query(
-        `insert into orgs (name, slug) values ('Scheduler Org B', $1) returning id`,
-        [`scheduler-test-b-${Date.now()}`],
-      )
-    ).rows[0].id;
+    const orgB = (await companies.add("Scheduler Org B")).id;
     const contactB = (
       await admin.query(
         `insert into contacts (org_id, first_name) values ($1, 'B') returning id`,
@@ -434,7 +412,7 @@ describe("scheduler tick + run writer (task-46)", () => {
     expect(rb.attempts.voice ?? []).toEqual([]);
   });
 
-  it("advancing OUT of a `call` step CLEARS state.lastDisposition so the next call is FRESH (M2 P0) [T7 criterion 6: lastDisposition-clear]", async () => {
+  it("advancing OUT of a `call` step CLEARS state.lastDisposition so the next call is FRESH (lastDisposition cleared)", async () => {
     // call_1 got 'no_answer' (the handler folded it). This tick routes call_1 -> call_2. The
     // scheduler MUST clear lastDisposition on advance; else call_2 RE-ENTERS on the STALE
     // 'no_answer' (routing to giveup -> end -> completed) instead of placing a FRESH call.

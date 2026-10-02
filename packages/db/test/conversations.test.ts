@@ -1,7 +1,8 @@
-// Transcript read path (transcript-UI task): cross-tenant denial + seq ordering.
+// Transcript read path (the console's transcript screen): cross-tenant denial + seq ordering.
 // Same harness shape as rls.test.ts — fixtures as postgres (RLS-exempt), reads as app_service.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { Pool } from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import { conversationMessages, createPool } from "../src";
 
 const LOCAL_DB_URL =
@@ -12,19 +13,15 @@ const APP_SERVICE_URL =
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
 
 const admin = new Pool({ connectionString: LOCAL_DB_URL, max: 2 });
+const companies = testCompanies(admin);
 let appService: Pool;
 let orgA = "";
 let orgB = "";
 let convoA = "";
 
 beforeAll(async () => {
-  const orgs = await admin.query(
-    `insert into orgs (name, slug) values
-       ('Convo Test Org A', 'convo-test-a'), ('Convo Test Org B', 'convo-test-b')
-     returning id, slug`,
-  );
-  orgA = orgs.rows.find((r) => r.slug === "convo-test-a").id;
-  orgB = orgs.rows.find((r) => r.slug === "convo-test-b").id;
+  orgA = (await companies.add("Convo Test Org A")).id;
+  orgB = (await companies.add("Convo Test Org B")).id;
   const convo = await admin.query(
     `insert into conversations (org_id, channel, direction) values ($1, 'voice', 'inbound')
      returning id`,
@@ -43,9 +40,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await admin.query(
-    `delete from orgs where slug in ('convo-test-a','convo-test-b')`,
-  );
+  await companies.cleanup();
   await appService?.end();
   await admin.end();
 });

@@ -1,20 +1,21 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow step field (data, not a
-// thenable) in the T26.2 definition JSON, e.g. { kind:"wait", for:"PT2H", then:"…" } — the same
+// thenable) in the workflow definition JSON, e.g. { kind:"wait", for:"PT2H", then:"…" } — the same
 // suppression scheduler.test.ts / handlers.test.ts carry. The interpreter reads step.then.
 //
-// T9 (task-49) — THE M2 REPLAY: the acceptance gate for the program. A multi-day lifecycle —
+// THE MULTI-DAY REPLAY (once the program's acceptance gate). A multi-day lifecycle —
 //   call_1 → no_answer → (wait 2h) → WhatsApp → (wait_until 11:00 next day) → call_2 → BOOKED
 // replayed DETERMINISTICALLY on a SimClock with synthetic providers (FakeVoice/FakeWa/fake-LLM):
 // no real telephony, no real waits, no ANTHROPIC key. The drive is the real spine end-to-end —
-// startRun + scheduler.tick + the four T7 handlers, dispatched directly (not boss.work) so time is
-// controlled. REAL-DB INTEGRATION, CI-OWNED (ci.yml supabase-local-stack: Postgres + pg-boss's
-// installed schema + FOR UPDATE SKIP LOCKED). It does NOT run in the worktree (no .env by rail) —
-// typecheck + lint are the only env-free gates here. Each `it` derives from exactly one M2 assert.
+// startRun + scheduler.tick + the job handlers, dispatched directly (not boss.work) so time is
+// controlled. Real local database (Postgres + pg-boss's installed schema + FOR UPDATE SKIP LOCKED),
+// so it runs with the local stack's settings (`bun run gate`, CI). Each `it` checks one assertion
+// of the replay.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool } from "@revenue-os/db";
 import { buildCatalog, type LlmTurn } from "@revenue-os/harness";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
+import { testCompanies } from "../../../tests/test-companies";
 import {
   handlePlaceCall,
   type PlaceCallDeps,
@@ -36,8 +37,9 @@ import {
 } from "./fixtures/fake-channels";
 import { SimClock } from "./fixtures/sim-clock";
 
-// app_service (RLS-bound) = the role the handlers connect as through withOrg — exactly production.
-// admin (superuser, BYPASSRLS) = seeds + assertions + the pgboss.job reads/deletes the drive needs.
+// app_service (RLS-bound) = the role the handlers connect as through withOrg — exactly production —
+// and the owner of pg-boss's tables, so it also does the pgboss.job reads/deletes the drive needs.
+// admin (superuser, BYPASSRLS) = seeds + assertions.
 const DB_URL =
   process.env.DATABASE_URL ||
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
@@ -62,9 +64,9 @@ const START = "2030-06-03T04:30:00.000Z";
 const TZ = "Asia/Kolkata";
 const clock = new SimClock(START);
 
-// The M2 workflow — the interpret shape from the plan. DESIGN DECISION (a) (flagged in the report):
+// The replay's workflow. DESIGN DECISION:
 // call_2 routes completed → end DIRECTLY, with NO separate `book` tool step. The site visit is
-// booked DURING call_2's turn by the closer calling book_appointment (the T4 tool writes BOTH the
+// booked DURING call_2's turn by the closer calling book_appointment (that tool writes BOTH the
 // appointment AND the attributed outcome). A separate write_outcome `book` step would double the
 // outcome, so the faithful design omits it.
 const M2_WF = {
@@ -101,6 +103,7 @@ const CALL_WF = {
   },
 };
 
+const companies = testCompanies(admin, appPool);
 // captured by the beforeAll drive; the assertion `it`s read these
 let orgId = "";
 let contactId = "";
@@ -108,20 +111,6 @@ let m2RunId = "";
 let guardCalls: GuardCall[] = [];
 let voicePlaceCount = 0;
 let waSendCount = 0;
-
-async function cleanup(): Promise<void> {
-  await admin.query(
-    `delete from pgboss.job where name in ('place_call', 'send_wa')`,
-  );
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug like 'm2-replay-%')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug like 'm2-replay-%')`,
-  );
-  // org delete cascades runs/workflows/conversations/messages/outcomes/appointments/tasks/policies
-  await admin.query(`delete from orgs where slug like 'm2-replay-%'`);
-}
 
 let wfSeq = 0;
 async function seedWorkflow(def: unknown, org = orgId): Promise<string> {
@@ -162,9 +151,9 @@ async function getRun(id: string) {
   return r.rows[0];
 }
 
-/** Every pgboss.job row for a singleton_key (the T6 dedup key runId:step:idx). */
+/** Every pgboss.job row for a singleton_key (the scheduler's dedup key runId:step:idx). */
 async function jobsFor(singletonKey: string) {
-  const r = await admin.query(
+  const r = await appPool.query(
     `select name, data, singleton_key from pgboss.job where singleton_key = $1`,
     [singletonKey],
   );
@@ -174,7 +163,7 @@ async function jobsFor(singletonKey: string) {
 /**
  * The deterministic drive: tick → dispatch the enqueued handlers directly → advance the clock to the
  * run's next wake_at → repeat, until the run completes. This is the production loop with pg-boss's
- * worker and its real waits removed: enqueue still lands in pgboss.job_common (the T6 contract), but
+ * worker and its real waits removed: enqueue still lands in pgboss.job_common (enqueueJob in src/scheduler.ts), but
  * WE pull the due job and invoke handlePlaceCall / handleSendWa in-line so time never actually
  * passes. place_call parks (wake_at NULL) then its handler RE-ARMS to clock.now(); a wait/wait_until
  * parks at a FUTURE wake_at we jump the clock to. No wake_at is ever hand-edited.
@@ -187,7 +176,7 @@ async function driveToCompletion(
   for (let iter = 0; iter < 40; iter++) {
     await tick(appPool, orgId, { now: clock.now() });
 
-    const jobs = await admin.query(
+    const jobs = await appPool.query(
       `select id, name, data from pgboss.job
         where data ->> 'runId' = $1 and state = 'created' order by created_on`,
       [runId],
@@ -199,7 +188,7 @@ async function driveToCompletion(
         await handleSendWa(sendDeps, job.data as SendWaJob);
       }
       // consume the job so the next iteration's tick/read doesn't re-dispatch it
-      await admin.query(`delete from pgboss.job where id = $1`, [job.id]);
+      await appPool.query(`delete from pgboss.job where id = $1`, [job.id]);
     }
 
     const run = await getRun(runId);
@@ -209,19 +198,18 @@ async function driveToCompletion(
       if (w > clock.now().getTime()) clock.set(new Date(w)); // jump to the next due instant
     } else if (jobs.rows.length === 0) {
       throw new Error(
-        `M2 drive stalled at step=${run.current_step} status=${run.status}`,
+        `replay drive stalled at step=${run.current_step} status=${run.status}`,
       );
     }
   }
   throw new Error(
-    "M2 drive exceeded its 40-iteration budget without completing",
+    "replay drive exceeded its 40-iteration budget without completing",
   );
 }
 
 beforeAll(async () => {
   // pg-boss installs pgboss.* at start(); createQueue makes the LIST partition the raw enqueue
-  // FK-needs. The admin (postgres) pool is BYPASSRLS but NOT the owner of pg-boss's tables — grant
-  // it read/delete AS app_service (the owner), exactly as scheduler.test.ts does. Idempotent.
+  // FK-needs.
   await boss.start();
   for (const q of QUEUES) {
     try {
@@ -230,19 +218,10 @@ beforeAll(async () => {
       // idempotent across reruns: the queue partition already exists
     }
   }
-  await appPool.query(
-    "grant select, delete on pgboss.job, pgboss.job_common to postgres",
-  );
-  await cleanup();
 
   // --- seed one org: contact (+ phone & whatsapp E.164 identities), an ACTIVE closer agent that
-  // may book_appointment, benign guardrail policies, and the ACTIVE M2 workflow --------------------
-  orgId = (
-    await admin.query(
-      `insert into orgs (name, slug) values ('M2 Org', $1) returning id`,
-      [`m2-replay-${Date.now()}`],
-    )
-  ).rows[0].id;
+  // may book_appointment, benign guardrail policies, and the ACTIVE replay workflow ----------------
+  orgId = (await companies.add("Replay Org")).id;
   contactId = (
     await admin.query(
       `insert into contacts (org_id, first_name, timezone) values ($1, 'Asha', $2) returning id`,
@@ -336,7 +315,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await boss.stop({ graceful: true, timeout: 5_000 });
   await appPool.end();
   await admin.end();
@@ -344,8 +323,8 @@ afterAll(async () => {
 
 const HOUR = 3_600_000;
 
-describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
-  it("[M2 assert 1] the run COMPLETES with attempts {voice:[2], whatsapp:[1]} spanning days", async () => {
+describe("multi-day replay — the lifecycle proof", () => {
+  it("[assert 1] the run COMPLETES with attempts {voice:[2], whatsapp:[1]} spanning days", async () => {
     const run = await getRun(m2RunId);
     expect(run.status).toBe("completed");
     expect(run.completed_at).not.toBeNull();
@@ -365,18 +344,14 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
     expect(t1 - t0).toBeGreaterThanOrEqual(24 * HOUR); // re-call on a later day
   });
 
-  it("[M2 assert 1 — GAP] a completed run rests at current_step='end'", async () => {
-    // GAP PIN (predict RED — reported to Fable, do NOT weaken). applyTransitions computes
-    //   nextStep = final.nextStep ?? run.current_step
-    // and a `call`→`end` route WALKS the terminal `end` step (its nextStep is null), so the run
-    // completes with current_step still = 'call_2' (the pre-terminal step), never 'end'. Either the
-    // scheduler should land current_step on the terminal step at completion, or the M2 spec should
-    // accept the pre-terminal value — Fable's call. The assertion encodes the brief's spec verbatim.
+  it("[assert 1] a completed run rests at current_step='end'", async () => {
+    // A `call`→`end` route walks the terminal `end` step, and the scheduler lands current_step on
+    // that terminal step at completion, not on the pre-terminal 'call_2'.
     const run = await getRun(m2RunId);
     expect(run.current_step).toBe("end");
   });
 
-  it("[M2 assert 2] two VOICE conversations, each a distinct provider_ref; messages strictly monotonic by seq", async () => {
+  it("[assert 2] two VOICE conversations, each a distinct provider_ref; messages strictly monotonic by seq", async () => {
     const convos = await admin.query(
       `select id, channel, provider, provider_ref from conversations
         where workflow_run_id = $1 order by created_at`,
@@ -386,7 +361,7 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
     const wa = convos.rows.filter((c) => c.channel === "whatsapp");
 
     // the two CALLS are two conversations with DISTINCT, non-null provider_refs (out-of-order-safe
-    // upsert-by-provider_ref, moat: convo_provider_ref_uq). send_wa opens its own conversation too
+    // upsert-by-provider_ref, unique index convo_provider_ref_uq). send_wa opens its own conversation too
     // (provider_ref NULL — the wamid rides the message), so the run holds 3 conversations total.
     expect(voice.length).toBe(2);
     expect(wa.length).toBe(1);
@@ -406,8 +381,8 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
     }
   });
 
-  it("[M2 assert 3] the booking wrote exactly ONE appointment + ONE site_visit_booked outcome, linked", async () => {
-    // The closer booked DURING call_2 via the book_appointment tool (design a) — which writes BOTH
+  it("[assert 3] the booking wrote exactly ONE appointment + ONE site_visit_booked outcome, linked", async () => {
+    // The closer booked DURING call_2 via the book_appointment tool (the design decision above) — which writes BOTH
     // the appointment and the attributed outcome atomically, on the run's contact.
     const appts = await admin.query(
       `select id from appointments where org_id = $1 and contact_id = $2`,
@@ -424,13 +399,10 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
     expect(outs.rows[0].appointment_id).toBe(appts.rows[0].id); // outcome ↔ appointment linked
   });
 
-  it("[M2 assert 3 — GAP] the site_visit_booked outcome is ATTRIBUTED to the run", async () => {
-    // GAP PIN (predict RED — reported to Fable, do NOT weaken). The moat table's whole point is
-    // attribution (spec §9), but book_appointment inserts the outcome as
-    //   (org_id, contact_id, appointment_id, kind, source)
-    // — NO workflow_run_id and NO conversation_id — so the booking outcome traces to the contact and
-    // appointment, never to THIS run. Fix (Fable's call): thread conversationId/runId into the tool so
-    // the outcome carries conversation_id (→ run) or workflow_run_id. Fix-agnostic assertion below.
+  it("[assert 3] the site_visit_booked outcome is ATTRIBUTED to the run", async () => {
+    // The outcomes table's whole point is attribution (AGENTS.md → Conventions: every business
+    // result is an outcomes row with attribution), so the booking outcome must trace to THIS run,
+    // through its conversation_id or its workflow_run_id, not only to the contact and appointment.
     const attributed = await admin.query(
       `select o.id from outcomes o
         where o.org_id = $1 and o.kind = 'site_visit_booked'
@@ -441,7 +413,7 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
     expect(attributed.rows.length).toBe(1);
   });
 
-  it("[M2 assert 4] the call turns and the wa send are METERED to usage_events", async () => {
+  it("[assert 4] the call turns and the wa send are METERED to usage_events", async () => {
     const usage = await admin.query(
       `select kind, count(*)::int n from usage_events
         where conversation_id in (select id from conversations where workflow_run_id = $1)
@@ -455,7 +427,7 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
     expect(byKind.get("wa_message") ?? 0).toBe(1); // the whatsapp send metered
   });
 
-  it("[M2 assert 5] EVERY send passed guard() first — no send bypassed the doorway (moat #4)", async () => {
+  it("[assert 5] EVERY send passed guard() first — no send bypassed the doorway", async () => {
     // guardCalls is the spy's complete ledger: the real guard ran (seeded quiet_hours/attempt_caps/
     // dnc pipeline at SIM time) before every doorway send. No blocking verdict, and the guard-call
     // count matches the sender-invocation count per channel ⇒ no send reached a provider un-guarded.
@@ -469,8 +441,8 @@ describe("M2 replay — the multi-day lifecycle proof (task-49)", () => {
   });
 });
 
-describe("M2 replay — exactly-once + tenancy (task-49)", () => {
-  it("[M2 assert 6a] a duplicate tick over a due call step enqueues EXACTLY ONE job (singleton_key)", async () => {
+describe("multi-day replay — exactly-once + tenancy", () => {
+  it("[assert 6a] a duplicate tick over a due call step enqueues EXACTLY ONE job (singleton_key)", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, {});
 
@@ -488,7 +460,7 @@ describe("M2 replay — exactly-once + tenancy (task-49)", () => {
     expect((await jobsFor(`${runId}:c:0`)).length).toBe(1); // exactly one
   });
 
-  it("[M2 assert 6b] a duplicate place_call DELIVERY is a no-op: one send, one conversation, one fold", async () => {
+  it("[assert 6b] a duplicate place_call DELIVERY is a no-op: one send, one conversation, one fold", async () => {
     const wf = await seedWorkflow(CALL_WF);
     const runId = await seedRun(wf, {});
     // seedRun parks at 'c' (pending). A place_call handler expects status 'waiting' — mark it so the
@@ -526,13 +498,8 @@ describe("M2 replay — exactly-once + tenancy (task-49)", () => {
     expect((await getRun(runId)).state.lastDisposition).toBe("no_answer"); // folded once
   });
 
-  it("[cross-tenant denial] tick(org A) never advances org B's due run (RLS, moat #3)", async () => {
-    const orgB = (
-      await admin.query(
-        `insert into orgs (name, slug) values ('M2 Org B', $1) returning id`,
-        [`m2-replay-b-${Date.now()}`],
-      )
-    ).rows[0].id;
+  it("[cross-tenant denial] tick(org A) never advances org B's due run (RLS)", async () => {
+    const orgB = (await companies.add("Replay Org B")).id;
     const contactB = (
       await admin.query(
         `insert into contacts (org_id, first_name) values ($1, 'Ben') returning id`,

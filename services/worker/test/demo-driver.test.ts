@@ -1,15 +1,15 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow-step field (data, not a
-// thenable) in the T26.2 definition JSON — the same suppression scheduler/handlers/m2-replay carry.
+// thenable) in the workflow definition JSON — the same suppression scheduler/handlers/m2-replay carry.
 //
-// task-60 (RED) — THE DEMO DRIVER acceptance suite. `bun run demo` sequences the full engine cycle
-// locally with NO telephony and NO LLM cost and prints the run's journey. This suite drives the
-// exported demo() (scripts/demo.ts) against the REAL local stack (Postgres + pg-boss + the real
-// Vapi webhook receiver), with the voice sender / LLM / outcome ports STUBBED — exactly the M2
-// replay's seam pattern. REAL-DB + REAL-RECEIVER INTEGRATION, CI-OWNED: it needs a migrated local
-// DB AND VAPI_WEBHOOK_SECRET in the process env (the receiver reads process.env directly and 501s
-// without it), so it does NOT run in a fresh worktree (no .env by rail). Each `it` derives from one
-// acceptance criterion of the task-60 brief.
+// THE DEMO DRIVER suite. `bun run demo` sequences the full engine cycle locally with NO telephony
+// and NO LLM cost and prints the run's journey. This suite drives the exported demo()
+// (scripts/demo.ts) against the REAL local stack (Postgres + pg-boss + the real Vapi webhook
+// receiver), with the voice sender / LLM / outcome ports STUBBED — the multi-day replay's seam
+// pattern (m2-replay.test.ts). It needs a migrated local database AND VAPI_WEBHOOK_SECRET in the
+// process env (the receiver reads it directly and answers 501 without it), so it runs with the
+// local stack's settings (`bun run gate`, CI).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { createPool } from "@revenue-os/db";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
@@ -19,6 +19,7 @@ import {
   demo,
   type JourneyStage,
 } from "../../../scripts/demo";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 import {
   makeFakeVoice,
@@ -36,7 +37,8 @@ const admin = new pg.Pool({
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   max: 4,
 });
-const appPool = createPool(DB_URL);
+const appPool = createPool(DB_URL); // also owns pg-boss's tables: reads and clears this file's jobs
+const companies = testCompanies(admin, appPool);
 const boss = new PgBoss({
   connectionString: DB_URL,
   schema: "pgboss",
@@ -51,8 +53,8 @@ const TZ = "Asia/Kolkata";
 
 // The demo workflow: a call that routes the BUSINESS disposition straight into the branch's side
 // effect — site_visit_agreed → book (writes a site_visit_booked outcome), callback → a callback
-// task. Mirrors the seeded real_estate qualification branch's SEMANTICS (see the open question in
-// the report re: the seeded workflow's intermediate `route` branch + lastDisposition clearing).
+// task. Mirrors the seeded real_estate qualification branch's SEMANTICS (the seeded workflow's
+// intermediate `route` branch has its own test at the end of this file).
 const DEMO_WF = {
   entry: "qualify_call",
   steps: {
@@ -83,17 +85,6 @@ const DEMO_WF = {
 let orgId = "";
 let workflowId = "";
 
-async function cleanup(): Promise<void> {
-  await admin.query(`delete from pgboss.job where name = 'place_call'`);
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug like 'demo-driver-%')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug like 'demo-driver-%')`,
-  );
-  await admin.query(`delete from orgs where slug like 'demo-driver-%'`);
-}
-
 beforeAll(async () => {
   await boss.start();
   try {
@@ -101,17 +92,7 @@ beforeAll(async () => {
   } catch {
     // idempotent across reruns
   }
-  await appPool.query(
-    "grant select, delete on pgboss.job, pgboss.job_common to postgres",
-  );
-  await cleanup();
-
-  orgId = (
-    await admin.query(
-      `insert into orgs (name, slug) values ('Demo Org', $1) returning id`,
-      [`demo-driver-${Date.now()}`],
-    )
-  ).rows[0].id;
+  orgId = (await companies.add("Demo Org")).id;
   await admin.query(
     `insert into agents (org_id, key, version, status, model, system_prompt, tools_allowed)
      values ($1, 'qualifier', 1, 'active', 'claude-fake', 'You are a qualifier.', '{book_appointment}')`,
@@ -139,7 +120,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await cleanup();
+  await companies.cleanup();
   await boss.stop({ graceful: true, timeout: 5_000 });
   await appPool.end();
   await admin.end();
@@ -149,7 +130,7 @@ let demoSeq = 0;
 
 /** Build injected deps for ONE demo run and invoke demo(). Every effect port is a stub/fake: no
  *  telephony, no Anthropic, no network beyond the localhost receiver. Returns the result plus the
- *  fakes so a test can assert placeCount / the guard ledger (moat #4). */
+ *  fakes so a test can assert placeCount / the guard ledger (guardrails before every send). */
 async function runDemo(
   disposition: string,
   opts: { workflowId?: string } = {},
@@ -173,7 +154,7 @@ async function runDemo(
       phone: `+91987650${String(1000 + demoSeq)}`,
     },
     disposition,
-    callId: `demo-call-${Date.now()}-${demoSeq}`,
+    callId: `demo-call-${randomUUID()}`, // call ids are unique across every company and every run
     voice,
     provider: makeScriptedLlm([
       {
@@ -189,7 +170,7 @@ async function runDemo(
   return { result, voice, guardCalls: guardSpy.calls };
 }
 
-/** The expected ordered stage sequence for a completed disposition path (criterion 7). */
+/** The expected ordered stage sequence for a completed disposition path. */
 const EXPECTED_STAGES: JourneyStage[] = [
   "enrolled",
   "tick_advanced",
@@ -199,8 +180,8 @@ const EXPECTED_STAGES: JourneyStage[] = [
   "terminal",
 ];
 
-describe("demo driver — golden path (task-60)", () => {
-  it("[criterion 1] enrolls a named contact via startRun and drives the run to a terminal state", async () => {
+describe("demo driver — golden path", () => {
+  it("enrolls a named contact via startRun and drives the run to a terminal state", async () => {
     const { result } = await runDemo("site_visit_agreed");
     expect(result.runId).toBeTruthy();
     expect(result.contactId).toBeTruthy();
@@ -221,18 +202,18 @@ describe("demo driver — golden path (task-60)", () => {
     expect(contact.rows[0]?.first_name).toMatch(/^Asha/);
   });
 
-  it("[criterion 7] returns the journey as ordered structured {stage, detail} data", async () => {
+  it("returns the journey as ordered structured {stage, detail} data", async () => {
     const { result } = await runDemo("site_visit_agreed");
     // structured data, not a formatted blob
     for (const ev of result.journey) {
       expect(typeof ev.stage).toBe("string");
       expect(typeof ev.detail).toBe("string");
     }
-    // the golden sequence, in order (criterion 7)
+    // the golden sequence, in order
     expect(result.journey.map((e) => e.stage)).toEqual(EXPECTED_STAGES);
   });
 
-  it("[criterion 3 · golden] site_visit_agreed advances the waiting run through the branch → a booking side effect", async () => {
+  it("[golden] site_visit_agreed advances the waiting run through the branch → a booking side effect", async () => {
     const { result } = await runDemo("site_visit_agreed");
     // the run left 'waiting' and completed by WALKING the branch to a terminal step
     const run = await admin.query(
@@ -248,11 +229,11 @@ describe("demo driver — golden path (task-60)", () => {
     expect(outcome.rows.length).toBe(1);
   });
 
-  it("[criterion 5] no real side effects: the stubbed voice sender fires exactly once and every send passed guard()", async () => {
+  it("no real side effects: the stubbed voice sender fires exactly once and every send passed guard()", async () => {
     const { result, voice, guardCalls } = await runDemo("site_visit_agreed");
     expect(result.terminalStatus).toBe("completed");
     expect(voice.placeCount).toBe(1); // one stubbed placement — no telephony, no re-placement
-    // moat #4: the send went through the real guard pipeline; no send bypassed the doorway
+    // guardrails before every send: the send went through the real guard pipeline; no send bypassed the doorway
     const voiceGuards = guardCalls.filter((c) => c.channel === "voice");
     expect(voiceGuards.length).toBe(1);
     expect(voiceGuards.every((c) => c.ok)).toBe(true);
@@ -273,8 +254,8 @@ function postSigned(body: unknown): Promise<Response> {
   );
 }
 
-describe("demo driver — alternate branch (task-60, criterion 3)", () => {
-  it("[criterion 3 · alternate] callback advances the run through the branch → a callback task row", async () => {
+describe("demo driver — alternate branch", () => {
+  it("[alternate] callback advances the run through the branch → a callback task row", async () => {
     const { result } = await runDemo("callback");
     expect(result.terminalStatus).toBe("completed");
     const task = await admin.query(
@@ -291,8 +272,8 @@ describe("demo driver — alternate branch (task-60, criterion 3)", () => {
   });
 });
 
-describe("demo driver — real receiver + dedupe (task-60, criterion 2)", () => {
-  it("[criterion 2] the demo's webhook goes through the REAL receiver and lands a webhook_events row", async () => {
+describe("demo driver — real receiver + dedupe", () => {
+  it("the demo's webhook goes through the REAL receiver and lands a webhook_events row", async () => {
     const { result } = await runDemo("site_visit_agreed");
     expect(result.terminalStatus).toBe("completed");
     const evs = await admin.query(
@@ -302,8 +283,8 @@ describe("demo driver — real receiver + dedupe (task-60, criterion 2)", () => 
     expect(evs.rows[0].n).toBeGreaterThanOrEqual(1);
   });
 
-  it("[criterion 2] posting the SAME event twice does not double-apply (dedupe_key honored)", async () => {
-    const callId = `demo-dedupe-${Date.now()}`;
+  it("posting the SAME event twice does not double-apply (dedupe_key honored)", async () => {
+    const callId = `demo-dedupe-${randomUUID()}`;
     const event = {
       message: {
         type: "end-of-call-report",
@@ -324,8 +305,8 @@ describe("demo driver — real receiver + dedupe (task-60, criterion 2)", () => 
   });
 });
 
-describe("demo driver — re-runnable (task-60, criterion 4)", () => {
-  it("[criterion 4] running demo() twice enrolls a FRESH run each time with no unique-collision crash", async () => {
+describe("demo driver — re-runnable", () => {
+  it("running demo() twice enrolls a FRESH run each time with no unique-collision crash", async () => {
     const first = await runDemo("site_visit_agreed");
     const second = await runDemo("site_visit_agreed");
     expect(second.result.runId).not.toBe(first.result.runId);
@@ -334,14 +315,9 @@ describe("demo driver — re-runnable (task-60, criterion 4)", () => {
   });
 });
 
-describe("demo driver — tenancy (task-60, moat #3)", () => {
+describe("demo driver — tenancy (RLS on every table)", () => {
   it("[cross-tenant denial] a demo run scoped to org A never advances org B's due run", async () => {
-    const orgB = (
-      await admin.query(
-        `insert into orgs (name, slug) values ('Demo Org B', $1) returning id`,
-        [`demo-driver-b-${Date.now()}`],
-      )
-    ).rows[0].id;
+    const orgB = (await companies.add("Demo Org B")).id;
     const contactB = (
       await admin.query(
         `insert into contacts (org_id, first_name) values ($1, 'Ben') returning id`,
@@ -373,7 +349,7 @@ describe("demo driver — tenancy (task-60, moat #3)", () => {
     expect(rb.rows[0].current_step).toBe("qualify_call"); // untouched
     expect(rb.rows[0].status).toBe("pending");
     expect(rb.rows[0].attempts.voice ?? []).toEqual([]); // never processed
-    const jobsB = await admin.query(
+    const jobsB = await appPool.query(
       `select count(*)::int n from pgboss.job where data ->> 'runId' = $1`,
       [runB],
     );
@@ -381,8 +357,8 @@ describe("demo driver — tenancy (task-60, moat #3)", () => {
   });
 });
 
-// The VERBATIM seeded qualification definition (copied byte-for-byte from
-// supabase/seeds/real_estate.sql — entry qualify_call, the retry/whatsapp/recall path, the `route`
+// A copy of the seeded qualification definition (from supabase/seeds/real_estate.sql; Slice 3's
+// demo item replaces such copies with the sequence a real company gets — entry qualify_call, the retry/whatsapp/recall path, the `route`
 // BRANCH, and the book/handoff/callback tool steps). Unlike DEMO_WF, the call step routes
 // on.completed → `route`, and the BRANCH then routes onDisposition. This is the definition
 // `bun run demo` faces against a real seeded org, so the acceptance suite MUST prove the golden
@@ -446,20 +422,16 @@ const SEEDED_QUAL_WF = {
   },
 };
 
-describe("demo driver — VERBATIM seeded qualification workflow (task-60)", () => {
-  it("[criterion 3 · seeded def] completed → route → site_visit_agreed → book yields a booking, same outcomes as the golden path", async () => {
+describe("demo driver — the seeded qualification workflow", () => {
+  it("[seeded def] completed → route → site_visit_agreed → book yields a booking, same outcomes as the golden path", async () => {
     // Seed the exact real_estate.sql `qualification` definition as ACTIVE and enroll a demo run into
     // IT (not DEMO_WF). The call resolves the qualified disposition; the run must WALK
     // qualify_call → route(branch) → book(tool) and complete with a site_visit_booked outcome.
     //
-    // DO NOT WEAKEN if this fails: with the current engine a business disposition cannot survive to
-    // `route`. place-call.ts folds ONE state.lastDisposition; the call re-entry consumes it via
-    // on[disposition] (so it must be a CALL outcome to reach `route`); and scheduler.ts drive()
-    // DELETES lastDisposition when advancing out of BOTH a `call` AND a `branch`. So at `route` the
-    // disposition is already gone → it falls through onDisposition["*"] → end, and `book` is never
-    // reached (no site_visit_booked outcome). That is a REAL defect the GREEN worker must fix (carry
-    // the qualified disposition through the intermediate branch, or reshape how the outcome folds);
-    // this assertion is the spec for `bun run demo` against a genuine seeded org.
+    // DO NOT WEAKEN: this once failed, because the business disposition did not survive to `route`
+    // (place-call.ts folds ONE state.lastDisposition, and the scheduler's drive() cleared it when
+    // advancing out of a step), so the run fell through onDisposition["*"] → end and never booked.
+    // This assertion is the spec for `bun run demo` against a genuine seeded org.
     const seededWfId = (
       await admin.query(
         `insert into workflows (org_id, key, version, status, definition)

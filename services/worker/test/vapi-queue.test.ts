@@ -1,9 +1,12 @@
-// STATE.md NEXT-3 (P2): webhook_events → processVapiEvents rides pg-boss, not test glue.
+// webhook_events → processVapiEvents rides pg-boss, not test glue.
 // Spec of this suite: events posted to the receiver must land in conversations/messages
-// through the QUEUE ALONE — processVapiEvents is never called here. Same S6 semantics as
-// vapi-webhook.test.ts (out-of-order arrival, dedupe-by-constraint, store-and-skip).
+// through the QUEUE ALONE — processVapiEvents is never called here. Same webhook semantics
+// (docs/security.md S6) as vapi-webhook.test.ts (out-of-order arrival, dedupe-by-constraint,
+// store-and-skip).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { testCompanies } from "../../../tests/test-companies";
 import app from "../src/index";
 import { startJobs, stopJobs } from "../src/jobs";
 
@@ -15,34 +18,19 @@ const admin = new pg.Pool({
   max: 1,
 });
 
+const companies = testCompanies(admin);
 let orgId = "";
-const callId = `qcall-${Date.now()}`;
-
-async function cleanup() {
-  await admin.query(
-    `delete from webhook_events where org_id in (select id from orgs where slug = 'vapi-queue-test')`,
-  );
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug = 'vapi-queue-test')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug = 'vapi-queue-test')`,
-  );
-  await admin.query(`delete from orgs where slug = 'vapi-queue-test'`);
-}
+// Call ids are unique across every company: one of this run's own, so two test runs at once never share it.
+const callId = `qcall-${randomUUID()}`;
 
 beforeAll(async () => {
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('Vapi Queue Org', 'vapi-queue-test') returning id`,
-  );
-  orgId = org.rows[0].id;
-  await startJobs(); // real pg-boss on the real local DB — mocks lie (tech-stack testing L2)
+  orgId = (await companies.add("Vapi Queue Org")).id;
+  await startJobs(); // real pg-boss on the real local DB — mocks lie
 }, 30_000); // cold start installs pg-boss's own schema objects
 
 afterAll(async () => {
   await stopJobs();
-  await cleanup();
+  await companies.cleanup();
   await admin.end();
 });
 
@@ -175,7 +163,7 @@ describe("vapi pipeline via pg-boss (P2 wiring)", () => {
     expect(statuses.rows).toEqual([{ status: "processed", n: 4 }]);
   }, 30_000); // a real queue drain under full-suite load outlives bun's 5s default
 
-  it("an exact replay dedupes at the constraint and drains to a no-op (S6.3)", async () => {
+  it("an exact replay dedupes at the constraint and drains to a no-op (docs/security.md S6.3)", async () => {
     const before = await admin.query(
       `select count(*)::int n from messages where org_id = $1`,
       [orgId],
@@ -200,7 +188,7 @@ describe("vapi pipeline via pg-boss (P2 wiring)", () => {
     expect(after.rows[0].n).toBe(before.rows[0].n); // dedupe_key conflict → nothing new
   }, 30_000);
 
-  it("unknown event types end 'skipped' via the queue — stored, never guessed (S6.5)", async () => {
+  it("unknown event types end 'skipped' via the queue — stored, never guessed (docs/security.md S6.5)", async () => {
     expect(
       (
         await post({

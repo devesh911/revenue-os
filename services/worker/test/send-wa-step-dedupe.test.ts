@@ -1,24 +1,17 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is a workflow step FIELD (data, not a
-// thenable) in the T26.2 definition JSON — same suppression as scheduler.test.ts.
-// H8 (hole audit, Package 2 / task-58) — RED spec: send_wa's exactly-once key must identify THIS
-// SEND, not this template. REAL-DB INTEGRATION, CI-OWNED (ci.yml supabase-local-stack): needs
-// Postgres + pg-boss's installed schema (the scheduler enqueues the jobs this suite then hands to
-// the handler, so the JOB PAYLOAD under test is the real one the scheduler produced — never a
-// hand-written one). Setup mirrors scheduler.test.ts + handlers.test.ts.
+// thenable) in the workflow definition JSON — same suppression as scheduler.test.ts.
+// send_wa's exactly-once key identifies THIS SEND, not this template. Real local database:
+// needs Postgres + pg-boss's installed schema (the scheduler enqueues the jobs this suite then
+// hands to the handler, so the JOB PAYLOAD under test is the real one the scheduler produced —
+// never a hand-written one), so it runs with the local stack's settings (`bun run gate`, CI).
+// Setup mirrors scheduler.test.ts + handlers.test.ts.
 //
-// DEFECT (ground truth, read directly, main@4a3b3fe):
-//   • services/worker/src/handlers/send-wa.ts:66 keys idempotency as
-//     `send_wa:${runId}:${action.template}` — run id + template, nothing else. The lookup at
-//     :67-72 returns BEFORE the var merge, BEFORE wa.send and BEFORE guard(): a silent no-op with
-//     no error, no task and no log.
-//   • The scheduler's own identity for the same send is step-scoped —
-//     singleton_key `${runId}:${step}:${idx}` (scheduler.ts:264) — so the two dedupe layers
-//     disagree and the coarser one wins.
-//   • Reachable from the ordinary reminder cadence: `steps` is a keyed RECORD (schema.ts:126) with
-//     no uniqueness rule on `template`, and interpret.ts:147-155 advances past the whatsapp step
-//     in the same transition, so the second send is a distinct, already-committed action. The
-//     scheduler enqueues two jobs; the second handler run finds the first send's usage_events row
-//     and returns. Exactly-once has silently become at-most-once-per-(run, template).
+// THE FIXED DEFECT: handleSendWa (src/handlers/send-wa.ts) once keyed its idempotency on run id +
+// template only, while the scheduler's identity for the same send is step-scoped (singleton_key
+// `${runId}:${step}:${idx}`, enqueueJob in src/scheduler.ts). Two whatsapp steps of one run that
+// share a template (the ordinary reminder cadence: `steps` is a keyed record with no uniqueness
+// rule on `template`) then sent once: the second handler run found the first send's usage row and
+// returned silently. Exactly-once had become at-most-once-per-(run, template).
 //
 // PINNED here:
 //   1. two DIFFERENT whatsapp steps of one run that share a template BOTH send (the reminder
@@ -36,6 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool } from "@revenue-os/db";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
+import { testCompanies } from "../../../tests/test-companies";
 import {
   handleSendWa,
   type SendWaDeps,
@@ -52,7 +46,8 @@ const admin = new pg.Pool({
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   max: 4,
 });
-const appPool = createPool(DB_URL);
+const appPool = createPool(DB_URL); // also owns pg-boss's tables: clears this file's jobs
+const companies = testCompanies(admin, appPool);
 // pg-boss installs pgboss.* at start(); the send_wa queue must exist before the scheduler's raw
 // insert into pgboss.job_common (FK to pgboss.queue), policy 'short' for the singleton_key dedupe.
 const boss = new PgBoss({
@@ -68,17 +63,6 @@ let orgId = "";
 let orgB = "";
 let contactId = "";
 let wfSeq = 0;
-const seededRuns: string[] = [];
-
-async function cleanup(): Promise<void> {
-  await admin.query(
-    `delete from usage_events where org_id in (select id from orgs where slug like 'wa-dedupe-test-%')`,
-  );
-  await admin.query(
-    `delete from audit_log where org_id in (select id from orgs where slug like 'wa-dedupe-test-%')`,
-  );
-  await admin.query(`delete from orgs where slug like 'wa-dedupe-test-%'`);
-}
 
 async function seedWorkflow(def: unknown, org = orgId): Promise<string> {
   wfSeq += 1;
@@ -109,9 +93,7 @@ async function seedRun(
       JSON.stringify({ contactId, vars: { name: "Asha" } }),
     ],
   );
-  const id = r.rows[0].id as string;
-  seededRuns.push(id);
-  return id;
+  return r.rows[0].id as string;
 }
 
 /** The REAL job the scheduler enqueued for `<runId>:<step>:0` — payload verbatim, never authored. */
@@ -147,7 +129,7 @@ const CADENCE_WF = {
   },
 };
 
-/** Counting sender + guard spy; the call log proves guard ran BEFORE each send (moat #4). */
+/** Counting sender + guard spy; the call log proves guard ran BEFORE each send (guardrails before every send). */
 function spyDeps(): { deps: SendWaDeps; log: string[]; templates: string[] } {
   const log: string[] = [];
   const templates: string[] = [];
@@ -175,17 +157,8 @@ beforeAll(async () => {
   } catch {
     // idempotent across reruns: the queue partition already exists
   }
-  await cleanup();
-  const org = await admin.query(
-    `insert into orgs (name, slug) values ('WA Dedupe Org', $1) returning id`,
-    [`wa-dedupe-test-${Date.now()}`],
-  );
-  orgId = org.rows[0].id;
-  const b = await admin.query(
-    `insert into orgs (name, slug) values ('WA Dedupe Org B', $1) returning id`,
-    [`wa-dedupe-test-b-${Date.now()}`],
-  );
-  orgB = b.rows[0].id;
+  orgId = (await companies.add("WA Dedupe Org")).id;
+  orgB = (await companies.add("WA Dedupe Org B")).id;
   contactId = (
     await admin.query(
       `insert into contacts (org_id, first_name) values ($1, 'Asha') returning id`,
@@ -200,18 +173,13 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  for (const runId of seededRuns) {
-    await appPool.query(`delete from pgboss.job where singleton_key like $1`, [
-      `${runId}:%`,
-    ]);
-  }
-  await cleanup();
+  await companies.cleanup();
   await boss.stop({ graceful: true, timeout: 5_000 });
   await appPool.end();
   await admin.end();
 });
 
-describe("send_wa dedupe is per-send, not per-template (H8)", () => {
+describe("send_wa dedupe is per-send, not per-template", () => {
   it("two different steps sharing ONE template both send — the reminder cadence is delivered twice", async () => {
     const wf = await seedWorkflow(CADENCE_WF);
     const runId = await seedRun(wf, "wa_1");
@@ -232,7 +200,7 @@ describe("send_wa dedupe is per-send, not per-template (H8)", () => {
 
     // THE ASSERTION: two distinct sends, not one. (Today the second is silently swallowed.)
     expect(templates).toEqual([TEMPLATE, TEMPLATE]);
-    expect(log).toEqual(["guard", "send", "guard", "send"]); // moat #4 held on BOTH sends
+    expect(log).toEqual(["guard", "send", "guard", "send"]); // guard before send held on BOTH sends
     expect(await countWaUsage(runId)).toBe(2); // both metered — two durable exactly-once markers
   }, 30_000);
 

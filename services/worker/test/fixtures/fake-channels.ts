@@ -1,9 +1,10 @@
-// T9 (task-49) — synthetic providers for the M2 replay: FakeVoice (Vapi), FakeWa (Meta), a
+// Synthetic providers for the multi-day replay (m2-replay.test.ts): FakeVoice (Vapi), FakeWa (Meta), a
 // scripted fake LLM, and a guard SPY. No real telephony, no real network, no ANTHROPIC_API_KEY.
-// These stand in for the T8 boot stubs (services/worker/src/jobs.ts) so the handlers run against
+// These stand in for the worker's stand-in senders (services/worker/src/jobs.ts) so the handlers run against
 // deterministic effects while every real invariant (guard-before-send, provider_ref uniqueness,
 // runTurn metering) still fires. G1-friendly (Intl/Date only) — but lives under services/, not a
 // package, so bun:* would be legal here; it needs none.
+import { randomUUID } from "node:crypto";
 import {
   type GuardedAction,
   guard,
@@ -20,7 +21,10 @@ import type { WaSenderPort } from "../../src/handlers/send-wa";
 import type { SimClock } from "./sim-clock";
 
 // Module-level counters for globally-unique provider refs (prevents test-isolation collisions
-// where each test fixture instance would restart counting at 1, causing provider_ref duplicates).
+// where each test fixture instance would restart counting at 1, causing provider_ref duplicates),
+// behind a tag of this run's own: provider refs are unique across every company, so two test runs
+// at once on the shared database must not both send `vapi-call-1`.
+const RUN = randomUUID().slice(0, 8);
 let voiceSeq = 0;
 let waSeq = 0;
 
@@ -58,7 +62,7 @@ export function makeFakeVoice(dispositions: string[]): {
   const place: VoiceSenderPort["place"] = async () => {
     voiceSeq += 1;
     placed += 1;
-    const providerRef = `vapi-call-${voiceSeq}`;
+    const providerRef = `vapi-call-${RUN}-${voiceSeq}`;
     refs.push(providerRef);
     return { providerRef };
   };
@@ -90,7 +94,7 @@ export function makeFakeWa(): {
   const send: WaSenderPort["send"] = async () => {
     waSeq += 1;
     sent += 1;
-    const providerRef = `wamid-${waSeq}`;
+    const providerRef = `wamid-${RUN}-${waSeq}`;
     refs.push(providerRef);
     return { providerRef };
   };
@@ -106,7 +110,7 @@ export function makeFakeWa(): {
 export type GuardCall = { channel?: string; ok: boolean };
 
 /**
- * A guard SPY that proves moat #4 (no send bypasses guard) without faking the verdict: it delegates
+ * A guard SPY that proves guardrails run before every send (no send bypasses guard) without faking the verdict: it delegates
  * to the REAL @revenue-os/harness `guard` (the seeded quiet_hours / attempt_caps / dnc pipeline),
  * injecting the SimClock as ctx.now so the window checks read simulated time — not the CI wall clock
  * (which would make quiet-hours nondeterministic). Every doorway send passes through `fn` before the
