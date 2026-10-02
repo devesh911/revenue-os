@@ -1110,6 +1110,14 @@ describe("toolRefusal: what agents' own tools may not do", () => {
     expect(refused).toEqual([]);
   });
 
+  it("stops reading, and so refuses, a line nesting more `((` than it reads, instead of taking minutes", () => {
+    const started = Date.now();
+    expect(() => toolRefusal("(".repeat(64 * 1024), look)).toThrow(
+      "nests more than 64",
+    );
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
   it("refuses when it can't tell which branch a bare push would push", () => {
     expect(
       toolRefusal("git push", { ...look, branchOf: () => undefined }),

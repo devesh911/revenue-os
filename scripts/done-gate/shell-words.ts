@@ -26,7 +26,7 @@ export function simpleCommands(line: string): string[][] {
  */
 export function readings(line: string): string[][][] {
   const [a = [], b = []] = [true, false].map(
-    (dparen) => read(line, 0, "", dparen).commands,
+    (dparen) => read(line, 0, "", { dparen, misses: 0 }).commands,
   );
   return JSON.stringify(a) === JSON.stringify(b) ? [a] : [a, b];
 }
@@ -46,15 +46,19 @@ const OPENERS = new Set([
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
 const beforeProgram = (w: string) => ASSIGNMENT.test(w) || KEYWORDS.has(w);
 
+type How = { dparen: boolean; misses: number };
+const MAX_MISSES = 64;
+
 /**
  * Reads `line` from `from` to its end, or to the `stop` that closes a substitution: its commands, and where it stopped.
- * `dparen`: `((` may open arithmetic; `arith`: this is arithmetic, where `<<` is a shift.
+ * `how.dparen`: `((` may open arithmetic; `how.misses`: each `((` read ahead that was not arithmetic, and is read
+ * again; `arith`: this is arithmetic, where `<<` is a shift.
  */
 function read(
   line: string,
   from: number,
   stop: string,
-  dparen: boolean,
+  how: How,
   arith = false,
 ) {
   const out: string[][] = [[]];
@@ -117,7 +121,7 @@ function read(
   const first = (commands: string[][]) =>
     out.splice(out.length - 1, 0, ...commands);
   const substitute = (at: number, open: number, close: string) => {
-    const inner = read(line, open, close, dparen);
+    const inner = read(line, open, close, how);
     first(inner.commands);
     word += line.slice(at, inner.end + 1);
     inWord = true;
@@ -127,8 +131,13 @@ function read(
   // Arithmetic from `open` to the `))` that closes it, read with no heredocs; nothing if the `)` matching the
   // second `(` is not followed by another, where shells read subshells instead.
   const arithmetic = (open: number) => {
-    const inner = read(line, open, ")", dparen, true);
-    return line[inner.end + 1] === ")" ? inner : undefined;
+    const inner = read(line, open, ")", how, true);
+    if (line[inner.end + 1] === ")") return inner;
+    // Each miss reads its text again, so deep nesting would take minutes: refuse to read it instead.
+    if (++how.misses > MAX_MISSES)
+      throw new Error(
+        `it nests more than ${MAX_MISSES} \`((\` that are not arithmetic`,
+      );
   };
   // A ; & | ( ) or new line ends the command, and any ${ still open there.
   const separate = () => {
@@ -137,12 +146,20 @@ function read(
     braces.length = 0;
     next();
   };
-  let expr: ReturnType<typeof arithmetic>;
   let i = from;
   for (; i < line.length; i++) {
     const ch = line[i] ?? "";
     const endsArm =
       ch === ";" ? line.slice(i, i + 3).match(/^;(;&?|[&|])/)?.[0] : undefined; // ;; ;& ;;& or ;|
+    // Arithmetic that opens here: `$((`, or an unquoted `((`.
+    const expr =
+      quote === "'"
+        ? undefined
+        : line.startsWith("$((", i)
+          ? arithmetic(i + 3)
+          : how.dparen && !arith && !quote && line.startsWith("((", i)
+            ? arithmetic(i + 2)
+            : undefined;
     if (quote === "'") {
       if (ch === "'") quote = "";
       else word += ch;
@@ -153,7 +170,7 @@ function read(
       word += line[++i] ?? "";
       inWord = true;
       plain = false;
-    } else if (line.startsWith("$((", i) && (expr = arithmetic(i + 3))) {
+    } else if (expr && ch === "$") {
       first(expr.commands);
       word += line.slice(i, expr.end + 2);
       inWord = true;
@@ -222,7 +239,7 @@ function read(
           );
           if (text.trim() === tag) break;
         }
-        if (expands) first(substitutionsIn(line.slice(i + 1, at), dparen)); // an unquoted tag: the body is double-quoted text
+        if (expands) first(substitutionsIn(line.slice(i + 1, at), how)); // an unquoted tag: the body is double-quoted text
         i = at - 1;
       }
     } else if (ch === "'" || ch === '"') {
@@ -248,12 +265,7 @@ function read(
       arm = []; // the next arm's patterns come next
       leading = true;
       i += endsArm.length - 1;
-    } else if (
-      ch === "(" &&
-      dparen &&
-      line[i + 1] === "(" &&
-      (expr = arithmetic(i + 2))
-    ) {
+    } else if (expr && ch === "(") {
       separate();
       first(expr.commands);
       i = expr.end + 1;
@@ -282,13 +294,13 @@ function read(
 }
 
 /** The commands an unquoted heredoc's body runs: its substitutions. The rest of it is text. */
-function substitutionsIn(text: string, dparen: boolean) {
+function substitutionsIn(text: string, how: How) {
   const found: string[][] = [];
   for (let k = 0; k < text.length; k++) {
     if (text[k] === "\\") k++;
     else if (text.startsWith("$(", k) || text[k] === "`") {
       const tick = text[k] === "`";
-      const inner = read(text, k + (tick ? 1 : 2), tick ? "`" : ")", dparen);
+      const inner = read(text, k + (tick ? 1 : 2), tick ? "`" : ")", how);
       found.push(...inner.commands);
       k = inner.end;
     }
