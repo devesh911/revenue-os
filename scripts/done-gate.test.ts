@@ -2164,11 +2164,11 @@ describe("bun run gate pr: main's copy of the rules judges a pull request (rules
     commitAll(dir);
     const origin = mkdtempSync(join(tmpdir(), "done-gate-origin-"));
     dirs.push(origin);
-    sh(origin, ["git", "init", "-q", "--bare"]);
+    sh(origin, ["git", "init", "-q", "--bare", "-b", "main"]);
     sh(dir, ["git", "push", "-q", origin, "main", `feat:refs/pull/${PR}/head`]);
     const runner = join(mkdtempSync(join(tmpdir(), "done-gate-runner-")), "w");
     dirs.push(dirname(runner));
-    sh(dirname(runner), ["git", "clone", "-q", origin, runner]);
+    sh(dirname(runner), ["git", "clone", "-q", "-b", "main", origin, runner]); // as the checkout's `ref: main`
     const step = (body: string) =>
       runs.map((c) =>
         sh(runner, ["/bin/sh", "-c", c], { PR_NUMBER: PR, PR_BODY: body }),
