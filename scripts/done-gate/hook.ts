@@ -18,6 +18,17 @@ import { verifierDone } from "./verifier";
  */
 export async function hook(input: HookInput, codex: boolean, entry: string) {
   const event = input.hook_event_name;
+  // Before a tool call, what agents' tools may not do is judged first, so nothing that fails before it lets a
+  // command through; a check that fails refuses the command.
+  if (event === "PreToolUse") {
+    let refused: string | undefined;
+    try {
+      refused = commandRefusal(input);
+    } catch (e) {
+      refused = `it could not check this command (${String(e).split("\n")[0]}).`;
+    }
+    if (refused) return deny(refused, "command");
+  }
   // The gate of the checkout the agent is in; when that has none (a branch cut before the gate, another
   // repository, no checkout at all), the one this file belongs to, whose repository holds the session's record.
   const shell = toplevel(input.cwd ?? process.cwd());
@@ -44,22 +55,13 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
   switch (event) {
     case "SessionStart":
       return touch(repo, input, store, session);
-    case "PreToolUse": {
-      let refused: string | undefined;
+    case "PreToolUse":
       try {
-        refused = commandRefusal(input);
+        mergeGate(repo, input, store, codex);
       } catch (e) {
-        refused = `it could not check this command (${String(e).split("\n")[0]}).`; // so it refuses it
+        deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
       }
-      if (refused) deny(refused, "command");
-      else
-        try {
-          mergeGate(repo, input, store, codex);
-        } catch (e) {
-          deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
-        }
       return touch(repo, input, store, session); // a failure here stays quiet: no tool call waits on it
-    }
     case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
       if (input.agent_type === "verifier")
         store.put(

@@ -72,7 +72,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit|mcp__terminal__run_in_terminal",
         "hooks": [
           {
             "type": "command",
