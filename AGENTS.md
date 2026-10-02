@@ -18,15 +18,17 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 1. **Secrets** — never read or write `.env*` values; never put tokens in chat, commits or logs.
 2. **Cloud** — no prod deploys; no `supabase link` or `supabase db push` from agent sessions (the
    hooks refuse both, and migration repair and a reset of the linked database: `scripts/done-gate/tools.ts`
-   says what agents' own tools may not do). Every merge to main already applies new migrations to cloud staging
-   (`.github/workflows/deploy.yml`), so merging a migration *is* a cloud push: treat it that way.
+   says what agents' own tools may not do). Every merge to main applies its new migrations to cloud staging
+   once `checks` has passed on it (`.github/workflows/staging-migrations.yml`), so merging a migration *is* a
+   cloud push: treat it that way.
 3. **Tenancy** — every new tenant table ships with `org_id` + RLS + a cross-tenant denial test in
    the same PR (RLS is enforced on all tables by `tests/rls_coverage.sql`; denial tests do not yet
    cover every older table). DB access only through `packages/db` `withOrg` (the `app_service`
    role + `request.org_id`). Never the Supabase service-role key in app code. Only `agents`, `workflows` and `eval_scenarios` may
    hold global template rows with a null `org_id`.
-4. **History** — migrations are append-only (expand–contract); never edit an applied one; never
-   force-push a shared branch.
+4. **History** — migrations are append-only (expand–contract); never edit an applied one (`rules-from-main`
+   refuses a PR that edits, renames or deletes a migration already on main or reuses a migration number:
+   `scripts/done-gate/migrations.ts`); never force-push a shared branch.
 5. **Sends** — outbound messages only through `packages/channels` doorways, which run `guard()`
    first; tool side effects pass the autonomy check; approval-gated actions become a human task,
    never a silent drop.
