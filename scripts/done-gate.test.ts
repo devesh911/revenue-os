@@ -372,6 +372,20 @@ describe("checkRules", () => {
       ],
     ] as const)
       expect(problemsOf(add(file, line))).toEqual([]);
+    // Policy DDL takes the same locks, through supautils' policy_grants.
+    for (const line of [
+      "await admin.query(`create policy p on tasks using (true)`);",
+      "await admin.query(`ALTER POLICY p ON tasks USING (false)`);",
+      "await admin.query(`drop policy if exists p on tasks`);",
+    ])
+      expect(problemsOf(add(test, line))).toEqual([
+        `${test}:1 creates, changes or drops a policy, which on the local stack locks every auth table and deadlocks another test run's sign-ups; policies belong in a migration`,
+      ]);
+    expect(
+      problemsOf(
+        add("supabase/migrations/020_x.sql", "create policy p on tasks;"),
+      ),
+    ).toEqual([]); // a migration is where a policy belongs
   });
 
   it("blocks a throwing placeholder on a product path unless STATE.md lists it as Stub", () => {

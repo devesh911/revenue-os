@@ -38,6 +38,8 @@ const DELETES_SHARED =
 // with a sign-up in another test run going at the same moment. A test installs its trigger once per database and
 // leaves it (services/worker/test/scheduler-apply-poison.test.ts).
 const DROPS_TRIGGER = /\bdrop\s+trigger\b/i;
+// Its policy_grants setting does the same for a policy created, changed or dropped: policies belong in migrations.
+const POLICY_DDL = /\b(?:create|alter|drop)\s+policy\b/i;
 const SKIP =
   /(?<![\w$.!])(it|test|describe)(?:\s*\.\s*[\w$]+)*?\s*(?:\.\s*|\[\s*["'`])(?:skip|only|todo|skipIf|runIf|todoIf|if|fixme|fail|failing)\b|\bx(?:it|test|describe)\b/g;
 
@@ -127,6 +129,8 @@ function lineProblem(
     return "deletes companies or queued jobs other than through tests/test-companies.ts, which deletes only what this test made; a broader delete removes another test run's (delete a job only by its id)";
   if (TEST.test(file) && DROPS_TRIGGER.test(stmt))
     return "drops a trigger, which on the local stack locks every auth table and deadlocks another test run's sign-ups; install a test's trigger once per database and leave it (as services/worker/test/scheduler-apply-poison.test.ts does)";
+  if (TEST.test(file) && POLICY_DDL.test(stmt))
+    return "creates, changes or drops a policy, which on the local stack locks every auth table and deadlocks another test run's sign-ups; policies belong in a migration";
   if (TEST.test(file))
     return readsSource &&
       /\b(readFileSync|readFile|Bun\.file)\s*\(/.test(text) &&
