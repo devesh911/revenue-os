@@ -884,6 +884,20 @@ const REFUSED: [string, string][] = [
   ["function f { gh release create x; }; f", LOOP],
   ["case x in x) gh release create v1;; esac", LOOP],
   ["if ! cat .env; then :; fi", SECRET],
+  // A case arm's patterns are not commands; what an arm runs is, and so is a "pattern" no shell reads as one.
+  ["case x in a) echo;; (b) gh release create v1;; esac", LOOP],
+  ["case x in a) echo;; esac; gh release create v1", LOOP],
+  ["case x in a) echo;; $(gh release create v1)) echo;; esac", LOOP],
+  ["case x in a) echo;; b | gh release create v1;; esac", LOOP],
+  ["for ((i=0;;i++)); do gh release create v1; done", LOOP],
+  ['( "case" x in a | gh release create v1 )', LOOP], // a quoted case is a program, piped into gh
+  ["( x=1 case x in a | gh release create v1 )", LOOP], // so is case after an assignment
+  // A `<<` inside ${…} starts no heredoc, and a comment's quote hides nothing: the lines after them run.
+  [`echo \${x:-<<EOF}\ngh release create v1\nEOF`, LOOP],
+  [`echo \${x:-{} <<EOF}\ngh release create v1\nEOF`, LOOP], // zsh reads the { as nested, so the brace is still open
+  [`echo \${x:-"}" <<EOF}\ngh release create v1\nEOF`, LOOP],
+  ["# it's fine\ngh release create v1\n# done'", LOOP],
+  ["# a comment; gh release create v1", LOOP], // a shell that takes no comments (zsh -i) runs it
   // Nor do wrappers with options: each is skipped with its options, and timeout with its duration.
   ["env -i gh release create v1", LOOP],
   ["env -u HOME gh release create v1", LOOP],
@@ -912,6 +926,14 @@ const REFUSED: [string, string][] = [
   ["xargs -I{} sh -c 'gh pr close {}' < prs.txt", HIDDEN],
   // A command this check can't read, in a line that names something it guards.
   [`\${GH:-gh} release create v1`, HIDDEN],
+  [`x=\${a:- b} \${GH:- gh} release create v1`, HIDDEN],
+  [`( echo \${x:-a;;b}|gh release create v1 )`, HIDDEN],
+  [`( echo \${x:-a;;;b}|gh\${IFS}release\${IFS}create\${IFS}v1 )`, HIDDEN], // no case arm in a ${…}
+  // An assignment's ${ that never closes keeps no word across its spaces: dash runs the rest as a command.
+  [`y=<<\${a gh release create v1`, LOOP],
+  [`y=<<\${a cat .env`, SECRET],
+  // Outside an assignment, bash splits what ${…} expands to, so its spaces still end a word.
+  [`git push origin feat/x\${b:- main}`, PUSH],
   ["$(echo gh) release create v1", HIDDEN],
   ["{gh,} release create v1", HIDDEN],
   ["X=gh; $X release create v1", HIDDEN],
@@ -1063,6 +1085,16 @@ const ALLOWED = [
   'for f in docs/*.md; do wc -l "$f"; done',
   "if [ -f package.json ]; then bun test; fi",
   'case "$x" in a) echo a;; esac',
+  // An assignment's ${…} is one word across its spaces, and a case arm's patterns are not commands.
+  `r=$(gh run list --limit 1 --json databaseId -q '.[0].databaseId'); id=\${r%% *}`,
+  `id=\${r%% *} gh run view "$id"`,
+  'while true; do r=$(gh run view 1 --json status -q .status); case "$r" in 123*) sleep 8;; *completed*) break;; esac; done',
+  'case "$(gh pr view 5 --json state -q .state)" in OPEN|*DRAFT*) echo open;; *MERGED*|*CLOSED*) echo done;; esac',
+  's=$(gh run view 1 --json status -q .status)\ncase "$s" in\n  (*queued*|*in_progress*) echo wait ;;\n  *) echo done ;;\nesac',
+  'case "$s" in a) gh run watch 1;& *b*) gh run view 1;| *c*) echo c;;& *d*) echo d;; esac',
+  'gh pr view 5; if [ -n "$x" ]; then case $x in *a*|*b*) echo ab;; esac; fi',
+  // A comment's quote is text.
+  "# wait for the run's checks\nfor id in $(gh run list -L 3 --json databaseId -q '.[].databaseId'); do gh run view \"$id\" --json status -q '.status | ascii_upcase' | grep -q '^COMPLETED*'; done",
   "timeout 600 gh pr checks 12 --watch",
   "command -v gh",
   "env FOO=1 bun test",
