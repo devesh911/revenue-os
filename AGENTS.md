@@ -34,12 +34,15 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 7. **main is PR-only with CI green** (required check: `checks`). Merge authority follows the
    PHASE line on line 1 of `STATE.md`: SETUP = agents squash-merge independent PRs one at a
    time on observed-green checks with real evidence, after confirming base == main; LIVE =
-   only humans merge. A change to a rule file (the done gate, CI, lint or type settings, the hooks, the verifier, the package
-   scripts) needs nobody's approval to start and is explained before it merges: its PR body says which rule changed,
-   whether it tightens or loosens it, and why; the agent shows Devesh that explanation in chat, then, in SETUP, merges
-   it itself on observed-green checks like any other PR. Agents use Devesh's own GitHub login, so GitHub's settings
-   only stop accidents; the hooks enforce what agents must not do (Slice 0's tools item adds the
-   refusals still missing).
+   only humans merge. A change to a rule file (any path that `RULE_FILES` in the done gate matches: the done gate,
+   CI, lint and type settings, the hooks, the verifier and the package scripts; until Slice 0's rule-change item adds
+   them to that list, the skills, AGENTS.md and CLAUDE.md count too) needs nobody's approval to start and is explained
+   before it merges: its PR body says which rule changed, whether it tightens or loosens it, and why; the agent shows
+   Devesh that explanation in chat, then, in SETUP, merges it itself on observed-green checks like any other PR. Once
+   Slice 0's rule-change item lands and Devesh makes it a required check, `rules-from-main` judges every PR with main's
+   copy of the rules, and docs/runbooks/rules-check-way-back.md says what Devesh does if that copy misfires. Agents
+   use Devesh's own GitHub login, so GitHub's settings only stop accidents; the hooks enforce what agents must not do
+   (Slice 0's tools item adds the refusals still missing).
 8. **No false "done"** — never report a capability as working if it runs only in tests, has no
    production caller, or is wired to a stub. Every stub on a production path is listed as
    **Stub** in `STATE.md → What works today`.
@@ -66,7 +69,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   Codex's `/hooks`) but has no verifier agent, so a green product change stops once, marked NOT
   independently verified: ask Claude to run the verifier, or check it yourself. Humans run `bun run gate`.
   The gate stops careless or premature "done", not an agent that sets out to forge it: Devesh's
-  own attention and GitHub's required `checks` are the backstops, and `STATE.md → What works
+  own attention and GitHub's required checks (`checks`, and `rules-from-main` once Slice 0's rule-change item
+  lands and Devesh makes it a required check, which runs main's copy of the rules) are the backstops, and `STATE.md → What works
   today` lists the gate's known holes.
 - CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
   agent and human.
@@ -163,7 +167,7 @@ settings) · `bun run dev` · `bun run db:reset`
 - **Moat rules**: every conversation, message and task traces to a contact and, when known, a
   workflow run; every business result is an append-only `outcomes` row with attribution, never
   a status string · RLS on every public table · completed conversations require a disposition
-  (not yet enforced: Slice 1) · guardrails run before every send · active agent and workflow
+  (not yet enforced: Slice 4) · guardrails run before every send · active agent and workflow
   versions are immutable — change means a new version plus passing evals · derived-data exports
   only through a consent-filtered, aggregated pipeline.
 - TypeScript strict. Zod at every boundary: HTTP and webhook shapes in `packages/shared`;
