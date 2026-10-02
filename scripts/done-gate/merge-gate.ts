@@ -193,6 +193,7 @@ export function mergeGate(
           "core.quotePath=off",
           "diff",
           "--name-only",
+          "-z", // a name holding a quote comes whole, never quoted
           "--no-renames",
           base,
           head,
@@ -203,6 +204,7 @@ export function mergeGate(
           "diff-tree",
           "--no-commit-id",
           "--name-only",
+          "-z",
           "--no-renames",
           "-r",
           "--root",
@@ -211,7 +213,7 @@ export function mergeGate(
     {},
     true,
   )
-    .split("\n")
+    .split("\0")
     .some(isProduct);
   const ruling = parseRuling(store.get("verdict", tree));
   if (!product || ruling?.verdict === "pass")

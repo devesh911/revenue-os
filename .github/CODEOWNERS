@@ -1,22 +1,37 @@
-# Docs and the working agreement require Devesh's review (enforced once the main ruleset requires
-# code-owner review at go-live; see docs/security.md S13.1).
+# Docs require Devesh's review (enforced once the main ruleset requires code-owner review at go-live; see
+# docs/security.md S13.1).
 docs/**    @devesh911
-CLAUDE.md  @devesh911
-AGENTS.md  @devesh911
 ROADMAP.md @devesh911
 
-# What "done" means: the checks, the done gate and the verifier. Loosening any of them is Devesh's call
-# (AGENTS.md, hard rail 7); scripts/done-gate.ts also tells him on every stop that changes one, and its
-# test fails if a file it flags (RULE_FILES) is missing here. A name without a "/" matches at any depth.
+# Rule files: what "done" means and how agents work. The list is RULE_FILES in scripts/done-gate/rules.ts; the
+# lines below name the same files, and the done gate's test fails when the two differ in either direction. An
+# agent may change a rule file without asking first. Its pull request says in its body which rule changed, which
+# way and why, and adds a line to STATE.md → Rule changes. The agent shows Devesh that explanation before it merges
+# (AGENTS.md, hard rail 7). A name without a "/" matches at any depth; a leading "/" means the repository's root.
 .github/**                          @devesh911
-.claude/settings.json               @devesh911
-.claude/agents/**                   @devesh911
 .codex/**                           @devesh911
+**/.claude/settings*.json           @devesh911
+**/.claude/agents/**                @devesh911
+**/.claude/skills/**                @devesh911
+**/.claude/commands/**              @devesh911
 scripts/done-gate*                  @devesh911
+scripts/done-gate/**                @devesh911
 scripts/guards.sh                   @devesh911
+scripts/guards/**                   @devesh911
+scripts/cycle-hook.sh               @devesh911
+scripts/cycle.ts                    @devesh911
+scripts/local-env.ts                @devesh911
+tests/rls_coverage.sql              @devesh911
+tests/setup*.ts                     @devesh911
+/.mcp.json                          @devesh911
+AGENTS.md                           @devesh911
+CLAUDE.md                           @devesh911
+.gitleaks.toml                      @devesh911
+.gitleaksignore                     @devesh911
+.gitattributes                      @devesh911
 package.json                        @devesh911
 bunfig.toml                         @devesh911
 biome.json                          @devesh911
+biome.jsonc                         @devesh911
 tsconfig*.json                      @devesh911
-tests/rls_coverage.sql              @devesh911
-apps/console/playwright.config.ts   @devesh911
+playwright.config.ts                @devesh911

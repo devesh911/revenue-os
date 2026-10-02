@@ -6,20 +6,55 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { browserEnv, run, tail } from "./checks";
 import { git } from "./git";
+import { judgePr } from "./pr";
 import { listed, rulesOn } from "./rules";
 import { onSharedStack } from "./shared-stack";
-import { type Snap, snapshot } from "./snapshot";
+import { snapshot } from "./snapshot";
 import { Store, stateDir } from "./store";
 import { allTestsRun } from "./tests-ran";
 import { parseRuling, prove, type Ruling } from "./verdict";
 
-const USAGE = `usage: bun run gate [rules [--base <ref>] | tests [e2e] | pause "<question>" | verdict pass|fail "<what you saw>" | verdict cannot-verify "<what only Devesh can provide>"]
-       bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)`;
+const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>" | verdict pass|fail "<what you saw>" | verdict cannot-verify "<what only Devesh can provide>"]
+       bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
+       pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data`;
+
+/** `--base <ref>` and `--head <ref>`, each at most once, and nothing else; undefined for any other words. */
+const refsOf = (args: string[]) => {
+  const refs = new Map<string, string>();
+  for (let i = 0; i < args.length; i += 2) {
+    const [flag = "", ref = ""] = [args[i], args[i + 1]];
+    if (
+      !["--base", "--head"].includes(flag) ||
+      !ref ||
+      ref.startsWith("-") ||
+      refs.has(flag)
+    )
+      return;
+    refs.set(flag, ref);
+  }
+  return {
+    base: refs.get("--base") ?? "origin/main",
+    head: refs.get("--head"),
+  };
+};
+
+/** The change from `base` to `head` (the worktree without one), or exit 2 saying why `who` can't read it. */
+const changeOf = (who: string, repo: string, base: string, head?: string) => {
+  try {
+    return snapshot(repo, true, base, head);
+  } catch (e) {
+    console.error(
+      `${who} ✗ could not compare ${head ?? "the change"} with ${base}: ${String(e).split("\n")[0]}`,
+    );
+    process.exit(2);
+  }
+};
 
 export async function cli(cmd: string, args: string[]) {
   const repo = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
   const store = new Store(stateDir(repo));
   const text = args.join(" ").trim();
+  const refs = refsOf(args);
   if (cmd === "check") {
     const snap = snapshot(repo);
     const proof = await prove(snap, store);
@@ -35,25 +70,39 @@ export async function cli(cmd: string, args: string[]) {
         : "Verifier: no ruling on this exact code yet.",
     );
     process.exit(proof.ok ? 0 : 1);
-  } else if (
-    cmd === "rules" &&
-    (!args.length || (args[0] === "--base" && args[1] && args.length === 2))
-  ) {
-    const base = args[1] ?? "origin/main";
-    let snap: Snap;
-    try {
-      snap = snapshot(repo, true, base);
-    } catch (e) {
+  } else if (cmd === "rules" && refs) {
+    const { base, head } = refs;
+    const { problems, notes } = rulesOn(
+      changeOf("Done rules", repo, base, head),
+    );
+    const what = `the change${head ? ` in ${head}` : ""} since ${base}`;
+    console.log(
+      (problems.length
+        ? `Done rules ✗ ${problems.length} problem(s) in ${what}:\n${listed(problems)}`
+        : `Done rules ✓ nothing in ${what} breaks them`) +
+        notes.map((n) => `\n⚠ ${n}`).join(""),
+    );
+    process.exit(problems.length ? 1 : 0);
+  } else if (cmd === "pr" && refs) {
+    const { base, head } = refs;
+    const body = process.env.PR_BODY;
+    const pr = process.env.PR_NUMBER?.trim() || undefined;
+    if (body === undefined || (pr && !/^\d+$/.test(pr))) {
       console.error(
-        `Done rules ✗ could not compare the change with ${base}: ${String(e).split("\n")[0]}`,
+        'Pull request ✗ give its body in PR_BODY (PR_BODY="$(cat body.md)") and, when it has one, its number in PR_NUMBER',
       );
       process.exit(2);
     }
-    const { problems, notes } = rulesOn(snap);
+    const { problems, notes } = judgePr(
+      changeOf("Pull request", repo, base, head),
+      body,
+      pr,
+    );
+    const what = `the change${head ? ` in ${head}` : ""} since ${base}`;
     console.log(
       (problems.length
-        ? `Done rules ✗ ${problems.length} problem(s) in the change since ${base}:\n${listed(problems)}`
-        : `Done rules ✓ nothing in the change since ${base} breaks them`) +
+        ? `Pull request ✗ ${problems.length} problem(s) in ${what}:\n${problems.map((p) => `- ${p}`).join("\n")}`
+        : `Pull request ✓ nothing in ${what} breaks the done rules, and every rule change is explained and recorded`) +
         notes.map((n) => `\n⚠ ${n}`).join(""),
     );
     process.exit(problems.length ? 1 : 0);

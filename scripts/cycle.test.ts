@@ -261,6 +261,18 @@ it('a "## " section that is neither a slice nor the Side track is a format probl
   ).toEqual([]);
 });
 
+it("reads STATE.md → Rule changes for the tracker page, one entry per line", () => {
+  const s = parseState(
+    `${STATE}\n## Rule changes\n\nNewest first.\n\n- 2026-10-02 · [#9](https://example.com) · biome.json · tighter\n- 2026-10-01 · [#8](https://example.com) · AGENTS.md · looser\n`,
+  );
+  expect(s.problems).toEqual([]);
+  expect(s.ruleChanges).toEqual([
+    "2026-10-02 · [#9](https://example.com) · biome.json · tighter",
+    "2026-10-01 · [#8](https://example.com) · AGENTS.md · looser",
+  ]);
+  expect(parseState(STATE).ruleChanges).toEqual([]);
+});
+
 it("both parsers read files saved with Windows line endings", () => {
   const crlf = (s: string) => s.replace(/\n/g, "\r\n");
   const r = parseRoadmap(

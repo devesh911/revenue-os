@@ -14,11 +14,13 @@ const CODE = /\.[cm]?[jt]sx?$/;
 // A string literal naming source code: a src/ path, or a file ending .ts/.tsx/.js/.jsx.
 const SOURCE_PATH =
   /["'`](?:[^"'`\n]*\/)?(?:src(?:\/[^"'`\n]*)?|[^"'`\n]+\.[cm]?[jt]sx?)["'`]/;
-// Files that decide what "done" means. Changing them is allowed, and Devesh is told every time (in the
-// stop's message and in CI's log). .github/CODEOWNERS names him as their owner, but GitHub asks for his
-// review only once the main ruleset requires code-owner review, which it does not yet.
+// Rule files: the files that decide what "done" means and how agents work, at any letter case. This is the one
+// list; AGENTS.md hard rail 7, .github/CODEOWNERS and STATE.md cite it rather than repeating it, and the CODEOWNERS
+// test keeps the two equal. Changing one is allowed: Devesh is told at every stop and in CI's log, and its pull
+// request explains it and records it (rule-changes.ts). ROADMAP.md and STATE.md stay out, because every pull
+// request changes them.
 export const RULE_FILES =
-  /^(\.github\/|\.codex\/|\.claude\/(settings\.json|agents\/)|scripts\/(guards\.sh|done-gate)|tests\/rls_coverage\.sql|package\.json$|bunfig\.toml$|(apps\/[^/]+\/)?(biome|tsconfig[^/]*)\.json$|apps\/console\/playwright\.config\.ts$)/;
+  /^(\.github\/|\.codex\/|scripts\/(guards(\.sh$|\/)|done-gate|cycle-hook\.sh$|cycle\.ts$|local-env\.ts$)|tests\/(rls_coverage\.sql|setup[^/]*\.ts)$|\.mcp\.json$)|(^|\/)(\.claude\/(settings[^/]*\.json$|agents\/|skills\/|commands\/)|(AGENTS|CLAUDE)\.md$|\.gitleaks(\.toml|ignore)$|\.gitattributes$|package\.json$|bunfig\.toml$|biome\.jsonc?$|tsconfig[^/]*\.json$|playwright\.config\.ts$)/i;
 const ALLOW = "done-gate: allow";
 // In a test file, a test switched off or singled out: skip/only/todo, their conditional forms (skipIf, runIf,
 // todoIf, if), Playwright's fixme and fail, bun's failing, after any modifiers (concurrent, serial, describe),
