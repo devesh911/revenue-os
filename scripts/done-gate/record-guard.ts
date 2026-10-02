@@ -22,9 +22,12 @@ const NAMED = /\.git\/(?:\.?\/)*done-gate(?![\w.-])/;
 // A git folder: `.git` as a part of a path, or git's ways of naming one.
 const GIT_DIR =
   /(?:^|[\s'"`=:(/*?])\.git(?=$|[\s'"`;&|)/*?])|--(?:git-common-dir|git-dir|absolute-git-dir|git-path)\b|\bGIT_(?:COMMON_)?DIR\b/;
+// The git folder itself as a whole word: `.git`, `x/.git/`, `$(git rev-parse --git-common-dir)`, `$GIT_DIR`.
+const ITSELF =
+  /(^|\/)\.git\/?$|--(?:git-common-dir|git-dir|absolute-git-dir)\)\/?$|^\$\{?GIT_(?:COMMON_)?DIR\}?\/?$/;
 // The record's name anywhere but in the gate's code (scripts/done-gate.ts and scripts/done-gate/).
 const NAME = /(?<!scripts\/)done-gate(?![\w.-])/;
-// Programs a line naming a git folder may run: they only read, print, or move the shell.
+// Programs that may be handed the git folder, or run inside it: they only read, print, or move the shell.
 const READS = new Set(
   "cat less head tail wc du ls stat file readlink realpath dirname basename echo printf test [ [[ cd pushd popd pwd true false git grep rg diff cmp jq".split(
     " ",
@@ -84,13 +87,20 @@ function commandTouches(line: string, cwd: string): string | undefined {
   if (line.length > MAX_LINE) return;
   const all = runs(line);
   const said = [line, ...all.flat()].join("\n"); // its text, and each word read from it with quotes removed
-  const gitDir = GIT_DIR.test(said) || /(^|\/)\.git(\/|$)/.test(cwd);
+  const inGit = /(^|\/)\.git(\/|$)/.test(cwd);
+  // Refused: the record named outright; a git folder named with the record's name or a pattern; the git folder
+  // itself handed to a program that is not a reader (`rm -rf .git`), or such a program or a write to a file run
+  // inside it; the record's name with a program that deletes, moves, copies or links (`find . -name done-gate -delete`).
   if (
     NAMED.test(said) ||
-    (gitDir &&
-      (NAME.test(said) ||
-        /[*?[{]/.test(said) ||
-        all.some((w) => !READS.has(w[0] ?? "") || writes(w)))) ||
+    ((inGit || GIT_DIR.test(said)) &&
+      (NAME.test(said) || /[*?[{]/.test(said))) ||
+    all.some(
+      (w) =>
+        (!READS.has(w[0] ?? "") &&
+          (inGit || w.slice(1).some((a) => ITSELF.test(a)))) ||
+        (inGit && writes(w)),
+    ) ||
     (NAME.test(said) && all.some(changes))
   )
     return RECORD;
