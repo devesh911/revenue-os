@@ -1,29 +1,50 @@
-# Pattern: TanStack Query (keys factory + optimistic mutation) — dev-workflow R2/R3
+# Pattern: TanStack Query (a feature's query and save) — the guardrail settings screen
+Server state lives in one `api.ts` per feature, as query hooks. This is an excerpt of the real file the Settings
+screen's guardrail form uses (`bun run guards` fails when it no longer matches):
+
 ```ts
-// features/tasks/api.ts — the ONLY place task server-state lives
-export const taskKeys = {
-  all: ["tasks"] as const,
-  open: (orgId: string) => [...taskKeys.all, orgId, "open"] as const,
+// apps/console/src/features/guardrails/api.ts
+export const queryKeys = {
+  guardrailPolicies: (orgId: string) => ["guardrail-policies", orgId] as const,
 };
+…
+const GuardrailPoliciesResponse = z.object({ policies: z.array(Policy) });
+…
+const PolicyResponse = z.object({ policy: Policy });
 
-export const useOpenTasksQuery = (orgId: string) =>
-  useQuery({ queryKey: taskKeys.open(orgId),
-             queryFn: () => api.get("/tasks?status=open", z.array(Task)) });   // apiFetch zod-parses (R6)
-
-export const useClaimTaskMutation = () => {
-  const qc = useQueryClient(); const { orgId, userId } = useOrg();
-  return useMutation({
-    mutationFn: (id: string) => api.post(`/tasks/${id}/claim`, {}, Task),
-    onMutate: async (id) => {                                   // optimistic (R3)
-      await qc.cancelQueries({ queryKey: taskKeys.open(orgId) });
-      const prev = qc.getQueryData(taskKeys.open(orgId));
-      qc.setQueryData(taskKeys.open(orgId), (ts: Task[] = []) =>
-        ts.map(t => t.id === id ? { ...t, status: "claimed", assignee: userId } : t));
-      return { prev };
-    },
-    onError: (_e, _id, ctx) => qc.setQueryData(taskKeys.open(orgId), ctx?.prev),  // rollback
-    onSettled: () => qc.invalidateQueries({ queryKey: taskKeys.open(orgId) }),
+export function useGuardrailPoliciesQuery(orgId: string) {
+  return useQuery({
+    queryKey: queryKeys.guardrailPolicies(orgId),
+    queryFn: () =>
+      api(`/orgs/${orgId}/guardrail-policies`, GuardrailPoliciesResponse),
   });
-};
+}
+
+export function useUpdateGuardrailPolicy(orgId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // Validate against the shared boundary schema BEFORE sending — a malformed config never
+    // reaches the network. The route re-parses server-side; this is the browser-side belt.
+    mutationFn: (input: unknown) =>
+      api(`/orgs/${orgId}/guardrail-policies`, PolicyResponse, {
+        method: "PUT",
+        body: GuardrailPolicyInputSchema.parse(input),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.guardrailPolicies(orgId),
+      });
+    },
+  });
+}
 ```
-Rules: keys only from the factory · no useEffect fetching · optimistic where a human watches · invalidate on settle.
+`api()` (`apps/console/src/lib/api.ts`) sends the signed-in person's token and parses every response with the
+schema it is given, so a hook's data is exactly that schema's type. The response shape (`Policy`, left out above)
+is still written here by hand rather than taken from packages/shared; Slice 5 · "Each API response is described
+once, in packages/shared…" moves it there, and a new feature should take its response shape from packages/shared
+once that lands.
+
+Rules: query keys come from the feature's own `queryKeys` · every response is parsed by `api()` with a Zod schema ·
+a save's body is parsed with the same packages/shared schema the route parses, before it is sent · a save
+invalidates the queries it changed · the API's data is read only through the hooks in a feature's `api.ts`, never
+fetched in `useEffect`.
