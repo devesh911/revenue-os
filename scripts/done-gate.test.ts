@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -19,15 +20,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
-import {
-  checkRules,
-  mergeOf,
-  onSharedStack,
-  parseDiff,
-  RULE_FILES,
-  simpleCommands,
-  usesExport,
-} from "./done-gate";
+import { parseDiff } from "./done-gate/diff";
+import { usesExport } from "./done-gate/export-users";
+import { mergeOf } from "./done-gate/merge-gate";
+import { checkRules, RULE_FILES } from "./done-gate/rules";
+import { onSharedStack } from "./done-gate/shared-stack";
+import { simpleCommands } from "./done-gate/shell-words";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
@@ -89,6 +87,11 @@ function repo() {
   dirs.push(dir);
   mkdirSync(join(dir, "scripts"));
   copyFileSync(GATE, join(dir, "scripts", "done-gate.ts"));
+  cpSync(
+    join(import.meta.dir, "done-gate"),
+    join(dir, "scripts", "done-gate"),
+    { recursive: true },
+  );
   writeFileSync(join(dir, "STATE.md"), "# State\n");
   sh(dir, ["git", "init", "-q", "-b", "main"]);
   commitOld(dir);
@@ -1148,6 +1151,84 @@ describe("the hook", () => {
     });
   });
 
+  it("warns at every one of its hooks, instead of going quiet, in a checkout without the gate", () => {
+    const bare = mkdtempSync(join(tmpdir(), "done-gate-none-"));
+    dirs.push(bare);
+    sh(bare, ["git", "init", "-q"]);
+    const commands = [".claude/settings.json", ".codex/hooks.json"].flatMap(
+      (file) =>
+        Object.values(
+          (
+            JSON.parse(
+              readFileSync(join(import.meta.dir, "..", file), "utf8"),
+            ) as { hooks: Record<string, { hooks: { command: string }[] }[]> }
+          ).hooks,
+        )
+          .flat()
+          .flatMap((g) => g.hooks.map((h) => h.command))
+          .filter((c) => c.includes("done-gate")),
+    );
+    expect(commands).toHaveLength(9); // six Claude Code events, three Codex ones
+    for (const command of commands) {
+      const r = sh(bare, ["/bin/sh", "-c", command], {
+        CLAUDE_PROJECT_DIR: bare,
+      });
+      expect(r.status).toBe(0);
+      expect(JSON.parse(r.stdout)).toEqual({
+        systemMessage:
+          "Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked",
+      });
+    }
+  });
+
+  it("refuses a merge and says nothing is checked, never going quiet, when a file of the gate fails to load", () => {
+    const dir = repo();
+    const words = join(dir, "scripts", "done-gate", "shell-words.ts");
+    writeFileSync(
+      words,
+      readFileSync(words, "utf8").replace(
+        "export function simpleCommands(",
+        "export function simpleCommandz(",
+      ),
+    );
+    // The checkout's own copy, as a session started there runs it.
+    const own = (event: string, command?: string) =>
+      sh(
+        dir,
+        ["bun", "scripts/done-gate.ts", "hook"],
+        {},
+        JSON.stringify({
+          hook_event_name: event,
+          session_id: "s1",
+          cwd: dir,
+          ...(command ? { tool_name: "Bash", tool_input: { command } } : {}),
+        }),
+      );
+    const merge = own("PreToolUse", "gh pr merge 5 --squash");
+    expect(merge.status).toBe(0);
+    expect(JSON.parse(merge.stdout)).toMatchObject({
+      hookSpecificOutput: {
+        permissionDecision: "deny",
+        permissionDecisionReason: expect.stringContaining(
+          "it could not load the done gate (SyntaxError: Export named 'simpleCommands' not found",
+        ),
+      },
+    });
+    expect(JSON.parse(own("PreToolUse", "ls").stdout)).toEqual({
+      systemMessage: expect.stringContaining(
+        "Done gate ⚠ could not load (SyntaxError: Export named 'simpleCommands' not found",
+      ),
+    });
+    for (const event of ["Stop", "SessionStart"])
+      expect(JSON.parse(own(event).stdout).systemMessage).toMatch(
+        /^Done gate ⚠ could not run \(SyntaxError: .*\); this stop was NOT checked$/,
+      );
+    rmSync(join(dir, "scripts", "done-gate"), { recursive: true });
+    expect(JSON.parse(own("Stop").stdout).systemMessage).toContain(
+      "Done gate ⚠ could not run (",
+    );
+  });
+
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");
@@ -1919,7 +2000,7 @@ describe("the shared local stack (one database and port 4173 for every worktree)
       dir,
       "hold.ts",
       `import { appendFileSync, rmSync, writeFileSync } from "node:fs";
-import { onSharedStack } from "./scripts/done-gate.ts";
+import { onSharedStack } from "./scripts/done-gate/shared-stack.ts";
 while (Date.now() < ${go});
 await onSharedStack(".", async () => {
   try { writeFileSync("holding", "", { flag: "wx" }); } catch { appendFileSync("log", "two holders at once\\n"); }

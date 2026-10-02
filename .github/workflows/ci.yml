@@ -70,7 +70,7 @@ jobs:
             echo "VAPI_WEBHOOK_SECRET=local-test-secret"
           } >> "$GITHUB_ENV"
 
-      # Every test must run: a skipped or todo test fails, however it was switched off (scripts/done-gate.ts, MAY_SKIP).
+      # Every test must run: a skipped or todo test fails, however it was switched off (scripts/done-gate/tests-ran.ts, MAY_SKIP).
       - run: bun run gate tests
 
       # Console sign-in e2e against the real local stack: the wrapper exports the stack env, Playwright

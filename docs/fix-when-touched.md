@@ -22,7 +22,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | `docs/tracker/` | 6. Tracker page shows where it was published from |
 | `scripts/demo.ts`, `tests/`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
 | Local branches, `.claude/worktrees/`, `.gitignore` | 8. Leftover branches and worktrees |
-| `scripts/done-gate.ts`, `packages/harness/src/policies.ts`, `packages/harness/src/workflow/`, `services/worker/src/scheduler.ts`, `services/worker/src/runs.ts`, `services/worker/src/handlers/place-call.ts`, `packages/db/src/screens.ts`, `services/worker/src/routes/screens.ts`, `apps/console/src/features/screens/`, `apps/console/src/pages/Settings/`, `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/db/src/orgs.ts`, `scripts/demo.ts`, `services/worker/test/handlers.test.ts`, `scripts/guards.sh` | 10. Files with more than one job |
+| `packages/harness/src/policies.ts`, `packages/harness/src/workflow/`, `services/worker/src/scheduler.ts`, `services/worker/src/runs.ts`, `services/worker/src/handlers/place-call.ts`, `packages/db/src/screens.ts`, `services/worker/src/routes/screens.ts`, `apps/console/src/features/screens/`, `apps/console/src/pages/Settings/`, `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/db/src/orgs.ts`, `scripts/demo.ts`, `services/worker/test/handlers.test.ts`, `scripts/guards.sh` | 10. Files with more than one job |
 | `services/worker/src/vapi/process.ts`, `packages/harness/src/loop.ts`, `packages/harness/src/workflow/interpret.ts`, `packages/db/src/contacts.ts` | 11. Functions over the complexity limit |
 
 ## Product code
@@ -72,7 +72,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **Fix:** When you edit one of these test files, replace its checks that read source code as text with a test that renders, calls or drives the code (or with a lint rule), delete false "RED today" comments (they claim a passing test fails) and checks that only pin a finished file move, and move console tests from `tests/` into `apps/console/test/`.
 
-**When:** the PR that next edits the test file. The rule is that behaviour is proved by behaviour tests; reading source stays fine for architecture checks and secret scans. The done gate already refuses new source-reading test lines (`scripts/done-gate.ts:280-285`), so only the existing ones remain.
+**When:** the PR that next edits the test file. The rule is that behaviour is proved by behaviour tests; reading source stays fine for architecture checks and secret scans. The done gate already refuses new source-reading test lines (`lineProblem` in `scripts/done-gate/rules.ts`), so only the existing ones remain.
 
 **Why it matters:** `apps/console/test/guardrails-console.test.tsx` checked that the Settings save's source said `PUT` and stayed green for about two months while the browser blocked that save.
 
@@ -180,13 +180,12 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - The old import path keeps working: the new folder's `index.ts` exports exactly the old public names, no more.
 - Never move code that a later roadmap item deletes. Isolate it instead, so that item deletes a whole file or folder.
 - Update every citation of the moved code in the same PR, by function name, not line number.
-- Write the result as one job per file, siblings importing each other in one direction only, no `utils` file, and a header comment naming the file's job. Slice 0's done-gate split item writes this convention into docs/patterns as an excerpt of that split.
+- Write the result as one job per file, siblings importing each other in one direction only, no `utils` file, and a header comment naming the file's job. docs/patterns/one-job-per-file.md shows it, as an excerpt of the done gate's split.
 
 **When:** the PR in the right-hand column below, or any earlier PR that has to change the same seam.
 
 | File | Split into | Done by |
 |---|---|---|
-| `scripts/done-gate.ts` (1,716 lines, about 12 jobs) | a `scripts/done-gate/` folder, with `scripts/done-gate.ts` kept as the entry file (every hook looks for it) holding `hook()` (it checks `import.meta.path`); the gate's own test helper `repo()` in `scripts/done-gate.test.ts` copies the folder, not one file | Slice 0's done-gate split item (added in this replan), before the other Slice 0 items that edit the gate |
 | `packages/harness/src/policies.ts`: four guardrail checks (approval level, calling hours, do-not-call, contact limits) that treat a database error differently (calling hours lets the send through today; do-not-call and contact limits block), with the company-settings query written twice | one file per check, in a `policies/` folder | the first guardrail item to touch it: Slice 1 · "When a lead says "don't contact me"…" or "No WhatsApp message goes to a lead without a recorded opt-in…"; at the latest Slice 3 · "Contact limits hold even when…". The break-every-new-line check is Slice 1's first item (moved there from Slice 3 on 2026-10-02), so it lands before this move: the moved lines must be recognised by Slice 0's move detection (the done-rules item), or every moved line is put through it |
 | `packages/harness/src/workflow/schema.ts`, and the step-map half of `services/worker/src/scheduler.ts` (`drive()`, the `MAX_STEPS` step cap, and the rule that clears the call's result) | step-map code together in `packages/harness/src/workflow/`, apart from what the planner keeps, so deleting the step map deletes one folder; enrolment (`services/worker/src/runs.ts`) and the call handler (`services/worker/src/handlers/place-call.ts`, which reads the step map with an unchecked type cast) call that module instead of each reading the step map themselves | Slice 3 · "A sequence can carry a goal plus rules…" |
 | The "screens" grouping, one file in each of three layers: `packages/db/src/screens.ts`, `services/worker/src/routes/screens.ts`, `apps/console/src/features/screens/api.ts` | tasks, contacts, conversations and metrics, with the same names in all three; each PR moves only the part it edits | database reads: Slice 1 · "Every database query also filters by company…" (`listTasks`, `listConversations` and `funnelMetrics` lack the company filter); its booking counts: Slice 4 · "Booking a site visit has one authoritative implementation…" (they count `booking` and `qualified`, while the engine writes `site_visit_booked`); worker routes: Slice 5 · "One shared membership and role check…"; console calls: the first item that adds a contact action to the console |
@@ -207,7 +206,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **Fix:** When your PR rewrites one of these functions, bring it under biome's cognitive-complexity limit of 20 (biome's score for how deeply a function's branches and loops nest) and remove its file's exemption from `biome.json` in the same PR. The exemption is per file in `biome.json`, never a per-line ignore comment, which the done gate may read as silencing a check.
 
-**When:** the PR that next rewrites the function. The limit, a ban on import cycles and these four exemptions arrive with Slice 0's done-gate split item; until then there is no exemption to remove, so keep the function from growing. Editing `biome.json` is a rule-file change, so the PR body explains it.
+**When:** the PR that next rewrites the function. The limit, a ban on import cycles and these four exemptions are in `biome.json` since Slice 0's done-gate split item, and `scripts/lint-limits.test.ts` shows they reach every app, service and package; keep each function from growing until then. Editing `biome.json` is a rule-file change, so the PR body explains it.
 
 | Function | File | Score | Likely next rewrite |
 |---|---|---|---|
@@ -216,7 +215,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | the inner `run` of `interpret` (walks the fixed step map) | `packages/harness/src/workflow/interpret.ts` | 27 | none: the step map is frozen and deleted in Slice 3, so this exemption goes with the file; a refactor that keeps its behaviour is allowed |
 | `importContacts` (CSV import) | `packages/db/src/contacts.ts` | 22 | Slice 1's WhatsApp opt-in item (import records the opt-in) or do-not-call item (imported lists) |
 
-Scores from biome 2.5.3 (the pinned version) on main at d44c77c; none of the four files changed by 7d5e52e. The other five functions over 20 are all in `scripts/done-gate.ts`, outside the limit's scope (source under apps, services and packages).
+Scores from biome 2.5.3 (the pinned version) on main at d44c77c; none of the four files changed by 7d5e52e. Six more functions over 20 are in the done gate (`scripts/done-gate/`: `stop`, `simpleCommands`, `mergeGate`, `cli`, `snapshot`, `touch`), outside the limit's scope (source under apps, services and packages).
 
 **From findings:** none of the 73. It comes from the structure review of 2026-09-30.
 

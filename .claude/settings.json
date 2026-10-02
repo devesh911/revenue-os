@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
             "timeout": 30
           }
         ]
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
             "timeout": 60
           }
         ]
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
             "timeout": 3600,
             "statusMessage": "Done gate: checking the change"
           }
@@ -79,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
             "timeout": 3600,
             "statusMessage": "Done gate: checking the teammate's change"
           }
@@ -92,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
             "timeout": 30
           }
         ]
@@ -104,7 +104,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook",
             "timeout": 30
           }
         ]

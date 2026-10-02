@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
             "timeout": 30
           }
         ]
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
             "timeout": 60
           }
         ]
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || exit 0; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/scripts/done-gate.ts\"; [ -f \"$f\" ] || { echo '{\"systemMessage\":\"Done gate ⚠ NOT running in this checkout (scripts/done-gate.ts is missing): nothing done here is checked\"}'; exit 0; }; exec \"$(command -v bun || echo \"$HOME/.bun/bin/bun\")\" \"$f\" hook codex",
             "timeout": 3600,
             "statusMessage": "Done gate: checking the change"
           }
