@@ -2,6 +2,7 @@
 // test or a checker, read source code in a test), and which files decide what "done" means.
 
 import { exportsOf, statementAt, uncommented } from "./code-text";
+import { markNotes } from "./coverage-marks";
 import type { Added } from "./diff";
 import type { Snap } from "./snapshot";
 
@@ -103,6 +104,7 @@ export function checkRules(
     else
       notes.push(`exception at ${a.file}:${a.line}${why ? ` (${why})` : ""}`);
   }
+  notes.push(...markNotes(added)); // each line no test runs on purpose, which Devesh sees
   const rules = files.filter((f) => RULE_FILES.test(f));
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);
@@ -165,6 +167,7 @@ const skips = (line: string) => {
 };
 
 export const isProduct = (f: string) => PRODUCT.test(f) && !TEST.test(f);
+export const isTest = (f: string) => TEST.test(f);
 
 export const rulesOn = (snap: Snap) =>
   checkRules(

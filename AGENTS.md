@@ -92,7 +92,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   agent and human.
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
   reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
-  `scripts/done-gate/tests-ran.ts` lists it with why.
+  `scripts/done-gate/tests-ran.ts` lists it with why. Bun's run also fails when a line the change adds to a
+  .ts or .tsx file under apps, services or packages is run by no test, or a new migration has no database
+  test in the same change that uses what it adds (scripts/done-gate/coverage.ts). A deliberate gap, or a line
+  wrongly reported as not run, is marked on its line, `// coverage gap: <why>`; console code only the
+  browser checks reach, `// coverage: browser-only (<its .e2e.ts file>)`.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.
@@ -142,8 +146,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    no item: it builds nothing), `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`, each
    with an em dash; then what / why /
    evidence (the gate's line, the verifier's ruling, how the result was seen working), with a
-   `Rule change:` line per changed rule file (hard rail 7) and a `Fix-when-touched:` line per entry of
-   docs/fix-when-touched.md whose area the PR touches (step 6). `rules-from-main` refuses a PR without
+   `Rule change:` line per changed rule file (hard rail 7), a `Fix-when-touched:` line per entry of
+   docs/fix-when-touched.md whose area the PR touches (step 6) and a `Coverage mark: <file> · <what the
+   mark says>` line per coverage mark the PR adds. `rules-from-main` refuses a PR without
    them; `PR_BODY="$(cat body.md)" bun run gate pr` judges the body as it will. Watch CI: `gh pr checks <n> --watch`. Green means observed
    green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
