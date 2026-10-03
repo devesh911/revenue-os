@@ -108,7 +108,7 @@ const copyOf = (edit: (dir: string) => void, message = "a changed copy") => {
 };
 /** `file` in `dir` with `from` replaced by `to`; throws when `from` is not there, so a copy never silently stays the same. */
 const replaced = (dir: string, file: string, from: string, to: string) => {
-  const text = readFileSync(join(dir, file), "utf8");
+  const text = readFileSync(join(dir, file), "utf8"); // done-gate: allow read only to write a changed copy into a scratch clone, never to check what it says
   if (!text.includes(from)) throw new Error(`${file} no longer has ${from}`);
   writeFileSync(join(dir, file), text.replace(from, to));
 };
@@ -307,7 +307,7 @@ describe("the gate's hook, as the steps start it", () => {
         else process.env[k] = was[k];
     }
     expect(failures(results)).toEqual([]);
-    const calls = readFileSync(log, "utf8").trim().split("\n");
+    const calls = readFileSync(join(bin, "env.txt"), "utf8").trim().split("\n");
     expect(calls.length).toBeGreaterThan(5);
     expect(calls.filter((c) => c !== "gh=none evals=none")).toEqual([]);
   }, 300_000);
@@ -317,7 +317,8 @@ describe("the step for a session started after interrupted work", () => {
   it("hands the gate that work as it is left: in a worktree of its own, by a session quiet for 15 minutes and more", async () => {
     // A stand-in gate that logs each call, holds the second session at its start and sends its stop back until the
     // checks have passed: the step's own checks pass on it, so what is under test is what the step hands the gate.
-    const log = join(scratch("proof-0-held-"), "calls.jsonl");
+    const held = scratch("proof-0-held-");
+    const log = join(held, "calls.txt");
     const repo = scratch("proof-0-stand-in-");
     mkdirSync(join(repo, "scripts"));
     writeFileSync(
@@ -327,7 +328,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs
 const rev = (what: string) => spawnSync("git", ["rev-parse", "--path-format=absolute", what], { encoding: "utf8" }).stdout.trim();
 const common = rev("--git-common-dir");
 const [cmd, ...args] = process.argv.slice(2);
-const input = cmd === "hook" ? JSON.parse(readFileSync(0, "utf8")) : {};
+const input = cmd === "hook" ? await Bun.stdin.json() : {};
 appendFileSync(${JSON.stringify(log)}, \`\${JSON.stringify({ cmd, event: input.hook_event_name, session: input.session_id, worktree: rev("--git-dir") !== common, at: Date.now() })}\\n\`);
 if (cmd === "checkpoint") writeFileSync(\`\${common}/next.txt\`, args[args.indexOf("--next") + 1] ?? "");
 const two = input.session_id === "proof-2";
@@ -358,7 +359,7 @@ if (two && input.hook_event_name === "Stop" && !existsSync(\`\${common}/done-gat
       worktree: boolean;
       at: number;
     };
-    const calls = readFileSync(log, "utf8")
+    const calls = readFileSync(join(held, "calls.txt"), "utf8")
       .trim()
       .split("\n")
       .map((l) => JSON.parse(l) as Call);
@@ -525,7 +526,8 @@ describe("the verifier's run on a change missing a cross-company test", () => {
   it("passes when the verifier, started as the verifier agent with only the evals key, rules FAIL for the other company, while it holds the shared local stack", async () => {
     const copy = root();
     const lock = join(stateDir(copy), "local-stack.lock");
-    const seen = join(scratch("proof-0-lock-"), "seen.txt");
+    const lockDir = scratch("proof-0-lock-");
+    const seen = join(lockDir, "seen.txt");
     const claude = verifier(
       "Ruling: FAIL — no test asks for another company's open tasks; add a cross-company test",
       `{ { test -f "${lock}" && echo held || echo free; } > "${seen}"; }`,
@@ -539,7 +541,7 @@ describe("the verifier's run on a change missing a cross-company test", () => {
     const calls = claude.calls();
     expect(calls).toContain("--agent verifier");
     expect(calls).toContain("key: evals-key-for-tests");
-    expect(readFileSync(seen, "utf8").trim()).toBe("held");
+    expect(readFileSync(join(lockDir, "seen.txt"), "utf8").trim()).toBe("held");
   });
 
   it("fails when the verifier passes it, or fails it for another reason though its report names another company elsewhere", async () => {
@@ -558,7 +560,8 @@ describe("the verifier's run on a change missing a cross-company test", () => {
   });
 
   it("gives its sample a production caller and a test at the API layer, so the only thing missing is the other company", async () => {
-    const out = join(scratch("proof-0-diff-"), "changed.txt");
+    const diffDir = scratch("proof-0-diff-");
+    const out = join(diffDir, "changed.txt");
     const claude = verifier(
       "Ruling: FAIL — add a cross-company test",
       `{ git diff --name-only main > "${out}"; }`,
@@ -567,7 +570,7 @@ describe("the verifier's run on a change missing a cross-company test", () => {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
     });
-    const changed = readFileSync(out, "utf8");
+    const changed = readFileSync(join(diffDir, "changed.txt"), "utf8");
     expect(changed).toContain("services/worker/src/routes/screens.ts");
     expect(changed).toMatch(/services\/worker\/test\/[\w-]+\.test\.ts/);
   });
