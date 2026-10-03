@@ -17,7 +17,7 @@ it("tells the verifier to find each behaviour's and edge case's test at the laye
   for (const phrase of [
     "find the test that exercises it at the layer people use",
     "an API test, which calls the worker's real routes",
-    "through `app.fetch` on `services/worker/src/index.ts`",
+    "do, through `app.fetch` on",
     "a browser test in `apps/console/e2e/`",
     "it never counts alone",
     "another company: company B's user or rows never see or change company A's",

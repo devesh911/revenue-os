@@ -17,7 +17,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 |---|---|
 | Any file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
 | `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
-| `apps/console/test/guardrails-console.test.tsx`, `apps/console/test/pages-adoption-behavior.test.tsx`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts` | 3. Tests that read source code as text |
+| `apps/console/test/pages-adoption-behavior.test.tsx`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
 | `scripts/demo.ts`, `scripts/dev-login.test.ts` | 9. Imports the lint rule allows only as exceptions |
@@ -71,12 +71,11 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **Fix:** When you edit one of these test files, replace its checks that read source code as text with a test that renders, calls or drives the code (or with a lint rule), and delete false "RED today" comments (they claim a passing test fails).
 
-**When:** the PR that next edits the test file. The rule is that behaviour is proved by behaviour tests; a structure check (which part may import which) or a secret scan lives in lint or `bun run guards`, never in a test file. The done gate refuses new source-reading test lines (`lineProblem` in `scripts/done-gate/rules.ts`, which since [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) also catches a code file imported as text), so only the existing ones remain.
+**When:** the PR that next edits the test file. The rule is that behaviour is proved by behaviour tests; a structure check (which part may import which) or a secret scan lives in lint or `bun run guards`, never in a test file. The done gate refuses new source-reading test lines (`scripts/done-gate/source-reading.ts`, which since [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) also catches a code file imported with options, such as `with { type: "text" }`; STATE.md lists the ways that still get past it), so only the existing ones remain.
 
-**Why it matters:** `apps/console/test/guardrails-console.test.tsx` checked that the Settings save's source said `PUT` and stayed green for about two months while the browser blocked that save.
+**Why it matters:** the guardrail settings test checked that the Settings save's source said `PUT` and stayed green for about two months while the browser blocked that save.
 
-**What remains** (the rest was done by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS): the source halves of the console page and boot tests went, replaced by render, start-up and browser tests or by lint rules for the Supabase client, the Anthropic SDK and raw HTML; the console tests moved from `tests/` into `apps/console/test/`):
-- `apps/console/test/guardrails-console.test.tsx` (source half): a browser test that saves calling hours, reloads and sees the value kept, and sees an error on bad input. Slice 1's browser-check item writes this test; delete the source half in that PR.
+**What remains** (the rest was done by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS): the source halves of the console page, boot and guardrail settings tests went, replaced by render, start-up, hook and browser tests, a lint rule for the Supabase client and guards for the Anthropic SDK and raw HTML; the console tests moved from `tests/` into `apps/console/test/`):
 - "RED today" comments: `apps/console/test/pages-adoption-behavior.test.tsx` (4), and one each in `packages/channels/test/channels.test.ts` and `packages/shared/test/api-error.test.ts`.
 - Acceptable as they are (they check docs or settings, not product code): `apps/console/test/readme-coverage.test.ts`, `apps/console/test/ui-contract.test.tsx`, `scripts/guards.test.ts`, `scripts/verifier-instructions.test.ts`.
 
@@ -128,7 +127,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 ### 8. Leftover branches and worktrees
 
-**Fix:** Whenever an agent cleans up after its own merged PR, it also deletes other local branches already merged into main, removes worktrees whose branch is merged and that have no uncommitted changes and no running session, clears worktree entries whose folder is gone, and adds `.agents/` to `.gitignore` so a second copy of the skills can't be committed.
+**Fix:** Whenever an agent cleans up after its own merged PR, it also deletes other local branches already merged into main, removes worktrees whose branch is merged and that have no uncommitted changes and no running session, and clears worktree entries whose folder is gone. (`.agents/` is in `.gitignore` since [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS), so a second copy of the skills can't be committed.)
 
 **When:** any agent's clean-up after its own PR.
 
@@ -137,7 +136,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 - 9 worktrees. The Downloads clone and the main checkout's stray `.agents` copy are already gone, but git still lists `~/Downloads/revenue-os/.claude/worktrees/marketing-launch` as prunable; `git worktree prune` clears it.
 - `.agents/` is still not in `.gitignore`.
 
-**State on 2026-10-01:** Devesh removed the three worktrees from before the done gate (his prospect spreadsheets now live in ~/Documents, outside the repo), and the prunable Downloads entry is gone. The main checkout and 7 worktrees remain, with 21 local branches, among them branches whose worktree is gone (for example `claude/realestate-prospecting-pipeline-f68eb3`, `claude/quizzical-ishizaka-fe2b61`). `.agents/` is still not in `.gitignore`.
+**State on 2026-10-01:** Devesh removed the three worktrees from before the done gate (his prospect spreadsheets now live in ~/Documents, outside the repo), and the prunable Downloads entry is gone. The main checkout and 7 worktrees remain, with 21 local branches, among them branches whose worktree is gone (for example `claude/realestate-prospecting-pipeline-f68eb3`, `claude/quizzical-ishizaka-fe2b61`). `.agents/` was still not in `.gitignore` then.
 
 **From findings:**
 - Stale worktrees, branches, a second out-of-date clone, and untracked out-of-date skill copies around the main checkout
@@ -272,7 +271,7 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Code comments name finished tasks as the fix for stubs that are still live | Entry 1 |
 | Dead modules that advertise a second way of doing things: Drizzle schema mirror and dependency, AI-provider registry, a stale demo script, an unused component | Entry 2 |
 | Half the schema has no production code, and a Drizzle 'mirror' covers 3 of 33 tables, is unused, and is labelled the only DB entry | Entry 2 |
-| 16 test files check source code as text instead of what the code does, and the repo teaches this as 'the RED idiom' | Mostly settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (render, start-up and browser tests and lint rules replace them; the idiom comments are gone); the guardrail settings test's source half: entry 3 (Slice 1's browser check) |
+| 16 test files check source code as text instead of what the code does, and the repo teaches this as 'the RED idiom' | Settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (render, start-up, hook and browser tests, a lint rule and guards replace them; the idiom comments are gone) |
 | 38 stale 'RED today' comments on passing tests, tests that only pin a finished file move, and console tests split across two folders | Mostly settled by [#PR-THIS](https://github.com/devesh911/revenue-os/pull/PR-THIS) (the console tests are in one folder, the move pins are gone); six 'RED today' comments: entry 3 |
 | Skills tell agents that lessons.md outranks them, but lessons.md is 36 KB of mostly resolved history that calls itself 'not law'; its lessons should become checks | Entry 4 |
 | Skills restate facts that have drifted; two of five skills are switched off locally; a stale untracked .agents skill copy remains | Entry 4 (the switched-off skills: Devesh's "Finish clearing the retired orchestrator from your Mac" item in STATE.md → Waiting on Devesh) |
