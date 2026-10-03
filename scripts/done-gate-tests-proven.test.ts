@@ -290,6 +290,27 @@ it("adds one", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("counts a new file that only another new product file names as product code, not a test helper", () => {
+    const r = prove(
+      scratch({
+        "apps/x/src/base.ts": "export const base = (n: number) => n + 1;\n",
+        "apps/x/src/fresh.ts":
+          'import { base } from "./base";\n\nexport const fresh = (n: number) => base(n);\n',
+        "apps/x/src/old.ts":
+          'import { fresh } from "./fresh";\n\nexport const old = () => fresh(0);\n',
+        "apps/x/test/base.test.ts": `import { expect, it } from "bun:test";
+import { base } from "../src/base";
+
+it("adds one", () => {
+  expect(base(1)).toBe(2);
+});
+`,
+      }),
+    );
+    expect(r.text).toContain(proven(1, 1));
+    expect(r.ok).toBe(true);
+  });
+
   it("accepts a test of a new export in an old file, added to that file's old test file", () => {
     const r = prove(
       scratch({
