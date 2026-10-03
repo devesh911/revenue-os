@@ -1,8 +1,10 @@
 // Test helpers and fixtures inside product folders: a file the change adds under apps/, services/ or packages/
-// counts as product code only when a file other than a test, a Markdown page or another such file names it, by its
-// name as an import or a path writes it ("./sample-phones", "phones.json", "./testing" for testing/index.ts).
-// Anything else the change adds there (src/testing/, src/__fixtures__/) only tests use: it is a helper or fixture,
-// and it comes along to main's code like the tests themselves (tests-proven.ts).
+// counts as product code only when a file other than a test, a Markdown page, the gate itself or another such file
+// names it, in quotes after a "/" or a quote, as an import or a path writes it: its whole name, its name without
+// its last extension (with or without a .js or .ts one), or, for an index file, its folder's name. Anything else
+// the change adds there (a testing/ or __fixtures__/ folder under src/) only tests use: it is a helper or fixture,
+// and it comes along to main's code like the tests themselves (tests-proven.ts). A file some other file happens
+// to quote by the same name counts as product code: a leniency, never a false refusal.
 
 import { git } from "./git";
 import { isProduct, TEST } from "./rules";
@@ -28,9 +30,10 @@ export function testOnly(snap: Snap): Set<string> {
   const namers = new Map(
     fresh.map((f) => {
       const parts = f.split("/");
-      const stem = (parts.at(-1) ?? "").split(".")[0] ?? "";
-      const names = stem === "index" ? [stem, parts.at(-2) ?? ""] : [stem];
-      const named = `[/"'\`](${names.map(escaped).join("|")})(\\.[A-Za-z0-9]+)*["'\`]`;
+      const name = parts.at(-1) ?? "";
+      const stem = name.replace(/\.[^.]*$/, "");
+      const stems = stem === "index" ? [stem, parts.at(-2) ?? ""] : [stem];
+      const named = `[/"'\`](${escaped(name)}|(${stems.map(escaped).join("|")})(\\.[cm]?[jt]sx?)?)["'\`]`;
       return [
         f,
         git(
@@ -41,7 +44,14 @@ export function testOnly(snap: Snap): Set<string> {
         )
           .split("\0")
           .map((l) => l.slice(snap.tree.length + 1)) // "<tree>:<path>"
-          .filter((g) => g && g !== f && !TEST.test(g) && !/\.md$/i.test(g)),
+          .filter(
+            (g) =>
+              g &&
+              g !== f &&
+              !TEST.test(g) &&
+              !/\.md$/i.test(g) &&
+              !g.startsWith("scripts/done-gate"),
+          ),
       ] as const;
     }),
   );

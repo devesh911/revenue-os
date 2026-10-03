@@ -422,7 +422,10 @@ it("reads three rows", () => {
   it("refuses a test leaning on a new helper or fixture in a product folder that only tests name: it comes along to main's code, where the test passes", () => {
     const r = prove(
       scratch({
-        ...PRODUCT,
+        // product code quoting a like name ("ones.list") and the gate quoting the helper's name don't count
+        "apps/x/src/old.ts": `${OLD}export const LOG = "ones.list";\n`,
+        "scripts/done-gate/quote.ts":
+          'export const Q = "../src/testing/sample";\n',
         // a helper named only by another helper is a helper too
         "apps/x/src/testing/sample.ts":
           'import { ONE } from "./one";\n\nexport const SAMPLE = ONE;\n',
