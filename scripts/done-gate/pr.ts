@@ -3,11 +3,12 @@
 // each fix-when-touched entry it touches answered, no other workflow able to report a check named rules-from-main
 // or checks (the two main's ruleset requires), and no migration on main changed or its number reused (migrations.ts).
 
+import { markBodyProblems } from "./already-on-main";
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
 import { firstLineProblems } from "./pr-first-line";
-import { ruleChangeProblems } from "./rule-changes";
+import { ruleChangeProblems, shown } from "./rule-changes";
 import { rulesOn } from "./rules";
 import type { Snap } from "./snapshot";
 
@@ -124,6 +125,7 @@ export function judgePr(
       ...fixWhenTouchedProblems(snap.files, body, table),
       ...secondCheck(workflows),
       ...migrationProblems(snap),
+      ...markBodyProblems(snap.added, shown(body)), // each "behaviour already on main" mark, copied into the body
     ],
     notes: [...notes, ...unreadTable(table)],
   };

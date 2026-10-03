@@ -1,6 +1,7 @@
 // The done rules: what no added line may do (throw as a placeholder, export what nothing calls, switch off a
 // test or a checker, read source code in a test), and which files decide what "done" means.
 
+import { markNotes } from "./already-on-main";
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import type { Added } from "./diff";
 import type { Snap } from "./snapshot";
@@ -103,6 +104,7 @@ export function checkRules(
     else
       notes.push(`exception at ${a.file}:${a.line}${why ? ` (${why})` : ""}`);
   }
+  notes.push(...markNotes(added)); // tests that pass on main, and why (tests-proven.ts)
   const rules = files.filter((f) => RULE_FILES.test(f));
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);
@@ -174,3 +176,5 @@ export const rulesOn = (snap: Snap) =>
   );
 export const listed = (problems: string[]) =>
   `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line; Devesh sees every exception.`;
+/** A test file, or a helper or fixture in a test folder: what main's copy takes from the change (tests-proven.ts). */
+export const isTest = (f: string) => TEST.test(f);

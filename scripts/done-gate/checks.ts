@@ -21,6 +21,11 @@ const CHECKS: Check[] = [
     cmd: ["bun", "run", "local", "bun", "run", "gate", "tests"],
     db: true,
   },
+  {
+    name: "tests proven",
+    cmd: ["bun", "run", "local", "bun", "run", "gate", "proven"],
+    db: true,
+  },
   { name: "database policies", cmd: ["bun", "run", "rls:check"], db: true },
   {
     name: "browser checks",
