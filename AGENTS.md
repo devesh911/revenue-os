@@ -61,8 +61,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   Every slice's `Proof:` line is written as steps a script can run and check against the real
   product (`bun run proof <slice>`, which Slice 0's last item, the proof runner, builds). When the
   slice's last item lands, the agent sets it to `proof ready`; when every step passes, the agent
-  sets it to `done` and writes the date and the passing run's link after `Seen by Devesh:` (the
-  proof runner item renames that field `Proof passed:`). Each run's short report (what was done,
+  sets it to `done` and writes the date and the passing run's link after `Proof passed:`, in a PR
+  whose body carries that run's report (`rules-from-main` refuses a link that is not a run of the
+  proof workflow, for that slice, that passed every step on a commit on main; `bun run cycle
+  --banner` shows each slice's latest run and what to do). Each run's short report (what was done,
   what was seen, screenshots, and a recording or transcript where a call or chat is involved) is
   posted to the standing "Proof reports" GitHub issue, so GitHub notifies Devesh; he may look at it
   or ignore it, and a done slice reopens if he says so. GitHub re-runs the proofs of `proof ready`

@@ -27,7 +27,7 @@ const slice = (
   blocked = "nothing",
   items = "- [ ] Build the thing (agent)",
 ) =>
-  `## Slice ${n}: Title ${n}\nStatus: ${status}\nGoal: g\nProof: p\nBlocked by: ${blocked}\nSeen by Devesh: —\n\n${items}\n`;
+  `## Slice ${n}: Title ${n}\nStatus: ${status}\nGoal: g\nProof: p\nBlocked by: ${blocked}\nProof passed: —\n\n${items}\n`;
 const roadmap = (...slices: string[]) => `# Roadmap\n\n${slices.join("\n")}`;
 const STATE =
   "PHASE: SETUP\n\n## What works today\n| Area | Capability | Status | Where / why |\n|---|---|---|---|\n| Data | x | Works | y |\n## Waiting on Devesh\n## Decisions in force\n";
@@ -448,6 +448,8 @@ function scratchRepo() {
       "scripts/cycle.ts",
       "scripts/cycle-hook.sh",
       "docs/tracker/parse.js",
+      "scripts/proof/latest.ts",
+      "scripts/done-gate/proof-run.ts",
     ].map((f) => [f, readFileSync(join(ROOT, f), "utf8")]), // done-gate: allow copies the real scripts into a scratch repo to run them
     [
       "ROADMAP.md",

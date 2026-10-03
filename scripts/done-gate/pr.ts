@@ -1,12 +1,14 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
 // every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
 // each fix-when-touched entry it touches answered, no other workflow able to report a check named rules-from-main
-// or checks (the two main's ruleset requires), and no migration on main changed or its number reused (migrations.ts).
+// or checks (the two main's ruleset requires), no migration on main changed or its number reused (migrations.ts), and
+// each slice it sets to done proved by a passing proof run on main, whose report its body carries (proof-link.ts).
 
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
 import { firstLineProblems } from "./pr-first-line";
+import { proofLinks } from "./proof-link";
 import { ruleChangeProblems } from "./rule-changes";
 import { rulesOn } from "./rules";
 import type { Snap } from "./snapshot";
@@ -83,7 +85,7 @@ const at = (snap: Snap, file: string) =>
   git(snap.repo, ["cat-file", "blob", `${snap.tree}:${file}`], {}, true);
 
 /** `base` is main: its fix-when-touched table judges, never the branch's, and its ROADMAP.md says what is finished. */
-export function judgePr(
+export async function judgePr(
   snap: Snap,
   body: string,
   pr?: string,
@@ -124,6 +126,13 @@ export function judgePr(
       ...fixWhenTouchedProblems(snap.files, body, table),
       ...secondCheck(workflows),
       ...migrationProblems(snap),
+      ...(await proofLinks(
+        snap.repo,
+        at(snap, "ROADMAP.md"),
+        onBase("ROADMAP.md"),
+        body,
+        base,
+      )),
     ],
     notes: [...notes, ...unreadTable(table)],
   };

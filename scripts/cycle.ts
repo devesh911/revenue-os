@@ -18,6 +18,7 @@ import {
   parseState,
   plain,
 } from "../docs/tracker/parse.js";
+import { type Latest, proofLines, readLatest } from "./proof/latest";
 
 export type Cycle = {
   roadmap: string;
@@ -26,6 +27,7 @@ export type Cycle = {
   item: string; // what this branch builds: git config branch.<name>.description (AGENTS.md → The loop, step 2)
   from: string;
   branchRoadmap?: string; // ROADMAP.md in the agent's folder: a replan adds its line there before it merges
+  proofRuns?: Latest[] | string; // --banner: each proof-ready or done slice's latest proof run, or why gh could not read them
 };
 
 const ROOT = join(import.meta.dir, "..");
@@ -96,6 +98,7 @@ export function banner(c: Cycle): string {
     cur
       ? `Current slice: Slice ${cur.n}: ${cur.title} (${cur.Status}, ${cur.items.filter((i) => i.done).length} of ${cur.items.length} items done).\nProof (a script runs it; the slice is done when every step passes): ${cur.Proof ?? ""}\nNext item: ${next ? next.text : "none left for agents. Set the slice to proof ready and run its proof (AGENTS.md → Definition of done)."}`
       : "No slice can be built now: each unfinished slice is proof ready (run its proof: when every step passes, set it to done; when one fails, add an item naming the failure) or blocked. Tell Devesh what blocks it; do not start other work.",
+    ...proofLines(slices, c.proofRuns),
     !c.item
       ? `${c.branch ? `This branch (${c.branch})` : "This checkout"} has no roadmap item. Build only on a branch made for one item, off origin/main, and record it: ${record(name)}.`
       : !k
@@ -105,7 +108,7 @@ export function banner(c: Cycle): string {
           : `This branch (${c.branch}) builds ${k.kind}: ${k.what}. It has no roadmap line to tick; the PR body's what / why / evidence is the record.`,
     'New asks (AGENTS.md → The loop, step 1). A question or look-up: answer it; no branch switch, no code. Work that does not belong in the repo (prospect lists, videos, research, naming, data about real people; fake seed and test data is fine): do it in a scratch folder outside the repo, never commit it, no branch. Marketing-site work: the Side track, no replan, one open PR at most. An item already on the roadmap in a later slice: a replan that moves its line into the current slice in the same PR. Any other build ask: reply "off-roadmap PR, or replan?" and build nothing until Devesh picks; a message that already starts with "off-roadmap" or "replan" has picked. At most one off-roadmap PR is open at a time: if one is open, link it and ask Devesh to merge or close it, or to replan.',
     'Every PR body starts with "Roadmap: Slice N — <item>", "Roadmap: Slice N — replan: <what>", "Roadmap: Side track — <what>" or "Roadmap: off-roadmap — <what>" (AGENTS.md → The loop, step 4), and answers each docs/fix-when-touched.md entry whose area it touches with `Fix-when-touched: <entry number> · fixed | not applicable · <how or why>`; `rules-from-main` refuses it otherwise.',
-    'Done means seen working (AGENTS.md → Definition of done). A slice is done when its proof runs and passes: the agent writes the date and the passing run\'s link after "Seen by Devesh:".',
+    'Done means seen working (AGENTS.md → Definition of done). A slice is done when its proof runs and passes: the agent writes the date and the passing run\'s link after "Proof passed:", and `rules-from-main` checks that link.',
   ];
   if (found.length)
     lines.push(
@@ -232,6 +235,11 @@ if (import.meta.main) {
           ? "origin/main"
           : "origin/main as of the last fetch (fetching just now failed or timed out), so it could be out of date",
     };
+    const proved = parseRoadmap(c.roadmap)
+      .slices.filter((s) => s.Status === "proof ready" || s.Status === "done")
+      .map((s) => s.n);
+    if (flag === "--banner" && proved.length)
+      c.proofRuns = readLatest(ROOT, proved);
     out = flag === "--banner" ? banner(c) : pin(c);
   } catch (e) {
     out = unknown((e as Error).message);

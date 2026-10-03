@@ -121,7 +121,7 @@ function plan(dir: string, items: string[]) {
   write(
     dir,
     "ROADMAP.md",
-    `## Slice 0: Ground\nStatus: in progress\nGoal: g\nProof: p\nBlocked by: nothing\nSeen by Devesh: —\n\n${items.map((i) => `- [ ] ${i} (agent)`).join("\n")}\n`,
+    `## Slice 0: Ground\nStatus: in progress\nGoal: g\nProof: p\nBlocked by: nothing\nProof passed: —\n\n${items.map((i) => `- [ ] ${i} (agent)`).join("\n")}\n`,
   );
   sh(dir, ["git", "add", "ROADMAP.md"]);
   sh(dir, [...GIT, "commit", "-qm", "plan"]);

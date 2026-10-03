@@ -13,10 +13,10 @@ export type Slice = {
   Goal?: string;
   Proof?: string;
   "Blocked by"?: string;
-  "Seen by Devesh"?: string;
+  "Proof passed"?: string;
 };
 export const STATUSES: string[];
-export function seenOk(v: string | undefined): boolean;
+export function passedOk(v: string | undefined): boolean;
 export function plain(s: string): string;
 export function sections(md: string): Record<string, string[]>;
 export function parseRoadmap(md: string): {

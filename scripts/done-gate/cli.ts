@@ -104,7 +104,7 @@ export async function cli(cmd: string, args: string[]) {
       );
       process.exit(2);
     }
-    const { problems, notes } = judgePr(
+    const { problems, notes } = await judgePr(
       changeOf("Pull request", repo, base, head),
       body,
       pr,
