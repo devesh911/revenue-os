@@ -2,7 +2,7 @@
 // settings missing, all of its code loads without building a sign-in client (a module that built one on load would
 // throw "supabaseUrl is required." and leave a blank page) and the configuration screen names each missing
 // setting. With them present, the app runs inside its error boundary, so a screen that fails to draw shows
-// "Something went wrong" instead of a blank page (the boundary itself: tests/app-error-boundary.test.tsx).
+// "Something went wrong" instead of a blank page (the boundary itself: app-error-boundary.test.tsx).
 import { expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
