@@ -1,6 +1,7 @@
 // A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call an MCP tool that
 // merges, the gate's own record and hook, what agents' tools may not do, the merge check and the note of the
-// checkout, the verifier's call, start, commands, hand-back and stop, and the judgement at a stop.
+// checkout, the verifier's call, start, commands, hand-back and stop, what a session is shown and held to when it
+// starts, and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
@@ -10,6 +11,7 @@ import { type HookInput, runsIn } from "./hook-io";
 import { deny, mergeGate } from "./merge-gate";
 import { mergeToolRefusal } from "./merge-reading";
 import { recordRefusal } from "./record-guard";
+import { sessionStart } from "./session-start";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
 import { commandRefusal } from "./tools";
@@ -72,9 +74,15 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
   }
   const store = new Store(stateDir(repo));
   const session = input.session_id ?? "unknown";
+  // Where Claude Code keeps the session's transcript, which a checkpoint reads Devesh's words from (checkpoint.ts).
+  if (
+    input.transcript_path &&
+    store.get("transcript", session) !== input.transcript_path
+  )
+    store.put("transcript", session, input.transcript_path);
   switch (event) {
     case "SessionStart":
-      return touch(repo, input, store, session);
+      return sessionStart(repo, input, store, session, codex);
     case "PreToolUse":
       if (input.tool_name === "Agent" || input.tool_name === "SubagentHandback")
         return verifierCall(input, store, session);

@@ -1,9 +1,12 @@
-// `bun run gate` and `bun run see` from a terminal: every check, the rules alone, the tests, a pause, or what a
-// signed-in person sees. The verifier's ruling is not among them: only its own delivered report counts (verifier.ts).
+// `bun run gate` and `bun run see` from a terminal: every check, the rules alone, the tests, a pause, the branch's
+// checkpoint, or what a signed-in person sees. The verifier's ruling is not among them: only its own delivered
+// report counts (verifier.ts).
 
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { toplevel } from "./checkouts";
+import { checkpointCommand } from "./checkpoint";
 import { browserEnv, run, tail } from "./checks";
 import { git } from "./git";
 import { judgePr } from "./pr";
@@ -14,7 +17,7 @@ import { Store, stateDir } from "./store";
 import { allTestsRun } from "./tests-ran";
 import { prove, rulingOn } from "./verdict";
 
-const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>"]
+const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>" | checkpoint [--done "<…>" --failed "<…>" --next "<…>"]]
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
        pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data`;
 
@@ -123,6 +126,8 @@ export async function cli(cmd: string, args: string[]) {
     (!args.length || (args[0] === "e2e" && args.length === 1))
   ) {
     process.exit(allTestsRun(repo, args[0] === "e2e"));
+  } else if (cmd === "checkpoint") {
+    process.exit(checkpointCommand(toplevel(repo), store, args));
   } else if (cmd === "pause" && text) {
     store.put("pause", snapshot(repo, false).tree, text);
     console.log(

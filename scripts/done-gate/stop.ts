@@ -5,6 +5,7 @@ import { relative } from "node:path";
 import { extra, idOf, keyOf, madeHere, rootsOf } from "./checkouts";
 import { git } from "./git";
 import { type HookInput, say } from "./hook-io";
+import { HELD } from "./interrupted";
 import { isProduct } from "./rules";
 import { snapshot } from "./snapshot";
 import type { Store } from "./store";
@@ -34,9 +35,14 @@ export async function stop(
       trees.push(tree);
       const toucher = store.get("toucher", idOf(root));
       if (toucher && toucher !== session) continue; // another session worked here since: its change, not this one's
-      const accepted = store.get("accepted", key);
+      // A session held to work it found here (interrupted.ts) has accepted nothing here until a stop passes on it.
+      const accepted =
+        store.get(HELD, key) === undefined
+          ? store.get("accepted", key)
+          : undefined;
       if (tree === accepted) {
-        // Work from before the session, never judged: say so once, rather than pass it in silence.
+        // Work from before the session that does not hold it (on main, or in a checkout it only looked at), never
+        // judged: say so once, rather than pass it in silence.
         if (
           tree === store.get("baseline", key) &&
           !store.get("warned", `${key}-${tree}`)
@@ -110,7 +116,11 @@ export async function stop(
     );
   }
   if (!failed) {
-    for (const w of work) store.put("accepted", w.key, w.tree);
+    for (const w of work) {
+      store.put("accepted", w.key, w.tree);
+      if (store.take(HELD, w.key))
+        store.put("warned", `${w.key}-${w.tree}`, "1"); // judged, and told just now
+    }
     store.take("blocks", session);
     store.take("gave-up", session);
     return say([...passed, ...notes].join("\n"));

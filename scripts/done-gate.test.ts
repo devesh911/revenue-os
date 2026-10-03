@@ -2440,18 +2440,19 @@ describe("the hook", () => {
     );
   });
 
-  it("tells Devesh once when a session changed nothing but its checkout holds unverified product work from before", () => {
+  it("holds a session that starts on a branch holding unverified product work from before, rather than telling Devesh once (more in scripts/done-gate-restart.test.ts)", () => {
     const dir = repo();
     sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
     sh(dir, ["git", "checkout", "-qb", "feat/half"]);
     write(dir, "services/worker/src/half.ts", "const half = 1;\n");
     commitOld(dir);
     hook(dir, "SessionStart");
-    expect(hook(dir, "Stop")).toEqual({
-      ...QUIET,
-      told: "Done gate ⚠ this session changed nothing in the main checkout, but it holds product changes from before the session that nobody has verified",
-    });
-    expect(hook(dir, "Stop")).toEqual(QUIET);
+    checksPassed(dir);
+    const r = hook(dir, "Stop");
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      'Run the verifier agent (Agent tool, subagent_type "verifier")',
+    );
   });
 
   it("accepts the code it gave up on once the verifier passes it, and still delivers a question", () => {
