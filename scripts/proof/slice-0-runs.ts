@@ -137,7 +137,7 @@ export const runRecords: Step = {
           `${sha}^`,
           sha,
           "--",
-          "supabase/migrations",
+          "supabase/migrations/*.sql", // a migration, as supabase db push reads them; not the folder's README
         );
       } catch {
         return true; // a commit this checkout lacks is held to nothing it can't see
