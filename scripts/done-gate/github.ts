@@ -100,8 +100,9 @@ const API_VALUE = [
 
 /**
  * gh api reads: no method but GET and no fields (-f, -F, --field, --raw-field, which make it a POST) or --input.
- * GraphQL reads send their query as a field, so `gh api graphql` may send fields (variables included) when one is
- * an inline `query=`, none reads a file (`=@…`) and none holds a mutation.
+ * GraphQL reads send their query as a field, so `gh api graphql` may send fields (variables included) when its
+ * `query=` is written out inline (starting with `{` or `query`, with no `$(…)` or backquote to fill it in when it
+ * runs), none reads a file (`=@…`) and none holds a mutation.
  */
 function api(args: string[]) {
   const no = (detail: string) =>
@@ -137,8 +138,16 @@ function api(args: string[]) {
     return no("sends fields, which makes it a POST");
   if (fields.some((f) => /^[^=]*=@/.test(f)))
     return no("reads a field from a file");
-  if (!fields.some((f) => f.startsWith("query=")))
-    return no("sends no inline query");
+  const queries = fields
+    .filter((f) => f.startsWith("query="))
+    .map((f) => f.slice(6).trimStart());
+  if (
+    !queries.length ||
+    queries.some((q) => !/^(\{|query\b)/.test(q) || /\$\(|`/.test(q))
+  )
+    return no(
+      "sends no inline query (one written out in the command, starting with `{` or `query`)",
+    );
   if (fields.some((f) => /\bmutation\b/i.test(f)))
     return no("sends a mutation, which writes");
 }

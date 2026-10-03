@@ -220,7 +220,9 @@ describe("a verifier ruling", () => {
       {
         hook_event_name: "PreToolUse",
         tool_name: "Bash",
-        tool_input: { command: "gh pr merge 7 --squash" },
+        tool_input: {
+          command: `gh pr merge 7 --squash --match-head-commit ${head}`,
+        },
       },
       { PATH: `${bin}:${process.env.PATH}` },
     );

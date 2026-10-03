@@ -1,7 +1,8 @@
 // What agents' own tools may not do, asked by the Claude Code and Codex hooks before every shell command. This file
 // reads each command for the program it really runs (past keywords and wrappers, inside substitutions, and in
 // what a shell, eval or script is handed), refuses a command it can't read in a line that names something it
-// guards, and refuses the cloud database pushes; secrets.ts judges secrets and github.ts GitHub. Claude Code's own
+// guards, and refuses the cloud database pushes; secrets.ts judges secrets, github.ts GitHub and merge-reading.ts
+// merges (record-guard.ts, which hook.ts runs first, the gate's own record and hook). Claude Code's own
 // settings deny the database pushes, the login reads and .env files too.
 
 import { homedir } from "node:os";
@@ -9,6 +10,7 @@ import { resolve } from "node:path";
 import { git } from "./git";
 import { githubRefusal } from "./github";
 import type { HookInput } from "./hook-io";
+import { mergeRefusal, namesMerge } from "./merge-reading";
 import { envFileUnder, loginRefusal, secretRefusal } from "./secrets";
 import {
   into,
@@ -49,7 +51,10 @@ export function toolRefusal(command: string, look: Look): string | undefined {
 
 /** Judges each simple command of `line`, in each way shells read it; `text` is the whole command line, where a guarded word is looked for. */
 function judge(line: string, look: Look, text: string): string | undefined {
-  for (const commands of readings(line)) {
+  const all = readings(line);
+  // Does the line name gh (or graphql) and merge, in its text or in a word read from it (quotes removed)?
+  const merging = namesMerge([text, ...all.flat(2)].join("\n"));
+  for (const commands of all) {
     let dir = "";
     for (const words of commands) {
       const w = unredirected(program(words));
@@ -58,7 +63,8 @@ function judge(line: string, look: Look, text: string): string | undefined {
         secretRefusal(words, w, dir, look.envFileIn) ??
         loginRefusal(w) ??
         cloud(w) ??
-        githubRefusal(w, dir, look.branchOf);
+        githubRefusal(w, dir, look.branchOf) ??
+        mergeRefusal(unredirected(words), merging, line !== text);
       if (why) return why;
       if (w[0] === "cd" || w[0] === "pushd") dir = into(dir, w[1] ?? "~");
     }
