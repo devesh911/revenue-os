@@ -144,12 +144,12 @@ function pathWords(w: string[], handsOn: boolean): string[] {
     )
       text.add(k);
   });
-  // A ruling's note or a question for Devesh, handed to the gate's own command.
+  // A question for Devesh, handed to the gate's own command.
   const gate = positionals(args).filter((a) => !/^run(-script)?$/.test(a));
   if (
     name === "bun" &&
     (gate[0] === "gate" || ENTRY.test(gate[0] ?? "")) &&
-    /^(verdict|pause)$/.test(gate[1] ?? "")
+    gate[1] === "pause"
   )
     args.forEach((_, k) => {
       if (k > args.indexOf(gate[1] ?? "")) text.add(k);

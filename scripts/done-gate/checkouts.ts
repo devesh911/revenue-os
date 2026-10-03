@@ -1,9 +1,11 @@
 // Which checkouts a session worked in, the state it found each in, and which of them a stop answers for.
 
 import { existsSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { git } from "./git";
 import type { HookInput } from "./hook-io";
+import { gitOf, into, program, simpleCommands } from "./shell-words";
 import { snapshot } from "./snapshot";
 import type { Store } from "./store";
 
@@ -56,6 +58,42 @@ export const madeHere = (root: string, started: number) => {
     !/^(checkout|reset): |: Fast-forward$/.test(how.join(" "))
   );
 };
+/** The checkout (of `all`) that holds `path`: the deepest, as a worktree may sit inside the main checkout's folder. */
+const holding = (all: string[], path: string) => {
+  let dir = path;
+  while (!existsSync(dir) && dir !== dirname(dir)) dir = dirname(dir); // a file about to be created
+  const at = real(dir);
+  return all
+    .filter((c) => at === c || at.startsWith(`${c}/`))
+    .sort((a, b) => b.length - a.length)[0];
+};
+
+/**
+ * The checkouts a shell command runs a program in: the one it starts in (`cwd`) until a `cd` or `pushd` moves it,
+ * and one `git -C` names. A checkout it only names (a path given to `cat` or `diff`) is not one it runs in.
+ */
+export function ranIn(repo: string, cwd: string, command: string) {
+  const all = checkoutsOf(repo);
+  const at = (dir: string) =>
+    resolve(cwd, dir.replace(/^~(?=\/|$)/, homedir()));
+  const found = new Set<string>();
+  let dir = "";
+  for (const words of simpleCommands(command)) {
+    const w = program(words);
+    if (!w.length) continue;
+    if (w[0] === "cd" || w[0] === "pushd") {
+      dir = into(dir, w[1] ?? "~");
+      continue;
+    }
+    const named = gitOf(words)?.dirs ?? [];
+    for (const d of named.length ? named.map((c) => into(dir, c)) : [dir]) {
+      const root = holding(all, at(d));
+      if (root) found.add(root);
+    }
+  }
+  return [...found];
+}
+
 /** What a checkout holds beyond its HEAD commit (edits, new files) as one id, which a pull or a switch keeps. */
 export const extra = (root: string, tree: string) =>
   Bun.hash(git(root, ["diff-tree", "-r", "HEAD", tree], {}, true)).toString(36);
@@ -86,12 +124,7 @@ export function touch(
   const hits = new Set<string>();
   for (const p of [cwd, tool.file_path, tool.notebook_path, ...entered]) {
     if (typeof p !== "string" || !p) continue;
-    let dir = resolve(cwd, p);
-    while (!existsSync(dir) && dir !== dirname(dir)) dir = dirname(dir); // a file about to be created
-    const path = real(dir);
-    const deepest = all // a worktree may sit inside the main checkout's folder
-      .filter((c) => path === c || path.startsWith(`${c}/`))
-      .sort((a, b) => b.length - a.length)[0];
+    const deepest = holding(all, resolve(cwd, p));
     if (deepest) hits.add(deepest);
   }
   let named = command;

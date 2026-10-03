@@ -13,7 +13,7 @@ import { mergeOf } from "./merge-reading";
 import { isProduct } from "./rules";
 import { gitOf, positionals, program, simpleCommands } from "./shell-words";
 import type { Store } from "./store";
-import { parseRuling } from "./verdict";
+import { rulingOn } from "./verdict";
 
 const runsGit = (words: string[], sub: string) => gitOf(words)?.sub === sub;
 const mergesThroughApi = (words: string[]) => {
@@ -212,7 +212,7 @@ export function mergeGate(
   )
     .split("\0")
     .some(isProduct);
-  const ruling = parseRuling(store.get("verdict", tree));
+  const ruling = rulingOn(store, tree);
   if (!product || ruling?.verdict === "pass")
     return say(
       `Done gate ✓ merge of ${short}: ${checks}${ruling?.verdict === "pass" ? ` · verifier PASS: ${ruling.note}` : " (no product code changed)"}`,

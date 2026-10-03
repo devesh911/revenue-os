@@ -33,6 +33,7 @@ import { checkRules, RULE_FILES } from "./done-gate/rules";
 import { onSharedStack } from "./done-gate/shared-stack";
 import { simpleCommands } from "./done-gate/shell-words";
 import { toolRefusal } from "./done-gate/tools";
+import { removeTranscripts, verifierRun } from "./done-gate-verifier-run";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
@@ -40,6 +41,7 @@ setDefaultTimeout(30_000);
 const dirs: string[] = [];
 afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  removeTranscripts();
 });
 
 const sh = (
@@ -1559,11 +1561,17 @@ describe("the hook", () => {
     rmSync(index);
     write(common, `done-gate/checked/${tree}`, "typecheck, 3 tests");
   }
-  const verified = (dir: string, cwd: string, note: string) => {
-    hook(cwd, "SubagentStart", { agent_type: "verifier" });
-    gate(dir, "verdict", "pass", note);
-    return hook(cwd, "SubagentStop", { agent_type: "verifier" });
-  };
+  /** The verifier, started with the Agent tool, works in `worksIn` and hands back its ruling (auto mode). */
+  const verified = (
+    cwd: string,
+    note: string,
+    ruling = "PASS",
+    worksIn = [cwd],
+  ) =>
+    verifierRun(GATE, cwd, {
+      report: `Ruling: ${ruling} — ${note}`,
+      worksIn,
+    }).stops.at(-1) ?? { status: null };
   /** A second checkout of the same repository, in its own folder. */
   const worktree = (dir: string, branch: string) => {
     const wt = mkdtempSync(join(tmpdir(), "done-gate-wt-"));
@@ -1619,23 +1627,20 @@ describe("the hook", () => {
 
   it("lets a product change through only on the verifier agent's own PASS for that exact code", () => {
     const dir = repo();
+    hook(dir, "SessionStart"); // the session notes the checkout before it changes it
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");
     checksPassed(dir);
     expect(hook(dir, "Stop").reason).toContain(
       'Run the verifier agent (Agent tool, subagent_type "verifier")',
     );
 
-    gate(dir, "verdict", "pass", "looks fine to me"); // the builder grading itself: ignored
+    // The builder grading itself: there is no such command.
+    expect(gate(dir, "verdict", "pass", "looks fine to me").status).toBe(2);
     expect(hook(dir, "Stop").sentBack).toBe(true);
 
-    hook(dir, "SubagentStart", { agent_type: "verifier" }); // a real verifier starts clean
     expect(
-      hook(dir, "SubagentStop", { agent_type: "verifier" }).reason,
-    ).toContain("record your ruling");
-    gate(dir, "verdict", "pass", "saw the route answer 200 with the new field");
-    expect(hook(dir, "SubagentStop", { agent_type: "verifier" }).status).toBe(
-      0,
-    );
+      verified(dir, "saw the route answer 200 with the new field").status,
+    ).toBe(0);
 
     const ok = hook(dir, "Stop");
     expect(ok.sentBack).toBe(false);
@@ -1651,11 +1656,10 @@ describe("the hook", () => {
 
   it("hands a FAIL ruling's findings back to the agent and never accepts it", () => {
     const dir = repo();
+    hook(dir, "SessionStart"); // the session notes the checkout before it changes it
     write(dir, "apps/console/src/page.tsx", "const page = 1;\n");
     checksPassed(dir);
-    hook(dir, "SubagentStart", { agent_type: "verifier" });
-    gate(dir, "verdict", "fail", "the contacts page still shows the old card");
-    hook(dir, "SubagentStop", { agent_type: "verifier" });
+    verified(dir, "the contacts page still shows the old card", "FAIL");
     const r = hook(dir, "Stop");
     expect(r.sentBack).toBe(true);
     expect(r.reason).toContain(
@@ -1982,6 +1986,7 @@ describe("the hook", () => {
       SessionStart: [""],
       PreToolUse: [
         "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit|mcp__terminal__run_in_terminal",
+        "Agent|SubagentHandback",
         "mcp__.*[Mm]erge.*",
       ],
       Stop: [""],
@@ -2013,7 +2018,7 @@ describe("the hook", () => {
           .flatMap((g) => g.hooks.map((h) => h.command))
           .filter((c) => c.includes("done-gate")),
     );
-    expect(commands).toHaveLength(10); // six Claude Code events (two hooks before a tool call), three Codex ones
+    expect(commands).toHaveLength(11); // eight Claude Code hooks (three before a tool call), three Codex ones
     for (const command of commands) {
       const r = sh(bare, ["/bin/sh", "-c", command], {
         CLAUDE_PROJECT_DIR: bare,
@@ -2076,11 +2081,10 @@ describe("the hook", () => {
 
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
+    hook(dir, "SessionStart"); // the session notes the checkout before it changes it
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");
     checksPassed(dir);
-    hook(dir, "SubagentStart", { agent_type: "verifier" });
-    gate(dir, "verdict", "cannot-verify", "a real WhatsApp number to text");
-    hook(dir, "SubagentStop", { agent_type: "verifier" });
+    verified(dir, "a real WhatsApp number to text", "CANNOT_VERIFY");
     expect(hook(dir, "Stop")).toEqual({
       ...QUIET,
       told: "Done gate ⚠ NOT verified: the verifier needs something only you can provide: a real WhatsApp number to text (checks green: typecheck, 3 tests)",
@@ -2142,9 +2146,7 @@ describe("the hook", () => {
     checksPassed(dir);
     expect(merge().why).toContain(`nobody independent has seen ${short} work`);
     expect(merge(undefined, true).why).toContain("Codex has no verifier agent");
-    expect(verified(dir, dir, "sent a test SMS and saw it logged").status).toBe(
-      0,
-    );
+    expect(verified(dir, "sent a test SMS and saw it logged").status).toBe(0);
     expect(merge()).toEqual({
       refused: false,
       why: "",
@@ -2201,9 +2203,7 @@ describe("the hook", () => {
     write(dir, "services/worker/src/wa.ts", "const wa = 1;\n");
     commitAll(dir);
     checksPassed(dir);
-    hook(dir, "SubagentStart", { agent_type: "verifier" });
-    gate(dir, "verdict", "cannot-verify", "a real WhatsApp number to text");
-    hook(dir, "SubagentStop", { agent_type: "verifier" });
+    verified(dir, "a real WhatsApp number to text", "CANNOT_VERIFY");
     const head = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
     const r = hook(
       dir,
@@ -2292,7 +2292,9 @@ describe("the hook", () => {
 
     write(wt, "services/worker/src/pay.ts", "const pay = 1;\n");
     checksPassed(wt);
-    expect(verified(wt, dir, "a test payment went through").status).toBe(0); // ruled from the worktree
+    expect(
+      verified(dir, "a test payment went through", "PASS", [wt]).status,
+    ).toBe(0); // it ran its commands in the worktree
     expect(hook(dir, "Stop").told).toContain(
       "verifier PASS: a test payment went through",
     );
@@ -2382,18 +2384,14 @@ describe("the hook", () => {
       write(root, file, "const x = 1;\n");
       checksPassed(root);
     }
-    hook(dir, "SubagentStart", { agent_type: "verifier", agent_id: "v1" });
-    hook(dir, "SubagentStart", { agent_type: "verifier", agent_id: "v2" });
-    gate(dir, "verdict", "pass", "a works");
-    expect(
-      hook(dir, "SubagentStop", { agent_type: "verifier", agent_id: "v1" })
-        .status,
-    ).toBe(0);
-    gate(b, "verdict", "pass", "b works");
-    expect(
-      hook(dir, "SubagentStop", { agent_type: "verifier", agent_id: "v2" })
-        .status,
-    ).toBe(0);
+    // v1 hands back first, but v2 stops first: v2's stop delivers only v2's report.
+    hook(dir, "PreToolUse", {
+      agent_id: "v1",
+      agent_type: "verifier",
+      tool_name: "SubagentHandback",
+      tool_input: { message: "Ruling: FAIL — a is broken" },
+    });
+    expect(verified(dir, "a and b work", "PASS", [dir, b]).status).toBe(0);
     expect(hook(dir, "Stop").sentBack).toBe(false);
   });
 
@@ -2418,7 +2416,7 @@ describe("the hook", () => {
     expect(JSON.parse(r.stdout).decision).toBe("block");
   });
 
-  it("counts a ruling only for code of the session whose verifier gave it, and a FAIL stands", () => {
+  it("counts a ruling only for code of the session whose verifier gave it", () => {
     const dir = repo();
     const wt = worktree(dir, "feat/b");
     const edit = (root: string, file: string, session = "s1") =>
@@ -2433,13 +2431,9 @@ describe("the hook", () => {
     edit(wt, "services/worker/src/b.ts", "b");
     write(wt, "services/worker/src/b.ts", "const b = 1;\n");
     checksPassed(wt);
-    hook(dir, "SubagentStart", { agent_type: "verifier" }); // s1's verifier starts
-    gate(wt, "verdict", "pass", "looks fine to me"); // meanwhile the other builder grades itself
-    gate(dir, "verdict", "fail", "the job never ran");
-    gate(dir, "verdict", "pass", "fine"); // a PASS after it on the same code
-    expect(hook(dir, "SubagentStop", { agent_type: "verifier" }).status).toBe(
-      0,
-    );
+    // The other builder grading itself while s1's verifier runs: there is no such command.
+    expect(gate(wt, "verdict", "pass", "looks fine to me").status).toBe(2);
+    expect(verified(dir, "the job never ran", "FAIL").status).toBe(0);
     expect(hook(wt, "Stop", { session_id: "b" }).sentBack).toBe(true);
     expect(hook(dir, "Stop").reason).toContain(
       "the verifier ruled FAIL: the job never ran",
@@ -2462,6 +2456,7 @@ describe("the hook", () => {
 
   it("accepts the code it gave up on once the verifier passes it, and still delivers a question", () => {
     const dir = repo();
+    hook(dir, "SessionStart"); // the session notes the checkout before it changes it
     write(dir, "services/worker/src/a.ts", "const a = 1;\n");
     checksPassed(dir);
     for (let i = 1; i <= 5; i++) expect(hook(dir, "Stop").sentBack).toBe(true);
@@ -2472,7 +2467,7 @@ describe("the hook", () => {
     expect(hook(dir, "Stop").told).toBe(
       "Done gate ⏸ waiting on you: Should the retry wait an hour? (the change so far is NOT verified)",
     );
-    expect(verified(dir, dir, "the job ran and wrote its row").status).toBe(0);
+    expect(verified(dir, "the job ran and wrote its row").status).toBe(0);
     expect(hook(dir, "Stop")).toEqual({
       ...QUIET,
       told: "Done gate ✓ typecheck, 3 tests · verifier PASS: the job ran and wrote its row",

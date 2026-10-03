@@ -351,9 +351,8 @@ describe("the gate's own record (.git/done-gate) and hook", () => {
       'grep -rn ".git/done-gate" docs STATE.md',
       "rm -rf /tmp/done-gate",
       'git commit -qm "done-gate: refuse --admin" && cp a.txt b.txt',
-      // Text that names the record: a ruling's note, a question for Devesh, a pull request's words, a file written
-      // from a heredoc, and the hook's command printed, not run.
-      'bun run gate verdict pass "saw rm -rf .git/done-gate refused"',
+      // Text that names the record: a question for Devesh, a pull request's words, a file written from a heredoc,
+      // and the hook's command printed, not run.
       'bun run gate pause "may I clear .git/done-gate?"',
       'gh pr comment 7 --body "the gate keeps its record in .git/done-gate"',
       "cat > /tmp/body.md <<'EOF'\nThe gate keeps its record in .git/done-gate.\nEOF",
@@ -503,15 +502,14 @@ describe("a line that names gh and merge must read as a plain `gh pr merge <numb
     expect(refused).toEqual([]);
   });
 
-  // The outside review of 2026-10-03 found the verifier's ruling refused when its note named gh and merge, as the
-  // natural note for any item about merging does.
-  it("lets the verifier record its ruling through the hook, whatever its note names", () => {
+  // The outside review of 2026-10-03 found the gate's own command refused when its words named gh and merge, as a
+  // question about any item on merging does.
+  it("lets the gate's own command through the hook, whatever its question names", () => {
     const dir = repo();
     const refused = [
-      'bun run gate verdict pass "saw gh pr merge refused with --admin"',
-      'bun run gate verdict fail "gh pr merge 7 went through without --match-head-commit"',
-      `bun scripts/done-gate.ts verdict cannot-verify "a merge needs Devesh's own gh login"`,
-      'bun run gate verdict pass "saw rm -rf .git/done-gate and a hook run by hand refused"',
+      'bun run gate pause "may I run gh pr merge 7 without --match-head-commit?"',
+      `bun scripts/done-gate.ts pause "a merge with --admin needs Devesh's own gh login"`,
+      'bun run gate pause "may I clear .git/done-gate after a hook run by hand?"',
       "gh pr view 7 --json mergeable,headRefOid && bun run gate pr",
     ].flatMap((command) => {
       const r = hook(dir, bash(command));

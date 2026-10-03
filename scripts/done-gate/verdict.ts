@@ -15,7 +15,7 @@ export type Ruling = {
 };
 
 const NEED_VERIFIER = `You can't finish yet: product code changed, and nobody independent has seen it work.
-Run the verifier agent (Agent tool, subagent_type "verifier"). Give it Devesh's request word for word, what you changed, and how you believe it can be seen working. If it rules FAIL, fix what it found and run it again.
+Run the verifier agent (Agent tool, subagent_type "verifier"), with no \`model\`: it runs on the one .claude/agents/verifier.md names. Give it Devesh's request word for word (when he typed none for this work, the roadmap item's text, word for word; the gate also hands it his typed words and the item's text itself), what you changed, and how you believe it can be seen working. Only its own delivered report counts: it ends with its ruling line. If it rules FAIL, fix what it found and run it again.
 If you are stopping to ask Devesh a question rather than finishing, run \`bun run gate pause "<the question>"\` and stop again.`;
 
 /** Rules + checks: everything a machine can prove. Checks are cached per exact code; `cachedOnly` runs none. */
@@ -78,7 +78,7 @@ function rule(
       ok: true,
       message: `Done gate ✓ ${proof.checks} (no product code changed, so no verifier needed)${told}`,
     };
-  const ruling = parseRuling(store.get("verdict", tree));
+  const ruling = rulingOn(store, tree);
   if (!ruling && codex)
     return {
       ok: true,
@@ -107,9 +107,17 @@ function rule(
   };
 }
 
-export function parseRuling(raw: string | undefined): Ruling | undefined {
+/**
+ * The record of delivered rulings, one per exact code; only verifier.ts writes it. Main's gate before 2026-10-03
+ * kept rulings in `verdict`, from a command anyone could run, and a checkout on a branch cut before then still runs
+ * that gate, so `verdict` is never read.
+ */
+export const DELIVERED = "delivered";
+
+/** The verifier's delivered ruling on this exact code, if any. */
+export function rulingOn(store: Store, tree: string): Ruling | undefined {
   try {
-    const r = JSON.parse(raw ?? "") as Ruling;
+    const r = JSON.parse(store.get(DELIVERED, tree) ?? "") as Ruling;
     return ["pass", "fail", "cannot-verify"].includes(r.verdict) && r.note
       ? r
       : undefined;

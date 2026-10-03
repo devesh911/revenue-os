@@ -1,7 +1,6 @@
 // The gate's record: one small file per fact under .git/done-gate, shared by every checkout of the repository.
 
 import {
-  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -34,9 +33,6 @@ export class Store {
   }
   put(kind: string, key: string, value: string) {
     writeFileSync(this.file(kind, key), value);
-  }
-  add(kind: string, key: string, value: string) {
-    appendFileSync(this.file(kind, key), value);
   }
   take(kind: string, key: string) {
     const value = this.get(kind, key);
