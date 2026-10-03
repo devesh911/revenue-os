@@ -29,8 +29,9 @@ real stack is a browser test in `../e2e/`.
   state machine and when it wipes the cache), `query-client.test.ts` (retry rule; 401 → sign out),
   `org-access.test.tsx` (workspace membership check, no-access page, landing empty/error states).
   The browser half is `../e2e/auth.e2e.ts` (real local stack, run by `bun run local bun run e2e`).
-- `guardrails-console.test.tsx` — the Settings guardrail hooks and form. Its half that reads source
-  as text is a leftover, not a pattern: Slice 1's browser check replaces it.
+- `guardrails-console.test.tsx` — the Settings guardrail section's states and forms;
+  `guardrails-save.test.tsx` — what a save sends (a PUT checked against the shared schema, signed
+  in) and that it refreshes the policies shown. The save in a real browser is Slice 1's browser check.
 - `test-utils.ts` — shared helpers the suites import (`visible()` / decoded `text()`, `buttons()`,
   `apiErrorFor()` real API errors, `asPrimitivesMap()` barrel cast, `mockModule()`); not a test.
 - `router.tsx` — a static SSR Router harness the leaf tests render inside (not a test itself).

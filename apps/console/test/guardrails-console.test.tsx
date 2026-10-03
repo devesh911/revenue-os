@@ -1,9 +1,6 @@
-// The console's guardrail settings: the features/guardrails/api.ts hooks and the Settings page's "Guardrails"
-// section. The behaviour describes render the real SettingsPage on the server with its two data hooks faked through
-// mockModule (process-wide, so afterAll restores the real modules). The two describes that read source files as
-// text are a leftover, not a pattern to copy: a test shows what the code does. Slice 1's browser check replaces
-// them with a browser test that saves calling hours, reloads, sees them kept and sees an error on a failed save
-// (docs/fix-when-touched.md, entry 3); until then they are the only check that the save is wired.
+// The console's guardrail settings: the Settings page's "Guardrails" section. These render the real SettingsPage on
+// the server with its two data hooks faked through mockModule (process-wide, so afterAll restores the real modules).
+// What the hooks themselves send, and what they refresh, is guardrails-save.test.tsx.
 import { afterAll, describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
@@ -88,59 +85,6 @@ async function renderSettings(): Promise<string> {
     </Router>,
   );
 }
-
-// The leftover source reads (see the header): a missing file reads as empty, so it fails as an assertion.
-const GUARDRAILS_API = "apps/console/src/features/guardrails/api.ts";
-const SETTINGS_SRC = "apps/console/src/pages/Settings/index.tsx";
-const readSrc = async (p: string): Promise<string> => {
-  try {
-    return await Bun.file(p).text();
-  } catch {
-    return "";
-  }
-};
-
-describe("features/guardrails/api.ts — hooks contract (source)", () => {
-  it("exports useGuardrailPoliciesQuery + useUpdateGuardrailPolicy", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toMatch(/export (function|const) useGuardrailPoliciesQuery/);
-    expect(src).toMatch(/export (function|const) useUpdateGuardrailPolicy/);
-  });
-
-  it("query GETs the org-scoped /guardrail-policies endpoint via useQuery", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toContain("/guardrail-policies");
-    expect(src).toMatch(/useQuery/);
-  });
-
-  it("mutation PUTs and validates its body with the shared GuardrailPolicyInputSchema", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toMatch(/useMutation/);
-    expect(src).toMatch(/method:\s*["']PUT["']/);
-    expect(src).toContain("@revenue-os/shared");
-    expect(src).toContain("GuardrailPolicyInputSchema");
-  });
-
-  it("mutation invalidates the guardrail-policies query key on success", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toMatch(/useQueryClient/);
-    expect(src).toMatch(/invalidateQueries/);
-    expect(src).toMatch(/onSuccess/);
-  });
-});
-
-describe("Settings page — wires the live Guardrails section (source)", () => {
-  it("drops the dead 'hasn't shipped' placeholder copy", async () => {
-    const src = await readSrc(SETTINGS_SRC);
-    expect(src).not.toContain("will live here");
-    expect(src).not.toContain("backend wave");
-    expect(src).not.toContain("hasn't shipped");
-  });
-
-  it("consumes the guardrail-policies query hook", async () => {
-    expect(await readSrc(SETTINGS_SRC)).toContain("useGuardrailPoliciesQuery");
-  });
-});
 
 describe("Settings Guardrails section — honest data states", () => {
   it("loading → calm 'Loading…'", async () => {
