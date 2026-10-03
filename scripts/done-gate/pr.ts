@@ -2,6 +2,7 @@
 // every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
 // each fix-when-touched entry it touches answered, no other workflow able to report a check named rules-from-main
 // or checks (the two main's ruleset requires), and no migration on main changed or its number reused (migrations.ts).
+// Each test the change marks as checking behaviour main already has is copied into the body (already-on-main.ts).
 
 import { markBodyProblems } from "./already-on-main";
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
