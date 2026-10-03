@@ -2,13 +2,12 @@
 // gate's record does not show passed, may be held to that change: each of its stops judges it, as if the session had
 // made it, until a stop passes on it on that branch (stop.ts). A session that writes a branch's checkpoint is held to
 // its change the same way (checkpoint.ts). The hold is in force only while no other session that worked there, and
-// has not accepted the code as it is, is still at work: a second session or a teammate beside the one making the
-// change leaves it to that one, until it has been quiet 15 minutes. A question to Devesh (`bun run gate pause`) ends
-// it. Never held: the main checkout, where Devesh keeps files of his own, on any branch; a detached checkout, made to
-// read a commit; and a checkout a session only looks at (stop.ts tells Devesh once instead). A checkout the gate
-// can't read is not judged: its stop tells Devesh its change was NOT checked.
+// has not accepted the code as it is, is still at work there: a second session or a teammate beside the one making
+// the change leaves it to that one, until that one has been quiet there 15 minutes. A question to Devesh (`bun run
+// gate pause`) ends it. Never held: the main checkout, where Devesh keeps files of his own, on any branch; a detached
+// checkout, made to read a commit; and a checkout a session only looks at (stop.ts tells Devesh once instead). A
+// checkout the gate can't read is not judged: its stop tells Devesh its change was NOT checked.
 
-import { statSync } from "node:fs";
 import { relative } from "node:path";
 import { checkoutsOf, identity, idOf, keyOf } from "./checkouts";
 import { noDocker } from "./checks";
@@ -25,10 +24,21 @@ type Verdict =
   | { ok: true; message: string }
   | { ok: false; headline: string; reason: string };
 
-// Quiet this long, a session has stopped: one shell command runs 10 minutes at most, and a stop's own run is
-// seen by its process (`stopping`), for as long as a Stop hook may run.
+// Quiet this long in a checkout, a session has stopped working there: one shell command runs 10 minutes at most, and
+// a stop's own run is seen by its process (`stopping`), for as long as a Stop hook may run.
 export const QUIET_MINUTES = 15;
 const STOP_MAX = 3_600_000;
+
+/**
+ * At each session start and before each tool call, after the checkout is noted (checkouts.ts touch): `session` is at
+ * work in each checkout it is the last to work in. Kept per checkout, so a session busy elsewhere that once looked at
+ * a worktree does not keep a hold off there.
+ */
+export function atWorkNow(repo: string, store: Store, session: string) {
+  for (const root of checkoutsOf(repo))
+    if (store.get("toucher", idOf(root)) === session)
+      store.put("active", keyOf(session, root), String(Date.now()));
+}
 
 export const branchOf = (root: string) =>
   git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], {}, true);
@@ -104,16 +114,9 @@ export const hold = (
     JSON.stringify({ branch: branchOf(root), why }),
   );
 
-/** When `session` last showed a sign of life: a hook event, a write to its transcript, a stop still running. */
-function atWork(store: Store, session: string) {
-  const transcript = store.get("transcript", session);
-  let wrote = 0;
-  try {
-    wrote = transcript ? statSync(transcript).mtimeMs : 0;
-  } catch {
-    // no transcript to read
-  }
-  const seen = Math.max(Number(store.get("active", session) ?? 0), wrote);
+/** Is the session of `key` (a session and a checkout) at work there: seen there lately, or in a stop still running? */
+function atWork(store: Store, key: string, session: string) {
+  const seen = Number(store.get("active", key) ?? 0);
   const [pid = 0, since = 0] = (store.get("stopping", session) ?? "")
     .split(" ")
     .map(Number);
@@ -140,7 +143,7 @@ function othersAtWork(
       key.endsWith(id) &&
       other !== session &&
       store.get("accepted", key) !== tree &&
-      atWork(store, other)
+      atWork(store, key, other)
     );
   });
 }

@@ -6,6 +6,7 @@ import { checkoutsOf, toplevel, touch } from "./checkouts";
 import { checkpointAtStart } from "./checkpoint";
 import type { HookInput } from "./hook-io";
 import {
+  atWorkNow,
   heldTo,
   holdOf,
   noteInterrupted,
@@ -28,6 +29,7 @@ export async function sessionStart(
   // Before the checkout is noted, which makes what it holds this session's starting point.
   const newly = here ? noteInterrupted(root, store, session, codex) : undefined;
   touch(repo, input, store, session);
+  atWorkNow(repo, store, session);
   if (!here) return;
   const h = holdOf(store, session, root);
   let inForce = !!h;

@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { toplevel, touch } from "./checkouts";
 import { seenBy, showOnArrival } from "./checkpoint";
 import { type HookInput, runsIn } from "./hook-io";
+import { atWorkNow } from "./interrupted";
 import { deny, mergeGate } from "./merge-gate";
 import { mergeToolRefusal } from "./merge-reading";
 import { recordRefusal } from "./record-guard";
@@ -76,14 +77,12 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
   const store = new Store(stateDir(repo));
   const session = input.session_id ?? "unknown";
   // Where Claude Code keeps the session's transcript, which a checkpoint reads Devesh's words from (checkpoint.ts),
-  // and when the session was last at work, which tells a held session whether it may leave a change to it
-  // (interrupted.ts).
+  // and a stop running, which tells a held session it may leave a change to this one (interrupted.ts).
   if (
     input.transcript_path &&
     store.get("transcript", session) !== input.transcript_path
   )
     store.put("transcript", session, input.transcript_path);
-  store.put("active", session, String(Date.now()));
   if (event === "Stop" || event === "TeammateIdle")
     store.put("stopping", session, `${process.pid} ${Date.now()}`);
   switch (event) {
@@ -103,6 +102,7 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
       // A failure here stays quiet: no tool call waits on it.
       const before = seenBy(store, session);
       touch(repo, command, store, session);
+      atWorkNow(repo, store, session);
       verifierWorked(repo, command, store, session);
       return refused || showOnArrival(store, session, before);
     }

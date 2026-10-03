@@ -12,10 +12,9 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
-  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -228,15 +227,14 @@ function checksPassed(dir: string) {
   write(record(dir), `checked/${tree}`, "typecheck, 3 tests");
 }
 
-/** The sessions were cut off 16 minutes ago: their last hook event and transcript write move back that far. */
+/** The sessions were cut off 16 minutes ago: when the gate last saw each at work, in each checkout, moves back. */
 function cutOff(dir: string, ...sessions: string[]) {
-  const ago = Date.now() - 16 * 60_000;
+  const ago = String(Date.now() - 16 * 60_000);
+  const active = join(record(dir), "active");
   for (const s of sessions) {
-    write(record(dir), `active/${s}`, String(ago));
+    for (const f of existsSync(active) ? readdirSync(active) : [])
+      if (f === s || f.startsWith(`${s}-`)) writeFileSync(join(active, f), ago);
     rmSync(join(record(dir), "stopping", s), { force: true });
-    const t = join(record(dir), "transcript", s);
-    if (existsSync(t))
-      utimesSync(readFileSync(t, "utf8"), ago / 1000, ago / 1000);
   }
 }
 
@@ -618,6 +616,17 @@ describe("work interrupted before it was checked", () => {
       told: "Done gate ⏸ waiting on you: Is the export the lead's to finish? (the change so far is NOT verified)",
     });
     expect(stop(wt, "q")).toMatchObject({ sentBack: false, told: "" });
+  });
+
+  it("counts a session as at work only in a checkout it is still working in: one that looked at the worktree, then went on elsewhere, does not keep the hold off", () => {
+    const { main, wt } = repo();
+    start(wt, "b1");
+    start(main, "coord");
+    command(main, "coord", `git -C ${wt} status`); // a coordinator looks in, before the builder's change
+    edit(wt, "b1", "services/worker/src/export.ts", "const exp = 1;\n");
+    cutOff(wt, "b1", "coord");
+    command(main, "coord", "git status"); // and goes on working in the main checkout
+    expect(start(wt, "b2").told).toContain("held to unchecked work");
   });
 
   it("keeps the hold when the session switches away and back: only a pass on the held branch ends it", () => {
