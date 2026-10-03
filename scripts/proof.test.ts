@@ -5,8 +5,6 @@
 import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
-  copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -18,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { secondCheck } from "./done-gate/pr";
 import { ALL_PASSED, reportHeading } from "./done-gate/proof-run";
+import { prove } from "./proof/cli";
 import { dueSlices } from "./proof/due";
 import { reportText } from "./proof/report";
 import { overall, runSteps } from "./proof/run";
@@ -209,86 +208,82 @@ describe("the report", () => {
 });
 
 describe("bun run proof <slice>", () => {
-  /** A scratch copy of the runner, with ROADMAP.md, STATE.md and its own slices list. */
-  const copy = (slices: string) => {
+  const steps = (failing: boolean): Step[] => [
+    { does: "passes", check: () => "fine" },
+    { does: "needs the key", needs: [needsKey], check: () => "x" },
+    ...(failing
+      ? [
+          {
+            does: "fails",
+            check: () => {
+              throw new Error("saw the wrong thing");
+            },
+          },
+        ]
+      : []),
+  ];
+  /** Proves slice `n` as the command does, into a scratch folder, with GITHUB_OUTPUT as the proof workflow sets it. */
+  const proved = async (n: number, list: Step[] | undefined) => {
     const dir = scratch("proof-cli-");
-    cpSync(join(ROOT, "scripts", "proof"), join(dir, "scripts", "proof"), {
-      recursive: true,
-    });
-    mkdirSync(join(dir, "scripts", "done-gate"));
-    copyFileSync(
-      join(ROOT, "scripts", "done-gate", "proof-run.ts"),
-      join(dir, "scripts", "done-gate", "proof-run.ts"),
-    );
-    mkdirSync(join(dir, "docs", "tracker"), { recursive: true });
-    copyFileSync(
-      join(ROOT, "docs", "tracker", "parse.js"),
-      join(dir, "docs", "tracker", "parse.js"),
-    );
-    writeFileSync(
-      join(dir, "ROADMAP.md"),
-      "# Roadmap\n\n## Slice 0: Ground\nStatus: proof ready\nGoal: g\nProof: p\nBlocked by: nothing\nProof passed: —\n\n## Slice 1: Next\nStatus: not started\nGoal: g\nProof: p\nBlocked by: nothing\nProof passed: —\n",
-    );
-    writeFileSync(join(dir, "STATE.md"), STATE);
-    writeFileSync(join(dir, "scripts", "proof", "slices.ts"), slices);
-    return dir;
-  };
-  const prove = (dir: string, ...args: string[]) => {
     const output = join(dir, "github-output");
     writeFileSync(output, "");
-    const r = spawnSync("bun", ["scripts/proof/cli.ts", ...args], {
-      cwd: dir,
-      encoding: "utf8",
-      env: { ...process.env, GITHUB_OUTPUT: output, ANTHROPIC_EVALS_KEY: "" },
+    const r = await prove(n, list, {
+      root: dir,
+      env: {
+        GITHUB_OUTPUT: output,
+        GITHUB_SERVER_URL: "https://github.com",
+        GITHUB_REPOSITORY: "o/r",
+        GITHUB_RUN_ID: "9",
+      },
+      state: STATE,
+      dir: join(dir, "report"),
     });
-    return { ...r, output: readFileSync(output, "utf8") };
+    return {
+      ...r,
+      report: readFileSync(join(dir, "report", "report.md"), "utf8"),
+      output: readFileSync(output, "utf8"),
+    };
   };
-  const SOME = `import type { Step } from "./step";
-export const SLICES: Record<number, Step[]> = {
-  0: [
-    { does: "passes", check: () => "fine" },
-    { does: "needs the key", needs: [{ item: "${KEY}", arrived: (env) => !!env.ANTHROPIC_EVALS_KEY }], check: () => "x" },
-    FAILING
-  ],
-};
-`;
 
-  it("exits 1 when a step failed, writes report.md and tells the workflow the result", () => {
-    const dir = copy(
-      SOME.replace(
-        "FAILING",
-        '{ does: "fails", check: () => { throw new Error("saw the wrong thing"); } },',
+  it("exits 1 when a step failed, writes report.md naming the run, and tells the workflow the result", async () => {
+    const r = await proved(0, steps(true));
+    expect(r.code).toBe(1);
+    expect(r.report).toBe(r.text);
+    expect(r.report.split("\n").slice(0, 2)).toEqual([
+      reportHeading(0, "failed"),
+      expect.stringMatching(
+        /^Run: https:\/\/github\.com\/o\/r\/actions\/runs\/9 · commit \w+ · \d{4}-\d{2}-\d{2}$/,
       ),
-    );
-    const out = join(dir, "report");
-    const r = prove(dir, "0", "--out", out);
-    expect(r.status).toBe(1);
-    const report = readFileSync(join(out, "report.md"), "utf8");
-    expect(report.split("\n")[0]).toBe(reportHeading(0, "failed"));
-    expect(report).toContain("saw the wrong thing");
-    expect(r.stdout).toContain(reportHeading(0, "failed"));
+    ]);
+    expect(r.report).toContain("saw the wrong thing");
     expect(r.output).toBe("result=failed\n");
   });
 
-  it("exits 0 when the only steps not passed wait on Devesh, listing them", () => {
-    const dir = copy(SOME.replace("FAILING", ""));
-    const out = join(dir, "report");
-    const r = prove(dir, "0", "--out", out);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain(KEY);
+  it("exits 0 when the only steps not passed wait on Devesh, listing them", async () => {
+    const r = await proved(0, steps(false));
+    expect(r.code).toBe(0);
+    expect(r.report).toContain(KEY);
     expect(r.output).toBe("result=waiting\n");
   });
 
-  it("fails a slice that has no steps yet, and refuses a slice ROADMAP.md does not have", () => {
-    const dir = copy(SOME.replace("FAILING", ""));
-    const none = prove(dir, "1", "--out", join(dir, "r1"));
-    expect(none.status).toBe(1);
-    expect(none.stdout).toContain("has no proof steps");
-    expect(none.output).toBe("result=failed\n");
-    const unknown = prove(dir, "9");
+  it("fails a slice that has no steps yet", async () => {
+    const r = await proved(1, undefined);
+    expect(r.code).toBe(1);
+    expect(r.report).toContain("has no proof steps");
+    expect(r.output).toBe("result=failed\n");
+  });
+
+  it("refuses a slice ROADMAP.md does not have, and anything but a slice number", () => {
+    const run = (...args: string[]) =>
+      spawnSync("bun", ["run", "proof", ...args], {
+        cwd: ROOT,
+        encoding: "utf8",
+      });
+    const unknown = run("99");
     expect(unknown.status).toBe(2);
-    expect(unknown.stderr).toContain("ROADMAP.md has no Slice 9");
-    expect(prove(dir).status).toBe(2);
+    expect(unknown.stderr).toContain("ROADMAP.md has no Slice 99");
+    expect(run().status).toBe(2);
+    expect(run("0", "--elsewhere").status).toBe(2);
   });
 });
 
@@ -337,11 +332,12 @@ describe("which slices a proof run proves", () => {
     expect(() => dueSlices(md, "1; rm -rf /")).toThrow("a slice number");
   });
 
-  it("tells the workflow as `slices=[…]`", () => {
-    const dir = scratch("proof-due-");
-    const output = join(dir, "out");
+  it("tells the workflow as `slices=[…]`, run as its step runs it", () => {
+    const step = (workflow().jobs.due?.steps ?? []).find((s) => s.id === "due");
+    expect(step?.env).toEqual({ SLICE: expr("inputs.slice") });
+    const output = join(scratch("proof-due-"), "out");
     writeFileSync(output, "");
-    const r = spawnSync("bun", [join(ROOT, "scripts", "proof", "due.ts")], {
+    const r = spawnSync("bash", ["-e", "-c", step?.run ?? "false"], {
       cwd: ROOT,
       encoding: "utf8",
       env: { ...process.env, GITHUB_OUTPUT: output, SLICE: "0" },
