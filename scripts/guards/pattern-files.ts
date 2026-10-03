@@ -5,15 +5,16 @@
 // The repository's files are the ones `git ls-files` lists (committed, or new and not ignored), each a plain file or
 // link on disk. A name is looked up in that list, never on disk, so a path outside the repository, an ignored file
 // (a build's output, a secrets file) and another letter case all count as missing, the same here as in CI; and an
-// excerpt is compared only with a listed plain file, never a link, so a pattern can't make this guard read anything
-// else.
+// excerpt is compared only with a listed plain file whose real path is that path in this checkout, never a link or
+// a file in a linked folder, so a pattern can't make this guard read anything else.
 //
 // An excerpt is a code block (``` or ~~~) whose first line is a comment holding only a file's path from the
 // repository's root (`// apps/console/src/features/guardrails/api.ts`). Its other lines are copied from that file
 // word for word: each line right after the one before it, as in the file, a line of just "…" (comment marks
 // allowed) standing for lines left out and a "…" inside a line for words left out. Names inside an excerpt are the
-// real file's own (fix-when-touched entry 1 deals with stale ones), so they are not looked up here. A code block
-// indented four spaces is never an excerpt.
+// real file's own (fix-when-touched entry 1 deals with stale ones), so they are not looked up here. A fence inside a
+// list item or a quote counts too, its lines read without the indent or ">" before its fence; a code block indented
+// four spaces and an HTML <pre> block are never excerpts.
 //
 // A name in prose is a word in backticks that reads as a path (it ends in "/", ends in a file extension, or starts
 // with one of the repository's top-level files or folders: `packages/db`), a word with a "/" ending in a file
@@ -22,7 +23,7 @@
 // address name no file.
 
 import { spawnSync } from "node:child_process";
-import { lstatSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { posix } from "node:path";
 
 const DIR = "docs/patterns/";
@@ -33,8 +34,9 @@ const LINE_NUMBER = /:\d+(?:-\d+)?$/;
 const WEB_ADDRESS = /\S*:\/\/\S*/g;
 const LINK = /\]\(([^()\s]+)\)/g;
 const SCHEME = /^[a-z][\w+.-]*:/i;
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const FENCE = /^((?:\s*>)*\s*)(`{3,}|~{3,})(.*)$/; // what stands before a fence, its marks, the rest
 const INDENTED = /^(?: {4}|\t)\s*\S/;
+const HTML_BLOCK = /^(?:\s*>)*\s*<pre[\s>]/i; // an HTML <pre> block, which starts its line
 const LABEL = /^\s*(?:\/\/|#|--|\{?\/\*|<!--)\s*(\S+?)\s*(?:\*\/\}?|-->)?\s*$/;
 const ELIDED = /^\s*(?:\/\/|#|--|\{?\/\*|<!--)?\s*…\s*(?:\*\/\}?|-->)?\s*$/;
 const literally = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -56,6 +58,10 @@ const root = git("rev-parse", "--show-toplevel");
 if (root.status !== 0)
   fail(["git can't read this checkout: nothing was checked"]);
 process.chdir(root.stdout.trim());
+const here = realpathSync(".");
+/** A plain file of this checkout: not a link, and not reached through a linked folder. */
+const plain = (f: string) =>
+  lstatSync(f).isFile() && realpathSync(f) === posix.join(here, f);
 const listed = git(
   "ls-files",
   "-z",
@@ -156,9 +162,9 @@ function blockProblems(pattern: string, at: number, block: string[]): string[] {
     ];
   if (!files.has(label))
     return [`${pattern} names ${label}, which the repository does not hold`];
-  if (!lstatSync(label).isFile())
+  if (!plain(label))
     return [
-      `${pattern}: the excerpt of ${label} is a link, which this guard never reads; copy from the file it points to`,
+      `${pattern}: the excerpt of ${label} is a link, or in a linked folder, which this guard never reads; copy from the file it points to`,
     ];
   const drifted = driftedLine(
     block.slice(1),
@@ -177,21 +183,23 @@ function problemsIn(pattern: string): string[] {
   const names = new Set<string>();
   const lines = readFileSync(pattern, "utf8").split("\n");
   let fence = ""; // the open code block's fence, if any
+  let inset = ""; // what stands before that fence on its line: a list item's indent, a quote's ">"
   let block: string[] = [];
   let opened = 0;
   lines.forEach((line, i) => {
-    const mark = line.match(FENCE)?.[1] ?? "";
+    const [, before = "", mark = "", rest = ""] = line.match(FENCE) ?? [];
     if (fence) {
-      if (
-        mark[0] === fence[0] &&
-        mark.length >= fence.length &&
-        line.trim() === mark
-      ) {
+      if (mark[0] === fence[0] && mark.length >= fence.length && !rest.trim()) {
         problems.push(...blockProblems(pattern, opened, block));
         fence = "";
-      } else block.push(line);
+      } else
+        block.push(line.startsWith(inset) ? line.slice(inset.length) : line);
     } else if (mark) {
-      [fence, block, opened] = [mark, [], i + 1];
+      [fence, inset, block, opened] = [mark, before, [], i + 1];
+    } else if (HTML_BLOCK.test(line)) {
+      problems.push(
+        `${pattern}:${i + 1}: an HTML code block; an example is a fenced excerpt of a real file`,
+      );
     } else if (INDENTED.test(line) && !lines[i - 1]?.trim()) {
       problems.push(
         `${pattern}:${i + 1}: an indented code block; an example is a fenced excerpt of a real file`,
@@ -215,9 +223,9 @@ if (!patterns.length)
     `no pattern files under ${DIR}: AGENTS.md → Docs sends agents there, so a moved folder moves this guard too`,
   ]);
 const problems = patterns.flatMap((p) =>
-  lstatSync(p).isFile()
+  plain(p)
     ? problemsIn(p)
-    : [`${p} is a link, which this guard never reads`],
+    : [`${p} is a link, or in a linked folder, which this guard never reads`],
 );
 if (problems.length) fail(problems);
 console.log(

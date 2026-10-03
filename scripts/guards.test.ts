@@ -28,8 +28,8 @@ afterAll(() => {
 
 /**
  * Runs the guards in a throwaway git repo (the folder `repo` inside a scratch folder) holding `files`, plus one
- * pattern file unless `patterns` is false; `outside` files sit in the scratch folder beside the repo, and `links`
- * are symbolic links (path → where it points), committed like files.
+ * pattern file unless `patterns` is false; `outside` files sit in the scratch folder beside the repo, `links` are
+ * symbolic links (path → where it points), committed like files, and `after` changes the repo once it is committed.
  */
 function runGuards(
   files: Record<string, string>,
@@ -39,6 +39,7 @@ function runGuards(
     patterns = true,
     outside = {} as Record<string, string>,
     links = {} as Record<string, string>,
+    after = (_repo: string) => {},
   } = {},
 ) {
   const top = mkdtempSync(join(tmpdir(), "guards-"));
@@ -66,6 +67,7 @@ function runGuards(
     ])
       expect(spawnSync("git", args, { cwd: dir }).status).toBe(0);
   }
+  after(dir);
   const r = spawnSync("bash", [entry], { cwd: dir, encoding: "utf8" });
   return { code: r.status, out: r.stdout + r.stderr };
 }
@@ -171,6 +173,7 @@ describe("guard patterns · every example is an excerpt of a file the repository
         // not files in this repo: a command, a package, a web address, a word pair, a branch, a media type, an
         // import path, a pair of roles
         "Run `bun run guards`; import `@revenue-os/db`; see https://example.com/docs/gone.md; and/or.",
+        "A screen never shows raw text in a `<pre>` tag.", // prose about HTML, not an HTML block
         "Branch off `origin/main`, answer `application/json`, import `hono/cors`, as `admin/operator`.",
         // a link is read from the pattern file's own folder
         "See [the query](../../lib/real.sql) and [its line](../../lib/real.sql#L2).",
@@ -185,6 +188,15 @@ describe("guard patterns · every example is an excerpt of a file the repository
           FENCE,
         ].join("\n"),
         ["~~~sql", "-- lib/real.sql", "select 3;", "~~~"].join("\n"),
+        // an excerpt inside a list item or a quote: its lines are read without the list's indent or the quote's mark
+        [
+          "1. Run it:",
+          "    ```sql",
+          "    -- lib/real.sql",
+          "    select 1;",
+          "    ```",
+        ].join("\n"),
+        ["> ```sql", "> -- lib/real.sql", "> select 3;", "> ```"].join("\n"),
       ].join("\n"),
       "docs/patterns/nested/q.md": "Read `lib/real.sql`.",
     });
@@ -225,7 +237,7 @@ describe("guard patterns · every example is an excerpt of a file the repository
     expect(out).toContain("FAIL — patterns");
   });
 
-  it("fails a code block that is not an excerpt: no label, a label with more than the path, a ~~~ block, an indented block", () => {
+  it("fails a code block that is not an excerpt: no label, a label with more than the path, a ~~~ block, an indented block, one inside a list item or a quote, an HTML block", () => {
     const { code, out } = runGuards({
       "lib/real.sql": REAL,
       "docs/patterns/plain.md": [
@@ -259,9 +271,33 @@ describe("guard patterns · every example is an excerpt of a file the repository
         "",
         "    await db.insertNote(orgId);",
       ].join("\n"),
+      "docs/patterns/list.md": [
+        "1. Write the route:",
+        `    ${FENCE}ts`,
+        '    app.post("/orgs/:orgId/notes", (c) => c.json(db.insertNote()));',
+        `    ${FENCE}`,
+      ].join("\n"),
+      "docs/patterns/quote.md": [
+        `> ${FENCE}ts`,
+        "> db.insertNote(orgId);",
+        `> ${FENCE}`,
+      ].join("\n"),
+      "docs/patterns/pre.md": [
+        "Text",
+        "<pre>",
+        "db.insertNote(orgId)",
+        "</pre>",
+      ].join("\n"),
     });
     expect(code).toBe(1);
-    for (const p of ["plain.md:2", "lines.md:1", "from.md:1", "tilde.md:5"])
+    for (const p of [
+      "plain.md:2",
+      "lines.md:1",
+      "from.md:1",
+      "tilde.md:5",
+      "list.md:2",
+      "quote.md:1",
+    ])
       expect(out).toContain(`docs/patterns/${p}: ${NOT_AN_EXCERPT}`);
     expect(out).toContain(
       "docs/patterns/tilde.md: the excerpt of lib/real.sql no longer matches it from this line: select insert_note(); -- invented",
@@ -269,6 +305,7 @@ describe("guard patterns · every example is an excerpt of a file the repository
     expect(out).toContain(
       "docs/patterns/indented.md:3: an indented code block",
     );
+    expect(out).toContain("docs/patterns/pre.md:2: an HTML code block");
   });
 
   it("fails when an excerpt's lines are no longer in its file, together and in order", () => {
@@ -335,7 +372,18 @@ describe("guard patterns · every example is an excerpt of a file the repository
       outside: secret,
       links: { "lib/link.txt": "../../outside.txt" },
     });
-    for (const { code, out } of [outside, linked]) {
+    // a committed file whose folder is then swapped for a link to a folder outside
+    const behind = runGuards(
+      { "lib/a/outside.txt": "committed", ...probes("# lib/a/outside.txt") },
+      {
+        outside: secret,
+        after: (repo) => {
+          rmSync(join(repo, "lib/a"), { recursive: true });
+          symlinkSync("../..", join(repo, "lib/a"));
+        },
+      },
+    );
+    for (const { code, out } of [outside, linked, behind]) {
       expect(code).toBe(1);
       expect(out).not.toContain("no longer matches");
     }
@@ -345,6 +393,9 @@ describe("guard patterns · every example is an excerpt of a file the repository
       );
       expect(linked.out).toContain(
         `docs/patterns/${p}.md: the excerpt of lib/link.txt is a link`,
+      );
+      expect(behind.out).toContain(
+        `docs/patterns/${p}.md: the excerpt of lib/a/outside.txt is a link`,
       );
     }
   });
