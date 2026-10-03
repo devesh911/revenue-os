@@ -31,7 +31,7 @@ it("tells the verifier to find each behaviour's and edge case's test at the laye
 it("tells the verifier to parse what one part writes with the reading part's own schema", () => {
   for (const phrase of [
     "run the writer for real and parse what it wrote with the reader's own schema",
-    "`packages/shared/src/`",
+    "the shared Zod schema in",
     "Rule FAIL when it doesn't parse, or when no test makes the writer's real output pass the reader's schema",
   ])
     expect(words).toContain(phrase);
