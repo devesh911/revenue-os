@@ -1,5 +1,5 @@
 // The exact code in a checkout (tracked and untracked files, minus ignored ones) as a tree id, with its diff
-// from main and, for each export the diff adds, the files that use it.
+// from main (the lines git saw move marked, moved.ts) and, for each export the diff adds, the files that use it.
 
 import {
   copyFileSync,
@@ -12,8 +12,16 @@ import {
 import { join } from "node:path";
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import { type Added, parseDiff } from "./diff";
-import { leadsTo, modulePath, STAR_FROM, usesExport } from "./export-users";
+import {
+  candidatesOf,
+  leadsTo,
+  modulePath,
+  reExportsOf,
+  STAR_FROM,
+  usesExport,
+} from "./export-users";
 import { git } from "./git";
+import { COLOURS, DETECT, withMoved } from "./moved";
 import { stateDir } from "./store";
 
 export type Snap = {
@@ -21,6 +29,7 @@ export type Snap = {
   tree: string;
   from: string; // the commit the change starts from: where it left the base (the tree itself when there is no diff)
   files: string[];
+  deleted: string[];
   added: Added[];
   removed: Added[];
   users: Map<string, string[]>;
@@ -46,6 +55,7 @@ export function snapshot(
       tree,
       from,
       git(repo, [...DIFF, from, head]),
+      git(repo, [...MOVED, from, head]),
       (args) =>
         git(repo, [...GREP, ...args, tree], {}, true)
           .split("\0")
@@ -80,6 +90,7 @@ export function snapshot(
       tree,
       from,
       git(repo, [...DIFF, "--cached", from], env),
+      git(repo, [...MOVED, "--cached", from], env),
       (args) =>
         git(repo, [...GREP, "--cached", ...args], env, true)
           .split("\0")
@@ -102,6 +113,7 @@ const NONE = (repo: string, tree: string): Snap => ({
   tree,
   from: tree,
   files: [],
+  deleted: [],
   added: [],
   removed: [],
   users: new Map(),
@@ -110,32 +122,48 @@ const NONE = (repo: string, tree: string): Snap => ({
 // attributes come from the empty tree, and no text conversion runs.
 const NO_ATTRIBUTES = "--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904"; // the empty tree
 const GREP = [NO_ATTRIBUTES, "-c", "core.quotePath=off", "grep", "-z"];
+const OPTIONS = [
+  "--no-textconv",
+  "--unified=0",
+  "--no-renames",
+  "--no-ext-diff",
+];
 const DIFF = [
   NO_ATTRIBUTES,
   "-c",
   "core.quotePath=off",
   "diff",
-  "--no-textconv",
-  "--unified=0",
   "--no-color",
-  "--no-renames",
-  "--no-ext-diff",
+  ...OPTIONS,
+];
+// The same diff again, coloured to show which lines moved; its text is never read.
+const MOVED = [
+  NO_ATTRIBUTES,
+  ...COLOURS,
+  "-c",
+  "core.quotePath=off",
+  "diff",
+  ...DETECT,
+  ...OPTIONS,
 ];
 
 /**
- * The diff's files and added lines, and for each export it adds, the files that use it. `grepIn(options)` runs
- * `git grep` with them over the code being judged and lists the files it names; `readFile` reads one of them.
+ * The diff's files and lines (those the coloured run shows moved marked), and for each export it adds, the files that
+ * use it. `grepIn(options)` runs `git grep` with them over the code being judged and lists the files it names;
+ * `readFile` reads one of them.
  */
 function analyse(
   repo: string,
   tree: string,
   from: string,
   diff: string,
+  coloured: string,
   grepIn: (args: string[]) => string[],
   readFile: (f: string) => string,
 ): Snap {
-  const { files, added, removed } = parseDiff(diff);
-  const users = new Map<string, string[]>(); // "file name" → files using the export
+  const parsed = parseDiff(diff);
+  const { files, deleted } = parsed;
+  const { added, removed } = withMoved(coloured, parsed);
   const texts = new Map<string, string>();
   const read = (f: string) => {
     if (!texts.has(f)) texts.set(f, readFile(f));
@@ -144,11 +172,41 @@ function analyse(
   // Files holding a string: only candidates, usesExport decides.
   const grep = (s: string, word = false) =>
     grepIn(["-lIF"].concat(word ? ["-w"] : []).concat(["-e", s]));
+  const moduleAt = (spec: string, f: string) =>
+    candidatesOf(spec, f).find((c) => read(c) !== "");
+  /** The names `f` exports, those it passes on with `export *` included; never its default. */
+  const namesOf = (f: string, seen = new Set<string>()): string[] => {
+    if (seen.has(f)) return [];
+    seen.add(f);
+    const lines = read(f)
+      .split("\n")
+      .map((text, i) => ({ file: f, line: i + 1, text }));
+    return lines
+      .flatMap((_, i) => exportsOf(statementAt(lines, i).code))
+      .flatMap((n) => {
+        if (!n.startsWith("* from ")) return n === "default" ? [] : [n];
+        const next = moduleAt(n.slice(7), f);
+        return next ? namesOf(next, seen) : [];
+      });
+  };
   let stars: [string, string[]][] | undefined; // files that `export * from`, and from where
   let namespaced: string[] | undefined; // files that may `import * as`
-  for (const [i, { file }] of added.entries())
-    for (const name of exportsOf(statementAt(added, i).code)) {
-      if (users.has(`${file} ${name}`)) continue;
+  const found = new Map<string, string[]>(); // "file name" → files using the export
+  /** The files using `name`, which `file` exports: by importing it, through barrels, or through a file passing it on. */
+  const usersOf = (file: string, name: string): string[] => {
+    const key = `${file} ${name}`;
+    const known = found.get(key);
+    if (known) return known;
+    found.set(key, []); // a ring of files passing it on adds nothing
+    let users: string[];
+    if (name.startsWith("* from ")) {
+      // `export * from` passes on every name of its module: each a use when imported through this file. A module
+      // it can't read (a package name or alias) is let through.
+      const target = moduleAt(name.slice(7), file);
+      users = target
+        ? namesOf(target).flatMap((n) => usersOf(file, n))
+        : [file];
+    } else {
       stars ??= grep("export *").map((f) => [
         f,
         [...uncommented(read(f)).matchAll(STAR_FROM)].map((m) => m[1] ?? ""),
@@ -169,12 +227,23 @@ function analyse(
               )?.[1] ?? "",
             ].filter(Boolean)
           : [name];
-      users.set(
-        `${file} ${name}`,
-        [
-          ...new Set([...words.flatMap((w) => grep(w, true)), ...namespaced]),
-        ].filter((f) => usesExport(read(f), f, file, name, reach.slice(1))),
-      );
+      const barrels = reach.slice(1);
+      users = [
+        ...new Set([...words.flatMap((w) => grep(w, true)), ...namespaced]),
+      ].flatMap((f) => [
+        ...(usesExport(read(f), f, file, name, barrels) ? [f] : []),
+        ...reExportsOf(read(f), f, file, name, barrels).flatMap((as) =>
+          usersOf(f, as),
+        ),
+      ]);
     }
-  return { repo, tree, from, files, added, removed, users };
+    users = [...new Set(users)];
+    found.set(key, users);
+    return users;
+  };
+  const users = new Map<string, string[]>();
+  for (const [i, { file }] of added.entries())
+    for (const name of exportsOf(statementAt(added, i).code))
+      users.set(`${file} ${name}`, usersOf(file, name));
+  return { repo, tree, from, files, deleted, added, removed, users };
 }

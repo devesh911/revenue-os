@@ -144,11 +144,12 @@ describe("parseDiff", () => {
     ].join("\n");
     expect(parseDiff(diff)).toEqual({
       files: ["apps/x/src/a.ts", "old.ts"],
+      deleted: ["old.ts"],
       added: [
-        { file: "apps/x/src/a.ts", line: 4, text: "const y = 2;" },
-        { file: "apps/x/src/a.ts", line: 5, text: "+i;" },
+        { file: "apps/x/src/a.ts", line: 4, text: "const y = 2;", hunk: 1 },
+        { file: "apps/x/src/a.ts", line: 5, text: "+i;", hunk: 1 },
       ],
-      removed: [{ file: "old.ts", line: 1, text: "gone" }],
+      removed: [{ file: "old.ts", line: 1, text: "gone", hunk: 2 }],
     });
   });
 
@@ -196,6 +197,7 @@ describe("checkRules", () => {
       notes: [
         "checker silenced at packages/harness/src/workflow/schema.ts:1: lint/suspicious/noThenProperty: `then` is a workflow step field",
       ],
+      exceptions: [],
     });
   });
 
@@ -1310,7 +1312,7 @@ describe("usesExport: who counts as using an export", () => {
       expect(by(`import def, { ${name} } from "../jobs";\n`)).toBe(true);
       expect(
         by(`export { ${name} } from "./jobs";\n`, "services/worker/src/x.ts"),
-      ).toBe(true);
+      ).toBe(false); // passed on, not used: the re-export is an export of its own (scripts/done-gate-rules.test.ts)
       expect(by(`import * as jobs from "../jobs";\njobs.${name}();\n`)).toBe(
         true,
       );

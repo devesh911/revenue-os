@@ -1,6 +1,14 @@
-// The change as git reports it: the files a diff touches, and every line it adds and removes, numbered.
+// The change as git reports it: the files a diff touches, the files it deletes, and every line it adds and removes,
+// numbered, with the hunk (the run of changed lines) it sits in.
 
-export type Added = { file: string; line: number; text: string };
+/** A changed line. `hunk` counts git's hunks from 1 across the diff; `moved`: git saw the line move (moved.ts). */
+export type Added = {
+  file: string;
+  line: number;
+  text: string;
+  hunk?: number;
+  moved?: boolean;
+};
 
 const ESCAPE: Record<string, number> = {
   a: 7,
@@ -33,18 +41,24 @@ function pathOf(rest: string) {
   return new TextDecoder().decode(new Uint8Array(bytes)).slice(2);
 }
 
-/** PURE: `git diff --unified=0 --no-renames` → the files it touches (each once), and every line it adds and removes. */
+/**
+ * PURE: `git diff --unified=0 --no-renames` → the files it touches (each once), the files it deletes (one that became
+ * a link is deleted and made again, so it is not among them), and every line it adds and removes.
+ */
 export function parseDiff(diff: string): {
   files: string[];
+  deleted: string[];
   added: Added[];
   removed: Added[];
 } {
   const files: string[] = [];
+  const gone = new Set<string>();
   const added: Added[] = [];
   const removed: Added[] = [];
   let file = "";
   let line = 0;
   let old = 0;
+  let hunks = 0;
   let header = false;
   for (const l of diff.split("\n")) {
     const hunk = l.match(/^@@ -(\d+)\S* \+(\d+)/);
@@ -52,14 +66,17 @@ export function parseDiff(diff: string): {
       file = pathOf(l.slice(11));
       if (!files.includes(file)) files.push(file); // a file that became a link shows twice
       header = true;
-    } else if (hunk) {
+    } else if (header && l.startsWith("deleted file mode ")) gone.add(file);
+    else if (header && l.startsWith("new file mode ")) gone.delete(file);
+    else if (hunk) {
       old = Number(hunk[1]);
       line = Number(hunk[2]);
+      hunks++;
       header = false;
     } else if (!header && l.startsWith("+"))
-      added.push({ file, line: line++, text: l.slice(1) });
+      added.push({ file, line: line++, text: l.slice(1), hunk: hunks });
     else if (!header && l.startsWith("-"))
-      removed.push({ file, line: old++, text: l.slice(1) });
+      removed.push({ file, line: old++, text: l.slice(1), hunk: hunks });
   }
-  return { files, added, removed };
+  return { files, deleted: [...gone], added, removed };
 }

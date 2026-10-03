@@ -5,12 +5,23 @@ import type { Added } from "./diff";
 
 const EXPORT =
   /^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([\w$]+)/;
-/** PURE: the names an added line exports: one declaration, "default", or each name of `export { a, b as c }`. */
+/**
+ * PURE: the names an added line exports: one declaration, "default", each name of `export { a, b as c }` (with or
+ * without `from`), the namespace of `export * as ns from`, or, for `export * from "./m"`, `* from ./m`: every name m
+ * exports, passed on.
+ */
 export const exportsOf = (text: string): string[] => {
   const one = text.match(EXPORT)?.[1];
   if (one) return [one];
   if (/^export\s+default\b/.test(text)) return ["default"];
-  const list = text.match(/^export\s*\{([^}]*)\}\s*;?\s*$/)?.[1] ?? "";
+  const star = text.match(
+    /^export\s*\*\s*(?:as\s+([\w$]+)\s*)?from\s*["']([^"']+)["']/,
+  );
+  if (star) return [star[1] ?? `* from ${star[2]}`];
+  const list =
+    text.match(
+      /^export\s*\{([^}]*)\}\s*(?:from\s*["'][^"']+["']\s*)?;?\s*$/,
+    )?.[1] ?? "";
   return list
     .split(",")
     .map(
