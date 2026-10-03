@@ -16,7 +16,7 @@ const FIRST =
 const WHY = "a sample change the proof makes and throws away";
 // Product code that switches the type checker off: a problem whichever copy of the rules finds it.
 const SAMPLE = "services/worker/src/proof-sample.ts";
-const UNCHECKED = '// @ts-ignore\nconst sample: number = "one";\n';
+const UNCHECKED = '// @ts-ignore\nconst sample: number = "one";\n'; // done-gate: allow the sample written into a scratch branch, for main's copy of the rules to refuse
 
 /** On a new branch `name` cut from main: `change`, committed; then back to main. */
 function branch(dir: string, name: string, change: () => void) {

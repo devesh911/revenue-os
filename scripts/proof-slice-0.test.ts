@@ -167,8 +167,10 @@ describe("Slice 0's proof steps", () => {
   }, 600_000);
 
   it("every refusal step fails on a checkout whose gate, hooks and guards refuse nothing", async () => {
-    const weak = join(scratch("proof-0-weak-"), "w");
-    spawnSync("git", ["clone", "-q", ROOT, weak]);
+    const weak = scratch("proof-0-weak-");
+    git(weak, "init", "-q", "-b", "main");
+    git(weak, "fetch", "-q", "--no-tags", ROOT, "HEAD"); // CI checks out a detached commit, which a clone may not
+    git(weak, "checkout", "-q", "-B", "main", "FETCH_HEAD");
     // The gate's entry does nothing, the hooks go quiet when it is missing, and the guards pass anything.
     writeFileSync(join(weak, "scripts", "done-gate.ts"), "process.exit(0);\n");
     writeFileSync(join(weak, "scripts", "guards.sh"), "exit 0\n");

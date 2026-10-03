@@ -148,6 +148,6 @@ export const runRecords: Step = {
     const ran = staging.filter((r) =>
       r.jobs.some((j) => j.conclusion !== "skipped"),
     );
-    return `of the last ${staging.length} runs on main, the ${ran.length} that ran started after \`checks\` passed on their commit, and ${ran.filter((r) => !changed(r.sha)).length} of them, on commits that changed no migration, skipped the apply step; the other ${staging.length - ran.length} never started their job (newest: ${staging[0]?.url})`;
+    return `of the last ${staging.length} runs on main, the ${ran.length} that ran started after \`checks\` passed on their commit, and ${ran.filter((r) => !changed(r.sha)).length} of them, on commits that changed no migration, skipped the apply step; ${staging.length - ran.length} skipped its job, as it does when ci did not pass (newest: ${staging[0]?.url})`;
   },
 };

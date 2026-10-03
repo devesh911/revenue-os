@@ -27,7 +27,7 @@ export const twoRunsAtOnce: Step = {
         throw new Error(
           `it did not pass (exit ${r.status}): ${tail(r.out, 12)}`,
         );
-      return `it passed: ${tail(r.out)}`;
+      return `it passed: ${tail(r.out, 4)}`;
     }),
 };
 

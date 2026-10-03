@@ -3,6 +3,7 @@
 // a stand-in `gh` for its merge check; and its record of checks that passed, as a passing `bun run gate` leaves it.
 
 import { spawnSync } from "node:child_process";
+import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import { snapshot } from "../done-gate/snapshot";
 import { Store, stateDir } from "../done-gate/store";
@@ -119,6 +120,6 @@ export function standInGh(base: string, head: string) {
     "gh",
     `#!/bin/sh\ncase "$1" in\n  pr) echo ${head} ;;\n  api) echo '{"total_count":0,"check_runs":[]}' ;;\nesac\n`,
   );
-  sh(bin, ["chmod", "755", "gh"]);
+  chmodSync(join(bin, "gh"), 0o755);
   return { PATH: `${bin}:${process.env.PATH}` };
 }
