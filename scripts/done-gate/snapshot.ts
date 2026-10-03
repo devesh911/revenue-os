@@ -201,11 +201,11 @@ function analyse(
     let users: string[];
     if (name.startsWith("* from ")) {
       // `export * from` passes on every name of its module: each a use when imported through this file. A module
-      // it can't read (a package name or alias) is let through.
+      // it can't read (a package name or alias), or one passing on no name the rules check (types alone), is let
+      // through.
       const target = moduleAt(name.slice(7), file);
-      users = target
-        ? namesOf(target).flatMap((n) => usersOf(file, n))
-        : [file];
+      const names = target ? namesOf(target) : [];
+      users = names.length ? names.flatMap((n) => usersOf(file, n)) : [file];
     } else {
       stars ??= grep("export *").map((f) => [
         f,

@@ -16,8 +16,9 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { usesExport } from "./done-gate/export-users";
-import { withMoved } from "./done-gate/moved";
+import { isMovedIn, withMoved } from "./done-gate/moved";
 import { checkRules, isProduct } from "./done-gate/rules";
+import { snapshot } from "./done-gate/snapshot";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 setDefaultTimeout(30_000); // each case starts git and bun several times
@@ -334,6 +335,29 @@ describe("moved code, found by git's moved-code detection", () => {
     );
   });
 
+  it("answers, for the rules that exempt moved lines, whether a line as the change leaves it only moved", () => {
+    const dir = project({ [BIG]: blocks(1, 30), "services/worker/a.ts": "" });
+    split(dir);
+    write(
+      dir,
+      part(2),
+      blocks(9, 15).replace("expect(d9).toBe(9 + 1);", "expect(d9).toBe(10);"),
+    );
+    write(dir, "services/worker/a.ts", "export const a = 1;\n");
+    const isMoved = isMovedIn(snapshot(dir, true, "main"));
+    expect(
+      [
+        [part(1), 1],
+        [part(2), 7],
+        [part(2), 8], // the expect edited on its way
+        [part(4), 70],
+        [part(4), 71], // past the file's end
+        ["services/worker/a.ts", 1], // added, not moved
+        [BIG, 1], // gone: its lines moved out
+      ].map(([file, line]) => isMoved(file as string, line as number)),
+    ).toEqual([true, true, false, true, false, false, false]);
+  });
+
   it("marks nothing moved when the coloured run failed or disagrees with the plain one", () => {
     const lines = {
       added: [{ file: "a.ts", line: 1, text: "x", hunk: 1 }],
@@ -494,6 +518,13 @@ describe("a re-export", () => {
       `${src}/price.ts`,
       'import { toCents } from "./lib";\ntoCents(1);\n',
     );
+    expect(rules(dir).status).toBe(0);
+  });
+
+  it("lets `export * from` a module of types alone through, as the rules check no type", () => {
+    const dir = project();
+    write(dir, `${src}/money-types.ts`, "export type Cents = number;\n");
+    write(dir, `${src}/types.ts`, 'export * from "./money-types";\n');
     expect(rules(dir).status).toBe(0);
   });
 });

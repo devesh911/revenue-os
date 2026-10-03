@@ -67,6 +67,18 @@ export function withMoved(
   };
 }
 
+/**
+ * PURE: the change's lines (a snapshot) → isMoved(file, line): did the line at `line` of `file`, numbered as the
+ * change leaves it, only move there? These are "moved lines, as the done-rules item detects them", which the coverage
+ * and tests-proven rules exempt.
+ */
+export function isMovedIn({ added }: { added: Added[] }) {
+  const moved = new Set(
+    added.filter((a) => a.moved).map((a) => `${a.line} ${a.file}`),
+  );
+  return (file: string, line: number) => moved.has(`${line} ${file}`);
+}
+
 /** PURE: each file holding moved lines, in the diff's order, with how many moved in and out; undefined when none did. */
 export function movedNote(files: string[], added: Added[], removed: Added[]) {
   const each = files.flatMap((f) => {

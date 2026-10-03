@@ -28,8 +28,8 @@ description: Use when building a roadmap item — any session implementing the n
    `bun run see <console path>`) and capture the evidence. Then run the verifier agent with
    Devesh's request word for word (when he gave none, the roadmap item's text, word for word); the
    done gate won't let you stop on product code without its PASS, or its CANNOT_VERIFY naming what only Devesh can provide (he is told it is NOT verified).
-8. PR body: written as AGENTS.md → The loop, step 4, says (its first line, the `Rule change:` and
-   `Fix-when-touched:` lines it owes, then what / why / evidence); `PR_BODY="$(cat body.md)" bun run
+8. PR body: written as AGENTS.md → The loop, step 4, says (its first line, every line that step says
+   it owes, then what / why / evidence); `PR_BODY="$(cat body.md)" bun run
    gate pr` judges it as `rules-from-main` will. `gh pr checks <n> --watch` — every required check
    must be observed green on GitHub; absent or red means stop.
 9. Same PR: tick the item in `ROADMAP.md` with `· evidence: …` (a Side-track or off-roadmap PR has
