@@ -151,9 +151,12 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    `gh pr merge <number> --squash --match-head-commit <the PR's full head commit>`, one per command: the
    done gate refuses it unless that commit passed `bun run gate` on this machine (a run without Docker,
    which skips the database tests, counts only once GitHub reports `checks` passed on that commit) and,
-   for product code, the verifier ruled PASS on it; a CANNOT_VERIFY means only Devesh merges it. Any
-   other way of merging (`--admin`, `gh api`, a merge handed to a shell, eval or script) is refused, and
-   so is any command or edit that touches the gate's record (`.git/done-gate`) or runs its hook by hand.
+   for product code, the verifier ruled PASS on it; a CANNOT_VERIFY means only Devesh merges it. The
+   check before each command also refuses the other ways of merging it can read (`--admin`, `gh api`, a
+   merge handed to a shell or eval, an MCP tool that merges, a script in a line that names gh and
+   merge), and any command or edit that touches the gate's record (`.git/done-gate`) or runs its hook by
+   hand. It reads command text, so it stops a careless try, not a determined one (STATE.md lists what
+   gets past it).
 6. The same PR ticks its roadmap item with evidence (an off-roadmap or Side-track PR has no line
    to tick; its PR body's what / why / evidence is the record), updates `STATE.md → What works
    today` if reality changed, and adds a line to `STATE.md → Decisions in force` for any decision.

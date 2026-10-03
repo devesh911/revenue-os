@@ -2,13 +2,16 @@
 // was proven on this machine (a partial proof, with no database tests, only once GitHub reports `checks` passed on it).
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import { checkoutsOf, toplevel } from "./checkouts";
 import { git } from "./git";
 import { checksNotPassed } from "./github-checks";
 import { type HookInput, say } from "./hook-io";
 import { mergeOf } from "./merge-reading";
 import { isProduct } from "./rules";
-import { gitOf, program, simpleCommands } from "./shell-words";
+import { gitOf, positionals, program, simpleCommands } from "./shell-words";
 import type { Store } from "./store";
 import { parseRuling } from "./verdict";
 
@@ -69,11 +72,25 @@ export function mergeGate(
     return deny(
       "merge with `gh pr merge <number>`, which the done gate checks, not through `gh api`.",
     );
-  const merges = commands
-    .map(mergeOf)
-    .filter(
-      (m) => m && !["--disable-auto", "--help", "-h"].some((f) => m.on.has(f)),
-    );
+  // Every folder the command visits before its merge, with each `cd` or `pushd` (a subshell's too, as reading the
+  // line can't tell where one ends); undefined for one known only when it runs (`cd "$D"`, `cd -`, `popd`).
+  const cwd = input.cwd ?? repo;
+  let dir: string | undefined = cwd;
+  const visited: (string | undefined)[] = [cwd];
+  const merges: NonNullable<ReturnType<typeof mergeOf>>[] = [];
+  for (const words of commands) {
+    const m = mergeOf(words);
+    if (m && !["--disable-auto", "--help", "-h"].some((f) => m.on.has(f)))
+      merges.push(m);
+    const [name = "", ...args] = program(words);
+    if (!/^(cd|pushd|popd)$/.test(name) || merges.length) continue;
+    const to = name === "popd" ? "-" : (positionals(args)[0] ?? "~");
+    dir =
+      dir === undefined || /^-$|[$`*?[{]/.test(to)
+        ? undefined
+        : resolve(dir, to.replace(/^~(?=\/|$)/, homedir()));
+    visited.push(dir);
+  }
   const m = merges[0];
   if (!m) return;
   if (merges.length > 1)
@@ -84,20 +101,21 @@ export function mergeGate(
     );
   const ours = ownerRepo(git(repo, ["remote", "get-url", "origin"], {}, true));
   const named = m.repo ?? (m.pr?.includes("/pull/") ? m.pr : undefined);
-  const cwd = input.cwd ?? repo;
-  // With no repository named, gh merges in the folder's own: this one's unless the folder has remotes, all elsewhere.
-  const remotes = git(cwd, ["remote", "-v"], {}, true)
-    .split("\n")
-    .map((l) => l.split(/\s+/)[1] ?? "")
-    .filter(Boolean);
-  if (
-    named
-      ? ownerRepo(named) !== ours
-      : !checkoutsOf(repo).includes(toplevel(cwd)) &&
-        remotes.length > 0 &&
-        !remotes.some((url) => ownerRepo(url) === ours)
-  )
-    return; // another repository's pull request
+  // With no repository named, gh merges in the folder's own: this one's unless the folder has remotes, all
+  // elsewhere. The merge is another repository's only if every folder the command visits is.
+  const elsewhere = (folder: string | undefined) => {
+    if (folder === undefined || !existsSync(folder)) return false;
+    const remotes = git(folder, ["remote", "-v"], {}, true)
+      .split("\n")
+      .map((l) => l.split(/\s+/)[1] ?? "")
+      .filter(Boolean);
+    return (
+      !checkoutsOf(repo).includes(toplevel(folder)) &&
+      remotes.length > 0 &&
+      !remotes.some((url) => ownerRepo(url) === ours)
+    );
+  };
+  if (named ? ownerRepo(named) !== ours : visited.every(elsewhere)) return; // another repository's pull request
   const number = m.pr
     ?.match(/^(\d+)$|\/pull\/(\d+)/)
     ?.slice(1)
@@ -118,7 +136,7 @@ export function mergeGate(
       "-q",
       '.headRefOid + " " + .baseRefOid',
     ],
-    { cwd, encoding: "utf8", timeout: 20_000 },
+    { cwd: repo, encoding: "utf8", timeout: 20_000 },
   );
   const [head = "", baseRef = ""] =
     view.status === 0 ? view.stdout.trim().split(" ") : [];
@@ -153,7 +171,7 @@ export function mergeGate(
     );
   // A partial pass (no Docker here, so no database tests) counts only once GitHub reports `checks` passed on it.
   const missing =
-    partial && checksNotPassed(head, named ? ownerRepo(named) : ours, cwd);
+    partial && checksNotPassed(head, named ? ownerRepo(named) : ours, repo);
   if (missing)
     return deny(
       `its head commit ${short} passed \`bun run gate\` here only in part (${partial}), and ${missing}. Wait until \`gh pr checks ${number}\` shows \`checks\` passed, or run \`bun run gate\` on a machine with Docker, then merge.`,

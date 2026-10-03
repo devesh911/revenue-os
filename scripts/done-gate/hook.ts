@@ -1,6 +1,6 @@
-// A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call the gate's own record
-// and hook, what agents' tools may not do, the merge check and the note of the checkout, the verifier's start and
-// stop, and the judgement at a stop.
+// A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call an MCP tool that
+// merges, the gate's own record and hook, what agents' tools may not do, the merge check and the note of the
+// checkout, the verifier's start and stop, and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { toplevel, touch } from "./checkouts";
 import { type HookInput, runsIn } from "./hook-io";
 import { deny, mergeGate } from "./merge-gate";
+import { mergeToolRefusal } from "./merge-reading";
 import { recordRefusal } from "./record-guard";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
@@ -24,6 +25,8 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
   // Before a tool call, what agents' tools may not do is judged first, so nothing that fails before it lets a
   // command through; a check that fails refuses the command.
   if (event === "PreToolUse") {
+    const tool = mergeToolRefusal(input.tool_name);
+    if (tool) return deny(tool);
     let refused: string | undefined;
     try {
       command = runsIn(input);

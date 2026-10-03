@@ -1982,6 +1982,7 @@ describe("the hook", () => {
       SessionStart: [""],
       PreToolUse: [
         "Bash|Monitor|Edit|Write|MultiEdit|NotebookEdit|mcp__terminal__run_in_terminal",
+        "mcp__.*[Mm]erge.*",
       ],
       Stop: [""],
       TeammateIdle: [""],
@@ -2012,7 +2013,7 @@ describe("the hook", () => {
           .flatMap((g) => g.hooks.map((h) => h.command))
           .filter((c) => c.includes("done-gate")),
     );
-    expect(commands).toHaveLength(9); // six Claude Code events, three Codex ones
+    expect(commands).toHaveLength(10); // six Claude Code events (two hooks before a tool call), three Codex ones
     for (const command of commands) {
       const r = sh(bare, ["/bin/sh", "-c", command], {
         CLAUDE_PROJECT_DIR: bare,

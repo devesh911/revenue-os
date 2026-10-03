@@ -4,9 +4,12 @@
 import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
+  constants,
   copyFileSync,
   cpSync,
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -94,16 +97,16 @@ function repo() {
 }
 
 type Out = { refused: boolean; why: string; told: string };
-/** Runs the repository's own copy of the gate's hook before a tool call, from `cwd`. */
+/** Runs the repository's own copy of the gate's hook before a tool call, from `cwd`, with `bun`. */
 function hook(
   dir: string,
   tool: Record<string, unknown>,
-  { cwd = dir, env = {}, codex = false } = {},
+  { cwd = dir, env = {}, codex = false, bun = "bun" } = {},
 ): Out {
   const r = sh(
     cwd,
     [
-      "bun",
+      bun,
       join(dir, "scripts", "done-gate.ts"),
       "hook",
       ...(codex ? ["codex"] : []),
@@ -133,10 +136,11 @@ describe("the gate's own record (.git/done-gate) and hook", () => {
   const HOOK = "it runs the done gate's hook by hand";
   const CODE = "it hands code that names the done gate";
 
-  it("refuses, and tells Devesh about, a command that touches the record, however it is spelt", () => {
+  it("refuses, and tells Devesh about, a command that touches the record, in the ways a careless command spells it", () => {
     const dir = repo();
     const wt = join(scratch("guards-wt-"), "w");
     sh(dir, ["git", "worktree", "add", "-qb", "feat/w", wt]);
+    symlinkSync(join(dir, ".git"), join(dir, "g"));
     const refused: [string, string, string?][] = [
       ["rm -rf .git/done-gate", RECORD],
       ["ls .git/done-gate/checked", RECORD],
@@ -179,6 +183,24 @@ describe("the gate's own record (.git/done-gate) and hook", () => {
       // In the git folder itself, a relative name or a pattern reaches the record.
       ["rm -rf done-gate", RECORD, join(dir, ".git")],
       ["rm -rf *", RECORD, join(dir, ".git")],
+      // A brace for the git folder's name, a variable the line sets to the git folder, git's --git-path, and a
+      // pattern after a `cd` into the git folder.
+      ["echo x > .{git,}/done-gate/verdict/abc", RECORD],
+      ['D=$(git rev-parse --git-common-dir); rm -rf "$D/done-gate"', RECORD],
+      ['D=$(git rev-parse --git-common-dir); cd "$D" && rm -rf d*', RECORD],
+      ["git rev-parse --git-path=done-gate | xargs rm -rf", RECORD],
+      ["cd .git/hooks && rm -rf ../d*", RECORD],
+      ["echo pass > .git/d*/verdict/abc", RECORD],
+      // Text the line hands on to be run, and a link to the git folder.
+      ["echo .git/done-gate | xargs rm -rf", RECORD],
+      ["bash <<'EOF'\nrm -rf .git/done-gate\nEOF", RECORD],
+      ["rm -rf g/done-gate/checked", RECORD],
+      ["cd g && rm -rf done-gate", RECORD],
+      ['git commit -qm "$(cat .git/done-gate/verdict/abc)"', RECORD],
+      // A pattern that stands for the git folder itself, in a folder that holds one.
+      ["rm -rf .* *", RECORD],
+      ["rm -rf ./.g?t", RECORD],
+      ["mv .{git,x} /tmp/old", RECORD],
     ];
     const wrong = refused.flatMap(([command, why, cwd]) => {
       const r = hook(dir, bash(command), { cwd: cwd ?? dir });
@@ -314,6 +336,51 @@ describe("the gate's own record (.git/done-gate) and hook", () => {
         }).refused,
       ).toBe(false);
   });
+
+  // The outside review of 2026-10-03 found each of these refused, and Devesh told of a try at the record: a git
+  // folder named anywhere in the line beside a pattern anywhere else in it, the record's name in a message or a
+  // search, or its name beside rm, cp or mv in another command of the line.
+  it("lets through everyday searches, listings and commits that name the git folder or the record only as text", () => {
+    const dir = repo();
+    const refused = [
+      `grep -rn "withOrg" . --exclude-dir=.git --include='*.ts'`,
+      "find . -path ./.git -prune -o -name '*.md' -print",
+      "ls -la .git && ls scripts/*.ts",
+      "cat .git/HEAD; ls apps/*/package.json",
+      'git commit -qm "The gate refuses commands that touch .git/done-gate"',
+      'grep -rn ".git/done-gate" docs STATE.md',
+      "rm -rf /tmp/done-gate",
+      'git commit -qm "done-gate: refuse --admin" && cp a.txt b.txt',
+      // Text that names the record: a ruling's note, a question for Devesh, a pull request's words, a file written
+      // from a heredoc, and the hook's command printed, not run.
+      'bun run gate verdict pass "saw rm -rf .git/done-gate refused"',
+      'bun run gate pause "may I clear .git/done-gate?"',
+      'gh pr comment 7 --body "the gate keeps its record in .git/done-gate"',
+      "cat > /tmp/body.md <<'EOF'\nThe gate keeps its record in .git/done-gate.\nEOF",
+      "echo scripts/done-gate.ts hook",
+      'git log --grep=".git/done-gate" --oneline',
+      // Patterns that can't stand for the git folder: in a folder that holds none, or not starting with a dot.
+      `rm -rf ${scratch("guards-plain-")}/.g*`,
+      "rm -rf dist/* && cp -r .claude/skills/* /tmp/skills/",
+      "find . -name '*.ts' -not -path './.git/*'",
+      "grep -rn TODO --exclude-dir=.git --include='*.ts' .",
+      "[ -d .git ] && echo yes",
+      `cat .git/HEAD; echo "\${HOME}"`,
+      "ls .git/hooks/*.sample",
+      `D=$(git rev-parse --git-common-dir); echo "\${D}/config"`,
+      "git rev-parse --git-common-dir && ls scripts/*.ts",
+      "rsync -a --exclude .git ./ /tmp/copy/",
+      "git log --oneline && echo '.git/*'",
+      "tar --exclude='.git' -czf /tmp/x.tgz .",
+      "grep -rn done-gate --exclude-dir=.git .",
+      "rm -f /tmp/x.log && rg -n done-gate docs",
+      "find .git -name '*.lock'",
+    ].flatMap((command) => {
+      const r = hook(dir, bash(command));
+      return r.refused ? [`${command}\n    refused: ${r.why}`] : [];
+    });
+    expect(refused).toEqual([]);
+  });
 });
 
 // Each command a line may not run when it names gh (or graphql) and merge, and a phrase its reason must hold.
@@ -324,6 +391,7 @@ const LITERAL = "written out in full";
 const REPO_ENV = "GH_REPO";
 const NESTED = "handed to a shell or eval";
 const SETTING = "a setting that names";
+const IN_WORD = "a command inside a word";
 const API = "`gh api` may only read";
 const LOOP = "not one of the loop's own GitHub steps";
 const REFUSED: [string, string][] = [
@@ -353,6 +421,24 @@ const REFUSED: [string, string][] = [
   ["git rebase -x 'gh pr merge 7' main", PLAIN],
   ["rg --pre 'gh pr merge 7' x", PLAIN],
   ["GIT_EDITOR='gh pr merge 7' git commit", SETTING],
+  // git's own commands that run a program they are handed (outside review, 2026-10-03): fetch and pull's
+  // upload-pack, abbreviated too, a remote-helper address (`ext::`), or a setting known only when it runs. (A push
+  // naming a program is refused already: agents' pushes take no such option.)
+  ["git fetch --upload-pack='gh pr merge 7 --squash --admin' .", PLAIN],
+  ["git pull --upload-pack='gh pr merge 7 --admin' . main", PLAIN],
+  ["git fetch --upl='gh pr merge 7' .", PLAIN],
+  [
+    "GIT_ALLOW_PROTOCOL=ext git fetch 'ext::sh -c gh% pr% merge% 7% --admin'",
+    PLAIN,
+  ],
+  [`X='gh pr merge 7 --admin'; GIT_SSH_COMMAND="$X" git fetch origin`, SETTING],
+  // A merge written inside a word (outside review, 2026-10-03), which bash runs when it reads the word as an array
+  // subscript, quotes or a backslash notwithstanding.
+  ["[[ 'x[$(gh pr merge 7 --squash --admin)]' -eq 0 ]]", IN_WORD],
+  ["printf -v 'y[$(gh pr merge 7 --admin)]' z", IN_WORD],
+  ['[[ "x[\\`gh pr merge 7\\`]" -eq 0 ]]', IN_WORD],
+  // bun running anything but the gate's own command.
+  ["bun scripts/merge.ts 7 && gh pr view 7", PLAIN],
   // gh api: a GraphQL query known only when it runs, the merge address and the merge mutation.
   ['gh api graphql -f query="$(cat merge.graphql)"', API],
   ['gh api graphql -f query="$Q"', API],
@@ -375,6 +461,10 @@ const ALLOWED = [
   "git merge --ff-only origin/main && gh pr view 7",
   "git merge-base HEAD origin/main",
   "git fetch origin && git merge-base --is-ancestor HEAD origin/main && gh pr list --state merged",
+  "git pull --ff-only origin main && gh pr view 7 --json mergeable",
+  "git fetch --update-head-ok origin && gh pr view 7 --json mergeable",
+  '[[ "$(gh pr view 7 --json mergeable -q .mergeable)" == MERGEABLE ]] && echo ok',
+  "GH_PAGER=cat gh pr view 7 --json mergeable",
   `gh pr merge 7 --squash --delete-branch --match-head-commit ${SHA}`,
   `gh pr merge 7 --auto --squash --match-head-commit=${SHA}`,
   `gh pr merge 7 -sd --match-head-commit ${SHA}`,
@@ -409,6 +499,23 @@ describe("a line that names gh and merge must read as a plain `gh pr merge <numb
     const refused = ALLOWED.flatMap((command) => {
       const got = toolRefusal(command, look);
       return got ? [`${command}\n    refused: ${got}`] : [];
+    });
+    expect(refused).toEqual([]);
+  });
+
+  // The outside review of 2026-10-03 found the verifier's ruling refused when its note named gh and merge, as the
+  // natural note for any item about merging does.
+  it("lets the verifier record its ruling through the hook, whatever its note names", () => {
+    const dir = repo();
+    const refused = [
+      'bun run gate verdict pass "saw gh pr merge refused with --admin"',
+      'bun run gate verdict fail "gh pr merge 7 went through without --match-head-commit"',
+      `bun scripts/done-gate.ts verdict cannot-verify "a merge needs Devesh's own gh login"`,
+      'bun run gate verdict pass "saw rm -rf .git/done-gate and a hook run by hand refused"',
+      "gh pr view 7 --json mergeable,headRefOid && bun run gate pr",
+    ].flatMap((command) => {
+      const r = hook(dir, bash(command));
+      return r.refused ? [`${command}\n    refused: ${r.why}`] : [];
     });
     expect(refused).toEqual([]);
   });
@@ -499,7 +606,7 @@ describe("the merge check: every agent merge names the exact commit that passed 
     expect(gh.calls().some((c) => c.startsWith("api"))).toBe(false); // a full result needs no word from GitHub
   });
 
-  it("reads a merge however gh reads it: quotes in its name, its options before `pr`, or from a folder outside the checkout", () => {
+  it("reads a merge as gh reads it: quotes in its name, its options before `pr`, or from a folder outside the checkout", () => {
     const dir = repo();
     const { head } = pullRequest(dir); // never proven here
     const gh = fakeGh(head);
@@ -539,6 +646,51 @@ describe("the merge check: every agent merge names the exact commit that passed 
         gh,
         elsewhere,
       ).refused,
+    ).toBe(false);
+  });
+
+  // The outside review of 2026-10-03 found the merge check judged the folder the tool call started in, so from
+  // another repository `cd <this checkout> && gh pr merge 7` was taken for that repository's business.
+  it("checks a merge in every folder the command visits before it, even from another repository", () => {
+    const dir = repo();
+    const { head } = pullRequest(dir); // never proven here
+    const gh = fakeGh(head);
+    const other = scratch("guards-other-");
+    sh(other, ["git", "init", "-q"]);
+    sh(other, [
+      "git",
+      "remote",
+      "add",
+      "origin",
+      "https://example.invalid/some/other.git",
+    ]);
+    const exact = `gh pr merge 7 --squash --match-head-commit ${head}`;
+    const unproven = `${head.slice(0, 7)} has not passed`;
+    const wrong = [
+      [`cd ${dir} && gh pr merge 7 --squash`, `--match-head-commit ${head}`],
+      [`cd ${dir} && ${exact}`, unproven],
+      [`(cd ${dir}; ${exact})`, unproven],
+      [`pushd ${dir} && ${exact}`, unproven],
+      [`cd /tmp && cd ${dir} && ${exact}`, unproven],
+      // A folder known only when the command runs may be this checkout.
+      [`cd "$REPO" && ${exact}`, unproven],
+      // A merge inside a substitution is a command the merge check reads like any other.
+      [`cd ${dir} && out=$(${exact})`, unproven],
+    ].flatMap(([command = "", why = ""]) => {
+      const r = merge(dir, command, gh, other);
+      return r.refused && r.why.includes(why)
+        ? []
+        : [
+            `${command}\n    expected: ${why}\n    got: ${r.why || "(allowed)"}`,
+          ];
+    });
+    expect(wrong).toEqual([]);
+    // From this checkout, a subshell that visits another repository leaves the merge here.
+    expect(merge(dir, `(cd ${other}) && ${exact}`, gh).why).toContain(unproven);
+    // Another repository's pull request, named by -R, is that repository's business.
+    expect(
+      merge(dir, `cd ${other} && gh -R some/other pr merge 7 --squash`, gh)
+        .refused,
     ).toBe(false);
   });
 
@@ -583,7 +735,85 @@ describe("the merge check: every agent merge names the exact commit that passed 
     }
   });
 
-  it("refuses a merge however it is spelt while a file of the gate fails to load", () => {
+  // The stand-in gh must win over a real one that sits beside bun, as Homebrew installs both in /opt/homebrew/bin.
+  it("asks the gh the caller's PATH names first, not one beside bun", () => {
+    const dir = repo();
+    const { head } = pullRequest(dir); // never proven here
+    const gh = fakeGh(head);
+    const brew = scratch("guards-brew-");
+    const bun = join(brew, "bun");
+    try {
+      linkSync(process.execPath, bun); // bun names its own folder by the path it was started from
+    } catch {
+      copyFileSync(process.execPath, bun, constants.COPYFILE_FICLONE);
+      chmodSync(bun, 0o755);
+    }
+    writeFileSync(
+      join(brew, "gh"),
+      "#!/bin/sh\necho 'the gh beside bun answered' >&2\nexit 1\n",
+      { mode: 0o755 },
+    );
+    const r = hook(
+      dir,
+      bash(`gh pr merge 7 --squash --match-head-commit ${head}`),
+      { env: gh.env, bun },
+    );
+    expect(r.why).toContain(`${head.slice(0, 7)} has not passed`);
+    expect(gh.calls().some((c) => c.startsWith("pr view 7"))).toBe(true);
+  });
+
+  // The outside review of 2026-10-03: the desktop app's auto-merge tool names no commit, and no hook watched it.
+  it("refuses an MCP tool that merges a pull request, and Claude Code asks the gate before one runs", () => {
+    const dir = repo();
+    for (const tool_name of [
+      "mcp__ccd_pr__set_auto_merge",
+      "mcp__github__merge_pull_request",
+    ]) {
+      const r = hook(dir, { tool_name, tool_input: { pr: 7, enabled: true } });
+      expect(r.refused).toBe(true);
+      expect(r.told).toStartWith(
+        "Done gate ✗ merge refused: it merges through an MCP tool",
+      );
+    }
+    // A tool that merges something other than a pull request is not the gate's business.
+    expect(
+      hook(dir, {
+        tool_name: "mcp__voice__agents_merge_branch",
+        tool_input: {},
+      }).refused,
+    ).toBe(false);
+    // .claude/settings.json runs the gate's hook before each of them.
+    const settings = JSON.parse(
+      readFileSync(
+        join(import.meta.dir, "..", ".claude", "settings.json"),
+        "utf8",
+      ),
+    ) as {
+      hooks: {
+        PreToolUse: { matcher: string; hooks: { command: string }[] }[];
+      };
+    };
+    const asked = (tool: string) =>
+      settings.hooks.PreToolUse.some(
+        (g) =>
+          new RegExp(`^(?:${g.matcher})$`).test(tool) &&
+          g.hooks.some(
+            (h) =>
+              h.command.includes("scripts/done-gate.ts") &&
+              /\bhook$/.test(h.command),
+          ),
+      );
+    expect(
+      ["mcp__ccd_pr__set_auto_merge", "mcp__github__merge_pull_request"].map(
+        asked,
+      ),
+    ).toEqual([true, true]);
+  });
+});
+
+describe("while a file of the gate fails to load", () => {
+  /** A copy of the gate one of whose files can't load: an export renamed, as a half-done edit leaves it. */
+  const broken = () => {
     const dir = repo();
     const words = join(dir, "scripts", "done-gate", "shell-words.ts");
     writeFileSync(
@@ -593,9 +823,66 @@ describe("the merge check: every agent merge names the exact commit that passed 
         "export function simpleCommandz(",
       ),
     );
+    return dir;
+  };
+
+  it("refuses a merge however it is spelt", () => {
+    const dir = broken();
     for (const command of ["g''h pr merge 7 --squash", "gh pr m\\erge 7"])
       expect(hook(dir, bash(command)).why).toContain(
         "it could not load the done gate",
       );
+    expect(
+      hook(dir, { tool_name: "mcp__ccd_pr__set_auto_merge", tool_input: {} })
+        .why,
+    ).toContain("it could not load the done gate");
+  });
+
+  // The outside review of 2026-10-03 found only merges refused in this state: the record and the hook were open.
+  it("refuses a command or edit that names the git folder or the record, or runs the hook, and lets the gate be fixed", () => {
+    const dir = broken();
+    const wrong = [
+      bash("rm -rf .git/done-gate"),
+      bash("cd .git && rm -rf d*"),
+      bash('rm -rf "$(git rev-parse --git-common-dir)/d"*'),
+      bash("bun scripts/done-gate.ts hook"),
+      bash("bun run gate hook < input.json"),
+      {
+        tool_name: "Write",
+        tool_input: { file_path: ".git/done-gate/verdict/abc", content: "{}" },
+      },
+    ].flatMap((tool) => {
+      const r = hook(dir, tool);
+      return r.refused &&
+        r.why.includes("it could not load the done gate") &&
+        /^Done gate ✗ (command|edit) refused: /.test(r.told)
+        ? []
+        : [`${JSON.stringify(tool)}\n    got: ${r.why || r.told}`];
+    });
+    expect(wrong).toEqual([]);
+    expect(hook(dir, bash("ls"), { cwd: join(dir, ".git") }).refused).toBe(
+      true,
+    );
+    // What fixing the gate takes still goes through, with the warning that nothing is checked.
+    const refused = [
+      bash("bunx biome check --write scripts/done-gate/shell-words.ts"),
+      bash("bun test scripts/done-gate-guards.test.ts -t hook"),
+      bash("git diff scripts/done-gate && git status --short"),
+      bash('git commit -qm "the shell reader loads again"'),
+      {
+        tool_name: "Edit",
+        tool_input: {
+          file_path: "scripts/done-gate/shell-words.ts",
+          old_string: "simpleCommandz",
+          new_string: "simpleCommands",
+        },
+      },
+    ].flatMap((tool) => {
+      const r = hook(dir, tool);
+      return r.refused || !r.told.startsWith("Done gate ⚠ could not load")
+        ? [`${JSON.stringify(tool)}\n    got: ${r.why || r.told}`]
+        : [];
+    });
+    expect(refused).toEqual([]);
   });
 });

@@ -25,7 +25,7 @@
 // The code lives in scripts/done-gate/, one job per file (docs/patterns/one-job-per-file.md). This file stays the
 // entry the hooks and `bun run gate` call: it hands a hook event to hook.ts and a command to cli.ts. It loads them
 // only inside its error handling, so a file there that fails to load (a renamed export, a missing file) is told to
-// Devesh and refuses a merge, never skipping a check in silence.
+// Devesh and refuses a merge, or a touch of the gate's record or hook, never skipping a check in silence.
 
 import { dirname } from "node:path";
 import type { HookInput } from "./done-gate/hook-io";
@@ -41,26 +41,50 @@ process.env.PATH = [
 const say = (systemMessage: string) =>
   process.stdout.write(JSON.stringify({ systemMessage }));
 
-/** Before a tool call, with the gate's code unloadable: refuse anything that may merge, and say so for the rest. */
+// While the gate can't load: a git folder (`.git`, or git's ways of naming one), the record's name outside the gate's
+// code, or a run of its hook by hand (`done-gate.ts … hook`, `gate hook`).
+const GUARDED =
+  /(^|[^\w.-])\.git([^\w-]|$)|--(git-common-dir|git-dir|absolute-git-dir|git-path)\b|\bGIT_(COMMON_)?DIR\b|(?<!scripts\/)done-gate(?![\w.-])|done-gate\.ts\b[\s\S]*\bhook\b|\bgates?\s+(--\s+)?hook\b/;
+
+/**
+ * Before a tool call, with the gate's code unloadable. Nothing here can read a command, so its text (quotes and
+ * backslashes taken out), an edit's path and an MCP tool's name are judged whole: refused is anything that names
+ * merge, the git folder, the record or a run of its hook, and any command run inside a git folder; the rest goes
+ * through, told that nothing is checked until the gate loads.
+ */
 function unloaded(input: HookInput, why: string) {
-  const command =
-    typeof input.tool_input?.command === "string"
-      ? input.tool_input.command
-      : "";
-  // Nothing here can read the command, so any that names merge with its quotes and backslashes taken out may merge.
-  if (!/merge/i.test(command.replace(/['"\\]/g, "")))
+  const tool = input.tool_input ?? {};
+  const text = [
+    tool.command,
+    tool.file_path,
+    tool.notebook_path,
+    input.tool_name?.startsWith("mcp__") && input.tool_name,
+  ]
+    .filter((t) => typeof t === "string")
+    .join("\n")
+    .replace(/['"\\]/g, "");
+  const what = /merge/i.test(text)
+    ? "merge"
+    : GUARDED.test(text) || /(^|\/)\.git(\/|$)/.test(input.cwd ?? "")
+      ? /^(Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/.test(
+          input.tool_name ?? "",
+        )
+        ? "edit"
+        : "command"
+      : undefined;
+  if (!what)
     return say(
       `Done gate ⚠ could not load (${why}): nothing done here is checked until it loads`,
     );
-  const reason = `it could not load the done gate (${why}), so it can't check this merge. Fix the gate first.`;
+  const reason = `it could not load the done gate (${why}), so it can't check this ${what}${what === "merge" ? "" : ", which names the git folder, the gate's record or its hook"}. Fix the gate first.`;
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        permissionDecisionReason: `The done gate refused this merge: ${reason}`,
+        permissionDecisionReason: `The done gate refused this ${what}: ${reason}`,
       },
-      systemMessage: `Done gate ✗ merge refused: ${reason}`,
+      systemMessage: `Done gate ✗ ${what} refused: ${reason}`,
     }),
   );
 }

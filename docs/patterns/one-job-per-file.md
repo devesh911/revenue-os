@@ -10,8 +10,8 @@ scripts/done-gate/
   snapshot.ts      The exact code in a checkout as a tree id, with its diff from main and who uses each export.
   store.ts         The gate's record: one small file per fact under .git/done-gate.
   stop.ts          A stop: the session's change in each checkout it worked in is judged (…).
-  merge-gate.ts    An agent's `gh pr merge` goes through only when the head commit was proven on this machine.
-  …                nineteen files, none called utils, helpers or common
+  merge-gate.ts    An agent's `gh pr merge` goes through only when it names the head commit, proven on this machine.
+  …                thirty files, none called utils, helpers or common
 ```
 ```ts
 // The change as git reports it: the files a diff touches and every line it adds, numbered.
