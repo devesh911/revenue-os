@@ -11,6 +11,12 @@ export type HookInput = {
   agent_id?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
+  tool_use_id?: string;
+  permission_mode?: string;
+  transcript_path?: string;
+  agent_transcript_path?: string;
+  last_assistant_message?: string;
+  stop_hook_active?: boolean;
   background_tasks?: unknown[];
   session_crons?: unknown[];
 };

@@ -1,5 +1,6 @@
 // A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call what agents' tools
-// may not do, the merge check and the note of the checkout, the verifier's start and stop, and the judgement at a stop.
+// may not do, the merge check and the note of the checkout, the verifier's call, start, commands, hand-back and stop,
+// and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
@@ -10,7 +11,12 @@ import { deny, mergeGate } from "./merge-gate";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
 import { commandRefusal } from "./tools";
-import { verifierDone } from "./verifier";
+import {
+  verifierCall,
+  verifierStarts,
+  verifierStops,
+  verifierWorked,
+} from "./verifier";
 
 /**
  * `entry`: the scripts/done-gate.ts that loaded this file. `codex`: run by .codex/hooks.json (`hook codex`) rather
@@ -58,23 +64,22 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
     case "SessionStart":
       return touch(repo, input, store, session);
     case "PreToolUse":
+      if (input.tool_name === "Agent" || input.tool_name === "SubagentHandback")
+        return verifierCall(input, store, session);
       try {
         mergeGate(repo, command, store, codex);
       } catch (e) {
         deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
       }
-      return touch(repo, command, store, session); // a failure here stays quiet: no tool call waits on it
-    case "SubagentStart": // a fresh verifier: only rulings recorded from now on are its own
+      // A failure here stays quiet: no tool call waits on it.
+      touch(repo, command, store, session);
+      return verifierWorked(repo, command, store, session);
+    case "SubagentStart":
       if (input.agent_type === "verifier")
-        store.put(
-          "verifier",
-          `${session}-${input.agent_id ?? "main"}`,
-          String(Date.now()),
-        );
+        verifierStarts(repo, input, store, session);
       return;
     case "SubagentStop":
-      if (input.agent_type === "verifier")
-        verifierDone(repo, input, store, session);
+      if (input.agent_type === "verifier") verifierStops(input, store, session);
       return;
     case "Stop":
     case "TeammateIdle":

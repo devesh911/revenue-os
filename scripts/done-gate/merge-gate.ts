@@ -7,7 +7,7 @@ import { type HookInput, say } from "./hook-io";
 import { isProduct } from "./rules";
 import { gitOf, program, simpleCommands } from "./shell-words";
 import type { Store } from "./store";
-import { parseRuling } from "./verdict";
+import { rulingOn } from "./verdict";
 
 // gh pr merge options that take a value; any other option is a switch.
 const GH_VALUE = new Set([
@@ -215,7 +215,7 @@ export function mergeGate(
   )
     .split("\0")
     .some(isProduct);
-  const ruling = parseRuling(store.get("verdict", tree));
+  const ruling = rulingOn(store, tree);
   if (!product || ruling?.verdict === "pass")
     return say(
       `Done gate ✓ merge of ${short}: ${checks}${ruling?.verdict === "pass" ? ` · verifier PASS: ${ruling.note}` : " (no product code changed)"}`,

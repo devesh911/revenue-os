@@ -8,7 +8,7 @@ import { type HookInput, say } from "./hook-io";
 import { isProduct } from "./rules";
 import { snapshot } from "./snapshot";
 import type { Store } from "./store";
-import { judge, parseRuling } from "./verdict";
+import { judge, rulingOn } from "./verdict";
 
 const MAX_BLOCKS = 5; // then the agent may stop, shown to Devesh as NOT DONE (Claude Code's own cap is 8)
 
@@ -42,10 +42,7 @@ export async function stop(
           !store.get("warned", `${key}-${tree}`)
         ) {
           store.put("warned", `${key}-${tree}`, "1");
-          if (
-            snapshot(root).files.some(isProduct) &&
-            !parseRuling(store.get("verdict", tree))
-          )
+          if (snapshot(root).files.some(isProduct) && !rulingOn(store, tree))
             notes.push(
               `Done gate ⚠ this session changed nothing in ${name(root)}, but it holds product changes from before the session that nobody has verified`,
             );
