@@ -3,9 +3,10 @@
 
 import { relative } from "node:path";
 import { extra, idOf, keyOf, madeHere, rootsOf } from "./checkouts";
+import { checkpointOwed } from "./checkpoint";
 import { git } from "./git";
 import { type HookInput, say } from "./hook-io";
-import { HELD } from "./interrupted";
+import { HELD, heldTo, judgeHeld, release } from "./interrupted";
 import { isProduct } from "./rules";
 import { snapshot } from "./snapshot";
 import type { Store } from "./store";
@@ -36,13 +37,12 @@ export async function stop(
       const toucher = store.get("toucher", idOf(root));
       if (toucher && toucher !== session) continue; // another session worked here since: its change, not this one's
       // A session held to work it found here (interrupted.ts) has accepted nothing here until a stop passes on it.
-      const accepted =
-        store.get(HELD, key) === undefined
-          ? store.get("accepted", key)
-          : undefined;
+      const accepted = heldTo(store, session, root, tree)
+        ? undefined
+        : store.get("accepted", key);
       if (tree === accepted) {
-        // Work from before the session that does not hold it (on main, or in a checkout it only looked at), never
-        // judged: say so once, rather than pass it in silence.
+        // Work from before the session that does not hold it (in the main checkout, in a checkout it only looked at,
+        // or while the session making it is still at work), never judged: say so once, rather than pass it in silence.
         if (
           tree === store.get("baseline", key) &&
           !store.get("warned", `${key}-${tree}`)
@@ -85,10 +85,12 @@ export async function stop(
     );
   for (const tree of new Set([...trees, ...work.map((w) => w.tree)])) {
     const pause = store.take("pause", tree);
-    if (pause)
+    if (pause) {
+      for (const w of work) store.take(HELD, w.key); // Devesh decides what happens to a held change
       return say(
         `Done gate ⏸ waiting on you: ${pause} (the change so far is NOT verified)`,
       );
+    }
   }
   // After the agent gave up on this exact code, only what is already known counts: no check runs again.
   const print = work
@@ -99,7 +101,9 @@ export async function stop(
   const passed: string[] = [];
   let failed: { headline: string; reason: string } | undefined;
   for (const w of work) {
-    const j = await judge(snapshot(w.root), store, codex, gaveUp);
+    const j = await judgeHeld(store, session, w.root, w.tree, () =>
+      judge(snapshot(w.root), store, codex, gaveUp),
+    );
     if (!j.ok) {
       failed = w.where
         ? {
@@ -115,10 +119,11 @@ export async function stop(
         : j.message,
     );
   }
+  if (!failed && !gaveUp) failed = checkpointOwed(work, store);
   if (!failed) {
     for (const w of work) {
       store.put("accepted", w.key, w.tree);
-      if (store.take(HELD, w.key))
+      if (release(store, session, w.root))
         store.put("warned", `${w.key}-${w.tree}`, "1"); // judged, and told just now
     }
     store.take("blocks", session);

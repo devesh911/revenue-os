@@ -1,13 +1,19 @@
-// What a session is shown when it starts in a checkout, or starts again after /clear or a compaction: whether it is
-// held to work it found there that never passed the gate (interrupted.ts), and the checkpoint of the branch there
-// (checkpoint.ts). Like every tool call, it also notes the checkout (checkouts.ts).
+// What a session is shown when it starts in a checkout, or starts again after /clear, a resume or a compaction:
+// whether it is held to work it found there that never passed the gate (interrupted.ts), and the checkpoint of the
+// branch there (checkpoint.ts). Like every tool call, it also notes the checkout (checkouts.ts).
 
-import { relative } from "node:path";
-import { checkoutsOf, identity, keyOf, toplevel, touch } from "./checkouts";
+import { checkoutsOf, toplevel, touch } from "./checkouts";
 import { checkpointAtStart } from "./checkpoint";
-import { git } from "./git";
 import type { HookInput } from "./hook-io";
-import { HELD, holdIfInterrupted } from "./interrupted";
+import {
+  heldTo,
+  holdOf,
+  noteInterrupted,
+  placeOf,
+  QUIET_MINUTES,
+  WROTE,
+} from "./interrupted";
+import { snapshot } from "./snapshot";
 import type { Store } from "./store";
 
 export async function sessionStart(
@@ -18,29 +24,26 @@ export async function sessionStart(
   codex: boolean,
 ) {
   const root = toplevel(input.cwd ?? repo);
-  const fresh =
-    !!root && store.get("seen", keyOf(session, root)) !== identity(root); // new to this checkout
+  const here = !!root && checkoutsOf(repo).includes(root);
+  // Before the checkout is noted, which makes what it holds this session's starting point.
+  const newly = here ? noteInterrupted(root, store, session, codex) : undefined;
   touch(repo, input, store, session);
-  const all = checkoutsOf(repo);
-  if (!all.includes(root)) return;
-  const newly = fresh
-    ? await holdIfInterrupted(root, store, session, codex)
-    : undefined;
-  const why = newly ?? store.get(HELD, keyOf(session, root));
-  const branch = git(
-    root,
-    ["symbolic-ref", "--quiet", "--short", "HEAD"],
-    {},
-    true,
-  );
+  if (!here) return;
+  const h = holdOf(store, session, root);
+  let inForce = !!h;
+  try {
+    inForce = !!heldTo(store, session, root, snapshot(root, false).tree);
+  } catch {
+    // a checkout the gate can't read: held, and its stop says it was NOT checked
+  }
+  const where = `${placeOf(root)} (branch ${h?.branch})`;
   const held =
-    why &&
-    `${relative(all[0] ?? root, root) || "the main checkout"} (branch ${branch}) holds a change that has not passed the gate (${why})`;
-  const context = [
-    held &&
-      `Done gate: ${held}: work interrupted before it was checked. This session is held to it: each of your stops judges that change, as if you had made it, until it passes (the done rules, every check, and for product code the verifier's ruling). Finish it, starting from the checkpoint below when there is one; if it is not yours to finish, ask Devesh with \`bun run gate pause "<question>"\`.`,
-    checkpointAtStart(root, store),
-  ]
+    h &&
+    h.why !== WROTE &&
+    (inForce
+      ? `Done gate: ${where} holds a change that has not passed the gate (${h.why}): work interrupted before it was checked. This session is held to it: each of your stops judges that change, as if you had made it, until one passes on branch ${h.branch} (the done rules, every check, and for product code the verifier's ruling). Finish it, starting from the checkpoint below when there is one; if it is not yours to finish, ask Devesh with \`bun run gate pause "<question>"\`, which ends the hold.`
+      : `Done gate: ${where} holds a change that has not passed the gate (${h.why}), and a session that worked there is still at work (seen in the last ${QUIET_MINUTES} minutes): the change is that session's to finish, so leave it alone. If that session stops for good, this one is held to the change: each of your stops judges it until one passes on branch ${h.branch}.`);
+  const context = [held, checkpointAtStart(root, store)]
     .filter(Boolean)
     .join("\n\n");
   if (!context) return;
@@ -50,9 +53,10 @@ export async function sessionStart(
         hookEventName: "SessionStart",
         additionalContext: context,
       },
-      ...(newly && {
-        systemMessage: `Done gate ⚠ this session is held to unchecked work: ${held}; each of its stops judges that change until it passes`,
-      }),
+      ...(newly &&
+        inForce && {
+          systemMessage: `Done gate ⚠ this session is held to unchecked work: ${where} holds a change that has not passed the gate (${newly}); each of its stops judges that change until one passes on that branch`,
+        }),
     }),
   );
 }

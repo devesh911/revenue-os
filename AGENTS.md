@@ -88,10 +88,12 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   own attention and GitHub's required checks (`checks`, and `rules-from-main`, which runs main's copy of the
   rules) are the backstops, and `STATE.md → What works
   today` lists the gate's known holes.
-- **Interrupted work holds the next session.** A session that starts in a checkout on a branch
-  (not main) holding a change that never passed the gate is held to it: each of its stops judges
-  that change as its own until one passes. On main, where Devesh keeps files of his own, and in a
-  checkout a session only looks at, he is told once instead.
+- **Interrupted work holds the next session.** A session that starts in a worktree on a branch
+  holding a change that never passed the gate, or that writes that branch's checkpoint, is held to
+  it once the session that made it has stopped (quiet for 15 minutes): each of its stops judges
+  that change as its own until one passes on that branch. Asking Devesh (`bun run gate pause`)
+  ends the hold. In the main checkout, where Devesh keeps files of his own, and in a checkout a
+  session only looks at, he is told once instead.
 - CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
   agent and human.
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
@@ -134,8 +136,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    Supabase stack and real pg-boss — never mock the database; a bug fix starts from a failing
    reproduction. After each commit, and before you stop, update the branch's checkpoint:
    `bun run gate checkpoint --done "<what is done>" --failed "<what failed, or nothing>" --next
-   "<the exact next step>"`. The gate adds Devesh's request word for word, and shows the
-   checkpoint to the next session that starts in that checkout.
+   "<the exact next step>"`. The gate adds Devesh's request word for word, shows the checkpoint
+   to the next session that starts in that checkout or works there, and sends a stop on a branch
+   that builds an item back until its checkpoint was written on the code as you leave it.
 3. `bun run gate` green, run bare — never pipe a gate through anything that can swallow its exit
    code. It runs typecheck, lint, guards, every test and the RLS check against the real local stack,
    and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs

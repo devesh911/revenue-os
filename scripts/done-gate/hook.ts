@@ -1,12 +1,13 @@
 // A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call an MCP tool that
 // merges, the gate's own record and hook, what agents' tools may not do, the merge check and the note of the
-// checkout, the verifier's call, start, commands, hand-back and stop, what a session is shown and held to when it
-// starts, and the judgement at a stop.
+// checkout (and its checkpoint, shown before a session's first command there), the verifier's call, start, commands,
+// hand-back and stop, what a session is shown and held to when it starts, and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { toplevel, touch } from "./checkouts";
+import { seenBy, showOnArrival } from "./checkpoint";
 import { type HookInput, runsIn } from "./hook-io";
 import { deny, mergeGate } from "./merge-gate";
 import { mergeToolRefusal } from "./merge-reading";
@@ -74,26 +75,37 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
   }
   const store = new Store(stateDir(repo));
   const session = input.session_id ?? "unknown";
-  // Where Claude Code keeps the session's transcript, which a checkpoint reads Devesh's words from (checkpoint.ts).
+  // Where Claude Code keeps the session's transcript, which a checkpoint reads Devesh's words from (checkpoint.ts),
+  // and when the session was last at work, which tells a held session whether it may leave a change to it
+  // (interrupted.ts).
   if (
     input.transcript_path &&
     store.get("transcript", session) !== input.transcript_path
   )
     store.put("transcript", session, input.transcript_path);
+  store.put("active", session, String(Date.now()));
+  if (event === "Stop" || event === "TeammateIdle")
+    store.put("stopping", session, `${process.pid} ${Date.now()}`);
   switch (event) {
     case "SessionStart":
       return sessionStart(repo, input, store, session, codex);
-    case "PreToolUse":
+    case "PreToolUse": {
       if (input.tool_name === "Agent" || input.tool_name === "SubagentHandback")
         return verifierCall(input, store, session);
+      let refused: unknown;
       try {
-        mergeGate(repo, command, store, codex);
+        refused = mergeGate(repo, command, store, codex);
       } catch (e) {
-        deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
+        refused = deny(
+          `it could not check this merge (${String(e).split("\n")[0]}).`,
+        );
       }
       // A failure here stays quiet: no tool call waits on it.
+      const before = seenBy(store, session);
       touch(repo, command, store, session);
-      return verifierWorked(repo, command, store, session);
+      verifierWorked(repo, command, store, session);
+      return refused || showOnArrival(store, session, before);
+    }
     case "SubagentStart":
       if (input.agent_type === "verifier")
         verifierStarts(repo, input, store, session);
