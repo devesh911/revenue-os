@@ -59,7 +59,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   not roadmap items: (1) and (2) still apply, and their evidence lives in the PR body.
 - **A slice is done** when its proof runs automatically and passes; Devesh does not need to act.
   Every slice's `Proof:` line is written as steps a script can run and check against the real
-  product (`bun run proof <slice>`, which Slice 0's last item, the proof runner, builds). When the
+  product (`bun run proof <slice>`, whose steps live in scripts/proof/). When the
   slice's last item lands, the agent sets it to `proof ready`; when every step passes, the agent
   sets it to `done` and writes the date and the passing run's link after `Proof passed:`, in a PR
   whose body carries that run's report (`rules-from-main` refuses a link that is not a run of the
