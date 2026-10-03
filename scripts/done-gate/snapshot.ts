@@ -10,7 +10,12 @@ import {
   utimesSync,
 } from "node:fs";
 import { join } from "node:path";
-import { exportsOf, statementAt, uncommented } from "./code-text";
+import {
+  exportsOf,
+  listedExports,
+  statementAt,
+  uncommented,
+} from "./code-text";
 import { type Added, parseDiff } from "./diff";
 import {
   candidatesOf,
@@ -163,12 +168,34 @@ function analyse(
 ): Snap {
   const parsed = parseDiff(diff);
   const { files, deleted } = parsed;
-  const { added, removed } = withMoved(coloured, parsed);
+  const marked = withMoved(coloured, parsed);
+  const { removed } = marked;
   const texts = new Map<string, string>();
+  let held: Set<string> | undefined; // the files in the tree: nothing outside it is read, an ignored file neither
   const read = (f: string) => {
-    if (!texts.has(f)) texts.set(f, readFile(f));
+    held ??= new Set(
+      git(repo, ["ls-tree", "-r", "-z", "--name-only", tree]).split("\0"),
+    );
+    if (!texts.has(f)) texts.set(f, held.has(f) ? readFile(f) : "");
     return texts.get(f) ?? "";
   };
+  // A name added inside a multi-line export list the change did not open is an export of its own (code-text.ts).
+  const lists = new Map<string, ReturnType<typeof listedExports>>();
+  const added = marked.added.map((a) => {
+    if (
+      !/^\s*(?:type\s+)?[\w$]+(?:\s+as\s+[\w$]+)?\s*,?\s*(?:\}.*)?$/.test(
+        a.text,
+      )
+    )
+      return a;
+    const list = lists.get(a.file) ?? listedExports(read(a.file));
+    lists.set(a.file, list);
+    const at = list.get(a.line);
+    return at &&
+      !marked.added.some((o) => o.file === a.file && o.line === at.open)
+      ? { ...a, within: at.stmt }
+      : a;
+  });
   // Files holding a string: only candidates, usesExport decides.
   const grep = (s: string, word = false) =>
     grepIn(["-lIF"].concat(word ? ["-w"] : []).concat(["-e", s]));

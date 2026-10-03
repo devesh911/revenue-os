@@ -213,4 +213,4 @@ export const rulesOn = (snap: Snap) =>
     snap.deleted,
   );
 export const listed = (problems: string[]) =>
-  `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line; Devesh sees every exception.`;
+  `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line, or, for a removed test, the line given above to docs/removed-tests.md; Devesh sees every exception.`;

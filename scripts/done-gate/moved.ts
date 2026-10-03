@@ -1,9 +1,10 @@
 // Moved code: the lines a change only moves, inside a file or into another (one file split into several), as git's
 // moved-code detection finds them (`--color-moved=blocks --color-moved-ws=allow-indentation-change`): a block of at
 // least 20 letters and digits removed in one place and added unchanged, indentation aside, in another. A line edited
-// on the way is not moved. A moved test is no removal (removed-tests.ts) and Devesh is told each moved file and how
-// many of its lines moved; every other done rule reads a moved line like any added one. A line's `moved` flag in the
-// snapshot is "moved lines, as the done-rules item detects them", for the later rules that exempt them.
+// on the way is not moved. A test moved whole into a file a test runner runs is no removal (removed-tests.ts) and
+// Devesh is told each moved file and how many of its lines moved; every other done rule reads a moved line like any
+// added one. A line's `moved` flag in the snapshot's added lines (numbered as the change leaves them) is "moved
+// lines, as the done-rules item detects them", which the coverage and tests-proven items exempt.
 
 import type { Added } from "./diff";
 
@@ -65,18 +66,6 @@ export function withMoved(
     added: mark(added, flags.added),
     removed: mark(removed, flags.removed),
   };
-}
-
-/**
- * PURE: the change's lines (a snapshot) → isMoved(file, line): did the line at `line` of `file`, numbered as the
- * change leaves it, only move there? These are "moved lines, as the done-rules item detects them", which the coverage
- * and tests-proven rules exempt.
- */
-export function isMovedIn({ added }: { added: Added[] }) {
-  const moved = new Set(
-    added.filter((a) => a.moved).map((a) => `${a.line} ${a.file}`),
-  );
-  return (file: string, line: number) => moved.has(`${line} ${file}`);
 }
 
 /** PURE: each file holding moved lines, in the diff's order, with how many moved in and out; undefined when none did. */

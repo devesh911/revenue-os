@@ -10,13 +10,14 @@ import {
   cpSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { usesExport } from "./done-gate/export-users";
-import { isMovedIn, withMoved } from "./done-gate/moved";
+import { withMoved } from "./done-gate/moved";
 import { checkRules, isProduct } from "./done-gate/rules";
 import { snapshot } from "./done-gate/snapshot";
 
@@ -144,6 +145,67 @@ const CALLS_ON_MAIN = [
   "});",
   "",
 ].join("\n");
+/** A test file holding one test, "refuses a blocked number", with two expect lines (3 and 4). */
+const BLOCKED = "services/worker/test/blocked.test.ts";
+const BLOCKED_TEST = [
+  'it("refuses a blocked number", () => {',
+  '  const result = place("+15550000");',
+  '  expect(result.status).toBe("refused");',
+  '  expect(result.reason).toBe("blocked");',
+  "});",
+  "",
+].join("\n");
+/** Two tests: "refuses a blocked number for every caller" (lines 4 to 8, its expects 6 and 7), then "places a call". */
+const TWO_TESTS = [
+  'import { expect, it } from "bun:test";',
+  'import { place } from "../src/calls";',
+  "",
+  'it("refuses a blocked number for every caller", () => {',
+  '  const result = place("+15550000");',
+  '  expect(result.status).toBe("refused");',
+  '  expect(result.reason).toBe("blocked");',
+  "});",
+  "",
+  'it("places a call", () => {',
+  '  const result = place("+15551234");',
+  '  expect(result.status).toBe("queued");',
+  "});",
+  "",
+].join("\n");
+const FIRST_TEST = TWO_TESTS.split("\n").slice(3, 9).join("\n");
+
+/** CI's step whose name starts with `name`, as .github/workflows/ci.yml writes it, its `${{ }}` filled from `github`. */
+const ciStep = (dir: string, name: string, github: Record<string, string>) => {
+  const ci = Bun.YAML.parse(
+    readFileSync(
+      join(import.meta.dir, "..", ".github", "workflows", "ci.yml"),
+      "utf8",
+    ),
+  ) as {
+    jobs: {
+      checks: {
+        steps: { name?: string; env?: Record<string, string>; run?: string }[];
+      };
+    };
+  };
+  const step = ci.jobs.checks.steps.find((s) => s.name?.startsWith(name));
+  const fill = (s: string) =>
+    s.replace(
+      /\$\{\{(.*?)\}\}/g,
+      (_, expr: string) =>
+        expr
+          .split("||")
+          .map((t) => t.trim())
+          .map((t) => (/^'.*'$/.test(t) ? t.slice(1, -1) : (github[t] ?? "")))
+          .find(Boolean) ?? "",
+    );
+  const env = Object.fromEntries(
+    Object.entries(step?.env ?? {}).map(([k, v]) => [k, fill(v)]),
+  );
+  const r = sh(dir, ["bash", "-c", fill(step?.run ?? "exit 9")], env);
+  return { status: r.status, out: r.stdout + r.stderr };
+};
+
 const ADD_TO_LIST = (target: string) =>
   `to remove it on purpose, add a line to docs/removed-tests.md in this change: \`YYYY-MM-DD · ${target} · <why>\``;
 
@@ -230,7 +292,10 @@ describe("a removed test file, test or expect line", () => {
     const r = rules(dir);
     expect(r.status).toBe(1);
     expect(r.out).toContain(
-      `Done rules ✗ 2 problem(s) in the change since main:\n- ${CALLS} > expect at line 5: the change removes this expect line (its line number before the change); ${ADD_TO_LIST(`${CALLS} > expect at line 5`)}\n- ${CALLS} > refuses a blocked number: the change removes this test; ${ADD_TO_LIST(`${CALLS} > refuses a blocked number`)}\n`,
+      "or, for a removed test, the line given above to docs/removed-tests.md",
+    );
+    expect(r.out).toContain(
+      `Done rules ✗ 2 problem(s) in the change since main:\n- ${CALLS} > expect at line 5: the change removes this expect line (its line number before the change); ${ADD_TO_LIST(`${CALLS} > expect at line 5`)}\n- ${CALLS} > refuses a blocked number: the change removes or rewrites this test; ${ADD_TO_LIST(`${CALLS} > refuses a blocked number`)}\n`,
     );
     const entries = [
       `2026-10-03 · ${CALLS} > expect at line 5 · the count is checked by calls-count.test.ts now`,
@@ -274,6 +339,175 @@ describe("a removed test file, test or expect line", () => {
     const r = rules(dir);
     expect(r.out).toContain("1 problem(s)");
     expect(r.out).toContain(`${CALLS} > a name too long for one line:`);
+  });
+
+  it("counts a test renamed as its expect lines go as removed, and an expect rewritten to check a constant as no replacement", () => {
+    const dir = project({ [BLOCKED]: BLOCKED_TEST });
+    write(
+      dir,
+      BLOCKED,
+      'it("is wired", () => {\n  const result = 1;\n  expect(true).toBe(true);\n  expect(1).toBe(1);\n});\n',
+    );
+    let r = rules(dir);
+    expect(r.out).toContain(
+      `Done rules ✗ 1 problem(s) in the change since main:\n- ${BLOCKED} > refuses a blocked number: the change removes or rewrites this test; ${ADD_TO_LIST(`${BLOCKED} > refuses a blocked number`)}\n`,
+    );
+    write(
+      dir,
+      BLOCKED,
+      BLOCKED_TEST.replace(
+        'result.status).toBe("refused")',
+        "true).toBe(true)",
+      ).replace('result.reason).toBe("blocked")', '"blocked").toBe("blocked")'),
+    );
+    r = rules(dir);
+    expect(r.out).toContain("2 problem(s)");
+    expect(r.out).toContain(
+      `- ${BLOCKED} > expect at line 3: the change removes this expect line`,
+    );
+    expect(r.out).toContain(
+      `- ${BLOCKED} > expect at line 4: the change removes this expect line`,
+    );
+    // Renamed alone, its expect lines as they were, a test is edited, not removed.
+    write(
+      dir,
+      BLOCKED,
+      BLOCKED_TEST.replace("a blocked number", "a number on the block list"),
+    );
+    expect(rules(dir).status).toBe(0);
+  });
+
+  it("counts an expect taken out of one test as removed when a new one is added to another test", () => {
+    const dir = project({ [CALLS]: CALLS_ON_MAIN });
+    write(
+      dir,
+      CALLS,
+      CALLS_ON_MAIN.replace("  expect(count()).toBe(1);\n", "").replace(
+        '"refused");\n',
+        '"refused");\n  expect(log()).toHaveLength(1);\n',
+      ),
+    );
+    const r = rules(dir);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(
+      `- ${CALLS} > expect at line 5: the change removes this expect line`,
+    );
+  });
+
+  it("is excused only by a line in docs/removed-tests.md naming that file and that test or line, with a reason", () => {
+    const dir = project({ [CALLS]: CALLS_ON_MAIN });
+    write(
+      dir,
+      CALLS,
+      CALLS_ON_MAIN.replace("  expect(count()).toBe(1);\n", ""),
+    );
+    const why = "the count is checked by calls-count.test.ts now";
+    for (const entry of [
+      `2026-10-03 · ${CALLS} > expect at line 4 · ${why}`, // another line
+      `2026-10-03 · ${CALLS} > places a call · ${why}`, // the test, which stays
+      `2026-10-03 · services/worker/test/texts.test.ts > expect at line 5 · ${why}`, // another file
+      `2026-10-03 · ${CALLS} > expect at line 5 ·`, // no reason
+      `2026-10-03 · ${CALLS} > expect at line 5 · —`, // no reason
+      `2026-10-03 · ${CALLS} > whole file · ${why}`, // the file stays
+    ]) {
+      write(dir, "docs/removed-tests.md", `${entry}\n`);
+      expect([entry, rules(dir).status]).toEqual([entry, 1]);
+    }
+    rmSync(join(dir, "docs/removed-tests.md"));
+    write(
+      dir,
+      "docs/notes.md",
+      `2026-10-03 · ${CALLS} > expect at line 5 · ${why}\n`,
+    );
+    expect(rules(dir).status).toBe(1); // the right line, in the wrong file
+  });
+
+  it("is judged in test files only: a test moved into product code is removed, and an expect line in product code is none", () => {
+    const test = "services/worker/test/calls.test.ts";
+    const code = "services/worker/src/old-calls.ts";
+    const lines = [
+      'it("refuses a blocked number for every caller", () => {',
+      '  expect(place("+15550000").status).toBe("refused");',
+      "});",
+    ];
+    const out = lines.map((text, i) => ({
+      file: test,
+      line: i + 1,
+      text,
+      hunk: 1,
+      moved: true,
+    }));
+    const into = lines.map((text, i) => ({
+      file: code,
+      line: i + 1,
+      text,
+      hunk: 2,
+      moved: true,
+    }));
+    expect(
+      checkRules([test, code], into, () => [], out, [test]).problems,
+    ).toEqual([
+      `${test} > whole file: the change deletes this test file; ${ADD_TO_LIST(`${test} > whole file`)}`,
+    ]);
+    const helper = "services/worker/src/assert-org.ts";
+    const gone = [
+      {
+        file: helper,
+        line: 4,
+        text: "  expect(row.org_id).toBe(org);",
+        hunk: 1,
+      },
+    ];
+    expect(checkRules([helper], [], () => [], gone).problems).toEqual([]);
+  });
+
+  it("numbers an expect line in CI's checks, run on GitHub's merge commit, as main's copy and a stop do", () => {
+    const calls = [
+      'import { expect, it } from "bun:test";',
+      "",
+      'it("counts each call", () => {',
+      "  place();",
+      "  expect(count()).toBe(1);",
+      "});",
+      "",
+    ].join("\n");
+    const dir = project({
+      [CALLS]: calls,
+      "package.json": '{ "scripts": { "gate": "bun scripts/done-gate.ts" } }\n',
+    });
+    const entry = `2026-10-03 · ${CALLS} > expect at line 5 · the count is checked by calls-count.test.ts now`;
+    write(dir, CALLS, calls.replace("  expect(count()).toBe(1);\n", ""));
+    write(dir, "docs/removed-tests.md", `${entry}\n`);
+    commit(dir);
+    // Meanwhile main gains two lines above the expect.
+    sh(dir, ["git", "checkout", "-q", "main"]);
+    write(
+      dir,
+      CALLS,
+      `// Calls, end to end.\n// Each test places its own.\n${calls}`,
+    );
+    commit(dir);
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "main"]);
+    const head = sh(dir, ["git", "rev-parse", "feat"]).stdout.trim();
+    sh(dir, ["git", "checkout", "-q", "--detach", "main"]);
+    sh(dir, [...GIT, "merge", "-q", "--no-ff", "-m", "merge", "feat"]);
+    const fromMain = sh(dir, [
+      "bun",
+      "scripts/done-gate.ts",
+      "rules",
+      "--base",
+      "origin/main",
+      "--head",
+      "feat",
+    ]);
+    expect(fromMain.status).toBe(0);
+    const ci = ciStep(dir, "Done rules", {
+      "github.base_ref": "main",
+      "github.event.pull_request.head.sha": head,
+      "github.sha": sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim(),
+    });
+    expect(ci.out).toContain(`⚠ removed test: ${entry}`);
+    expect(ci.status).toBe(0);
   });
 
   it("must be copied into the PR body, each line as docs/removed-tests.md has it", () => {
@@ -335,7 +569,7 @@ describe("moved code, found by git's moved-code detection", () => {
     );
   });
 
-  it("answers, for the rules that exempt moved lines, whether a line as the change leaves it only moved", () => {
+  it("marks, for the rules that exempt moved lines, each added line that only moved, numbered as the change leaves it", () => {
     const dir = project({ [BIG]: blocks(1, 30), "services/worker/a.ts": "" });
     split(dir);
     write(
@@ -344,7 +578,9 @@ describe("moved code, found by git's moved-code detection", () => {
       blocks(9, 15).replace("expect(d9).toBe(9 + 1);", "expect(d9).toBe(10);"),
     );
     write(dir, "services/worker/a.ts", "export const a = 1;\n");
-    const isMoved = isMovedIn(snapshot(dir, true, "main"));
+    const { added } = snapshot(dir, true, "main");
+    const isMoved = (file: string, line: number) =>
+      added.some((a) => a.moved && a.file === file && a.line === line);
     expect(
       [
         [part(1), 1],
@@ -384,6 +620,68 @@ describe("moved code, found by git's moved-code detection", () => {
     expect(r.out).toContain(
       `⚠ moved lines: docs/old-calls.md 10 in, ${CALLS} 10 out`,
     );
+  });
+
+  it("counts a test moved into a file no test runner runs as removed", () => {
+    const dir = project({ [CALLS]: TWO_TESTS });
+    write(dir, CALLS, TWO_TESTS.replace(`${FIRST_TEST}\n`, ""));
+    write(dir, "services/worker/test/old-cases.ts", `${FIRST_TEST}\n`);
+    const r = rules(dir);
+    expect(r.out).toContain(
+      `Done rules ✗ 1 problem(s) in the change since main:\n- ${CALLS} > refuses a blocked number for every caller: the change removes or rewrites this test`,
+    );
+    rmSync(join(dir, "services/worker/test/old-cases.ts"));
+    write(dir, "services/worker/test/blocked.test.ts", `${FIRST_TEST}\n`); // one bun runs
+    expect(rules(dir).status).toBe(0);
+    // A Playwright check moved into a file Playwright never runs (it runs *.e2e.ts only).
+    const login = [
+      'import { expect, test } from "@playwright/test";',
+      "",
+      'test("signs in with the dev login", async ({ page }) => {',
+      '  await page.goto("/login");',
+      '  await expect(page.getByText("Signed in as dev")).toBeVisible();',
+      "});",
+      "",
+    ].join("\n");
+    const e2e = project({ "apps/console/e2e/login.e2e.ts": login });
+    rmSync(join(e2e, "apps/console/e2e/login.e2e.ts"));
+    write(e2e, "apps/console/e2e/notes.ts", login);
+    expect(rules(e2e).out).toContain(
+      "- apps/console/e2e/login.e2e.ts > whole file: the change deletes this test file",
+    );
+  });
+
+  it("counts an expect moved on its own, out of its test, as removed, even into another test under code that never runs", () => {
+    const dir = project({ [CALLS]: TWO_TESTS });
+    write(
+      dir,
+      CALLS,
+      TWO_TESTS.replace(
+        '  expect(result.reason).toBe("blocked");\n',
+        "",
+      ).replace(
+        '"queued");\n',
+        '"queued");\n  if (result.status === "nope")\n    expect(result.reason).toBe("blocked");\n',
+      ),
+    );
+    const r = rules(dir);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(
+      `- ${CALLS} > expect at line 7: the change removes this expect line`,
+    );
+    // A test moved, but its expects pasted under another test that starts after it.
+    const split = project({ [BLOCKED]: BLOCKED_TEST });
+    rmSync(join(split, BLOCKED));
+    const [start, setup, ...rest] = BLOCKED_TEST.split("\n");
+    write(
+      split,
+      "services/worker/test/blocked-2.test.ts",
+      [start, setup, "});", 'it("pads the list", () => {', ...rest].join("\n"),
+    );
+    const s = rules(split);
+    expect(s.out).toContain("2 problem(s)");
+    expect(s.out).toContain(`- ${BLOCKED} > expect at line 3:`);
+    expect(s.out).toContain(`- ${BLOCKED} > expect at line 4:`);
   });
 
   it("still checks moved lines for skipped tests, throwing stubs and silenced checks", () => {
@@ -519,6 +817,61 @@ describe("a re-export", () => {
       'import { toCents } from "./lib";\ntoCents(1);\n',
     );
     expect(rules(dir).status).toBe(0);
+  });
+
+  it("checks a name added inside a multi-line export list as an export", () => {
+    const dir = project({
+      "packages/harness/src/llm.ts":
+        "export const createAnthropicProvider = () => 1;\nexport const selectProvider = () => 2;\n",
+      "packages/harness/src/index.ts":
+        'export {\n  createAnthropicProvider,\n} from "./llm";\n',
+      "packages/harness/src/money.ts":
+        "const toCents = (n: number) => n * 100;\nconst toRupees = (n: number) => n / 100;\nexport {\n  toCents,\n};\n",
+      [`${src}/jobs.ts`]:
+        'import { createAnthropicProvider, toCents } from "@revenue-os/harness";\ncreateAnthropicProvider();\ntoCents(1);\n',
+    });
+    write(
+      dir,
+      "packages/harness/src/index.ts",
+      'export {\n  createAnthropicProvider,\n  selectProvider,\n} from "./llm";\nexport * from "./money";\n',
+    );
+    write(
+      dir,
+      "packages/harness/src/money.ts",
+      "const toCents = (n: number) => n * 100;\nconst toRupees = (n: number) => n / 100;\nexport {\n  toCents,\n  toRupees };\n",
+    );
+    const r = rules(dir);
+    expect(r.out).toContain("2 problem(s)");
+    expect(r.out).toContain(
+      "- packages/harness/src/index.ts:3 exports selectProvider, but nothing outside tests uses it",
+    );
+    expect(r.out).toContain(
+      "- packages/harness/src/money.ts:5 exports toRupees, but nothing outside tests uses it",
+    );
+    write(
+      dir,
+      `${src}/jobs.ts`,
+      'import { createAnthropicProvider, selectProvider, toCents, toRupees } from "@revenue-os/harness";\ncreateAnthropicProvider();\nselectProvider();\ntoRupees(toCents(1));\n',
+    );
+    expect(rules(dir).status).toBe(0);
+  });
+
+  it("never reads, for `export * from`, a file outside the checkout or one git ignores", () => {
+    const dir = project({ ".gitignore": "ignored.ts\n" });
+    const outside = `${dir}-outside.ts`; // beside the checkout, not in it
+    dirs.push(outside);
+    write(dir, "ignored.ts", "export const fromIgnored = 1;\n");
+    writeFileSync(outside, "export const fromOutside = 1;\n");
+    write(
+      dir,
+      "packages/x/src/a.ts",
+      `export * from "../../../../${basename(outside, ".ts")}";\n`,
+    );
+    write(dir, "packages/x/src/b.ts", 'export * from "../../../ignored";\n');
+    expect(rules(dir)).toEqual({
+      status: 0,
+      out: "Done rules ✓ nothing in the change since main breaks them\n",
+    }); // let through unread, as `export *` from a package name is
   });
 
   it("lets `export * from` a module of types alone through, as the rules check no type", () => {

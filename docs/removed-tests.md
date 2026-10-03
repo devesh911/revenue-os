@@ -1,18 +1,31 @@
 # Removed tests
 
 Every test file, test (`it(` or `test(`) or `expect` line a change removes is named here by that same change, one line
-each, with why. A test moved into another test file is not removed (the done gate finds moves with git's moved-code
-detection); a test or expect line rewritten where it stood is an edit. The done gate refuses a change that removes a
-test without its line here (scripts/done-gate/removed-tests.ts), shows each line to Devesh at the agent's stop and in
-CI's log, and `rules-from-main` refuses a pull request whose body does not copy each line this file gains.
+each, with why. The done gate refuses a change that removes a test without its line here
+(scripts/done-gate/removed-tests.ts), shows each line to Devesh at the agent's stop and in CI's log, and
+`rules-from-main` refuses a pull request whose body does not copy each line this file gains.
+
+What is not a removal:
+
+- A test moved whole into a file a test runner runs (bun runs `*.test.*`, `*_test.*`, `*.spec.*` and `*_spec.*`;
+  Playwright runs `*.e2e.ts`): its first line and each of its expect lines land together, as git's moved-code
+  detection sees them. One file split into several is this.
+- A test renamed where it stands, none of its expect lines removed.
+- An expect line rewritten where it stood, in the same run of changed lines, into one that checks more than a constant.
+
+What is a removal, though the text lives on: a test moved into a file no runner runs (a helper, a note); an expect
+moved on its own, without its test, even into another test; a test renamed as its expect lines go (rewritten); an
+expect rewritten into `expect(true)`, `expect(1)` or another constant.
 
 The line, newest first under "Lines" (a leading "- " is allowed):
 
 `YYYY-MM-DD · <file> > <test name | expect at line N | whole file> · <why>`
 
-- `<file>` is the test file's path. `<test name>` is the test's name exactly as its `it(` or `test(` line writes it.
-  `expect at line N` is the line the expect had before the change. `whole file` covers a deleted test file and
+- `<file>` is the test file's path. `<test name>` is the test's name exactly as its `it(` or `test(` line wrote it
+  before the change. `expect at line N` is the line the expect had where the branch left main (CI's `checks`,
+  `rules-from-main` and an agent's stop all number it so). `whole file` covers a test file the change deletes, and
   everything in it.
-- The gate's message for each removal gives the line to write; only `<why>` is yours, in plain words.
+- The gate's message for each removal gives the line to write; only `<why>` is yours, in plain words: what checks
+  this now, or why nothing needs to.
 
 ## Lines

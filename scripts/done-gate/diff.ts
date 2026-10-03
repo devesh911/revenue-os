@@ -1,13 +1,17 @@
 // The change as git reports it: the files a diff touches, the files it deletes, and every line it adds and removes,
 // numbered, with the hunk (the run of changed lines) it sits in.
 
-/** A changed line. `hunk` counts git's hunks from 1 across the diff; `moved`: git saw the line move (moved.ts). */
+/**
+ * A changed line. `hunk` counts git's hunks from 1 across the diff; `moved`: git saw the line move (moved.ts);
+ * `within`: for an added line inside a multi-line `export { … }` list, the statement it adds alone (code-text.ts).
+ */
 export type Added = {
   file: string;
   line: number;
   text: string;
   hunk?: number;
   moved?: boolean;
+  within?: string;
 };
 
 const ESCAPE: Record<string, number> = {
