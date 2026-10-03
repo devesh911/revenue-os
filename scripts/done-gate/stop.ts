@@ -65,12 +65,12 @@ export async function stop(
       );
     }
   if (!work.length) return notes.length ? say(notes.join("\n")) : undefined;
-  const tasks = input.background_tasks ?? [];
-  const background = Boolean(tasks.length || input.session_crons?.length); // only the database checks wait (not-run.ts)
-  // A verifier the agent started in the background, as Claude Code lists it: its ruling is still to come.
-  const verifying = tasks.some(
-    (t) => (t as { agent_type?: unknown } | null)?.agent_type === "verifier",
-  );
+  const background = Boolean(
+    input.background_tasks?.length || input.session_crons?.length,
+  ); // only the database checks wait (not-run.ts)
+  // A verifier of this session started and not yet stopped (verifier.ts notes both), so its ruling is still to come.
+  const verifying =
+    background && store.list("verifier-running", `${session}-`).length > 0;
   for (const tree of new Set([...trees, ...work.map((w) => w.tree)])) {
     const pause = store.take("pause", tree);
     if (pause)

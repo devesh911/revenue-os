@@ -119,6 +119,7 @@ export function verifierStarts(
   store: Store,
   session: string,
 ) {
+  store.put("verifier-running", keyOf(session, input), "1"); // until its stop: a stop meanwhile awaits its ruling (stop.ts)
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
@@ -141,6 +142,7 @@ const sendBack = (why: string) => {
 /** When the verifier stops: its delivered ruling, if it counts, becomes the gate's record for that exact code. */
 export function verifierStops(input: HookInput, store: Store, session: string) {
   const key = keyOf(session, input);
+  store.take("verifier-running", key);
   const handed = store.take("handed", key);
   const stated = rulingOf(input.last_assistant_message ?? "");
   const run = runOf(input.agent_transcript_path);

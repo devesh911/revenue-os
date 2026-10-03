@@ -20,6 +20,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { noDocker as dockerMissing } from "./done-gate/checks";
 import {
   removeTranscripts,
   runHook,
@@ -310,19 +311,6 @@ describe("a stop judges a checkout whose latest commit main does not hold, howev
 });
 
 describe("while background work runs, a stop still judges the done rules and the verifier; only the database checks wait", () => {
-  // As Claude Code 2.1.288 lists a verifier the agent started in the background (its Stop input's background_tasks).
-  const VERIFYING = {
-    background_tasks: [
-      {
-        id: "a1",
-        type: "subagent",
-        status: "running",
-        description: "Verify the change",
-        agent_type: "verifier",
-      },
-    ],
-  };
-
   it("sends the agent back on a rule problem", () => {
     const dir = repo();
     write(dir, "services/worker/src/a.ts", "// @ts-ignore\n");
@@ -371,17 +359,27 @@ describe("while background work runs, a stop still judges the done rules and the
     const dir = repo();
     start(dir);
     write(dir, "services/worker/src/route.ts", "const route = 1;\n");
-    for (let i = 0; i < 6; i++)
-      expect(stop(dir, VERIFYING)).toEqual({
-        ...QUIET,
-        told: `${WAITING} · NOT verified yet: the verifier is still running, and the first stop after it ends reads its ruling`,
-      });
-    verified(dir, "saw the route answer 200");
+    // While it works, the session stops again and again. The gate knows it runs from its own start and stop hooks,
+    // whatever shape Claude Code gives its entry in background_tasks.
+    const agent = { background_tasks: [{ id: "a1", type: "local_agent" }] };
+    verifierRun(GATE, dir, {
+      report: "Ruling: PASS — saw the route answer 200",
+      during: () => {
+        for (let i = 0; i < 6; i++)
+          expect(stop(dir, agent)).toEqual({
+            ...QUIET,
+            told: `${WAITING} · NOT verified yet: the verifier is still running, and the first stop after it ends reads its ruling`,
+          });
+      },
+    });
     expect(stop(dir)).toEqual({
       ...QUIET,
       told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
     });
     expect(databaseChecksRan(dir)).toBe(3);
+    // Once it stopped, other background work no longer stands in for a ruling on code it never saw.
+    write(dir, "services/worker/src/route.ts", "const route = 2;\n");
+    expect(stop(dir, BACKGROUND).sentBack).toBe(true);
   });
 
   it("judges the same code afresh at the first stop after the work ends, even after the agent gave up", () => {
@@ -516,5 +514,15 @@ describe("a stop on a machine without Docker says what did not run, never with a
     });
     expect(JSON.parse(r.stdout).systemMessage).toStartWith("Done gate ✓ ");
     expect(databaseChecksRan(dir)).toBe(3);
+  });
+
+  it("asks the docker first on the PATH as the gate set it while running, on Linux too, where docker sits in /usr/bin", () => {
+    const path = process.env.PATH;
+    process.env.PATH = `${noDockerBin()}:${path}`; // a folder put first after bun started, as scripts/done-gate.ts does
+    try {
+      expect(dockerMissing()).toBe(true);
+    } finally {
+      process.env.PATH = path;
+    }
   });
 });
