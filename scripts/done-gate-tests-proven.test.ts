@@ -402,7 +402,10 @@ it("reads three rows", () => {
     const r = prove(
       scratch({
         ...PRODUCT,
-        "apps/x/src/testing/sample.ts": "export const SAMPLE = 1;\n",
+        // a helper named only by another helper is a helper too
+        "apps/x/src/testing/sample.ts":
+          'import { ONE } from "./one";\n\nexport const SAMPLE = ONE;\n',
+        "apps/x/src/testing/one.ts": "export const ONE = 1;\n",
         "apps/x/src/__fixtures__/ones.json": "[1, 1]\n",
         "apps/x/test/sample.test.ts": `import { expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -689,6 +692,26 @@ it("lives in a git checkout", () => {
     expect(r.ok).toBe(false);
     expect(r.text).toContain(
       'apps/x/test/old.test.ts:8 "lives in a git checkout" passes on main\'s code too',
+    );
+  });
+
+  it("runs the change's side in a copy too, so a test leaning on a file git ignores can't pass there and fail on main", () => {
+    const dir = scratch(
+      {
+        ...PRODUCT,
+        "local.json": "1\n",
+        "apps/x/test/old.test.ts": `${OLD_TEST}
+it("matches the local file", () => {
+  expect(old()).toBe(Number(require("node:fs").readFileSync(\`\${import.meta.dir}/../../../local.json\`, "utf8")));
+});
+`,
+      },
+      { ".gitignore": "local.json\n" },
+    );
+    const r = prove(dir);
+    expect(r.ok).toBe(false);
+    expect(r.text).toContain(
+      'apps/x/test/old.test.ts:8 "matches the local file" fails on this change (in a scratch copy of it, which holds nothing git ignores)',
     );
   });
 
