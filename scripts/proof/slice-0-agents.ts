@@ -2,12 +2,11 @@
 // with only ANTHROPIC_EVALS_KEY (claude.ts), its transcript saved in the report. Without that key, or when Anthropic
 // refuses it (its spending limit used up), they wait on Devesh's Waiting item; they never use another key or login.
 
-import { existsSync, readdirSync, symlinkSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { rulingOf } from "../done-gate/ruling";
 import { onSharedStack } from "../done-gate/shared-stack";
 import { conversation } from "./claude";
-import { commit, git, inScratch, write } from "./scratch";
+import { commit, git, inScratch, sh, write } from "./scratch";
 import { whereWeAre } from "./slice-0-plan";
 import type { Need, Step } from "./step";
 import { timeLeft } from "./time-limit";
@@ -305,16 +304,20 @@ export const crossCompany: Step = {
         routes = routes.replace(from, to);
       }
       write(dir, ROUTES, `${routes}\n`);
+      // The clone's own packages, its workspaces linked to its own code (a link to the proved checkout's would
+      // check that code instead), from bun's cache; then the sample formatted as the gate's lint wants it.
+      for (const cmd of [
+        ["bun", "install", "--frozen-lockfile"],
+        ["bunx", "biome", "check", "--write", ...Object.keys(SAMPLE), ROUTES],
+        ["bunx", "biome", "check", "--write", "packages/db/src/index.ts"],
+      ]) {
+        const r = sh(dir, cmd);
+        if (r.status !== 0)
+          throw new Error(
+            `\`${cmd.join(" ")}\` failed in the scratch clone: ${r.out.trim().split("\n").slice(-3).join(" / ")}`,
+          );
+      }
       commit(dir, "An API endpoint for a company's open-task count");
-      // The installed packages of the proved checkout, so the verifier can run the tests without installing any.
-      const workspaces = ["apps", "packages", "services"].flatMap((d) =>
-        existsSync(join(root, d))
-          ? readdirSync(join(root, d)).map((p) => `${d}/${p}`)
-          : [],
-      );
-      for (const m of ["", ...workspaces].map((w) => join(w, "node_modules")))
-        if (existsSync(join(root, m)) && existsSync(dirname(join(dir, m))))
-          symlinkSync(join(root, m), join(dir, m));
       // The verifier runs the whole gate and the tests on the one local database: it takes the proved checkout's
       // turn on it, as `bun run gate` does, since its scratch clone's own lock would not.
       return onSharedStack(
