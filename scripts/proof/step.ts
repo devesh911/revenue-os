@@ -29,3 +29,10 @@ export type Step = {
   /** Returns what was seen. Throws, saying what was seen instead, when the product does not do what it should. */
   check: (ctx: Context) => string | Promise<string>;
 };
+
+/**
+ * What a check throws when something it needs from Devesh turns out unusable while it runs (the evals key, its
+ * spending limit used up): the step waits on that STATE.md → Waiting on Devesh item, which the message names,
+ * instead of failing, so the slice and its items stay as they are.
+ */
+export class WaitingOn extends Error {}

@@ -7,7 +7,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseRoadmap } from "../docs/tracker/parse.js";
 import { banner, type Cycle } from "./cycle";
-import { readLatest } from "./proof/latest";
+import { proofLinkProblems } from "./done-gate/proof-link";
+import { reportHeading } from "./done-gate/proof-run";
+import { proofLines, readLatest } from "./proof/latest";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -47,6 +49,13 @@ describe("the field a passing proof run is written in", () => {
     ).toEqual([
       'Slice 0: the field "Seen by Devesh:" is now "Proof passed:"',
       'Slice 0 is missing its "Proof passed:" line',
+    ]);
+  });
+
+  it("is never on a slice with an unticked item: the parser reports a done slice that has one", () => {
+    const md = `# Roadmap\n\n${slice(0, "done", `2026-10-05 · [run 555](${URL0})`)}- [ ] B, never proved (agent)\n`;
+    expect(parseRoadmap(md).problems).toEqual([
+      expect.stringContaining("Slice 0 says done but 1 item is not ticked"),
     ]);
   });
 
@@ -143,6 +152,7 @@ describe("reading the latest proof runs with gh", () => {
       databaseId: 3,
       displayTitle: "Proof of Slice 4",
       status: "completed",
+      conclusion: "success",
       createdAt: "2026-10-06T03:00:00Z",
       url: "u3",
     },
@@ -150,6 +160,7 @@ describe("reading the latest proof runs with gh", () => {
       databaseId: 2,
       displayTitle: "Proof of every proof-ready or done slice (schedule)",
       status: "completed",
+      conclusion: "failure",
       createdAt: "2026-10-05T03:00:00Z",
       url: "u2",
     },
@@ -157,6 +168,7 @@ describe("reading the latest proof runs with gh", () => {
       databaseId: 1,
       displayTitle: "Proof of every proof-ready or done slice (schedule)",
       status: "completed",
+      conclusion: "success",
       createdAt: "2026-10-04T03:00:00Z",
       url: "u1",
     },
@@ -168,7 +180,14 @@ describe("reading the latest proof runs with gh", () => {
       1: { jobs: [job(0, "success"), job(1, "success", "skipped")] },
     });
     expect(readLatest(process.cwd(), [0, 1], env)).toEqual([
-      { n: 0, outcome: "failed", url: "u2", id: "2", date: "2026-10-05" },
+      {
+        n: 0,
+        outcome: "failed",
+        url: "u2",
+        id: "2",
+        date: "2026-10-05",
+        unlinkable: "concluded failure, not success",
+      },
       { n: 1, outcome: "waiting", url: "u1", id: "1", date: "2026-10-04" },
     ]);
   });
@@ -177,5 +196,109 @@ describe("reading the latest proof runs with gh", () => {
     expect(readLatest(process.cwd(), [0], gh([], {}, true))).toContain(
       "not logged in",
     );
+  });
+
+  it("gives up within its time, so a slow GitHub never holds a session's start past its hook's 20 seconds", () => {
+    const slow = gh(
+      [0, 1, 2, 3, 4].map((id) => ({ ...list[1], databaseId: id })),
+      Object.fromEntries([0, 1, 2, 3, 4].map((id) => [id, { jobs: [] }])),
+    );
+    // Each answer takes a second: the stand-in sleeps before it runs.
+    const bin = slow.PATH.split(":")[0] ?? "";
+    writeFileSync(
+      join(bin, "gh"),
+      `#!/bin/sh\nsleep 1\nif [ "$2" = list ]; then cat "${bin}/list.json"; else cat "${bin}/$3.json"; fi\n`,
+      { mode: 0o755 },
+    );
+    const started = Date.now();
+    const r = readLatest(process.cwd(), [0], slow, 2500);
+    expect(Date.now() - started).toBeLessThan(4000);
+    expect(String(r)).toContain("in time");
+  });
+});
+
+describe("the banner and rules-from-main judge a run alike", () => {
+  const URL42 = "https://github.com/devesh911/revenue-os/actions/runs/42";
+  const twoSlices = parseRoadmap(
+    `# Roadmap\n\n${slice(0, "proof ready")}\n${slice(1, "proof ready")}`,
+  ).slices;
+  const job = (n: number, conclusion: string) => ({
+    name: `proof (${n})`,
+    status: "completed",
+    conclusion,
+    steps: [
+      {
+        name: "Every step passed",
+        conclusion: conclusion === "success" ? "success" : "skipped",
+      },
+    ],
+  });
+  /** gh and GitHub's API both answering with run 42, whose run as a whole concluded `whole`. */
+  const run42 = (whole: string, jobs: unknown[]) => {
+    const bin = mkdtempSync(join(tmpdir(), "cycle-gh-"));
+    dirs.push(bin);
+    const listed = {
+      databaseId: 42,
+      displayTitle: "Proof of every proof-ready or done slice (schedule)",
+      status: "completed",
+      conclusion: whole,
+      createdAt: "2026-10-05T03:23:11Z",
+      url: URL42,
+    };
+    writeFileSync(join(bin, "list.json"), JSON.stringify([listed]));
+    writeFileSync(join(bin, "42.json"), JSON.stringify({ jobs }));
+    writeFileSync(
+      join(bin, "gh"),
+      `#!/bin/sh\nif [ "$2" = list ]; then cat "${bin}/list.json"; else cat "${bin}/42.json"; fi\n`,
+      { mode: 0o755 },
+    );
+    const api = async (path: string) =>
+      path.endsWith("/jobs?filter=latest&per_page=100")
+        ? { jobs }
+        : {
+            path: ".github/workflows/proof.yml",
+            status: "completed",
+            conclusion: whole,
+            head_sha: "a".repeat(40),
+            created_at: "2026-10-05T03:23:11Z",
+          };
+    return { env: { PATH: `${bin}:${process.env.PATH}` }, api };
+  };
+  /** What the banner says about Slice 0, and what rules-from-main says of the pull request its line asks for. */
+  const both = async (whole: string, jobs: unknown[]) => {
+    const r = run42(whole, jobs);
+    const line =
+      proofLines(twoSlices, readLatest(process.cwd(), [0, 1], r.env))[0] ?? "";
+    const passed = line.match(/"Proof passed: ([^"]+)"/)?.[1];
+    const problems = passed
+      ? await proofLinkProblems({
+          now: `# Roadmap\n\n${slice(0, "done", passed)}`,
+          main: `# Roadmap\n\n${slice(0, "proof ready")}`,
+          body: `Roadmap: Slice 0 — replan: its proof passed\n\n${reportHeading(0, "passed")}\nRun: ${URL42} · commit aaaaaaa · 2026-10-05\n`,
+          repo: "devesh911/revenue-os",
+          ask: r.api,
+          onMain: () => true,
+        })
+      : undefined;
+    return { line, problems };
+  };
+
+  it("does not ask for a slice to be set done with a run whose run as a whole failed, which rules-from-main refuses", async () => {
+    const { line, problems } = await both("failure", [
+      job(0, "success"),
+      job(1, "failure"),
+    ]);
+    expect(problems).toBeUndefined();
+    expect(line).not.toContain("Set it to done");
+    expect(line).toContain("concluded failure");
+  });
+
+  it("when it asks for a slice to be set done, rules-from-main lets that pull request through", async () => {
+    const { line, problems } = await both("success", [
+      job(0, "success"),
+      job(1, "success"),
+    ]);
+    expect(line).toContain("Set it to done");
+    expect(problems).toEqual([]);
   });
 });

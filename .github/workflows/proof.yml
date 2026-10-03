@@ -65,7 +65,7 @@ jobs:
     needs: due
     if: needs.due.outputs.slices != '[]'
     runs-on: ubuntu-latest
-    timeout-minutes: 120 # Slice 0's whole-suite runs at once and its two model steps take up to 45 minutes each
+    timeout-minutes: 120 # the steps stop at 100 minutes (scripts/proof/run.ts RUN_MINUTES), so the report is always written
     permissions:
       contents: read
       actions: read # a step may read GitHub's run records (Slice 0's proof reads staging-migrations' and ci's runs)
@@ -114,6 +114,11 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code@2.1.288
 
+      # The browser the gate's browser checks use, as ci.yml installs it: Slice 0's verifier run runs the whole gate.
+      - name: Install the browser checks' browser
+        if: matrix.slice <= 1
+        run: bunx playwright install --with-deps chromium
+
       # A step that needs an AI model reads ANTHROPIC_EVALS_KEY; while the secret is absent it reports waiting on
       # STATE.md → Waiting on Devesh. Exit 1 only when a step failed; `result` says passed, waiting or failed.
       - name: Prove the slice
@@ -140,7 +145,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      actions: read
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         continue-on-error: true # a slice whose job wrote no report is posted as stopped below

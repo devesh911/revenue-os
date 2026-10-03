@@ -121,6 +121,11 @@ export function parseRoadmap(md) {
       );
     if (s.Status === "done" && !passedOk(s["Proof passed"]))
       problems.push(`Slice ${s.n} says done but "Proof passed" has no date`);
+    const open = s.items.filter((i) => !i.done).length;
+    if (s.Status === "done" && open)
+      problems.push(
+        `Slice ${s.n} says done but ${open} item${open === 1 ? " is" : "s are"} not ticked`,
+      );
     slices.push(s);
   }
   if (!slices.length) problems.push("No slices found in ROADMAP.md");

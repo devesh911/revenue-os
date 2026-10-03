@@ -2,12 +2,15 @@
 // commit, judged from main's checkout as data, as rules-from-main judges a pull request (`bun scripts/done-gate.ts pr
 // --base main --head <branch>`, with a sample body and 9999 as its number) or as CI's done rules do (`… rules`). No
 // pull request is opened: one opened from a GitHub workflow starts no other workflows. Where a refusal could be for
-// another reason, the same change, put right, must pass.
+// another reason, the same change, put right, must pass. The two cases of a branch that rewrites what judges it (its
+// own gate, ci.yml) also run main's rules-from-main workflow as GitHub runs it (rules-from-main.ts): a branch can't
+// escape main's copy only because GitHub runs main's copy of that file.
 
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { areasOf, TABLE } from "../done-gate/fix-when-touched";
 import { judged, PR, rules } from "./gate";
+import { byWorkflow } from "./rules-from-main";
 import { commit, git, inScratch, sh, write } from "./scratch";
 import type { Step } from "./step";
 
@@ -116,27 +119,27 @@ export const unexplainedRuleChange: Step = {
     }),
 };
 
+const GATE = "scripts/done-gate.ts";
+const CI = ".github/workflows/ci.yml";
+const CHECKS_NOTHING =
+  "name: ci\non: [push, pull_request]\npermissions:\n  contents: read\njobs:\n  checks:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo nothing is checked\n";
+const RUN_AS_GITHUB =
+  "main's `rules-from-main` workflow, run as GitHub runs it (main's copy of the file, as `pull_request_target` runs it; its checkout of main and its steps, with the pull request fetched as data)";
+
 export const loosenedGate: Step = {
-  does: `Judges with main's copy of \`rules-from-main\` a branch that loosens its own copy of the gate (its scripts/done-gate.ts passes anything) and adds product code that switches the type checker off (${SAMPLE}), explained and recorded, and checks that main's copy refuses it while the branch's own copy passes it`,
+  does: `Judges with ${RUN_AS_GITHUB} a branch that loosens its own copy of the gate (its scripts/done-gate.ts passes anything) and adds product code that switches the type checker off (${SAMPLE}), explained and recorded, and checks that it refuses the branch while the branch's own copy passes it; and that main's copy refuses the loosened gate alone when the body doesn't explain it`,
   check: ({ root }) =>
-    inScratch(root, ({ dir }) => {
+    inScratch(root, ({ dir, base }) => {
+      const loosen = () =>
+        write(dir, GATE, "process.exit(0); // passes anything\n");
       branch(dir, "loosened", () => {
-        write(
-          dir,
-          "scripts/done-gate.ts",
-          "process.exit(0); // passes anything\n",
-        );
+        loosen();
         write(dir, SAMPLE, UNCHECKED);
-        record(dir, "scripts/done-gate.ts");
+        record(dir, GATE);
       });
+      branch(dir, "loosened-unexplained", loosen);
       git(dir, "checkout", "-q", "loosened");
-      const own = sh(dir, [
-        "bun",
-        "scripts/done-gate.ts",
-        "rules",
-        "--base",
-        "main",
-      ]);
+      const own = sh(dir, ["bun", GATE, "rules", "--base", "main"]);
       git(dir, "checkout", "-q", "main");
       if (own.status !== 0)
         throw new Error(
@@ -144,36 +147,42 @@ export const loosenedGate: Step = {
         );
       const why = refused(
         MAIN,
-        judged(dir, body(dir, { rules: ["scripts/done-gate.ts"] }), "loosened"),
+        byWorkflow(dir, base, "loosened", body(dir, { rules: [GATE] })),
         SAMPLE,
       );
-      return `the branch's own copy passed it; main's copy refused it: ${why}`;
+      const alone = refused(
+        MAIN,
+        judged(dir, body(dir), "loosened-unexplained"),
+        GATE,
+      );
+      return `the branch's own copy passed it; main's workflow refused it: ${why}; the loosened gate alone, unexplained: ${alone}`;
     }),
 };
 
 export const rewrittenCi: Step = {
-  does: `Judges with main's copy of \`rules-from-main\` a branch that rewrites ci.yml so its \`checks\` job checks nothing and adds product code that switches the type checker off (${SAMPLE}), explained and recorded, and checks that main's copy refuses it`,
+  does: `Judges with ${RUN_AS_GITHUB} a branch that rewrites ci.yml so its \`checks\` job checks nothing and adds product code that switches the type checker off (${SAMPLE}), explained and recorded, and checks that it refuses the branch; and that main's copy refuses the ci.yml rewrite alone when the body doesn't explain it, and passes it explained and recorded`,
   check: ({ root }) =>
-    inScratch(root, ({ dir }) => {
+    inScratch(root, ({ dir, base }) => {
       branch(dir, "rewritten-ci", () => {
-        write(
-          dir,
-          ".github/workflows/ci.yml",
-          "name: ci\non: [push, pull_request]\npermissions:\n  contents: read\njobs:\n  checks:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo nothing is checked\n",
-        );
+        write(dir, CI, CHECKS_NOTHING);
         write(dir, SAMPLE, UNCHECKED);
-        record(dir, ".github/workflows/ci.yml");
+        record(dir, CI);
+      });
+      branch(dir, "ci-alone", () => {
+        write(dir, CI, CHECKS_NOTHING);
+        record(dir, CI);
       });
       const why = refused(
         MAIN,
-        judged(
-          dir,
-          body(dir, { rules: [".github/workflows/ci.yml"] }),
-          "rewritten-ci",
-        ),
+        byWorkflow(dir, base, "rewritten-ci", body(dir, { rules: [CI] })),
         SAMPLE,
       );
-      return `main's copy refused it, whatever the branch's ci.yml runs: ${why}`;
+      const alone = refused(MAIN, judged(dir, body(dir), "ci-alone"), CI);
+      passes(
+        judged(dir, body(dir, { rules: [CI] }), "ci-alone"),
+        "the ci.yml rewrite explained and recorded",
+      );
+      return `main's workflow refused it, whatever the branch's ci.yml runs: ${why}; the ci.yml rewrite alone, unexplained: ${alone}; explained and recorded, it passed`;
     }),
 };
 

@@ -1,7 +1,8 @@
 // Scratch copies of the checkout being proved, for the proof steps that change code or run the gate on it: a clone
 // whose `main` and origin/main are the proved commit, or a small repository holding only that commit's gate. Each
 // step makes its own and removes it, whatever happens. Nothing in them can reach GitHub: their origin is an address
-// that never resolves. Commands in them get only the PATH and home folder, never a token or key the run holds.
+// that never resolves. Commands in them get only the PATH and home folder, never a token or key the run holds,
+// except the scripted Claude Code session, which gets the evals key alone (claude.ts).
 
 import { spawnSync } from "node:child_process";
 import {
@@ -13,6 +14,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { timeLeft } from "./time-limit";
 
 export const ORIGIN = "https://example.invalid/proof/revenue-os.git";
 
@@ -27,7 +29,7 @@ export const plainEnv = (extra: Record<string, string | undefined> = {}) =>
     }).filter((e): e is [string, string] => e[1] !== undefined),
   );
 
-/** Runs `cmd` in `dir`: its exit status and what it printed, both streams together. */
+/** Runs `cmd` in `dir`, stopped when the step's time is up: its exit status and what it printed, both streams together. */
 export function sh(
   dir: string,
   cmd: string[],
@@ -40,6 +42,7 @@ export function sh(
     input,
     encoding: "utf8",
     maxBuffer: 64 << 20,
+    timeout: timeLeft(),
   });
   return {
     status: r.status ?? 1,

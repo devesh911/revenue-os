@@ -6,8 +6,10 @@
 // (it starts the suite, this file included) and the read of GitHub's real run records.
 import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -17,6 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { currentSlice, nextItem, parseRoadmap } from "../docs/tracker/parse.js";
+import { stateDir } from "./done-gate/store";
 import { runSteps } from "./proof/run";
 import { steps as slice0 } from "./proof/slice-0";
 import { agentSession, crossCompany } from "./proof/slice-0-agents";
@@ -63,6 +66,8 @@ const scratch = (name: string) => {
   return d;
 };
 const KEY = "A second Anthropic key for the automatic test conversations";
+// The fingerprint of Slice 0's Proof line as these steps were written to it.
+const PROOF_LINE = "d36d3a9763c629d6";
 const STATE = `PHASE: SETUP\n\n## Waiting on Devesh\n- [ ] **${KEY}**: saved in GitHub as ANTHROPIC_EVALS_KEY\n## Decisions in force\n`;
 const prove = (steps: Step[], root = ROOT, env: NodeJS.ProcessEnv = {}) =>
   runSteps(steps, {
@@ -77,6 +82,36 @@ const failures = (results: { does: string; outcome: string; seen: string }[]) =>
   results.flatMap((r) =>
     r.outcome === "passed" ? [] : [`${r.does}\n  ${r.seen}`],
   );
+/** A scratch copy of this checkout's commit with `edit` applied and committed, as `main`. */
+const copyOf = (edit: (dir: string) => void, message = "a changed copy") => {
+  const dir = scratch("proof-0-copy-");
+  git(dir, "init", "-q", "-b", "main");
+  git(dir, "fetch", "-q", "--no-tags", ROOT, "HEAD"); // CI checks out a detached commit, which a clone may not
+  git(dir, "checkout", "-q", "-B", "main", "FETCH_HEAD");
+  edit(dir);
+  spawnSync(
+    "git",
+    [
+      "-c",
+      "user.email=proof@example.invalid",
+      "-c",
+      "user.name=proof",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "-qam",
+      message,
+    ],
+    { cwd: dir },
+  );
+  return dir;
+};
+/** `file` in `dir` with `from` replaced by `to`; throws when `from` is not there, so a copy never silently stays the same. */
+const replaced = (dir: string, file: string, from: string, to: string) => {
+  const text = readFileSync(join(dir, file), "utf8");
+  if (!text.includes(from)) throw new Error(`${file} no longer has ${from}`);
+  writeFileSync(join(dir, file), text.replace(from, to));
+};
 
 // The refusals whose safeguard is on main today; the others' items are still being built.
 const ON_MAIN = [
@@ -167,68 +202,197 @@ describe("Slice 0's proof steps", () => {
   }, 600_000);
 
   it("every refusal step fails on a checkout whose gate, hooks and guards refuse nothing", async () => {
-    const weak = scratch("proof-0-weak-");
-    git(weak, "init", "-q", "-b", "main");
-    git(weak, "fetch", "-q", "--no-tags", ROOT, "HEAD"); // CI checks out a detached commit, which a clone may not
-    git(weak, "checkout", "-q", "-B", "main", "FETCH_HEAD");
     // The gate's entry does nothing, the hooks go quiet when it is missing, and the guards pass anything.
-    writeFileSync(join(weak, "scripts", "done-gate.ts"), "process.exit(0);\n");
-    writeFileSync(join(weak, "scripts", "guards.sh"), "exit 0\n");
-    const quiet = JSON.stringify({
-      hooks: {
-        Stop: [
-          {
-            hooks: [
-              {
-                type: "command",
-                command:
-                  'f="$CLAUDE_PROJECT_DIR/scripts/done-gate.ts"; [ -f "$f" ] || exit 0; exec bun "$f" hook',
-              },
-            ],
-          },
-        ],
-      },
-    });
-    writeFileSync(join(weak, ".claude", "settings.json"), quiet);
-    writeFileSync(join(weak, ".codex", "hooks.json"), quiet);
-    spawnSync(
-      "git",
-      [
-        "-c",
-        "user.email=proof@example.invalid",
-        "-c",
-        "user.name=proof",
-        "-c",
-        "commit.gpgsign=false",
-        "commit",
-        "-qam",
-        "a gate that refuses nothing",
-      ],
-      { cwd: weak },
-    );
+    const weak = copyOf((dir) => {
+      writeFileSync(join(dir, "scripts", "done-gate.ts"), "process.exit(0);\n");
+      writeFileSync(join(dir, "scripts", "guards.sh"), "exit 0\n");
+      const quiet = JSON.stringify({
+        hooks: {
+          Stop: [
+            {
+              hooks: [
+                {
+                  type: "command",
+                  command:
+                    'f="$CLAUDE_PROJECT_DIR/scripts/done-gate.ts"; [ -f "$f" ] || exit 0; exec bun "$f" hook',
+                },
+              ],
+            },
+          ],
+        },
+      });
+      writeFileSync(join(dir, ".claude", "settings.json"), quiet);
+      writeFileSync(join(dir, ".codex", "hooks.json"), quiet);
+    }, "a gate that refuses nothing");
     const results = await prove([...ON_MAIN, ...COMING], weak);
     expect(results.filter((r) => r.outcome !== "failed")).toEqual([]);
     expect(results.every((r) => r.seen.length > 0)).toBe(true);
   }, 600_000);
+
+  it("its Proof line is the one these steps were written to: a change to it must revisit them", () => {
+    const proof =
+      parseRoadmap(git(ROOT, "show", "HEAD:ROADMAP.md")).slices.find(
+        (s) => s.n === 0,
+      )?.Proof ?? "";
+    // A new or reworded check needs its step (scripts/proof/slice-0*.ts); then this fingerprint is updated.
+    expect(createHash("sha256").update(proof).digest("hex").slice(0, 16)).toBe(
+      PROOF_LINE,
+    );
+  });
 });
 
-type Answer = { when?: string; first?: string; say: string };
+describe("main's copy of rules-from-main, as GitHub runs it", () => {
+  const WORKFLOW = join(".github", "workflows", "rules-from-main.yml");
+  const JUDGE = "run: bun scripts/done-gate.ts pr";
+
+  it("a branch's loosened gate and rewritten ci.yml are refused only because GitHub runs main's copy of the workflow: on `pull_request` both steps fail", async () => {
+    const own = copyOf((dir) =>
+      replaced(dir, WORKFLOW, "pull_request_target:", "pull_request:"),
+    );
+    const results = await prove([loosenedGate, rewrittenCi], own);
+    expect(results.map((r) => [r.outcome, r.seen])).toEqual([
+      ["failed", expect.stringContaining("pull_request")],
+      ["failed", expect.stringContaining("pull_request")],
+    ]);
+  }, 300_000);
+
+  it("the loosened-gate step fails when the workflow judges with the branch's own copy of the gate", async () => {
+    const own = copyOf((dir) =>
+      replaced(
+        dir,
+        WORKFLOW,
+        JUDGE,
+        "run: git checkout -q refs/pr/head && bun scripts/done-gate.ts pr",
+      ),
+    );
+    const [r] = await prove([loosenedGate], own);
+    expect(r?.outcome).toBe("failed");
+  }, 300_000);
+
+  it("the rewritten-ci step fails when main's copy does not count ci.yml as a rule file, or the workflow judges nothing", async () => {
+    const unruled = copyOf((dir) =>
+      replaced(dir, "scripts/done-gate/rules.ts", "^(\\.github\\/|", "^("),
+    );
+    const idle = copyOf((dir) =>
+      replaced(dir, WORKFLOW, JUDGE, "run: echo judged nothing # "),
+    );
+    for (const copy of [unruled, idle]) {
+      const [r] = await prove([rewrittenCi], copy);
+      expect(r?.outcome).toBe("failed");
+    }
+  }, 300_000);
+});
+
+describe("the gate's hook, as the steps start it", () => {
+  it("never gets the run's GitHub token or evals key, whichever helper starts it", async () => {
+    const bin = scratch("proof-0-bun-");
+    const log = join(bin, "env.txt");
+    writeFileSync(
+      join(bin, "bun"),
+      `#!/bin/sh\necho "gh=\${GH_TOKEN:-none} evals=\${ANTHROPIC_EVALS_KEY:-none}" >> "${log}"\nexec "${process.execPath}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const was = { ...process.env };
+    Object.assign(process.env, {
+      PATH: `${bin}:${process.env.PATH}`,
+      GH_TOKEN: "sentinel-gh-token",
+      ANTHROPIC_EVALS_KEY: "sentinel-evals-key",
+    });
+    let results: Awaited<ReturnType<typeof prove>>;
+    try {
+      results = await prove([undeliveredRuling, adminMerge]);
+    } finally {
+      for (const k of ["PATH", "GH_TOKEN", "ANTHROPIC_EVALS_KEY"])
+        if (was[k] === undefined) delete process.env[k];
+        else process.env[k] = was[k];
+    }
+    expect(failures(results)).toEqual([]);
+    const calls = readFileSync(log, "utf8").trim().split("\n");
+    expect(calls.length).toBeGreaterThan(5);
+    expect(calls.filter((c) => c !== "gh=none evals=none")).toEqual([]);
+  }, 300_000);
+});
+
+describe("the step for a session started after interrupted work", () => {
+  it("hands the gate that work as it is left: in a worktree of its own, by a session quiet for 15 minutes and more", async () => {
+    // A stand-in gate that logs each call, holds the second session at its start and sends its stop back until the
+    // checks have passed: the step's own checks pass on it, so what is under test is what the step hands the gate.
+    const log = join(scratch("proof-0-held-"), "calls.jsonl");
+    const repo = scratch("proof-0-stand-in-");
+    mkdirSync(join(repo, "scripts"));
+    writeFileSync(
+      join(repo, "scripts", "done-gate.ts"),
+      `import { spawnSync } from "node:child_process";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+const rev = (what: string) => spawnSync("git", ["rev-parse", "--path-format=absolute", what], { encoding: "utf8" }).stdout.trim();
+const common = rev("--git-common-dir");
+const [cmd, ...args] = process.argv.slice(2);
+const input = cmd === "hook" ? JSON.parse(readFileSync(0, "utf8")) : {};
+appendFileSync(${JSON.stringify(log)}, \`\${JSON.stringify({ cmd, event: input.hook_event_name, session: input.session_id, worktree: rev("--git-dir") !== common, at: Date.now() })}\\n\`);
+if (cmd === "checkpoint") writeFileSync(\`\${common}/next.txt\`, args[args.indexOf("--next") + 1] ?? "");
+const two = input.session_id === "proof-2";
+if (two && input.hook_event_name === "SessionStart")
+  console.log(JSON.stringify({ hookSpecificOutput: { additionalContext: \`Next step: \${readFileSync(\`\${common}/next.txt\`, "utf8")}\` }, systemMessage: "Done gate: this session is held to unchecked work" }));
+if (two && input.hook_event_name === "Stop" && !existsSync(\`\${common}/done-gate/checked\`))
+  console.log(JSON.stringify({ decision: "block", reason: "the checks have not passed" }));
+`,
+    );
+    git(repo, "init", "-q", "-b", "main");
+    git(repo, "add", "-A");
+    git(
+      repo,
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "user.name=t",
+      "commit",
+      "-qm",
+      "a stand-in gate",
+    );
+    const [r] = await prove([interrupted], repo);
+    expect(r?.seen).toContain("held");
+    expect(r?.outcome).toBe("passed");
+    type Call = {
+      session?: string;
+      cmd: string;
+      worktree: boolean;
+      at: number;
+    };
+    const calls = readFileSync(log, "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as Call);
+    expect(calls.filter((c) => !c.worktree)).toEqual([]);
+    const before = calls.filter(
+      (c) => c.session === "proof-1" || c.cmd === "checkpoint",
+    );
+    const after = calls.filter((c) => c.session === "proof-2");
+    expect(before.length).toBeGreaterThan(2);
+    expect(after.length).toBeGreaterThan(2);
+    const quiet =
+      Math.min(...after.map((c) => c.at)) -
+      Math.max(...before.map((c) => c.at));
+    expect(quiet).toBeGreaterThanOrEqual(15 * 60_000);
+  }, 120_000);
+});
+
+type Answer = { when?: string; first?: string; say: string; error?: boolean };
 /**
  * A stand-in `claude` that logs each call (its arguments, key, GitHub token, home and folder) and answers as
  * `claude -p --output-format stream-json` does: the first answer whose `when` the prompt (its last argument) holds,
- * after running `first` in its folder.
+ * after running `first` in its folder (`error`: as Claude Code reports an error from Anthropic's API).
  */
 const standIn = (answers: Answer[]) => {
   const bin = scratch("proof-0-claude-");
   const log = join(bin, "calls.txt");
-  const events = (text: string) =>
+  const events = (text: string, error = false) =>
     [
       { type: "system", subtype: "init", session_id: "stand-in" },
       { type: "assistant", message: { content: [{ type: "text", text }] } },
       {
         type: "result",
         subtype: "success",
-        is_error: false,
+        is_error: error,
         session_id: "stand-in",
         result: text,
       },
@@ -236,7 +400,7 @@ const standIn = (answers: Answer[]) => {
       .map((e) => `${JSON.stringify(e)}\n`)
       .join("");
   const cases = answers.map((a, i) => {
-    writeFileSync(join(bin, `answer-${i}.txt`), events(a.say));
+    writeFileSync(join(bin, `answer-${i}.txt`), events(a.say, a.error));
     return `  *"${a.when ?? ""}"*) ${a.first ?? ":"} >/dev/null 2>&1; cat "${join(bin, `answer-${i}.txt`)}" ;;`;
   });
   writeFileSync(
@@ -314,24 +478,59 @@ describe("the scripted fresh agent session", () => {
     expect(r?.outcome).toBe("failed");
     expect(r?.seen).toContain("feat/dark-mode");
   });
+
+  it("may run git to look around and make a branch, never to push", async () => {
+    const claude = session();
+    await prove([agentSession], ROOT, {
+      ...claude.env,
+      ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
+    });
+    const args = claude.calls().split("\n")[0] ?? "";
+    expect(args).toContain("Bash(git checkout:*)");
+    expect(args).not.toContain("Bash(git:*)");
+    expect(args).not.toContain("push");
+  });
+
+  it("waits on Devesh, naming the key's Waiting item, when Anthropic refuses the key for its spending limit", async () => {
+    const claude = standIn([
+      {
+        say: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+        error: true,
+      },
+    ]);
+    const [r] = await prove([agentSession], ROOT, {
+      ...claude.env,
+      ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
+    });
+    expect(r?.outcome).toBe("waiting");
+    expect(r?.seen).toContain(KEY);
+    expect(r?.seen).toContain("credit balance is too low");
+  });
 });
 
 describe("the verifier's run on a change missing a cross-company test", () => {
-  const verifier = (ruling: string) =>
-    standIn([{ say: `I ran its test.\n${ruling}` }]);
+  const verifier = (ruling: string, first?: string) =>
+    standIn([{ say: `I ran its test.\n${ruling}`, first }]);
+  // A copy of this checkout's commit: the step takes the proved checkout's turn on the shared local stack, which a
+  // gate run of this checkout may be holding while it runs these tests.
+  const root = () => copyOf(() => {});
 
   it("waits on Devesh's evals key without it", async () => {
     const claude = verifier("Ruling: PASS — x");
-    const [r] = await prove([crossCompany], ROOT, claude.env);
+    const [r] = await prove([crossCompany], root(), claude.env);
     expect(r?.outcome).toBe("waiting");
     expect(claude.calls()).toBe("");
   });
 
-  it("passes when the verifier, started as the verifier agent with only the evals key, rules FAIL for the other company", async () => {
+  it("passes when the verifier, started as the verifier agent with only the evals key, rules FAIL for the other company, while it holds the shared local stack", async () => {
+    const copy = root();
+    const lock = join(stateDir(copy), "local-stack.lock");
+    const seen = join(scratch("proof-0-lock-"), "seen.txt");
     const claude = verifier(
       "Ruling: FAIL — no test asks for another company's open tasks; add a cross-company test",
+      `{ { test -f "${lock}" && echo held || echo free; } > "${seen}"; }`,
     );
-    const [r] = await prove([crossCompany], ROOT, {
+    const [r] = await prove([crossCompany], copy, {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
     });
@@ -340,16 +539,37 @@ describe("the verifier's run on a change missing a cross-company test", () => {
     const calls = claude.calls();
     expect(calls).toContain("--agent verifier");
     expect(calls).toContain("key: evals-key-for-tests");
+    expect(readFileSync(seen, "utf8").trim()).toBe("held");
   });
 
-  it("fails when the verifier passes it", async () => {
-    const claude = verifier("Ruling: PASS — the count is right");
-    const [r] = await prove([crossCompany], ROOT, {
+  it("fails when the verifier passes it, or fails it for another reason though its report names another company elsewhere", async () => {
+    for (const ruling of [
+      "Ruling: PASS — the count is right",
+      "Another company's tasks are never counted, I checked.\nRuling: FAIL — nothing outside tests calls openTaskCount",
+    ]) {
+      const claude = verifier(ruling);
+      const [r] = await prove([crossCompany], root(), {
+        ...claude.env,
+        ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
+      });
+      expect(r?.outcome).toBe("failed");
+      expect(r?.seen).toContain(ruling.includes("PASS") ? "PASS" : "FAIL");
+    }
+  });
+
+  it("gives its sample a production caller and a test at the API layer, so the only thing missing is the other company", async () => {
+    const out = join(scratch("proof-0-diff-"), "changed.txt");
+    const claude = verifier(
+      "Ruling: FAIL — add a cross-company test",
+      `{ git diff --name-only main > "${out}"; }`,
+    );
+    await prove([crossCompany], root(), {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
     });
-    expect(r?.outcome).toBe("failed");
-    expect(r?.seen).toContain("PASS");
+    const changed = readFileSync(out, "utf8");
+    expect(changed).toContain("services/worker/src/routes/screens.ts");
+    expect(changed).toMatch(/services\/worker\/test\/[\w-]+\.test\.ts/);
   });
 });
 

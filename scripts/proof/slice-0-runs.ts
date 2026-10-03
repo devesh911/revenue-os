@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { git, plainEnv } from "./scratch";
 import type { Step } from "./step";
+import { timeLeft } from "./time-limit";
 
 const STAGING = "staging-migrations.yml";
 const APPLY = "Apply migrations to staging";
@@ -78,6 +79,7 @@ function gh<T>(root: string, env: NodeJS.ProcessEnv, args: string[]): T {
     cwd: root,
     encoding: "utf8",
     env: plainEnv({ GH_TOKEN: env.GH_TOKEN }),
+    timeout: timeLeft(),
   });
   if (r.status !== 0)
     throw new Error(

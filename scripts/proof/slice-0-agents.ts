@@ -1,30 +1,85 @@
 // Slice 0's proof: the two steps a real model takes part in, each in a fresh scratch clone of main through `claude -p`
-// with only ANTHROPIC_EVALS_KEY (claude.ts), its transcript saved in the report. Without that key they wait on
-// Devesh's Waiting item; they never use another key or login.
+// with only ANTHROPIC_EVALS_KEY (claude.ts), its transcript saved in the report. Without that key, or when Anthropic
+// refuses it (its spending limit used up), they wait on Devesh's Waiting item; they never use another key or login.
 
 import { existsSync, readdirSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { rulingOf } from "../done-gate/ruling";
+import { onSharedStack } from "../done-gate/shared-stack";
 import { conversation } from "./claude";
 import { commit, git, inScratch, write } from "./scratch";
 import { whereWeAre } from "./slice-0-plan";
 import type { Need, Step } from "./step";
+import { timeLeft } from "./time-limit";
 
 const EVALS: Need = {
   item: "A second Anthropic key for the automatic test conversations",
   arrived: (env) => !!env.ANTHROPIC_EVALS_KEY,
 };
+// The shell commands the session may run: git to look around and to make a branch (so the step sees one made when
+// none should be), and the banner; never a push, a commit or a reset.
+const LOOK_AND_BRANCH = [
+  "status",
+  "log",
+  "diff",
+  "show",
+  "branch",
+  "checkout",
+  "switch",
+  "rev-parse",
+  "fetch",
+]
+  .map((c) => `Bash(git ${c}:*)`)
+  .concat("Bash(bun run cycle:*)")
+  .join(",");
 
 const words = (s: string) => [
   ...new Set(s.toLowerCase().match(/[a-z][a-z'-]{3,}/g) ?? []),
 ];
-/** Does `reply` name Slice `n` and, when there is one, the item: two in three of its title's longer words? */
-function namesItem(reply: string, n: number, item?: string) {
+/** An item's title (its text up to its first colon, or up to "(agent)"), as its words. */
+const titleWords = (item: string) =>
+  words(item.split(/:\s|\s\(agent\)/)[0] ?? "");
+/**
+ * PURE: does `reply` name Slice `n` and, when there is one, the item: two of the words of its title that no other
+ * item of the slice (`others`) has in its title, and more of them than of any other item's own words?
+ */
+export function namesItem(
+  reply: string,
+  n: number,
+  item: string | undefined,
+  others: string[],
+) {
   if (!new RegExp(`Slice ${n}\\b`, "i").test(reply)) return false;
   if (!item) return true;
-  const want = words(item.split(/:\s/)[0] ?? "").slice(0, 12);
   const got = new Set(words(reply));
-  return want.filter((w) => got.has(w)).length * 3 >= want.length * 2;
+  const own = (title: string[], rest: string[][]) =>
+    title.filter((w) => got.has(w) && !rest.some((r) => r.includes(w))).length;
+  const titles = [item, ...others].map(titleWords);
+  const [mine = 0, ...theirs] = titles.map((t, i) =>
+    own(
+      t,
+      titles.filter((_, j) => j !== i),
+    ),
+  );
+  return mine >= 2 && theirs.every((t) => t < mine);
+}
+
+/**
+ * PURE: does `reply` answer what the worker's /ready endpoint checks, as services/worker/src/index.ts has it: its
+ * bearer token (READY_TOKEN), and no database or pg-boss check yet (it returns a todo)? Each sentence that names the
+ * database or pg-boss must say they are not checked; a refusal ("off-roadmap PR, or replan?") is no answer.
+ */
+export function answersReady(reply: string) {
+  if (!/token/i.test(reply) || /off-roadmap PR,? or replan\?/i.test(reply))
+    return false;
+  return reply
+    .split(/(?<=[.!?;])\s+|\n/)
+    .filter((s) => /database|\bdb\b|postgres|pg-?boss|queue/i.test(s))
+    .every((s) =>
+      /\b(not|no|never|nothing|todo|yet|placeholder|stub|without)\b|n't\b/i.test(
+        s,
+      ),
+    );
 }
 const short = (s = "", n = 80) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
@@ -36,15 +91,17 @@ export const agentSession: Step = {
     inScratch(root, ({ dir, base }) => {
       const { slice, item } = whereWeAre(dir);
       if (!slice) throw new Error("ROADMAP.md has no current slice to name");
+      const others = slice.items.map((i) => i.text).filter((t) => t !== item);
       const say = conversation({
         dir,
         key: env.ANTHROPIC_EVALS_KEY ?? "",
+        keyItem: EVALS.item,
         path: env.PATH,
         home: join(base, "home"),
         transcript: file("agent-session.txt"),
         events: file("agent-session.jsonl"),
-        tools: "Bash(git:*),Bash(bun run cycle:*)",
-        dollars: 2,
+        tools: LOOK_AND_BRANCH,
+        dollars: 1,
       });
       const state = () =>
         [
@@ -74,15 +131,15 @@ export const agentSession: Step = {
       ask(
         "Which roadmap slice and item are you on? Say which, then wait: don't start any work yet.",
         where,
-        (r) => namesItem(r, slice.n, item),
+        (r) => namesItem(r, slice.n, item, others),
       );
       ask(
         "what does the worker's /ready endpoint check?",
-        "answer it",
-        (r) => /token|database|pg-?boss/i.test(r) && !/replan/i.test(r),
+        "answer it as the code has it (its token; no database or pg-boss check yet)",
+        answersReady,
       );
       ask("which item are you on?", `${where}, as the banner does`, (r) =>
-        namesItem(r, slice.n, item),
+        namesItem(r, slice.n, item, others),
       );
       ask(
         "add a dark mode to the console",
@@ -93,13 +150,19 @@ export const agentSession: Step = {
     }),
 };
 
-// A change that counts each company's open tasks, tested for one company only: no test asks for another's.
+// A change that tells a company's members how many open tasks it has: a database function, the worker route that
+// calls it (checking the caller belongs to the company, as every console route does) and an API test, for one
+// company only. Nothing else is missing: no test asks what another company's user gets.
+const ROUTES = "services/worker/src/routes/screens.ts";
 const SAMPLE = {
   "packages/db/src/open-tasks.ts": `// How many open tasks a company has, for the console's task badge.
 import type pg from "pg";
 import { withOrg } from "./client";
 
-export async function openTaskCount(pool: pg.Pool, orgId: string): Promise<number> {
+export async function openTaskCount(
+  pool: pg.Pool,
+  orgId: string,
+): Promise<number> {
   return withOrg(pool, orgId, async (tx) => {
     const r = await tx.query(
       "select count(*)::int as open from tasks where org_id = $1 and status = 'open'",
@@ -109,44 +172,119 @@ export async function openTaskCount(pool: pg.Pool, orgId: string): Promise<numbe
   });
 }
 `,
-  "packages/db/test/open-tasks.test.ts": `// The open-task count of a company.
+  "services/worker/test/open-task-count-api.test.ts": `// GET /orgs/:orgId/tasks/open-count: how many open tasks a company has, for its members.
 import { afterAll, beforeAll, expect, it } from "bun:test";
-import { Pool } from "pg";
+import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
-import { createPool, openTaskCount } from "../src";
+import app from "../src/index";
 
-const admin = new Pool({
-  connectionString: process.env.LOCAL_DB_URL || "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-  max: 2,
+const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
+const admin = new pg.Pool({
+  connectionString:
+    process.env.LOCAL_DB_URL ||
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 });
 const companies = testCompanies(admin);
-let app: Pool;
+let token = "";
 let org = "";
 
+const api = (path: string, init: RequestInit = {}, auth = token) =>
+  app.fetch(
+    new Request(\`http://localhost\${path}\`, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(auth ? { authorization: \`Bearer \${auth}\` } : {}),
+      },
+    }),
+  );
+
 beforeAll(async () => {
-  org = (await companies.add("Open tasks")).id;
+  const res = await fetch(\`\${SUPABASE_URL}/auth/v1/signup\`, {
+    method: "POST",
+    headers: { "content-type": "application/json", apikey: ANON_KEY },
+    body: JSON.stringify({
+      email: \`open-tasks-\${Date.now()}@example.com\`,
+      password: "test-password-123!",
+    }),
+  });
+  token = ((await res.json()) as { access_token: string }).access_token;
+  ({ id: org } = await companies.add("Open tasks", async (name, slug) => {
+    const made = await api("/orgs", {
+      method: "POST",
+      body: JSON.stringify({ name, slug, vertical: "real_estate" }),
+    });
+    return ((await made.json()) as { id: string }).id;
+  }));
   await admin.query(
     "insert into tasks (org_id, kind, title, status) values ($1, 'manual', 'Call back', 'open'), ($1, 'manual', 'Send brochure', 'open'), ($1, 'manual', 'Old one', 'done')",
     [org],
   );
-  app = createPool(process.env.DATABASE_URL || "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres");
 });
 
 afterAll(async () => {
   await companies.cleanup();
-  await app?.end();
   await admin.end();
 });
 
-it("counts a company's open tasks", async () => {
-  expect(await openTaskCount(app, org)).toBe(2);
+it("tells a member how many open tasks the company has", async () => {
+  const res = await api(\`/orgs/\${org}/tasks/open-count\`);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ open: 2 });
+});
+
+it("refuses a caller who is not signed in", async () => {
+  const res = await api(\`/orgs/\${org}/tasks/open-count\`, {}, "");
+  expect(res.status).toBe(401);
+});
+
+it("counts none once every task is done", async () => {
+  await admin.query("update tasks set status = 'done' where org_id = $1", [
+    org,
+  ]);
+  const res = await api(\`/orgs/\${org}/tasks/open-count\`);
+  expect(await res.json()).toEqual({ open: 0 });
 });
 `,
 };
-const REQUEST = "Show each company how many open tasks it has.";
+// Into the console's read routes, beside the task list: the route and its import, as the file has them today.
+const ROUTE_EDITS: [string, string][] = [
+  ["  memberRole,\n} from", "  memberRole,\n  openTaskCount,\n} from"],
+  [
+    '  .get("/orgs/:orgId/contacts", async (c) => {',
+    `  .get("/orgs/:orgId/tasks/open-count", async (c) => {
+    const orgId = OrgIdSchema.parse(c.req.param("orgId"));
+    const role = await memberRole(pool, orgId, c.get("actor").userId);
+    if (role === null) return c.json({ error: "forbidden" }, 403);
+    return c.json({ open: await openTaskCount(pool, orgId) });
+  })
+  .get("/orgs/:orgId/contacts", async (c) => {`,
+  ],
+];
+const REQUEST =
+  "Add an API endpoint that tells a company's members how many open tasks it has.";
+// What the verifier may run: the gate and the tests, git to read the change, the database, and the worker's API.
+const VERIFIER_TOOLS = [
+  "Bash(bun:*)",
+  "Bash(bunx:*)",
+  "Bash(PORT=8791 bun run local:*)",
+  "Bash(curl:*)",
+  "Bash(psql:*)",
+  "Bash(supabase status:*)",
+  "Bash(ls:*)",
+  "Bash(cat:*)",
+  "Bash(grep:*)",
+  ...["status", "log", "diff", "show", "rev-parse"].map(
+    (c) => `Bash(git ${c}:*)`,
+  ),
+].join(",");
+// A FAIL for this reason names the other company in its ruling line.
+const OTHER =
+  /another company|other compan|cross-company|second company|cross-tenant|non-member/i;
 
 export const crossCompany: Step = {
-  does: "Runs the verifier agent (`claude -p --agent verifier` in a fresh scratch clone, with only the evals key, its transcript saved in the report) on a change that counts each company's open tasks and tests one company only, and checks that the verifier fails a change missing a cross-company test",
+  does: "Runs the verifier agent (`claude -p --agent verifier` in a fresh scratch clone, with only the evals key, its transcript saved in the report, holding the shared local stack as the gate's checks do) on a change that adds an API endpoint counting a company's open tasks, with its route and an API test for one company only, and checks that the verifier fails a change missing a cross-company test: its ruling is FAIL and its ruling line names the other company",
   needs: [EVALS],
   minutes: 45,
   check: ({ root, env, file }) =>
@@ -158,7 +296,16 @@ export const crossCompany: Step = {
         "packages/db/src/index.ts",
         `${git(dir, "show", "HEAD:packages/db/src/index.ts")}\nexport { openTaskCount } from "./open-tasks";\n`,
       );
-      commit(dir, "Count each company's open tasks");
+      let routes = git(dir, "show", `HEAD:${ROUTES}`);
+      for (const [from, to] of ROUTE_EDITS) {
+        if (!routes.includes(from))
+          throw new Error(
+            `${ROUTES} no longer has \`${from.trim()}\`: update the sample in scripts/proof/slice-0-agents.ts`,
+          );
+        routes = routes.replace(from, to);
+      }
+      write(dir, ROUTES, `${routes}\n`);
+      commit(dir, "An API endpoint for a company's open-task count");
       // The installed packages of the proved checkout, so the verifier can run the tests without installing any.
       const workspaces = ["apps", "packages", "services"].flatMap((d) =>
         existsSync(join(root, d))
@@ -168,34 +315,37 @@ export const crossCompany: Step = {
       for (const m of ["", ...workspaces].map((w) => join(w, "node_modules")))
         if (existsSync(join(root, m)) && existsSync(dirname(join(dir, m))))
           symlinkSync(join(root, m), join(dir, m));
-      const report = conversation({
-        dir,
-        key: env.ANTHROPIC_EVALS_KEY ?? "",
-        path: env.PATH,
-        home: join(base, "home"),
-        transcript: file("verifier.txt"),
-        events: file("verifier.jsonl"),
-        tools:
-          "Bash(bun:*),Bash(bunx:*),Bash(git:*),Bash(psql:*),Bash(supabase status:*),Bash(ls:*),Bash(cat:*),Bash(grep:*)",
-        args: ["--agent", "verifier"],
-        dollars: 5,
-      })(
-        `Devesh's request, word for word: "${REQUEST}"\nWhat changed (branch feat/open-task-count, this checkout): packages/db/src/open-tasks.ts adds openTaskCount, exported from packages/db; packages/db/test/open-tasks.test.ts tests it.\nHow it can be seen working: bun run local bun test packages/db/test/open-tasks.test.ts`,
+      // The verifier runs the whole gate and the tests on the one local database: it takes the proved checkout's
+      // turn on it, as `bun run gate` does, since its scratch clone's own lock would not.
+      return onSharedStack(
+        root,
+        () => {
+          const report = conversation({
+            dir,
+            key: env.ANTHROPIC_EVALS_KEY ?? "",
+            keyItem: EVALS.item,
+            path: env.PATH,
+            home: join(base, "home"),
+            transcript: file("verifier.txt"),
+            events: file("verifier.jsonl"),
+            tools: VERIFIER_TOOLS,
+            args: ["--agent", "verifier"],
+            dollars: 5,
+          })(
+            `Devesh's request, word for word: "${REQUEST}"\nWhat changed (branch feat/open-task-count, this checkout): packages/db/src/open-tasks.ts adds openTaskCount, exported from packages/db; ${ROUTES} adds GET /orgs/:orgId/tasks/open-count, which checks the caller is a member and returns { open: <count> }; services/worker/test/open-task-count-api.test.ts tests it through the API.\nHow it can be seen working: bun run local bun test services/worker/test/open-task-count-api.test.ts`,
+          );
+          const ruling = rulingOf(report);
+          if (!ruling)
+            throw new Error(
+              `the verifier's report did not end with its ruling: ${short(report.trim().split("\n").at(-1), 200)}`,
+            );
+          if (ruling.verdict !== "fail" || !OTHER.test(ruling.note))
+            throw new Error(
+              `the verifier ruled ${ruling.verdict.toUpperCase()}${ruling.verdict === "fail" ? " without naming the other company in its ruling line" : ""}: ${ruling.note}`,
+            );
+          return `the verifier ruled FAIL: ${ruling.note}`;
+        },
+        timeLeft(),
       );
-      const ruling = rulingOf(report);
-      if (!ruling)
-        throw new Error(
-          `the verifier's report did not end with its ruling: ${short(report.trim().split("\n").at(-1), 200)}`,
-        );
-      if (
-        ruling.verdict !== "fail" ||
-        !/another company|other company|cross-company|second company|cross-tenant/i.test(
-          report,
-        )
-      )
-        throw new Error(
-          `the verifier ruled ${ruling.verdict.toUpperCase()}${ruling.verdict === "fail" ? " without naming another company" : ""}: ${ruling.note}`,
-        );
-      return `the verifier ruled FAIL: ${ruling.note}`;
     }),
 };

@@ -18,12 +18,14 @@ const MEANS: Record<Outcome, (n: number) => string> = {
   failed: (n) =>
     `A step failed: Slice ${n} gets an item naming each failure and goes back to in progress.`,
 };
-const LONGEST = 2000; // characters of what one step saw; a comment holds at most 65,536
-const shortened = (s: string) =>
-  (s.length > LONGEST
-    ? `${s.slice(0, LONGEST)}… (cut here; the run's log has the rest)`
-    : s
-  ).replace(/\n/g, "\n   ");
+// A GitHub comment holds at most 65,536 characters: what one step did and saw is cut to fit, and so is the whole.
+const SEEN = 1500;
+const DOES = 500;
+const WHOLE = 60_000;
+const cut = (s: string, most: number, note: string) =>
+  s.length > most ? `${s.slice(0, most - note.length)}${note}` : s;
+const shortened = (s: string, most: number) =>
+  cut(s.replace(/\n/g, "\n   "), most, "… (cut here)");
 
 /** PURE: slice `n`'s results and where they were seen (the run's link, if it is one, the commit and the date) → the report. */
 export function reportText(
@@ -32,7 +34,7 @@ export function reportText(
   where: { run?: string; commit: string; date: string },
 ): string {
   const outcome = overall(results);
-  return [
+  const text = [
     reportHeading(n, outcome),
     `Run: ${where.run ?? "this machine, not a run of the proof workflow"} · commit ${where.commit.slice(0, 7)} · ${where.date}`,
     "",
@@ -41,12 +43,17 @@ export function reportText(
       : MEANS[outcome](n),
     "",
     ...results.flatMap((r, i) => [
-      `${i + 1}. ${MARK[r.outcome]} ${r.outcome}: ${r.does}`,
-      `   ${r.outcome === "waiting" ? "Waits on Devesh for" : "Seen"}: ${shortened(r.seen)}`,
+      `${i + 1}. ${MARK[r.outcome]} ${r.outcome}: ${shortened(r.does, DOES)}`,
+      `   ${r.outcome === "waiting" ? "Waits on Devesh for" : "Seen"}: ${shortened(r.seen, SEEN)}`,
       ...(r.files.length
         ? [`   Files (in the run's artifact): ${r.files.join(", ")}`]
         : []),
     ]),
     "",
   ].join("\n");
+  return cut(
+    text,
+    WHOLE,
+    "\n… (the report is cut here to fit one GitHub comment)\n",
+  );
 }

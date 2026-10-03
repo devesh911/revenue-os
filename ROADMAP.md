@@ -17,8 +17,11 @@ Status is one of: `not started` · `in progress` · `proof ready` · `done`. Whe
 slice's proof passes, the agent sets it to `done` and writes the passing run's date and link after
 `Proof passed:`, as `Proof passed: YYYY-MM-DD · [run <id>](<the run's link>)` (`bun run cycle
 --banner` prints the line to write), in a pull request whose body carries that run's report;
-`rules-from-main` refuses it unless the link is a run of the proof workflow, for that slice, that
-passed every step on a commit already on main. Each run's short report is posted to the standing "Proof reports" GitHub issue, so GitHub
+`rules-from-main` refuses it unless the link is a run of the proof workflow that succeeded as a
+whole and passed every step of that slice on a commit already on main, and the body shows the
+report's heading and `Run:` line. Every item of a done slice is ticked, and while a done slice
+keeps its link, its fields and items stay as they are (to change them, set it back to `proof
+ready`). Each run's short report is posted to the standing "Proof reports" GitHub issue, so GitHub
 notifies Devesh; he may look at it or ignore it, and a done slice reopens if he says so. A failed
 step becomes a new item naming the failure, and the slice (even a done one) goes back to
 `in progress`; a step that cannot run because something in STATE.md → Waiting on Devesh is

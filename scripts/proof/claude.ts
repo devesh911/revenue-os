@@ -3,16 +3,19 @@
 // key and a home folder of its own, so it never uses Devesh's login or settings, and it loads only the project's
 // settings, so the clone's hooks (the banner, the done gate) run as in any session. Edits are allowed and nothing
 // else is unless `tools` names it; nothing ever asks. Each exchange is added to the transcript: readable (.txt) and
-// as Claude Code's own events (.jsonl).
+// as Claude Code's own events (.jsonl). Each exchange stops after 20 minutes, or sooner when the step's time is up.
 
 import { spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { plainEnv } from "./scratch";
+import { WaitingOn } from "./step";
+import { timeLeft } from "./time-limit";
 
 export type Session = {
   dir: string; // the scratch clone it works in
   key: string; // ANTHROPIC_EVALS_KEY
+  keyItem: string; // the STATE.md → Waiting on Devesh item that key is
   path?: string; // the PATH that finds claude, bun and git
   home: string; // a folder of its own
   transcript: string; // the readable transcript
@@ -22,8 +25,14 @@ export type Session = {
   dollars: number; // the most one exchange may spend
 };
 
+// Anthropic refusing the key itself (its credit or spending limit used up, or the key revoked): only Devesh can put
+// that right, so the step waits on him. Our own cap (--max-budget-usd) is no refusal: it fails the step, saying so.
+const REFUSED =
+  /credit balance is too low|usage limits?|spend(?:ing)? limit|billing|invalid (?:x-)?api[ -]key|authentication_error/i;
+
 type Event = {
   type?: string;
+  subtype?: string;
   session_id?: string;
   result?: string;
   is_error?: boolean;
@@ -65,7 +74,7 @@ export function conversation(s: Session) {
           ANTHROPIC_API_KEY: s.key,
         }),
         encoding: "utf8",
-        timeout: 20 * 60_000,
+        timeout: timeLeft(20 * 60_000),
         maxBuffer: 256 << 20,
       },
     );
@@ -91,9 +100,16 @@ export function conversation(s: Session) {
       s.transcript,
       `Devesh: ${prompt}\n${used.map((u) => `  (tool) ${u}\n`).join("")}Agent: ${reply || "(no answer)"}\n\n`,
     );
+    const why = (r.stderr || reply || String(r.error ?? ""))
+      .trim()
+      .split("\n")[0];
+    if (result?.is_error && REFUSED.test(why ?? ""))
+      throw new WaitingOn(
+        `"${s.keyItem}" (STATE.md → Waiting on Devesh): Anthropic refused the key, saying: ${why}`,
+      );
     if (!result || result.is_error)
       throw new Error(
-        `claude gave no answer to "${prompt}" (exit ${r.status}): ${(r.stderr || reply || String(r.error ?? "")).trim().split("\n")[0]}`,
+        `claude gave no answer to "${prompt}" (exit ${r.status}${result?.subtype && result.subtype !== "success" ? `, ${result.subtype}` : ""}): ${why}`,
       );
     return reply;
   };

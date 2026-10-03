@@ -1,11 +1,14 @@
 // A pull request that sets a slice to done links, after "Proof passed:", a run of the proof workflow for that slice
-// that GitHub's API reports concluded success with every step passed, on a commit already on main, and its body
-// carries that run's report (AGENTS.md → Definition of done). GitHub is asked with plain GETs and no login: the
-// repository is public and rules-from-main holds no token. Were it made private, GitHub would answer 404 and every
-// such pull request would be refused, saying so, until rules-from-main's job is given `actions: read` and its token.
+// that GitHub's API reports concluded success with every step passed, on a commit already on main; every item of
+// the slice is ticked; and its body shows that run's report, as rules-from-main reads it: the report's heading and
+// its "Run: <link>" line (AGENTS.md → Definition of done). A slice main already has done keeps what its proof ran
+// on: while its "Proof passed:" stays, its title, goal, Proof line, blocker and items stay too. GitHub is asked with
+// plain GETs and no login: the repository is public and rules-from-main holds no token. Were it made private,
+// GitHub would answer 404 and every such pull request would be refused, saying so, until rules-from-main's job is
+// given `actions: read` and its token.
 
 import { spawnSync } from "node:child_process";
-import { parseRoadmap } from "../../docs/tracker/parse.js";
+import { parseRoadmap, type Slice } from "../../docs/tracker/parse.js";
 import { git } from "./git";
 import {
   ALL_PASSED,
@@ -13,6 +16,7 @@ import {
   PROOF_WORKFLOW,
   reportHeading,
   sliceOutcome,
+  unlinkable,
 } from "./proof-run";
 import { shown } from "./rule-changes";
 
@@ -78,9 +82,8 @@ async function unproven(
     run = (await ask(`repos/${repo}/actions/runs/${id}`)) as Run;
     if (run.path?.split("@")[0] !== PROOF_WORKFLOW)
       return `${link} is a run of ${run.path}, not of the proof workflow (${PROOF_WORKFLOW})`;
-    if (run.status !== "completed") return `${link} is still ${run.status}`;
-    if (run.conclusion !== "success")
-      return `${link} concluded ${run.conclusion}, not success`;
+    const whole = unlinkable(run);
+    if (whole) return `${link} ${whole}`;
     const sha = run.head_sha ?? "";
     if (!/^[0-9a-f]{40}$/.test(sha) || !onMain(sha))
       return `${link} ran on ${sha || "an unknown commit"}, which is not on main`;
@@ -131,16 +134,33 @@ export async function proofLinkProblems(o: {
   for (const s of parseRoadmap(o.now).slices) {
     const was = before.get(s.n);
     const passed = s["Proof passed"] ?? "";
-    if (
-      s.Status !== "done" ||
-      (was?.Status === "done" && was["Proof passed"] === passed)
-    )
+    if (s.Status !== "done") continue;
+    if (was?.Status === "done" && was["Proof passed"] === passed) {
+      if (asProved(was) !== asProved(s))
+        problems.push(
+          `ROADMAP.md changes Slice ${s.n}, which is done, while it keeps its "Proof passed:" (its title, goal, Proof line, blocker or items differ from main's), so no proof ran on what it now says: set it back to proof ready, so its proof runs again after the merge, or leave it as main has it`,
+        );
       continue;
+    }
+    for (const i of s.items.filter((i) => !i.done))
+      problems.push(
+        `ROADMAP.md sets Slice ${s.n} to done, but its item "${i.text} (${i.owner})" is not ticked: a slice is done only when every item is`,
+      );
     const why = await unproven(s.n, passed, o.body, o.repo, o.ask, o.onMain);
     if (why) problems.push(`ROADMAP.md sets Slice ${s.n} to done, but ${why}`);
   }
   return problems;
 }
+
+/** PURE: what a slice's proof stands for: everything but its "Proof passed:" and its items' evidence. */
+const asProved = (s: Slice) =>
+  JSON.stringify([
+    s.title,
+    s.Goal,
+    s.Proof,
+    s["Blocked by"],
+    s.items.map((i) => [i.text, i.owner, i.done]),
+  ]);
 
 /** This repository as "owner/name": GitHub's runner says it; a checkout reads it from origin. */
 const thisRepo = (dir: string) => {

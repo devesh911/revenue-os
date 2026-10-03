@@ -63,8 +63,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   slice's last item lands, the agent sets it to `proof ready`; when every step passes, the agent
   sets it to `done` and writes the date and the passing run's link after `Proof passed:`, in a PR
   whose body carries that run's report (`rules-from-main` refuses a link that is not a run of the
-  proof workflow, for that slice, that passed every step on a commit on main; `bun run cycle
-  --banner` shows each slice's latest run and what to do). Each run's short report (what was done,
+  proof workflow that succeeded as a whole and passed every step of that slice, on a commit on
+  main; a body without the report's heading and `Run:` line; a done slice with an unticked item;
+  and a change to a done slice that keeps its link; `bun run cycle --banner` shows each slice's
+  latest run and what to do). Each run's short report (what was done,
   what was seen, screenshots, and a recording or transcript where a call or chat is involved) is
   posted to the standing "Proof reports" GitHub issue, so GitHub notifies Devesh; he may look at it
   or ignore it, and a done slice reopens if he says so. GitHub re-runs the proofs of `proof ready`
@@ -198,6 +200,7 @@ errors as the dev login) · `bun run cycle --banner` (where we are: current slic
 this branch's item) · `bun run local <cmd>` (any command with the running local stack's
 settings) · `bun run dev` · `bun run db:reset`
 (local only) · `bun run db:seed <pack>` · `bun run demo` · `bun run evals` · `bun run guards`
+· `bun run proof <slice>` (that slice's proof steps and short report, as the proof workflow runs them)
 
 ## Conventions
 - **Moat rules**: every conversation, message and task traces to a contact and, when known, a

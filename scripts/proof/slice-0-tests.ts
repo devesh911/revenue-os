@@ -5,6 +5,7 @@
 import { onSharedStack } from "../done-gate/shared-stack";
 import { inScratch, sh, write } from "./scratch";
 import type { Step } from "./step";
+import { timeLeft } from "./time-limit";
 
 const AT_ONCE = "services/worker/test/test-runs-at-once.test.ts";
 const tail = (out: string, n = 3) =>
@@ -14,21 +15,25 @@ export const twoRunsAtOnce: Step = {
   does: `Runs ${AT_ONCE} on the local stack, taking its turn on it as the gate's checks do: two test runs started at once (it starts four whole-suite runs and a demo together) must both pass and leave another company's rows and queued jobs untouched`,
   minutes: 45,
   check: ({ root }) =>
-    onSharedStack(root, () => {
-      // `bun run local` reads the local stack's settings itself; nothing else of this run's is handed on.
-      const r = sh(root, ["bun", "run", "local", "bun", "test", AT_ONCE], {
-        CI: "1",
-      });
-      if (
-        r.status !== 0 ||
-        !/\b1 pass\b/.test(r.out) ||
-        !/\b0 fail\b/.test(r.out)
-      )
-        throw new Error(
-          `it did not pass (exit ${r.status}): ${tail(r.out, 12)}`,
-        );
-      return `it passed: ${tail(r.out, 4)}`;
-    }),
+    onSharedStack(
+      root,
+      () => {
+        // `bun run local` reads the local stack's settings itself; nothing else of this run's is handed on.
+        const r = sh(root, ["bun", "run", "local", "bun", "test", AT_ONCE], {
+          CI: "1",
+        });
+        if (
+          r.status !== 0 ||
+          !/\b1 pass\b/.test(r.out) ||
+          !/\b0 fail\b/.test(r.out)
+        )
+          throw new Error(
+            `it did not pass (exit ${r.status}): ${tail(r.out, 12)}`,
+          );
+        return `it passed: ${tail(r.out, 4)}`;
+      },
+      timeLeft(),
+    ),
 };
 
 export const patternFileGuard: Step = {

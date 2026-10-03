@@ -19,10 +19,11 @@ import { ALL_PASSED, reportHeading } from "./done-gate/proof-run";
 import { prove } from "./proof/cli";
 import { dueSlices } from "./proof/due";
 import { reportText } from "./proof/report";
-import { overall, runSteps } from "./proof/run";
+import { overall, RUN_MINUTES, runSteps } from "./proof/run";
+import { sh } from "./proof/scratch";
 import { steps as slice0 } from "./proof/slice-0";
 import { SLICES } from "./proof/slices";
-import type { Step } from "./proof/step";
+import { type Step, WaitingOn } from "./proof/step";
 
 setDefaultTimeout(30_000);
 const ROOT = join(import.meta.dir, "..");
@@ -135,6 +136,75 @@ describe("running a slice's steps", () => {
     expect(r?.seen).toContain("did not finish");
   });
 
+  it("stops a command a step runs when the step's time is up, and fails the step", async () => {
+    const started = Date.now();
+    const [r] = await run([
+      {
+        does: "sleeps",
+        minutes: 0.02, // 1.2 seconds
+        check: () => {
+          sh(ROOT, ["sleep", "6"]);
+          return "finished";
+        },
+      },
+    ]);
+    expect(Date.now() - started).toBeLessThan(4000);
+    expect(r?.outcome).toBe("failed");
+    expect(r?.seen).toContain("did not finish in 0.02 minute(s)");
+  });
+
+  it("never reports as passed a step that ran past its time, even one that blocked the whole while", async () => {
+    const [r] = await run([
+      {
+        does: "blocks",
+        minutes: 0.01,
+        check: () => {
+          spawnSync("sleep", ["2"]);
+          return "finished";
+        },
+      },
+    ]);
+    expect(r?.outcome).toBe("failed");
+    expect(r?.seen).toContain("did not finish");
+  });
+
+  it("stops the run when its own time is up, so the report is written before the proof job's limit", async () => {
+    const results = await runSteps(
+      [
+        {
+          does: "sleeps",
+          check: () => {
+            sh(ROOT, ["sleep", "6"]);
+            return "finished";
+          },
+        },
+        { does: "comes after", check: () => "ran" },
+      ],
+      {
+        root: ROOT,
+        env: {},
+        state: STATE,
+        dir: scratch("proof-"),
+        minutes: 0.02,
+      },
+    );
+    expect(results.map((r) => r.outcome)).toEqual(["failed", "failed"]);
+    expect(results[1]?.seen).toContain("the run's time ran out");
+  });
+
+  it("a step that finds what it needs from Devesh unusable while it runs waits on it, naming it", async () => {
+    const [r] = await run([
+      {
+        does: "talks to a model",
+        check: () => {
+          throw new WaitingOn(`"${KEY}": its spending limit is used up`);
+        },
+      },
+    ]);
+    expect(r?.outcome).toBe("waiting");
+    expect(r?.seen).toContain(KEY);
+  });
+
   it("keeps the files a step writes into the report folder, and refuses a name that leaves it", async () => {
     const dir = scratch("proof-files-");
     const [kept, refused] = await runSteps(
@@ -204,6 +274,22 @@ describe("the report", () => {
     expect(text).toContain("1-a.png");
     expect(text).toContain("2. … waiting: checks B");
     expect(text).toContain("stay as they are");
+  });
+
+  it("fits in one GitHub comment however long and many-lined the steps' texts are", () => {
+    const long = `${"a line of output\n".repeat(400)}`;
+    const text = reportText(
+      0,
+      Array.from({ length: 40 }, () => ({
+        does: "x".repeat(5000),
+        outcome: "failed" as const,
+        seen: long,
+        files: [],
+      })),
+      { commit: "abcdef0", date: "2026-10-05" },
+    );
+    expect(text.length).toBeLessThanOrEqual(65_536);
+    expect(text.split("\n")[0]).toBe(reportHeading(0, "failed"));
   });
 });
 
@@ -415,10 +501,7 @@ describe("proof.yml: the proof runs on GitHub after each deploy to main, once a 
       contents: "read",
       actions: "read",
     });
-    expect(w.jobs.post?.permissions).toEqual({
-      issues: "write",
-      actions: "read",
-    });
+    expect(w.jobs.post?.permissions).toEqual({ issues: "write" });
     for (const job of Object.values(w.jobs))
       for (const s of job.steps ?? []) {
         if (s.uses) expect(s.uses).toMatch(/@[0-9a-f]{40}$/);
@@ -453,6 +536,17 @@ describe("proof.yml: the proof runs on GitHub after each deploy to main, once a 
     expect(start?.if).toBe("matrix.slice <= 1");
     const passed = steps.find((s) => s.name === ALL_PASSED);
     expect(passed?.if).toBe("steps.prove.outputs.result == 'passed'");
+    // The verifier's run in Slice 0's proof runs the whole gate, browser checks included, as ci.yml installs them.
+    const browsers = steps.findIndex((s) =>
+      /playwright install --with-deps chromium/.test(s.run ?? ""),
+    );
+    expect(browsers).toBeGreaterThan(-1);
+    expect(browsers).toBeLessThan(steps.indexOf(prove));
+    expect(steps[browsers]?.if).toBe("matrix.slice <= 1");
+    // The run stops its steps in time to write its report before the job's limit, setup included.
+    expect(
+      (proof as { "timeout-minutes"?: number })["timeout-minutes"],
+    ).toBeGreaterThanOrEqual(RUN_MINUTES + 15);
     const upload = steps.find((s) =>
       s.uses?.startsWith("actions/upload-artifact@"),
     );

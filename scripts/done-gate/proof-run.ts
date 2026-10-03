@@ -35,6 +35,22 @@ export function sliceOutcome(
     : "waiting";
 }
 
+/**
+ * PURE: why a run, as a whole, can't be the link after "Proof passed:", or nothing when it can: still going, or not
+ * concluded success (another slice's proof failed, or posting the reports did). A run proves several slices, and
+ * rules-from-main takes only one that succeeded as a whole, so the banner judges by this too and never asks for a
+ * link it would refuse.
+ */
+export const unlinkable = (run: {
+  status?: string;
+  conclusion?: string | null;
+}) =>
+  run.status !== "completed"
+    ? `is still ${run.status ?? "going"}`
+    : run.conclusion !== "success"
+      ? `concluded ${run.conclusion}, not success`
+      : undefined;
+
 /** PURE: a slice's proof report opens with this line; the pull request that sets the slice to done shows it. */
 export const reportHeading = (n: number, outcome: Outcome) =>
   `## Proof report: Slice ${n} — ${outcome}`;

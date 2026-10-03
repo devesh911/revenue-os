@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { snapshot } from "../done-gate/snapshot";
 import { Store, stateDir } from "../done-gate/store";
 import { plainEnv, sh, write } from "./scratch";
+import { timeLeft } from "./time-limit";
 
 export type Told = {
   refused: boolean; // a command or edit refused before it ran
@@ -19,17 +20,23 @@ export type Told = {
 
 /**
  * The gate's hook in `dir`, as Claude Code runs it for `event`: the input on stdin, for session `o.session`, started
- * with `o.bun` and the PATH and home folder only (plus `o.env`).
+ * with `o.bun` (and its options `o.args`) and the PATH and home folder only (plus `o.env`), stopped when the step's
+ * time is up.
  */
 export function hook(
   dir: string,
   event: string,
   input: Record<string, unknown> = {},
-  o: { env?: Record<string, string>; session?: string; bun?: string } = {},
+  o: {
+    env?: Record<string, string>;
+    session?: string;
+    bun?: string;
+    args?: string[];
+  } = {},
 ): Told {
   const r = spawnSync(
     o.bun ?? "bun",
-    [join(dir, "scripts", "done-gate.ts"), "hook"],
+    [...(o.args ?? []), join(dir, "scripts", "done-gate.ts"), "hook"],
     {
       cwd: dir,
       env: plainEnv(o.env),
@@ -40,6 +47,7 @@ export function hook(
         ...input,
       }),
       encoding: "utf8",
+      timeout: timeLeft(),
     },
   );
   let out: {

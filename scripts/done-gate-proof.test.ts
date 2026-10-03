@@ -120,6 +120,40 @@ describe("a pull request that sets a slice to done", () => {
     ]);
   });
 
+  it("refuses a done slice changed while it keeps its link: its title, its Proof line or its items, asking GitHub nothing", async () => {
+    const gh = github();
+    const rewritten = DONE.replace("Ground", "Ground, renamed")
+      .replace("Proof: p", "Proof: a weaker proof")
+      .concat("- [ ] b (agent)\n- [ ] c, never proved (agent)\n");
+    const problems = await judge({ main: DONE, now: rewritten }, gh);
+    expect(problems).toContainEqual(
+      expect.stringContaining("changes Slice 0, which is done"),
+    );
+    expect(gh.asked).toEqual([]);
+    for (const now of [
+      DONE.replace("Proof: p", "Proof: a weaker proof"),
+      DONE.replace("- [x] A", "- [ ] A"),
+      `${DONE}- [x] B (agent) · evidence: x\n`,
+    ])
+      expect(await judge({ main: DONE, now }, gh)).toEqual([
+        expect.stringContaining("changes Slice 0, which is done"),
+      ]);
+  });
+
+  it("lets a done slice keep its link while a ticked item gains evidence", async () => {
+    const more = DONE.replace(
+      "evidence: [#1](https://example.com)",
+      "evidence: [#1](https://example.com), and seen again in [#2](https://example.com/2)",
+    );
+    expect(await judge({ main: DONE, now: more })).toEqual([]);
+  });
+
+  it("refuses a slice set to done that still has an unticked item", async () => {
+    expect(await judge({ now: `${DONE}- [ ] b (agent)\n` })).toEqual([
+      expect.stringContaining('its item "b (agent)" is not ticked'),
+    ]);
+  });
+
   it("refuses a missing, foreign or malformed link, and a date that is not the run's", async () => {
     const cases: [string, string][] = [
       ["2026-10-05", "has no link to a proof run"],

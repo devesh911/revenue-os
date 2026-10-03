@@ -9,8 +9,9 @@ import { join } from "node:path";
 import { snapshot } from "../done-gate/snapshot";
 import { removeTranscripts, verifierRun } from "../done-gate-verifier-run";
 import { bash, checksPassed, hook, said, standInGh, type Told } from "./gate";
-import { commit, git, inScratch, sh, write } from "./scratch";
+import { commit, git, inScratch, plainEnv, sh, write } from "./scratch";
 import type { Step } from "./step";
+import { timeLeft } from "./time-limit";
 
 const PRODUCT = "services/worker/src/proof-sample.ts";
 const NOTE = "docs/proof-sample.md";
@@ -50,10 +51,18 @@ function pullRequest(dir: string, base: string) {
 const merge = (head: string, extra = "") =>
   `gh pr merge 7 --squash${extra} --match-head-commit ${head}`;
 
-/** A verifier run the gate sees, cleaned up after; `run` as scripts/done-gate-verifier-run.ts takes it. */
+/**
+ * A verifier run the gate sees, cleaned up after; `run` as scripts/done-gate-verifier-run.ts takes it. Its hook
+ * calls get the PATH and home folder only, and stop when the step's time is up.
+ */
 function verifier(dir: string, run: Parameters<typeof verifierRun>[2]) {
   try {
-    return verifierRun(gateIn(dir), dir, { session: SESSION, ...run });
+    return verifierRun(gateIn(dir), dir, {
+      session: SESSION,
+      env: plainEnv(),
+      timeout: timeLeft(),
+      ...run,
+    });
   } finally {
     removeTranscripts();
   }
@@ -230,45 +239,77 @@ export const noDockerStop: Step = {
     }),
 };
 
+// How long before the new session the interrupted one last worked: an agent's worktree is left alone while another
+// session that worked there is at work, and the gate counts a session quiet for 15 minutes as stopped.
+const AN_HOUR_AGO = 60;
+
 export const interrupted: Step = {
-  does: "Starts a session after an interrupted, unchecked change on a branch (the session before saved a checkpoint with `bun run gate checkpoint` and never stopped), and checks that the new session is shown its checkpoint and held at the done gate until that change passes",
+  does: "Starts a session after an interrupted, unchecked change on a branch (in a worktree of its own, where the session before saved a checkpoint with `bun run gate checkpoint` an hour earlier and never stopped), and checks that the new session is shown its checkpoint and held at the done gate until that change passes",
   check: ({ root }) =>
-    inScratch(root, ({ dir }) => {
-      git(dir, "checkout", "-qb", "feat/proof-interrupted");
-      const [one, two] = [{ session: "proof-1" }, { session: "proof-2" }];
-      hook(dir, "SessionStart", {}, one);
-      hook(dir, "PreToolUse", bash("git status"), one);
-      write(dir, NOTE, "a sample the proof makes and throws away\n");
+    inScratch(root, ({ dir, base }) => {
+      const wt = join(base, "worktree");
+      git(dir, "worktree", "add", "-q", "-b", "feat/proof-interrupted", wt);
+      // The session before ran an hour ago: its gate calls run on a clock set back that far.
+      const past = join(base, "an-hour-ago.ts");
+      write(
+        base,
+        "an-hour-ago.ts",
+        `const now = Date.now;\nDate.now = () => now() - ${AN_HOUR_AGO * 60_000};\n`,
+      );
+      const earlier = ["--preload", past];
+      const one = { session: "proof-1", args: earlier };
+      const two = { session: "proof-2" };
+      hook(wt, "SessionStart", {}, one);
+      hook(wt, "PreToolUse", bash("git status"), one);
+      write(wt, NOTE, "a sample the proof makes and throws away\n");
       const next = "run bun run gate on the sample note";
-      const saved = sh(dir, [
-        "bun",
-        "scripts/done-gate.ts",
-        "checkpoint",
+      const parts = [
         "--done",
         "wrote the sample note",
         "--failed",
         "nothing yet",
         "--next",
         next,
+      ];
+      const asked = hook(
+        wt,
+        "PreToolUse",
+        bash(
+          `bun run gate checkpoint ${parts.map((p) => (p.startsWith("--") ? p : `"${p}"`)).join(" ")}`,
+        ),
+        one,
+      );
+      if (asked.refused)
+        throw new Error(
+          `\`bun run gate checkpoint\` was refused: ${said(asked)}`,
+        );
+      const saved = sh(wt, [
+        "bun",
+        ...earlier,
+        "scripts/done-gate.ts",
+        "checkpoint",
+        ...parts,
       ]);
       if (saved.status !== 0)
         throw new Error(
           `\`bun run gate checkpoint\` saved no checkpoint (exit ${saved.status}): ${first(saved.out)}`,
         );
-      const start = hook(dir, "SessionStart", {}, two);
+      const start = hook(wt, "SessionStart", {}, two);
       if (!start.context.includes(next))
         throw new Error(
           `the new session was not shown the checkpoint: ${start.context || said(start)}`,
         );
-      if (!/held/.test(`${start.told}\n${start.context}`))
-        throw new Error(`the new session was not held: ${said(start)}`);
-      const held = hook(dir, "Stop", {}, two);
+      if (!/held/.test(start.told))
+        throw new Error(
+          `Devesh was not told the new session is held: ${said(start)}`,
+        );
+      const held = hook(wt, "Stop", {}, two);
       if (!held.sentBack)
         throw new Error(
           `its stop, with the change unchecked, was let through: ${said(held)}`,
         );
-      checksPassed(dir);
-      const passed = hook(dir, "Stop", {}, two);
+      checksPassed(wt);
+      const passed = hook(wt, "Stop", {}, two);
       if (passed.sentBack)
         throw new Error(
           `once the change passed, its stop was still sent back: ${first(passed.why)}`,
