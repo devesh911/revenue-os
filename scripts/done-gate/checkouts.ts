@@ -42,22 +42,6 @@ export const identity = (root: string) => {
     return root;
   }
 };
-/**
- * Did this session make the commit HEAD is on, in this checkout (a commit, amend, rebase, cherry-pick or merge
- * commit since it started)? Arriving at a commit by a switch, a reset or a fast-forward is not making it.
- */
-export const madeHere = (root: string, started: number) => {
-  const [at = "", ...how] = git(
-    root,
-    ["reflog", "show", "-1", "--date=unix", "--format=%gd %gs", "HEAD"],
-    {},
-    true,
-  ).split(" ");
-  return (
-    Number(at.match(/\{(\d+)\}/)?.[1]) >= started &&
-    !/^(checkout|reset): |: Fast-forward$/.test(how.join(" "))
-  );
-};
 /** The checkout (of `all`) that holds `path`: the deepest, as a worktree may sit inside the main checkout's folder. */
 const holding = (all: string[], path: string) => {
   let dir = path;
@@ -150,8 +134,6 @@ export function touch(
     }
     store.put("toucher", idOf(c), session);
   }
-  if (!store.get("started", session))
-    store.put("started", session, String(Math.floor(Date.now() / 1000)));
 }
 
 /** The checkouts a stop answers for: those the session noted, and the one its shell is in. */

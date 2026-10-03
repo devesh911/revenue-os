@@ -169,7 +169,8 @@ export function mergeGate(
     return deny(
       `its head commit ${short} has not passed \`bun run gate\` on this machine. ${where} (and the verifier, for product code), then merge.`,
     );
-  // A partial pass (no Docker here, so no database tests) counts only once GitHub reports `checks` passed on it.
+  // A partial pass (no database checks: no Docker here, or a stop while background work ran) counts only once GitHub
+  // reports `checks` passed on it.
   const missing =
     partial && checksNotPassed(head, named ? ownerRepo(named) : ours, repo);
   if (missing)

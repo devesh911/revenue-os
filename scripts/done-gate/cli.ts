@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { browserEnv, run, tail } from "./checks";
 import { git } from "./git";
+import { NOT_RUN } from "./not-run";
 import { judgePr } from "./pr";
 import { listed, rulesOn } from "./rules";
 import { onSharedStack } from "./shared-stack";
@@ -72,7 +73,7 @@ export async function cli(cmd: string, args: string[]) {
     const ruling = rulingOn(store, snap.tree);
     console.log(
       proof.ok
-        ? `Done gate ✓ ${proof.checks}${proof.notes.map((n) => `\n⚠ ${n}`).join("")}`
+        ? `${proof.notRun ? `${NOT_RUN[proof.notRun]} · passed here: ` : "Done gate ✓ "}${proof.checks}${proof.notes.map((n) => `\n⚠ ${n}`).join("")}`
         : `Done gate ✗ ${proof.reason}`,
     );
     console.log(
