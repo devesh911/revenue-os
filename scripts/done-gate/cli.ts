@@ -126,7 +126,8 @@ export async function cli(cmd: string, args: string[]) {
   ) {
     process.exit(allTestsRun(repo, args[0] === "e2e"));
   } else if (cmd === "proven" && refs && !refs.head) {
-    // The done-rules item's moved-line detection is handed here as testsProven's third argument.
+    // Nothing counts as moved yet: the done-rules item's moved-code detection is handed in here, as testsProven's
+    // third argument, once that item merges.
     const r = testsProven(repo, changeOf("Tests proven", repo, refs.base));
     console.log(r.text);
     process.exit(r.ok ? 0 : 1);

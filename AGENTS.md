@@ -94,9 +94,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
   `scripts/done-gate/tests-ran.ts` lists it with why.
 - A change with product code proves its tests test it (`bun run gate proven`, in the gate and in CI): each
-  test it adds or edits must fail on main's code and pass on the change. One that deliberately checks
-  behaviour main already has says so on its first line, `// behaviour already on main: <why>`, and the PR
-  body copies it as `Behaviour already on main: <file> · <why>`.
+  test it adds or edits must fail on main's code and pass on the change (both run in scratch copies that
+  differ only in product code). One that deliberately checks behaviour main already has says so at the end
+  of its first line or alone on the comment line just above it, `// behaviour already on main: <why>`, and
+  the PR body copies it as `Behaviour already on main: <file> · <why>`.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.

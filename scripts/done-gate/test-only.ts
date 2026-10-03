@@ -1,5 +1,5 @@
-// Test helpers and fixtures inside product folders: a file the change adds under apps/, services/ or packages/
-// counts as product code only when a file other than a test, a Markdown page, the gate itself or another such file
+// Test helpers and fixtures inside product folders: a file the change adds that the gate calls product code
+// (isProduct, rules.ts), a migration or seed file aside, counts as product code here only when a file other than a test, a Markdown page, the gate itself or another such file
 // names it, in quotes after a "/" or a quote, as an import or a path writes it: its whole name, its name without
 // its last extension (with or without a .js or .ts one), or, for an index file, its folder's name. Anything else
 // the change adds there (a testing/ or __fixtures__/ folder under src/) only tests use: it is a helper or fixture,
@@ -13,7 +13,7 @@ import type { Snap } from "./snapshot";
 const NO_ATTRIBUTES = "--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** The files the change adds under apps/, services/ or packages/ that only tests (or other such files) name. */
+/** The product files the change adds, migrations and seeds aside, that only tests (or other such files) name. */
 export function testOnly(snap: Snap): Set<string> {
   const onMain = new Set(
     git(
@@ -24,8 +24,7 @@ export function testOnly(snap: Snap): Set<string> {
     ).split("\0"),
   );
   const fresh = snap.files.filter(
-    (f) =>
-      isProduct(f) && /^(apps|services|packages)\//.test(f) && !onMain.has(f),
+    (f) => isProduct(f) && !f.startsWith("supabase/") && !onMain.has(f),
   );
   const namers = new Map(
     fresh.map((f) => {

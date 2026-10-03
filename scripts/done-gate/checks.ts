@@ -1,5 +1,5 @@
-// Every check the gate runs on the code as it stands: typecheck, lint, guards, tests, database policies and the
-// browser checks, the database ones one run at a time.
+// Every check the gate runs on the code as it stands: typecheck, lint, guards, tests, tests proven (tests-proven.ts),
+// database policies and the browser checks, the database ones one run at a time.
 
 import { spawnSync } from "node:child_process";
 import { type AddressInfo, createConnection, createServer } from "node:net";
