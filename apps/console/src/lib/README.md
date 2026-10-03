@@ -5,9 +5,10 @@ Small, side-effect-light helpers the app boots on:
 - `env.ts` — `parseConsoleEnv(raw)` validates `import.meta.env` at the boundary with Zod
   (`docs/patterns/zod-boundary.md`) and returns a discriminated result (ok + the parsed env, or the
   NAMES of the invalid vars for the config-error screen). Pure: the caller passes `raw`, so it stays importable with no env present.
-- `supabase.ts` — `getSupabase()`, a LAZY, memoized client getter. Importing this module builds
-  NOTHING (no module-scope `createClient`), so it is safe on `main.tsx`'s static import graph even
-  when env is absent. This boot-honesty constraint is pinned by `tests/console-boot-honesty`.
+- `supabase.ts` — `getSupabase()`, a LAZY, memoized client getter, and the one file that imports the
+  Supabase package (`apps/console/biome.json` fails any other; other files take its types from
+  here). Importing it builds NOTHING (no module-scope `createClient`), so the console's code loads
+  even when env is absent: `test/console-boot-honesty.test.tsx` and `test/boot.test.tsx` prove it.
 - `api.ts` — the console-side `api<T>()` client: base URL from env, bearer token from Supabase,
   response Zod-parsed through the shared `apiFetch` wrapper, which throws a typed `ApiError`
   (status, method, path, the server's `error` code; status 0 = timeout / network). Pass the

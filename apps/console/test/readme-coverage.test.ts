@@ -1,11 +1,11 @@
-// task-28 ui-foundation-v2 · A1-RED — README coverage guard.
+// README coverage: every console folder that holds source or tests carries a README.md that says something.
 // The durable "self-explanatory repo" enforcement: every console folder that holds source or
 // tests must carry a README.md that actually says something (≥3 non-empty lines). The src/*
 // children are DERIVED (readdirSync) so a new source folder is guarded the moment it lands — a
 // hardcoded list silently missed src/ui. The fixed roots bookend them: apps/console and
 // apps/console/src (the authoritative folder map) plus the sibling apps/console/test.
 // Env-free by construction (bun test + node:fs + Bun.file, no DB/network). Paths are CWD-relative,
-// so the suite is run from the repo/worktree root — the same convention as tests/console-boot-honesty.
+// so the suite is run from the repo/worktree root.
 import { describe, expect, it } from "bun:test";
 import { readdirSync } from "node:fs";
 

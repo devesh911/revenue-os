@@ -1,11 +1,9 @@
-// task-52 RED — console Guardrails wiring: the features/guardrails/api.ts hooks and the Settings
-// "Guardrails" section. Env-free by construction (bun test + renderToStaticMarkup, no DOM library,
-// no DB/network, no new deps) — the two source-pin describes read the files as text (the repo's
-// established RED idiom, imitates pages-adoption-*), and the behavior describes render the real
-// SettingsPage with its two server-state hooks MOCKED via mockModule (process-global, so afterAll
-// restores the real modules). Interaction (an actual submit event) is NOT reachable without a DOM/interaction lib
-// (a new dep, forbidden), so "submit fires the PUT" is pinned at the source layer (useMutation +
-// PUT + invalidateQueries) — see report.
+// The console's guardrail settings: the features/guardrails/api.ts hooks and the Settings page's "Guardrails"
+// section. The behaviour describes render the real SettingsPage on the server with its two data hooks faked through
+// mockModule (process-wide, so afterAll restores the real modules). The two describes that read source files as
+// text are a leftover, not a pattern to copy: a test shows what the code does. Slice 1's browser check replaces
+// them with a browser test that saves calling hours, reloads, sees them kept and sees an error on a failed save
+// (docs/fix-when-touched.md, entry 3); until then they are the only check that the save is wired.
 import { afterAll, describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
@@ -57,7 +55,7 @@ let guardrailsResult: unknown = loadingState;
 const restoreOrgs = mockModule("../src/features/orgs/api", realOrgsApi, {
   useOrgsQuery: () => ok([orgFixture]),
 });
-// The two hooks SettingsPage calls, over the real module (which exists since task-52 GREEN).
+// The two hooks SettingsPage calls, faked over the real module.
 const restoreGuardrails = mockModule(
   "../src/features/guardrails/api",
   realGuardrailsApi,
@@ -91,8 +89,7 @@ async function renderSettings(): Promise<string> {
   );
 }
 
-// The repo RED idiom: read source as text; catch-to-empty so a missing file fails as a clean
-// assertion (`expect("").toContain(…)`), never a thrown ENOENT.
+// The leftover source reads (see the header): a missing file reads as empty, so it fails as an assertion.
 const GUARDRAILS_API = "apps/console/src/features/guardrails/api.ts";
 const SETTINGS_SRC = "apps/console/src/pages/Settings/index.tsx";
 const readSrc = async (p: string): Promise<string> => {

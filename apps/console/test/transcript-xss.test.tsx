@@ -1,13 +1,12 @@
-// S7.1 — transcripts render as text nodes: callers can literally speak "<script>" and it
-// must die as inert text. Render half: hostile content comes out escaped, never as markup.
-// Static half: dangerouslySetInnerHTML must not exist anywhere in console src.
-// (spec §12b: "S7.1 XSS-transcript render test in CI"; runs in CI's plain `bun test`.)
+// Transcripts render as text (docs/security.md S7.1): a caller can literally say "<script>" and it must show as
+// inert text, never run or draw as markup. That no console code injects raw HTML at all is a lint rule
+// (apps/console/biome.json, noDangerouslySetInnerHtml; scripts/lint-structure.test.ts proves it fires).
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   type TranscriptMessage,
   TranscriptView,
-} from "../apps/console/src/features/conversations/TranscriptView";
+} from "../src/features/conversations/TranscriptView";
 
 const hostile: TranscriptMessage[] = [
   { seq: 1, role: "contact", content: "<script>alert(1)</script>", ts: null },
@@ -23,10 +22,10 @@ const hostile: TranscriptMessage[] = [
     content: '</p><a href="javascript:alert(1)">click</a>',
     ts: null,
   },
-  { seq: 4, role: "tool", content: null, ts: null }, // content is nullable in the DDL
+  { seq: 4, role: "tool", content: null, ts: null }, // content is nullable in the database
 ];
 
-describe("S7.1 transcript XSS hardening", () => {
+describe("transcripts render hostile content as text", () => {
   it("renders hostile transcript content as inert text, never markup", () => {
     const html = renderToStaticMarkup(<TranscriptView messages={hostile} />);
 
@@ -36,7 +35,7 @@ describe("S7.1 transcript XSS hardening", () => {
 
     // …and never as executable/renderable markup: no element tag survives, and no TAG CONTEXT
     // carries a handler or javascript: URI. (Escaped TEXT legitimately contains substrings like
-    // `onerror=` — asserting on raw substrings was this spec's original bug.)
+    // `onerror=`, so asserting on raw substrings would be wrong.)
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img");
     expect(html).not.toMatch(/<[^>]*\bonerror\s*=/i);
@@ -45,7 +44,7 @@ describe("S7.1 transcript XSS hardening", () => {
     // content must round-trip VERBATIM: still readable as text, and never rewritten by a
     // "sanitizer" (no invisible characters injected — transcripts are evidence-grade data)
     expect(html).toContain("onerror=");
-    expect(html).not.toContain("\u200b"); // no zero-width "sanitizer" injections
+    expect(html).not.toContain("​"); // no zero-width "sanitizer" injections
   });
 
   it("renders a null-content message without crashing and without fabricating markup", () => {
@@ -55,16 +54,5 @@ describe("S7.1 transcript XSS hardening", () => {
       />,
     );
     expect(html.length).toBeGreaterThan(0);
-  });
-
-  it("no dangerouslySetInnerHTML anywhere in console src (static sweep)", async () => {
-    const glob = new Bun.Glob("apps/console/src/**/*.{ts,tsx}");
-    let checked = 0;
-    for await (const path of glob.scan(".")) {
-      const src = await Bun.file(path).text();
-      expect(src).not.toContain("dangerouslySetInnerHTML");
-      checked++;
-    }
-    expect(checked).toBeGreaterThan(5); // the sweep must actually have swept
   });
 });
