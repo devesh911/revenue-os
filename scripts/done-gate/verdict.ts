@@ -78,7 +78,7 @@ function rule(
       ok: true,
       message: `Done gate ✓ ${proof.checks} (no product code changed, so no verifier needed)${told}`,
     };
-  const ruling = parseRuling(store.get("verdict", tree));
+  const ruling = rulingOn(store, tree);
   if (!ruling && codex)
     return {
       ok: true,
@@ -107,9 +107,17 @@ function rule(
   };
 }
 
-export function parseRuling(raw: string | undefined): Ruling | undefined {
+/**
+ * The record of delivered rulings, one per exact code; only verifier.ts writes it. Main's gate before 2026-10-03
+ * kept rulings in `verdict`, from a command anyone could run, and a checkout on a branch cut before then still runs
+ * that gate, so `verdict` is never read.
+ */
+export const DELIVERED = "delivered";
+
+/** The verifier's delivered ruling on this exact code, if any. */
+export function rulingOn(store: Store, tree: string): Ruling | undefined {
   try {
-    const r = JSON.parse(raw ?? "") as Ruling;
+    const r = JSON.parse(store.get(DELIVERED, tree) ?? "") as Ruling;
     return ["pass", "fail", "cannot-verify"].includes(r.verdict) && r.note
       ? r
       : undefined;

@@ -33,7 +33,7 @@ import { checkRules, RULE_FILES } from "./done-gate/rules";
 import { onSharedStack } from "./done-gate/shared-stack";
 import { simpleCommands } from "./done-gate/shell-words";
 import { toolRefusal } from "./done-gate/tools";
-import { verifierRun } from "./done-gate-verifier-run";
+import { removeTranscripts, verifierRun } from "./done-gate-verifier-run";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
 // A hook test starts bun and git a dozen times; with other agents busy on the machine that passes bun's 5 s.
@@ -41,6 +41,7 @@ setDefaultTimeout(30_000);
 const dirs: string[] = [];
 afterAll(() => {
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  removeTranscripts();
 });
 
 const sh = (

@@ -1,6 +1,6 @@
 // A hook event from Claude Code or Codex, handed to the file that handles it: before a tool call what agents' tools
-// may not do, the merge check and the note of the checkout, the verifier's call, start, hand-back and stop, and the
-// judgement at a stop.
+// may not do, the merge check and the note of the checkout, the verifier's call, start, commands, hand-back and stop,
+// and the judgement at a stop.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
@@ -72,12 +72,8 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
         deny(`it could not check this merge (${String(e).split("\n")[0]}).`);
       }
       // A failure here stays quiet: no tool call waits on it.
-      return verifierWorked(
-        command,
-        store,
-        session,
-        touch(repo, command, store, session),
-      );
+      touch(repo, command, store, session);
+      return verifierWorked(repo, command, store, session);
     case "SubagentStart":
       if (input.agent_type === "verifier")
         verifierStarts(repo, input, store, session);

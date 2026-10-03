@@ -27,7 +27,10 @@ export function runOf(transcript: string | undefined) {
       readFileSync(transcript.replace(/\.jsonl$/, ".meta.json"), "utf8"),
     ) as { toolUseId?: unknown };
     return {
-      models: replies.map((r) => String(r.message?.model ?? "")),
+      // Claude Code's own notices (a usage limit reached) are written as replies from "<synthetic>": no model's.
+      models: replies
+        .map((r) => String(r.message?.model ?? ""))
+        .filter((m) => m !== "<synthetic>"),
       handedBack: replies.some(
         (r) =>
           Array.isArray(r.message?.content) &&

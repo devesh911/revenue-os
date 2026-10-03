@@ -12,7 +12,7 @@ import { onSharedStack } from "./shared-stack";
 import { snapshot } from "./snapshot";
 import { Store, stateDir } from "./store";
 import { allTestsRun } from "./tests-ran";
-import { parseRuling, prove } from "./verdict";
+import { prove, rulingOn } from "./verdict";
 
 const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>"]
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
@@ -69,7 +69,7 @@ export async function cli(cmd: string, args: string[]) {
   if (cmd === "check") {
     const snap = snapshot(repo);
     const proof = await prove(snap, store);
-    const ruling = parseRuling(store.get("verdict", snap.tree));
+    const ruling = rulingOn(store, snap.tree);
     console.log(
       proof.ok
         ? `Done gate ✓ ${proof.checks}${proof.notes.map((n) => `\n⚠ ${n}`).join("")}`

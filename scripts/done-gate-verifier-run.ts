@@ -3,7 +3,13 @@
 // 2026-10-03 with Claude Code 2.1.287 (the pull request that added this file quotes them).
 
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -38,9 +44,16 @@ export function runHook(
   };
 }
 
+const made: string[] = [];
+/** Removes every folder sessionTranscript made; each test file calls it when it is done. */
+export const removeTranscripts = () => {
+  for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
+};
+
 /** A folder standing in for ~/.claude/projects/<project>, holding a session transcript made of `records`. */
 export function sessionTranscript(session = "s1", records: object[] = []) {
   const dir = mkdtempSync(join(tmpdir(), "done-gate-projects-"));
+  made.push(dir);
   const path = join(dir, `${session}.jsonl`);
   writeFileSync(path, records.map((r) => `${JSON.stringify(r)}\n`).join(""));
   return path;
@@ -51,6 +64,14 @@ export type Run = {
   report: string;
   /** auto: Claude Code gives it SubagentHandback (true by default). */
   auto?: boolean;
+  /** In auto mode, whether it hands its report back (true by default); if not, it only stops with it. */
+  handsBack?: boolean;
+  /** Outside auto mode: a hand-back its transcript records before it stops (the session left auto mode after it). */
+  handedBackBefore?: string;
+  /** The session whose Agent call started it (its own session by default). */
+  calledBy?: string;
+  /** The session's hooks predate the gate's `Agent|SubagentHandback` group: it sees neither that call nor the hand-back. */
+  oldHooks?: boolean;
   session?: string;
   agent?: string;
   /** The model of each of its replies, as its transcript records them. */
@@ -63,7 +84,9 @@ export type Run = {
   transcript?: string;
   /** The checkouts it runs a command in, whose code its ruling covers (the session's folder by default). */
   worksIn?: string[];
-  /** What else happens while it works, before it stops. */
+  /** The commands it runs, each from the session's folder (by default `cd <checkout> && git status` for each of worksIn). */
+  commands?: string[];
+  /** What else happens after its last command, before it delivers its report. */
   during?: () => void;
 };
 
@@ -81,20 +104,22 @@ export function verifierRun(gate: string, cwd: string, run: Run) {
   const send = (input: Record<string, unknown>) =>
     runHook(gate, cwd, { session_id: session, transcript_path, ...input });
   const callId = `toolu_${agent}`;
-  const call = run.byWorkflow
-    ? undefined
-    : send({
-        hook_event_name: "PreToolUse",
-        permission_mode: mode,
-        tool_name: "Agent",
-        tool_input: {
-          description: "Verify the change",
-          prompt: "Devesh's request, word for word: …",
-          subagent_type: "verifier",
-          ...(run.model ? { model: run.model } : {}),
-        },
-        tool_use_id: callId,
-      });
+  const call =
+    run.byWorkflow || run.oldHooks
+      ? undefined
+      : send({
+          ...(run.calledBy ? { session_id: run.calledBy } : {}),
+          hook_event_name: "PreToolUse",
+          permission_mode: mode,
+          tool_name: "Agent",
+          tool_input: {
+            description: "Verify the change",
+            prompt: "Devesh's request, word for word: …",
+            subagent_type: "verifier",
+            ...(run.model ? { model: run.model } : {}),
+          },
+          tool_use_id: callId,
+        });
   if (call?.out.hookSpecificOutput?.permissionDecision === "deny")
     return { call, stops: [] };
   const start = send({
@@ -128,14 +153,16 @@ export function verifierRun(gate: string, cwd: string, run: Run) {
     );
   for (const model of models)
     reply(model, [{ type: "text", text: "I ran the checks." }]);
-  for (const dir of run.worksIn ?? [cwd])
+  const commands =
+    run.commands ?? (run.worksIn ?? [cwd]).map((d) => `cd ${d} && git status`);
+  for (const command of commands)
     send({
       hook_event_name: "PreToolUse",
       permission_mode: mode,
       agent_id: agent,
       agent_type: "verifier",
       tool_name: "Bash",
-      tool_input: { command: `cd ${dir} && git status` },
+      tool_input: { command },
       tool_use_id: `toolu_bash_${agent}`,
     });
   run.during?.();
@@ -151,27 +178,45 @@ export function verifierRun(gate: string, cwd: string, run: Run) {
       session_crons: [],
       ...extra,
     });
-  if (!auto)
-    return { call, start, stops: [stop({ last_assistant_message: report })] };
+  if (!auto) {
+    if (run.handedBackBefore)
+      reply(models.at(-1) ?? "", [
+        {
+          type: "tool_use",
+          name: "SubagentHandback",
+          input: { message: run.handedBackBefore },
+        },
+      ]);
+    return {
+      call,
+      start,
+      stop,
+      stops: [stop({ last_assistant_message: report })],
+    };
+  }
   // Auto mode: it may stop once before handing back, and Claude Code sends it back to hand its report back.
   const early = stop({ last_assistant_message: report });
-  const handBack = send({
-    hook_event_name: "PreToolUse",
-    permission_mode: mode,
-    agent_id: agent,
-    agent_type: "verifier",
-    tool_name: "SubagentHandback",
-    tool_input: { message: report },
-    tool_use_id: `toolu_handback_${agent}`,
-  });
+  if (run.handsBack === false) return { call, start, stop, stops: [early] };
+  const handBack = run.oldHooks
+    ? { status: 0, out: {}, err: "" }
+    : send({
+        hook_event_name: "PreToolUse",
+        permission_mode: mode,
+        agent_id: agent,
+        agent_type: "verifier",
+        tool_name: "SubagentHandback",
+        tool_input: { message: report },
+        tool_use_id: `toolu_handback_${agent}`,
+      });
   if (handBack.out.hookSpecificOutput?.permissionDecision === "deny")
-    return { call, start, handBack, stops: [early] };
+    return { call, start, stop, handBack, stops: [early] };
   reply(models.at(-1) ?? "", [
     { type: "tool_use", name: "SubagentHandback", input: { message: report } },
   ]);
   return {
     call,
     start,
+    stop,
     handBack,
     stops: [early, stop({ stop_hook_active: true })],
   };
