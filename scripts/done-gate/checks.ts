@@ -12,7 +12,7 @@ type Check = {
   browser?: true;
 };
 
-const CHECKS: Check[] = [
+export const CHECKS: Check[] = [
   { name: "typecheck", cmd: ["bun", "run", "typecheck"] },
   { name: "lint", cmd: ["bun", "run", "lint"] },
   { name: "guards", cmd: ["bun", "run", "guards"] },
@@ -80,10 +80,16 @@ export const browserEnv = async () => ({
 
 export const tail = (out: string, lines = 60) =>
   out.trimEnd().split("\n").slice(-lines).join("\n");
-const tally = (name: string, out: string) => {
+export const tally = (name: string, out: string) => {
   const n = out.match(/(\d+) pass(ed)?\b/)?.[1];
   return n ? `${n} ${name}` : name;
 };
+
+/** What a stop without Docker says it left to CI: every check on the database. */
+export const notRunHere = () =>
+  `NOT run here (no Docker): ${CHECKS.filter((c) => c.db)
+    .map((c) => c.name)
+    .join(", ")}; CI runs them`;
 
 export const noDocker = () =>
   spawnSync("docker", ["--version"]).error !== undefined;
@@ -124,9 +130,6 @@ export async function runChecks(
         )
       : undefined);
   if (failed) return { ok: false, text: failed };
-  if (!dbUp)
-    passed.push(
-      "NOT run here (no Docker): tests, database policies, browser checks; CI runs them",
-    );
+  if (!dbUp) passed.push(notRunHere());
   return { ok: true, text: passed.join(", "), complete: dbUp };
 }

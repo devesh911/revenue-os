@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 // Tests allowed not to run, as "file > name", and why. Any other test that bun or Playwright reports as skipped
 // or todo fails the tests or browser checks (`bun run gate tests`), however it was switched off.
-const MAY_SKIP: Record<string, string> = {
+export const MAY_SKIP: Record<string, string> = {
   "scripts/dev-login.test.ts > creates the dev user via /auth/v1/signup with the anon key when absent":
     "it runs only where the dev login does not exist yet, as in CI",
 };

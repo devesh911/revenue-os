@@ -1,14 +1,14 @@
 // The done rules: what no added line may do (throw as a placeholder, export what nothing calls, switch off a
 // test or a checker, read source code in a test), and which files decide what "done" means.
 
-import { markNotes } from "./already-on-main";
+import { changeMarks, markNote } from "./already-on-main";
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import type { Added } from "./diff";
 import type { Snap } from "./snapshot";
 
 const PRODUCT =
   /^(apps|services|packages)\/[^/]+\/src\/|^supabase\/(migrations|seed)/;
-const TEST =
+export const TEST =
   /[._](test|spec)\.[cm]?[jt]sx?$|\.e2e\.[cm]?[jt]sx?$|(^|\/)(tests?|e2e|__tests__)\//;
 const CODE = /\.[cm]?[jt]sx?$/;
 
@@ -104,7 +104,6 @@ export function checkRules(
     else
       notes.push(`exception at ${a.file}:${a.line}${why ? ` (${why})` : ""}`);
   }
-  notes.push(...markNotes(added)); // tests that pass on main, and why (tests-proven.ts)
   const rules = files.filter((f) => RULE_FILES.test(f));
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);
@@ -168,11 +167,14 @@ const skips = (line: string) => {
 
 export const isProduct = (f: string) => PRODUCT.test(f) && !TEST.test(f);
 
-export const rulesOn = (snap: Snap) =>
-  checkRules(
+export const rulesOn = (snap: Snap) => {
+  const r = checkRules(
     snap.files,
     snap.added,
     (name, file) => snap.users.get(`${file} ${name}`) ?? [],
   );
+  r.notes.push(...changeMarks(snap).map(markNote)); // tests that pass on main, and why (tests-proven.ts)
+  return r;
+};
 export const listed = (problems: string[]) =>
   `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line; Devesh sees every exception.`;

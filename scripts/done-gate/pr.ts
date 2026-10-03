@@ -4,7 +4,7 @@
 // or checks (the two main's ruleset requires), and no migration on main changed or its number reused (migrations.ts).
 // Each test the change marks as checking behaviour main already has is copied into the body (already-on-main.ts).
 
-import { markBodyProblems } from "./already-on-main";
+import { changeMarks, markBodyProblems } from "./already-on-main";
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
@@ -126,7 +126,7 @@ export function judgePr(
       ...fixWhenTouchedProblems(snap.files, body, table),
       ...secondCheck(workflows),
       ...migrationProblems(snap),
-      ...markBodyProblems(snap.added, shown(body)), // each "behaviour already on main" mark, copied into the body
+      ...markBodyProblems(changeMarks(snap), shown(body)), // each "behaviour already on main" mark, copied into the body
     ],
     notes: [...notes, ...unreadTable(table)],
   };

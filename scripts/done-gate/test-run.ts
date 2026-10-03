@@ -1,5 +1,5 @@
-// Running one test file alone with bun: each test's outcome from bun's JUnit report, what bun printed (which holds
-// the error when the file can't load), and, when asked, which lines ran.
+// Running one test file alone with bun, or one test of it: each test's outcome from bun's JUnit report, what bun
+// printed (which holds the error when the file can't load), bun's exit status and, when asked, which lines ran.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -19,8 +19,15 @@ export type FileRun = {
   cases: Case[];
   out: string;
   finished: boolean;
+  status: number | null;
   hits: Hits;
 };
+
+/** A test name pattern no test's name matches: the file loads and no test runs. */
+export const NO_TEST = "[^\\s\\S]";
+/** PURE: a test name pattern matching the test named `name`, inside any describe (bun matches the full name). */
+export const onlyTest = (name: string) =>
+  `(?:^| )${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
 
 /** A file bun runs as tests: name.test.ts, name_test.ts, name.spec.ts or name_spec.ts, in any JS or TS flavour. */
 export const isTestFile = (f: string) =>
@@ -57,11 +64,14 @@ export function casesOf(report: string): Case[] {
   });
 }
 
-/** Runs `file`, named from `dir`, alone in `dir` as CI does (CI=1); with `coverage`, records which lines ran. */
+/**
+ * Runs `file`, named from `dir`, alone in `dir` as CI does (CI=1); with `coverage`, records which lines ran; with
+ * `only`, a test name pattern, runs just the tests it matches (bun reports the others skipped).
+ */
 export function runTestFile(
   dir: string,
   file: string,
-  coverage = false,
+  { coverage = false, only }: { coverage?: boolean; only?: string } = {},
 ): FileRun {
   const out = mkdtempSync(join(tmpdir(), "done-gate-run-"));
   const junit = join(out, "junit.xml");
@@ -76,6 +86,7 @@ export function runTestFile(
         ...(coverage
           ? ["--coverage", "--coverage-reporter=lcov", `--coverage-dir=${out}`]
           : []),
+        ...(only === undefined ? [] : [`--test-name-pattern=${only}`]),
         `./${file}`,
       ],
       {
@@ -90,6 +101,7 @@ export function runTestFile(
       cases: casesOf(read(junit)).filter((c) => c.file === file),
       out: Bun.stripANSI(`${r.stdout ?? ""}${r.stderr ?? ""}`),
       finished: !r.error && r.signal === null,
+      status: r.status,
       hits: parseLcov(read(join(out, "lcov.info")), dir),
     };
   } finally {
