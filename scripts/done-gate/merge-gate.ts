@@ -169,8 +169,8 @@ export function mergeGate(
     return deny(
       `its head commit ${short} has not passed \`bun run gate\` on this machine. ${where} (and the verifier, for product code), then merge.`,
     );
-  // A partial pass (no database checks: no Docker here, or a stop while background work ran) counts only once GitHub
-  // reports `checks` passed on it.
+  // A partial pass (no Docker here, so no database checks) counts only once GitHub reports `checks` passed on it; a
+  // stop's pass while background work ran is never one (verdict.ts).
   const missing =
     partial && checksNotPassed(head, named ? ownerRepo(named) : ours, repo);
   if (missing)
@@ -178,7 +178,8 @@ export function mergeGate(
       `its head commit ${short} passed \`bun run gate\` here only in part (${partial}), and ${missing}. Wait until \`gh pr checks ${number}\` shows \`checks\` passed, or run \`bun run gate\` on a machine with Docker, then merge.`,
     );
   const checks =
-    checked ?? `${partial} · GitHub reports \`checks\` passed on it`;
+    checked ??
+    `${partial} · tests, database policies and browser checks did not run here; GitHub reports \`checks\` passed on it`;
   // Against the base GitHub merges into (the local main may be behind), listed as the stop's rules list files.
   const base =
     (baseRef && git(repo, ["merge-base", head, baseRef], {}, true)) ||

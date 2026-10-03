@@ -82,11 +82,36 @@ export function ranIn(repo: string, cwd: string, command: string) {
 export const extra = (root: string, tree: string) =>
   Bun.hash(git(root, ["diff-tree", "-r", "HEAD", tree], {}, true)).toString(36);
 
+/** The record of the code the session last accepted on the branch a checkout is on; none when it is on no branch. */
+const onBranch = (session: string, root: string) => {
+  const branch = git(
+    root,
+    ["symbolic-ref", "--quiet", "--short", "HEAD"],
+    {},
+    true,
+  );
+  return branch && `${session}-${Bun.hash(branch).toString(36)}`;
+};
+/**
+ * The code the session accepts in a checkout: as it found it, as main's commits arriving left it, or as a stop judged
+ * it. It is kept by branch too, so a worktree on that branch removed and added again, or moved, is judged from there.
+ */
+export function accept(
+  store: Store,
+  session: string,
+  root: string,
+  tree: string,
+) {
+  store.put("accepted", keyOf(session, root), tree);
+  const branch = onBranch(session, root);
+  if (branch) store.put("accepted-branch", branch, tree);
+}
+
 /**
  * Before a tool call, note each checkout the session is about to work in, and that it is the last to work there:
  * the checkout of its folder, of a file it edits, one a command enters (`cd`, `git -C`) or names by path. The
  * state a checkout is found in (the first time, or after another session worked there) is the baseline: only
- * what changes after it can be this session's.
+ * what changes after it can be this session's, and on a branch the session accepted elsewhere, what changed since.
  */
 export function touch(
   repo: string,
@@ -125,9 +150,17 @@ export function touch(
   for (const c of hits) {
     const key = keyOf(session, c);
     const same = store.get("seen", key) === identity(c);
-    if (!same || store.get("toucher", idOf(c)) !== session) {
+    const toucher = store.get("toucher", idOf(c));
+    if (!same || toucher !== session) {
       const tree = snapshot(c, false).tree;
-      store.put("accepted", key, tree);
+      // A checkout new to the session, on a branch it accepted elsewhere (a worktree it removed and added again, or
+      // moved): what changed on that branch since is still its own, unless another session worked here last.
+      const branch = onBranch(session, c);
+      const before =
+        !same && (!toucher || toucher === session) && branch
+          ? store.get("accepted-branch", branch)
+          : undefined;
+      accept(store, session, c, before ?? tree);
       store.put("extra", key, extra(c, tree));
       if (!same) store.put("baseline", key, tree);
       store.put("seen", key, identity(c));

@@ -40,7 +40,11 @@ export async function prove(
   const checked = store.get("checked", snap.tree);
   if (checked) return { ok: true, checks: checked, notes };
   const notRun = notRunWhy(background);
-  const partial = notRun && store.get("partial", snap.tree); // typecheck, lint and guards passed on it
+  // Typecheck, lint and guards passed on it: without Docker (`partial`, which counts at merge once GitHub reports
+  // `checks` passed), or while background work ran (`partial-background`, which never counts at merge: on a machine
+  // with Docker the checks on the database must run here).
+  const kind = notRun === "yet" ? "partial-background" : "partial";
+  const partial = notRun && store.get(kind, snap.tree);
   if (partial) return { ok: true, checks: partial, notes, notRun };
   if (cachedOnly)
     return { ok: false, headline: "the checks have not passed", reason: "" };
@@ -51,26 +55,40 @@ export async function prove(
       headline: r.text.split("\n")[0] ?? "a check failed",
       reason: `You can't finish yet: ${r.text}\nFix the cause. Never skip, silence or weaken a check to get past it.`,
     };
-  store.put(r.complete ? "checked" : "partial", snap.tree, r.text); // a partial run never passes a full one
+  store.put(r.complete ? "checked" : kind, snap.tree, r.text); // a partial run never passes a full one
   return { ok: true, checks: r.text, notes, notRun };
 }
 
-/** `codex`: the agent is Codex, which has no verifier agent, so it is never sent back to run one. */
+/**
+ * `codex`: the agent is Codex, which has no verifier agent, so it is never sent back to run one. `cachedOnly`: the
+ * agent gave up on this code (prove). `background`: work the session left running. `verifying`: a verifier the agent
+ * started in the background is still running, so its ruling is still to come.
+ */
 export async function judge(
   snap: Snap,
   store: Store,
   codex: boolean,
-  cachedOnly = false,
-  background = false,
+  { cachedOnly = false, background = false, verifying = false } = {},
 ): Promise<Verdict> {
   const proof = await prove(snap, store, cachedOnly, background);
   if (!proof.ok) return proof;
-  return rule(snap.tree, proof, snap.files.some(isProduct), store, codex);
+  return rule(
+    snap.tree,
+    proof,
+    snap.files.some(isProduct),
+    store,
+    codex,
+    verifying,
+  );
 }
 
+/** `waits`: passed for now, but a later stop judges the same code again (database checks or a ruling to come). */
 type Verdict =
-  | { ok: true; message: string; notRun?: NotRun }
+  | { ok: true; message: string; waits: boolean }
   | { ok: false; headline: string; reason: string };
+
+const VERIFYING =
+  "NOT verified yet: the verifier is still running, and the first stop after it ends reads its ruling";
 
 /** Proven by machine; does the change also need, and have, the verifier's ruling on this exact code? */
 function rule(
@@ -79,13 +97,18 @@ function rule(
   product: boolean,
   store: Store,
   codex: boolean,
+  verifying: boolean,
 ): Verdict {
   const told = proof.notes.length ? ` · ⚠ ${proof.notes.join(" · ")}` : "";
   // When the checks on the database did not run, the line saying so leads in place of `all`, never a ✓, then `verifier`.
-  const ok = (all: string, verifier?: string): Verdict => ({
+  const ok = (
+    all: string,
+    verifier?: string,
+    waits = proof.notRun === "yet",
+  ): Verdict => ({
     ok: true,
     message: `${proof.notRun ? [NOT_RUN[proof.notRun], verifier].filter(Boolean).join(" · ") : all}${told}`,
-    notRun: proof.notRun,
+    waits,
   });
   if (!product)
     return ok(
@@ -98,6 +121,14 @@ function rule(
     return ok(
       `Done gate ⚠ checks green (${proof.checks}), ${codexSays}`,
       codexSays,
+    );
+  // While a verifier it started in the background works, sending the agent back would only count toward its giving
+  // up: it may stop, NOT verified, and a later stop judges the same code again.
+  if (!ruling && verifying)
+    return ok(
+      `Done gate ⏳ ${VERIFYING} (checks green: ${proof.checks})`,
+      VERIFYING,
+      true,
     );
   if (!ruling)
     return {

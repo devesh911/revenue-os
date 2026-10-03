@@ -2,7 +2,7 @@
 // back to work.
 
 import { relative } from "node:path";
-import { idOf, keyOf, rootsOf } from "./checkouts";
+import { accept, idOf, keyOf, rootsOf } from "./checkouts";
 import { type HookInput, say } from "./hook-io";
 import { onlyMainArrived } from "./only-main";
 import { isProduct } from "./rules";
@@ -50,7 +50,7 @@ export async function stop(
       }
       // Only main's commits arrived (a pull, a switch to main), its own edits as they were: not the session's work.
       if (accepted && onlyMainArrived(root, store.get("extra", key), tree)) {
-        store.put("accepted", key, tree);
+        accept(store, session, root, tree);
         continue;
       }
       work.push({
@@ -65,9 +65,12 @@ export async function stop(
       );
     }
   if (!work.length) return notes.length ? say(notes.join("\n")) : undefined;
-  const background = Boolean(
-    input.background_tasks?.length || input.session_crons?.length,
-  ); // only the checks on the database wait for it to end (not-run.ts)
+  const tasks = input.background_tasks ?? [];
+  const background = Boolean(tasks.length || input.session_crons?.length); // only the database checks wait (not-run.ts)
+  // A verifier the agent started in the background, as Claude Code lists it: its ruling is still to come.
+  const verifying = tasks.some(
+    (t) => (t as { agent_type?: unknown } | null)?.agent_type === "verifier",
+  );
   for (const tree of new Set([...trees, ...work.map((w) => w.tree)])) {
     const pause = store.take("pause", tree);
     if (pause)
@@ -75,17 +78,22 @@ export async function stop(
         `Done gate ⏸ waiting on you: ${pause} (the change so far is NOT verified)`,
       );
   }
-  // After the agent gave up on this exact code, only what is already known counts: no check runs again.
-  const print = work
+  // After the agent gave up on this exact code, only what is already known counts: no check runs again. Once background
+  // work it gave up during has ended, the checks on the database can run, so the same code is judged afresh.
+  const print = `${work
     .map((w) => w.tree)
     .sort()
-    .join(" ");
+    .join(" ")}${background ? " while background work ran" : ""}`;
   const gaveUp = store.get("gave-up", session) === print;
   const passed: string[] = [];
-  const waits = new Set<string>(); // keys whose database checks still have to run at a later stop
+  const waits = new Set<string>(); // keys a later stop judges again: their database checks or verifier still to come
   let failed: { headline: string; reason: string } | undefined;
   for (const w of work) {
-    const j = await judge(snapshot(w.root), store, codex, gaveUp, background);
+    const j = await judge(snapshot(w.root), store, codex, {
+      cachedOnly: gaveUp,
+      background,
+      verifying,
+    });
     if (!j.ok) {
       failed = w.where
         ? {
@@ -95,7 +103,7 @@ export async function stop(
         : j;
       break;
     }
-    if (j.notRun === "yet") waits.add(w.key);
+    if (j.waits) waits.add(w.key);
     passed.push(
       w.where
         ? j.message.replace("Done gate ", `Done gate (${w.where}) `)
@@ -104,7 +112,7 @@ export async function stop(
   }
   if (!failed) {
     for (const w of work)
-      if (!waits.has(w.key)) store.put("accepted", w.key, w.tree);
+      if (!waits.has(w.key)) accept(store, session, w.root, w.tree);
     store.take("blocks", session);
     store.take("gave-up", session);
     return say([...passed, ...notes].join("\n"));

@@ -132,6 +132,70 @@ const stop = (
 const QUIET = { sentBack: false, told: "", reason: "" };
 const verified = (dir: string, note: string, ruling = "PASS") =>
   verifierRun(GATE, dir, { report: `Ruling: ${ruling} — ${note}` });
+/** The session runs a shell command from `dir`: the hook before it notes the checkouts it runs in. */
+const ran = (dir: string, command: string) =>
+  runHook(GATE, dir, {
+    hook_event_name: "PreToolUse",
+    tool_name: "Bash",
+    tool_input: { command },
+  });
+const ALL_CHECKS =
+  "Done gate ✓ typecheck, lint, guards, 3 tests, database policies, 3 browser checks";
+const WAITING =
+  "Done gate ⏳ NOT fully checked yet: tests, database policies and browser checks wait while background work runs; the first stop after it ends runs them";
+const HERE =
+  "Done gate ⚠ NOT fully checked: tests, database policies and browser checks did not run here; CI runs them";
+const BACKGROUND = { background_tasks: [{ id: "t1", type: "shell" }] };
+
+/**
+ * A folder holding a `docker` that can't run, as on a machine where Docker is not installed, and bun: started from
+ * there, bun's own folder leads the PATH the gate sets (scripts/done-gate.ts), so that docker is the one it finds, as
+ * Homebrew may install a real docker beside a real bun.
+ */
+const noDockerBin = () => {
+  const bin = scratch("no-docker-");
+  write(bin, "docker", "#!/bin/sh\nexit 127\n");
+  chmodSync(join(bin, "docker"), 0o755);
+  try {
+    linkSync(process.execPath, join(bin, "bun")); // bun names its own folder by the path it was started from
+  } catch {
+    copyFileSync(
+      process.execPath,
+      join(bin, "bun"),
+      constants.COPYFILE_FICLONE,
+    );
+    chmodSync(join(bin, "bun"), 0o755);
+  }
+  return bin;
+};
+
+/** A stand-in gh, first on the PATH the hook starts with: its pull request's head is `head`, and `checks` passed on it. */
+const passingGh = (head: string) => {
+  const bin = scratch("gh-");
+  write(
+    bin,
+    "answer.json",
+    JSON.stringify({
+      total_count: 1,
+      check_runs: [
+        {
+          name: "checks",
+          head_sha: head,
+          status: "completed",
+          conclusion: "success",
+          app: { id: 15368 },
+        },
+      ],
+    }),
+  );
+  write(
+    bin,
+    "gh",
+    `#!/bin/sh\ncase "$1" in\n  pr) echo ${head} ;;\n  api) cat "${join(bin, "answer.json")}" ;;\nesac\n`,
+  );
+  chmodSync(join(bin, "gh"), 0o755);
+  return { PATH: `${bin}:${process.env.PATH}` };
+};
 
 describe("a stop judges a checkout whose latest commit main does not hold, however it got there", () => {
   it("judges work the session committed after it switches to main and back", () => {
@@ -188,14 +252,76 @@ describe("a stop judges a checkout whose latest commit main does not hold, howev
     commit(dir);
     expect(stop(dir).sentBack).toBe(true); // its own work, judged
     sh(dir, ["git", "checkout", "-q", "main"]); // and set aside: main's code is not the session's to answer for
-    expect(stop(dir)).toEqual(QUIET);
+    expect(stop(dir)).toEqual(QUIET); // a known hole (STATE.md): the merge check, not a stop, judges that commit
+  });
+
+  /** A worktree on a branch of the session's own, noted, holding a commit main does not hold. */
+  const ownWorktree = () => {
+    const dir = repo();
+    start(dir);
+    const wt = join(scratch("wt-"), "w");
+    sh(dir, ["git", "worktree", "add", "-q", "-b", "feat/w", wt]);
+    ran(dir, `cd ${wt} && git status`);
+    write(wt, "services/worker/src/w.ts", "// @ts-ignore\n");
+    commit(wt);
+    return { dir, wt };
+  };
+
+  it("judges the session's commit in a worktree it removed and added again on the same branch", () => {
+    const { dir, wt } = ownWorktree();
+    sh(dir, ["git", "worktree", "remove", wt]);
+    sh(dir, ["git", "worktree", "add", "-q", wt, "feat/w"]);
+    ran(dir, `cd ${wt} && git status`);
+    const r = stop(dir);
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "services/worker/src/w.ts:1 switches the type checker off",
+    );
+  });
+
+  it("judges the session's commit in a worktree it moved", () => {
+    const { dir, wt } = ownWorktree();
+    const moved = join(scratch("wt-"), "moved");
+    sh(dir, ["git", "worktree", "move", wt, moved]);
+    ran(dir, `cd ${moved} && git status`);
+    const r = stop(dir);
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "services/worker/src/w.ts:1 switches the type checker off",
+    );
+  });
+
+  it("finds a worktree the session adds on someone else's branch as it is, to read their pull request", () => {
+    const dir = repo();
+    theirBranch(dir, "feat/theirs");
+    start(dir);
+    for (const how of [["feat/theirs"], ["--detach", "feat/theirs"]]) {
+      const wt = join(scratch("wt-"), "w");
+      sh(dir, ["git", "worktree", "add", "-q", wt, ...how]);
+      ran(dir, `cd ${wt} && git status`);
+      const r = stop(dir); // not sent back; Devesh is told once that it holds unverified work from before the session
+      expect(r.sentBack).toBe(false);
+      expect(r.told).toContain(
+        "but it holds product changes from before the session",
+      );
+      sh(dir, ["git", "worktree", "remove", wt]);
+    }
   });
 });
 
 describe("while background work runs, a stop still judges the done rules and the verifier; only the database checks wait", () => {
-  const BACKGROUND = { background_tasks: [{ id: "t1", type: "shell" }] };
-  const WAITING =
-    "Done gate ⏳ NOT fully checked yet: tests, database policies and browser checks wait while background work runs; the first stop after it ends runs them";
+  // As Claude Code 2.1.288 lists a verifier the agent started in the background (its Stop input's background_tasks).
+  const VERIFYING = {
+    background_tasks: [
+      {
+        id: "a1",
+        type: "subagent",
+        status: "running",
+        description: "Verify the change",
+        agent_type: "verifier",
+      },
+    ],
+  };
 
   it("sends the agent back on a rule problem", () => {
     const dir = repo();
@@ -240,37 +366,114 @@ describe("while background work runs, a stop still judges the done rules and the
     });
     expect(databaseChecksRan(dir)).toBe(0);
   });
+
+  it("waits for a verifier the agent started in the background, without sending it back, then reads its ruling", () => {
+    const dir = repo();
+    start(dir);
+    write(dir, "services/worker/src/route.ts", "const route = 1;\n");
+    for (let i = 0; i < 6; i++)
+      expect(stop(dir, VERIFYING)).toEqual({
+        ...QUIET,
+        told: `${WAITING} · NOT verified yet: the verifier is still running, and the first stop after it ends reads its ruling`,
+      });
+    verified(dir, "saw the route answer 200");
+    expect(stop(dir)).toEqual({
+      ...QUIET,
+      told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
+    });
+    expect(databaseChecksRan(dir)).toBe(3);
+  });
+
+  it("judges the same code afresh at the first stop after the work ends, even after the agent gave up", () => {
+    const dir = repo();
+    start(dir);
+    write(dir, "services/worker/src/route.ts", "const route = 1;\n");
+    for (let i = 0; i < 5; i++)
+      expect(stop(dir, BACKGROUND).sentBack).toBe(true);
+    expect(stop(dir, BACKGROUND).told).toStartWith(
+      "Done gate ✗ NOT DONE: the agent stopped after 5 tries",
+    );
+    verified(dir, "saw the route answer 200");
+    expect(stop(dir)).toEqual({
+      ...QUIET,
+      told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
+    });
+    expect(databaseChecksRan(dir)).toBe(3);
+  });
+
+  it("never lets a stop's pass while background work ran count at merge on a machine with Docker", () => {
+    const dir = repo();
+    start(dir);
+    sh(dir, ["git", "checkout", "-qb", "feat/notes"]);
+    write(dir, "docs/notes.md", "hello\n");
+    commit(dir);
+    const head = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
+    expect(stop(dir, BACKGROUND).told).toBe(WAITING);
+    const merge = (env: Record<string, string>) =>
+      runHook(
+        GATE,
+        dir,
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          tool_input: {
+            command: `gh pr merge 7 --squash --match-head-commit ${head}`,
+          },
+        },
+        env,
+      ).out;
+    const refused = merge(passingGh(head));
+    expect(refused.hookSpecificOutput?.permissionDecision).toBe("deny");
+    expect(refused.systemMessage).toBe(
+      `Done gate ✗ merge refused: its head commit ${head.slice(0, 7)} has not passed \`bun run gate\` on this machine. Check out ${head.slice(0, 7)} with nothing else changed (a clean worktree: \`git worktree add --detach .claude/worktrees/check ${head.slice(0, 7)}\`), run \`bun run gate\` there (and the verifier, for product code), then merge.`,
+    );
+    // A machine without Docker never runs them: its pass counts once GitHub reports `checks` passed, and says so.
+    expect(
+      stop(dir, {}, { PATH: `${noDockerBin()}:${process.env.PATH}` }).told,
+    ).toBe(HERE);
+    expect(merge(passingGh(head)).systemMessage).toBe(
+      `Done gate ✓ merge of ${head.slice(0, 7)}: typecheck, lint, guards · tests, database policies and browser checks did not run here; GitHub reports \`checks\` passed on it (no product code changed)`,
+    );
+  });
 });
 
 describe("a stop on a machine without Docker says what did not run, never with a ✓", () => {
-  const HERE =
-    "Done gate ⚠ NOT fully checked: tests, database policies and browser checks did not run here; CI runs them";
-  /**
-   * A `docker` that can't run, as on a machine where Docker is not installed, first on the PATH the gate sets: bun's
-   * own folder leads it (scripts/done-gate.ts), so bun runs from beside it, as Homebrew may install a real docker
-   * beside a real bun.
-   */
-  const noDocker = () => {
-    const bin = scratch("no-docker-");
-    write(bin, "docker", "#!/bin/sh\nexit 127\n");
-    chmodSync(join(bin, "docker"), 0o755);
-    try {
-      linkSync(process.execPath, join(bin, "bun")); // bun names its own folder by the path it was started from
-    } catch {
-      copyFileSync(
-        process.execPath,
-        join(bin, "bun"),
-        constants.COPYFILE_FICLONE,
-      );
-      chmodSync(join(bin, "bun"), 0o755);
-    }
-    return { PATH: `${bin}:${process.env.PATH}` };
-  };
+  const noDocker = () => ({ PATH: `${noDockerBin()}:${process.env.PATH}` });
 
-  it("shows exactly that line when no product code changed", () => {
+  it("shows exactly that line when no product code changed, while background work runs too", () => {
+    for (const input of [{}, BACKGROUND]) {
+      const dir = repo();
+      write(dir, "docs/notes.md", "hello\n");
+      expect(stop(dir, input, noDocker())).toEqual({ ...QUIET, told: HERE });
+      expect(databaseChecksRan(dir)).toBe(0);
+    }
+  });
+
+  it("shows a pass that ran no database checks without a ✓, as today's gate showed it", () => {
     const dir = repo();
+    sh(dir, ["git", "checkout", "-qb", "feat/notes"]);
     write(dir, "docs/notes.md", "hello\n");
-    expect(stop(dir, {}, noDocker())).toEqual({ ...QUIET, told: HERE });
+    commit(dir);
+    const tree = sh(dir, ["git", "rev-parse", "HEAD^{tree}"]).stdout.trim();
+    // What a stop that ran typecheck, lint and guards only leaves for this code, in the words today's gate writes when
+    // no local database answers. The shared one always answers here, so the test writes it for that run.
+    write(
+      dir,
+      `.git/done-gate/partial/${tree}`,
+      "typecheck, lint, guards, NOT run here (no Docker): tests, database policies, browser checks; CI runs them",
+    );
+    // Docker not installed: none on the PATH the hook starts with, and the one beside bun can't run.
+    const r = spawnSync(join(noDockerBin(), "bun"), [GATE, "hook"], {
+      cwd: dir,
+      env: { ...process.env, PATH: "/usr/bin:/bin" },
+      input: JSON.stringify({
+        hook_event_name: "Stop",
+        session_id: "s1",
+        cwd: dir,
+      }),
+      encoding: "utf8",
+    });
+    expect(JSON.parse(r.stdout).systemMessage).toBe(HERE);
     expect(databaseChecksRan(dir)).toBe(0);
   });
 

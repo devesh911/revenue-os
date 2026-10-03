@@ -76,7 +76,9 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   `scripts/done-gate.ts` checks what its session changed in each checkout it worked in (and was the last
   to work in): first the rules against fake-done (throwing
   stubs, exports nothing calls, silenced checks, skipped tests, tests that read source code), then every
-  check on the exact code, then, if product code changed, a ruling from the verifier agent
+  check on the exact code (without Docker the tests, database policies and browser checks are left to CI,
+  and while background work runs they wait for a later stop; either way Devesh sees `NOT fully checked`,
+  never a ✓), then, if product code changed, a ruling from the verifier agent
   (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words (when
   he gave none, the roadmap item's text, word for word): PASS,
   or CANNOT_VERIFY naming what only Devesh can provide (a real phone number, an account, a key),
