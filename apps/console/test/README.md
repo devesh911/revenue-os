@@ -20,7 +20,9 @@ real stack is a browser test in `../e2e/`.
   sign-in client and the configuration screen names what is missing; with env present, the app
   runs inside its error boundary), `app-error-boundary.test.tsx`, `console-boot-honesty.test.tsx`
   (the lazy sign-in client, the env check, the landing's unreachable-versus-empty states) and
-  `vite-api-url-honesty.test.tsx` (a production build needs a valid API address).
+  `vite-api-url-honesty.test.tsx` (a production build needs a valid API address). The browser
+  half is `../e2e/no-settings.e2e.ts`: a real build with its settings empty shows the configuration
+  screen.
 - `conversation-link.test.tsx`, `transcript-xss.test.tsx` — the shared conversation link, and
   transcripts rendering hostile content as inert text.
 - Sign-in front door: `auth-routing.test.tsx` (signed-out → /login?next, signed-in → a safe next,
