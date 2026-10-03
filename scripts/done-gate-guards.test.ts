@@ -736,6 +736,8 @@ describe("the merge check: every agent merge names the exact commit that passed 
   });
 
   // The stand-in gh must win over a real one that sits beside bun, as Homebrew installs both in /opt/homebrew/bin.
+  // It does while the gate's gh calls hand spawnSync no `env`: bun then looks gh up on the PATH it started with, not
+  // the one scripts/done-gate.ts sets (bun's own folder first). The outside review of 2026-10-03 asked.
   it("asks the gh the caller's PATH names first, not one beside bun", () => {
     const dir = repo();
     const { head } = pullRequest(dir); // never proven here
