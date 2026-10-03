@@ -176,5 +176,3 @@ export const rulesOn = (snap: Snap) =>
   );
 export const listed = (problems: string[]) =>
   `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line; Devesh sees every exception.`;
-/** A test file, or a helper or fixture in a test folder: what main's copy takes from the change (tests-proven.ts). */
-export const isTest = (f: string) => TEST.test(f);

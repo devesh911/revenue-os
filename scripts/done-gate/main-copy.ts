@@ -1,6 +1,6 @@
 // Main's code beside the change's tests: a scratch copy, outside the repo, of the commit the change left main at,
-// holding every test file the change adds, edits or deletes (helpers and fixtures in test folders too) as the change
-// has it, with main's packages installed.
+// with each file the caller names (the change's tests, helpers, fixtures and anything else that is not product code)
+// as the change has it, and the packages installed.
 
 import { spawnSync } from "node:child_process";
 import {
@@ -18,7 +18,11 @@ import { dirname, join } from "node:path";
 const NO_ATTRIBUTES = "--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 /** The copy's folder, by its real path (bun names files by theirs); the caller removes it. */
-export function mainCopy(repo: string, from: string, tests: string[]): string {
+export function mainCopy(
+  repo: string,
+  from: string,
+  fromChange: string[],
+): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "done-gate-main-")));
   try {
     const archive = spawnSync("git", [NO_ATTRIBUTES, "archive", from], {
@@ -32,7 +36,7 @@ export function mainCopy(repo: string, from: string, tests: string[]): string {
     });
     if (tar.status !== 0)
       throw new Error(`unpacking main's code failed: ${tar.stderr}`);
-    for (const f of tests) {
+    for (const f of fromChange) {
       const to = join(dir, f);
       rmSync(to, { force: true });
       if (!existsSync(join(repo, f))) continue; // the change deletes it

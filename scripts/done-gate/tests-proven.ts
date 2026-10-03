@@ -10,7 +10,7 @@ import { markNote, markOn } from "./already-on-main";
 import { exportsOf, statementAt } from "./code-text";
 import { lineRan } from "./lcov";
 import { mainCopy } from "./main-copy";
-import { isProduct, isTest } from "./rules";
+import { isProduct } from "./rules";
 import type { Snap } from "./snapshot";
 import { type Case, type FileRun, isTestFile, runTestFile } from "./test-run";
 import { testEnd } from "./test-span";
@@ -40,8 +40,9 @@ const MARK_HOW =
 
 /**
  * Runs each test file the change adds or edits, alone, on the change (with coverage) and, for those holding a new
- * or edited test, on main's code: the commit the change left main at (`snap.from`). Text for Devesh, and whether
- * every such test is proven. `isMoved` leaves out lines the change only moved.
+ * or edited test, on main's code: the commit the change left main at (`snap.from`) with the change's own copy of
+ * everything but product code, so its helpers and fixtures come along. Text for Devesh, and whether every such
+ * test is proven. `isMoved` leaves out lines the change only moved; the done-rules item hands it in (cli.ts).
  */
 export function testsProven(
   repo: string,
@@ -95,7 +96,11 @@ export function testsProven(
   const copyStarted = Date.now();
   let main: string;
   try {
-    main = mainCopy(repo, snap.from, snap.files.filter(isTest));
+    main = mainCopy(
+      repo,
+      snap.from,
+      snap.files.filter((f) => !isProduct(f)),
+    );
   } catch (e) {
     return refused([
       ...problems,

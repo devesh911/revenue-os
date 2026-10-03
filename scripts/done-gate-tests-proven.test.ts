@@ -290,11 +290,12 @@ it("makes one", () => {
     );
   });
 
-  it("refuses a test that can't load on main only because a new non-product file is missing: a missing helper or fixture never counts", () => {
-    const r = prove(
+  // A helper or fixture neither product code nor in a test folder, by today's product list and by the done-rules
+  // item's wider one, comes along to main's code too: a missing helper or fixture never counts.
+  it("refuses a test that imports a new helper outside a test folder: the helper comes along to main's code, where the test passes", () => {
+    const imported = prove(
       scratch({
         "apps/x/src/old.ts": `${OLD}export const unused = 2;\n`,
-        // Neither product code nor a test file, by today's product list and by the done-rules item's wider one.
         "docs/fixtures/rows.ts": "export const rows = [1, 2];\n",
         "apps/x/test/rows.test.ts": `import { expect, it } from "bun:test";
 import { rows } from "../../../docs/fixtures/rows";
@@ -305,9 +306,30 @@ it("has two rows", () => {
 `,
       }),
     );
-    expect(r.ok).toBe(false);
-    expect(r.text).toContain(
-      "can't load on main's code because docs/fixtures/rows.ts is missing, which is not product code this change adds",
+    expect(imported.ok).toBe(false);
+    expect(imported.text).toContain(
+      'apps/x/test/rows.test.ts:4 "has two rows" passes on main\'s code too',
+    );
+  });
+
+  it("refuses a test that reads a new fixture from disk outside a test folder: the fixture comes along to main's code, so the test can't throw there for want of it", () => {
+    const read = prove(
+      scratch({
+        "apps/x/src/old.ts": `${OLD}export const unused = 2;\n`,
+        "docs/fixtures/rows.json": "[1, 2, 3]\n",
+        "apps/x/test/rows.test.ts": `import { expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+
+it("reads three rows", () => {
+  const rows = JSON.parse(readFileSync(\`\${import.meta.dir}/../../../docs/fixtures/rows.json\`, "utf8"));
+  expect(rows.length).toBe(3);
+});
+`,
+      }),
+    );
+    expect(read.ok).toBe(false);
+    expect(read.text).toContain(
+      'apps/x/test/rows.test.ts:4 "reads three rows" passes on main\'s code too',
     );
   });
 
