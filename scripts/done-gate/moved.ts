@@ -54,10 +54,13 @@ export function withMoved(
     else if (!header && l.startsWith("-"))
       flags.removed.push(raw.startsWith(OLD_MOVED));
   }
+  if (
+    added.length !== flags.added.length ||
+    removed.length !== flags.removed.length
+  )
+    return { added, removed };
   const mark = (lines: Added[], moved: boolean[]) =>
-    lines.length === moved.length
-      ? lines.map((l, i) => (moved[i] ? { ...l, moved: true } : l))
-      : lines;
+    lines.map((l, i) => (moved[i] ? { ...l, moved: true } : l));
   return {
     added: mark(added, flags.added),
     removed: mark(removed, flags.removed),

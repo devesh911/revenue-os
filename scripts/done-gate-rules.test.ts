@@ -16,6 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { usesExport } from "./done-gate/export-users";
+import { withMoved } from "./done-gate/moved";
 import { checkRules, isProduct } from "./done-gate/rules";
 
 const GATE = join(import.meta.dir, "done-gate.ts");
@@ -331,6 +332,21 @@ describe("moved code, found by git's moved-code detection", () => {
     expect(r.out).toContain(
       `⚠ moved lines: ${part(1)} 80 in, ${part(2)} 69 in, ${part(3)} 80 in, ${part(4)} 70 in, ${BIG} 299 out\n`,
     );
+  });
+
+  it("marks nothing moved when the coloured run failed or disagrees with the plain one", () => {
+    const lines = {
+      added: [{ file: "a.ts", line: 1, text: "x", hunk: 1 }],
+      removed: [{ file: "b.ts", line: 1, text: "x", hunk: 2 }],
+    };
+    const ESC = "\u001b[";
+    const coloured = `diff --git a/a.ts b/a.ts\n@@ -0,0 +1 @@\n${ESC}36m+x${ESC}m\ndiff --git a/b.ts b/b.ts\n@@ -1 +0,0 @@\n${ESC}35m-x${ESC}m`;
+    expect(withMoved(coloured, lines)).toEqual({
+      added: [{ ...lines.added[0], moved: true }],
+      removed: [{ ...lines.removed[0], moved: true }],
+    });
+    expect(withMoved("", lines)).toEqual(lines); // git failed: an empty run
+    expect(withMoved(`${coloured}\n${ESC}36m+y${ESC}m`, lines)).toEqual(lines);
   });
 
   it("counts a test moved out of the test files, into a note, as removed", () => {

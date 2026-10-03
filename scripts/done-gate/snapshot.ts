@@ -55,7 +55,7 @@ export function snapshot(
       tree,
       from,
       git(repo, [...DIFF, from, head]),
-      git(repo, [...MOVED, from, head]),
+      git(repo, [...MOVED, from, head], {}, true),
       (args) =>
         git(repo, [...GREP, ...args, tree], {}, true)
           .split("\0")
@@ -90,7 +90,7 @@ export function snapshot(
       tree,
       from,
       git(repo, [...DIFF, "--cached", from], env),
-      git(repo, [...MOVED, "--cached", from], env),
+      git(repo, [...MOVED, "--cached", from], env, true),
       (args) =>
         git(repo, [...GREP, "--cached", ...args], env, true)
           .split("\0")
@@ -136,7 +136,7 @@ const DIFF = [
   "--no-color",
   ...OPTIONS,
 ];
-// The same diff again, coloured to show which lines moved; its text is never read.
+// The same diff again, coloured to show which lines moved; its text is never read. Should it fail, no line is moved.
 const MOVED = [
   NO_ATTRIBUTES,
   ...COLOURS,
