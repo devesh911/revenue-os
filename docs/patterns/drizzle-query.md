@@ -1,27 +1,33 @@
-# Pattern: org-scoped SQL query (what the code actually does)
-> The file name is historical: **Drizzle is installed but no query uses it.** Every query is parameterised SQL through `tx.query` inside `withOrg`. Adopting Drizzle for new code would be a recorded decision in `STATE.md`. The Drizzle example further down is kept only for that discussion.
+# Pattern: company-scoped SQL query (the file name is historical)
+No query in this codebase uses Drizzle, so the Drizzle example that stood here is deleted; Drizzle's unused copy of
+three tables, `packages/db/src/schema.ts`, goes under entry 2 of `docs/fix-when-touched.md`. Every query is
+parameterised SQL through `tx.query` inside `withOrg` (`packages/db/src/client.ts`), with the company in its where
+clause as well as in the database's own per-company rules:
 
 ```ts
-// the real idiom (e.g. packages/db/src/audit.ts, packages/harness/src/tools/book-appointment.ts)
-const rows = await withOrg(pool, orgId, (tx) =>
-  tx.query(
-    `select id, title from tasks where org_id = $1 and status = $2 order by priority desc limit 50`,
-    [orgId, "open"],
-  ),
-);
+// packages/db/src/agents.ts
+export async function listAgentsAndWorkflows(
+  pool: pg.Pool,
+  orgId: string,
+): Promise<{ agents: AgentRow[]; workflows: WorkflowRow[] }> {
+  return withOrg(pool, orgId, async (tx) => {
+    …
+    const agents = await tx.query(
+      `select id, key, version, status, model, created_at::text as created_at
+         from agents
+        where org_id = $1
+        order by key asc, version desc`,
+      [orgId],
+    );
+    …
+  });
+}
 ```
-Rules: org_id in EVERY where (RLS is the net, not the query plan) · values only through `$n` parameters, no string concatenation, ever.
+**Not every query does this yet.** About 40 SQL statements in product code, in some 20 functions, leave the company out of the where clause (counted on 2026-10-03, leaving out lookups of the company row itself and the scheduler's deliberate scan of every company's due runs), among them `listTasks`,
+`listConversations` and `funnelMetrics` in `packages/db/src/screens.ts` and the contact update in
+`packages/harness/src/tools/update-contact.ts`: don't copy a query without reading its where clause. Slice 1 ·
+"Every database query also filters by company…" adds the filter everywhere, adds a check that fails a query
+without it, and makes this file an excerpt of that code.
 
-## Historical Drizzle example (not used in this codebase)
-```ts
-// typed builder for the common shape
-const hot = await db.select().from(tasks)
-  .where(and(eq(tasks.orgId, orgId), eq(tasks.status, "open"), eq(tasks.kind, "callback")))
-  .orderBy(desc(tasks.priority)).limit(50);
-
-// sanctioned raw when SQL is clearer (still parameterized — S5.2)
-const lift = await db.execute(sql`
-  select count(*) filter (where o.occurred_at < now() - interval '14 day') as before
-  from outcomes o where o.org_id = ${orgId} and o.kind = ${kind}`);
-```
-Rules: org_id in EVERY where (RLS is the net, not the query plan) · no string concatenation, ever.
+Rules: `org_id` in every where clause (the database's per-company rules are the net, not the plan) · values only
+through `$n` parameters, never joined into the SQL text · one query at a time on a transaction's connection.
