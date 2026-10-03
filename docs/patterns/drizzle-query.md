@@ -23,7 +23,7 @@ export async function listAgentsAndWorkflows(
   });
 }
 ```
-**Not every query does this yet.** About 18 leave the company out of the where clause, among them `listTasks`,
+**Not every query does this yet.** About 40 SQL statements in product code, in some 20 functions, leave the company out of the where clause (counted on 2026-10-03, leaving out lookups of the company row itself and the scheduler's deliberate scan of every company's due runs), among them `listTasks`,
 `listConversations` and `funnelMetrics` in `packages/db/src/screens.ts` and the contact update in
 `packages/harness/src/tools/update-contact.ts`: don't copy a query without reading its where clause. Slice 1 ·
 "Every database query also filters by company…" adds the filter everywhere, adds a check that fails a query
