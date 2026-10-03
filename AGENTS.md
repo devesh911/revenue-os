@@ -93,10 +93,12 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
   reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
   `scripts/done-gate/tests-ran.ts` lists it with why. Bun's run also fails when a line the change adds to a
-  .ts or .tsx file under apps, services or packages is run by no test, or a new migration has no database
-  test in the same change that uses what it adds (scripts/done-gate/coverage.ts). A deliberate gap, or a line
-  wrongly reported as not run, is marked on its line, `// coverage gap: <why>`; console code only the
-  browser checks reach, `// coverage: browser-only (<its .e2e.ts file>)`.
+  .ts or .tsx file under apps, services or packages is run by no test (a line it only moves, or whose comment
+  alone it edits, aside), or a new migration has no database test in the same change that uses what it adds
+  (scripts/done-gate/coverage.ts). A deliberate gap, or a line wrongly reported as not run, is marked on its
+  line, `// coverage gap: <why>`; console code only the browser checks reach,
+  `// coverage: browser-only (<its .e2e.ts file under apps/console/e2e>)`; a mark alone on its line covers
+  the line below it, the form JSX needs.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.

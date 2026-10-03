@@ -1,7 +1,8 @@
 // Marks on product lines no test runs on purpose, written on the line itself: `// coverage gap: <why>` (a deliberate
 // gap, or a line the coverage rule wrongly reports as not run), or `// coverage: browser-only (<browser test file>)`
-// for console code only the browser checks reach (`{/* … */}` inside JSX). Devesh sees every one: the done rules
-// list each in the stop message and CI's log, and the pull request's body quotes each (pr-coverage-marks.ts).
+// for console code only the browser checks reach. A mark alone on its line covers the line below it instead: in JSX,
+// `{/* … */}` on the line above, where the formatter keeps it. Devesh sees every one: the done rules list each in the
+// stop message and CI's log, and the pull request's body quotes each (pr-coverage-marks.ts).
 
 import type { Added } from "./diff";
 
@@ -41,6 +42,13 @@ export const marksIn = (added: Added[]) =>
     return mark ? [{ ...a, ...mark }] : [];
   });
 
-/** PURE: one note per mark the change adds, for the stop message and CI's log. */
+/** PURE: the line of a pull request's body that quotes a mark. */
+export const quoteOf = (m: { file: string; says: string }) =>
+  `Coverage mark: ${m.file} · ${m.says}`;
+
+/** PURE: one note per mark the change adds, for the stop message and CI's log, with the line the PR body owes it. */
 export const markNotes = (added: Added[]) =>
-  marksIn(added).map((m) => `coverage mark at ${m.file}:${m.line}: ${m.says}`);
+  marksIn(added).map(
+    (m) =>
+      `coverage mark at ${m.file}:${m.line}: ${m.says} · the PR body quotes it: \`${quoteOf(m)}\``,
+  );

@@ -1,12 +1,14 @@
 // A new migration counts as covered only when the same change adds or edits a database test on the local stack
 // that uses what it adds: each table it creates is named in a cross-company denial test, and anything else it adds
 // (a function, view, type, sequence or column), or the tables it changes when it adds none of those, is named in a
-// database test. "Uses" is read from names, so this check's limits are: a test file counts as a database test when
-// it connects to the database (withOrg, a pg Pool or Client, createPool, testCompanies, LOCAL_DB_URL or
-// DATABASE_URL), and as a denial test when it also runs as one company through withOrg and expects nothing back or
-// a refusal; a name counts as used when a line the change adds to such a test holds it as a whole word, in a query
-// or anywhere else, so a test that names a table without asking another company for it still passes.
+// database test. "Uses" is read from names in code, comments never counting, so this check's limits are: a test file
+// counts as a database test when its code connects to the database (withOrg, a pg Pool or Client, createPool,
+// testCompanies, LOCAL_DB_URL or DATABASE_URL), and as a denial test when it also runs as one company through withOrg
+// and expects nothing back or a refusal, anywhere in the file; a name counts as used when the code of a line the
+// change adds to such a test holds it as a whole word, in a query or anywhere else, so a test that names a table
+// without asking another company for it still passes.
 
+import { codeLines } from "./code-lines";
 import type { Added } from "./diff";
 import { isTest } from "./rules";
 
@@ -35,7 +37,10 @@ const names = (sql: string, re: RegExp) => [
 const named = (lines: string[], name: string) =>
   lines.some((l) => new RegExp(`\\b${name}\\b`, "i").test(l));
 
-/** The change's added lines and a way to read a file as the change leaves it → each new migration nothing tests. */
+/**
+ * The change's added lines and a way to read a file as the change leaves it → each new migration nothing tests.
+ * Comments count for nothing: a test file is read, and a name looked for, in its code alone.
+ */
 export function untestedMigrations(
   added: Added[],
   read: (file: string) => string,
@@ -43,10 +48,14 @@ export function untestedMigrations(
   const tests = [
     ...new Set(added.filter((a) => isTest(a.file)).map((a) => a.file)),
   ]
-    .map((file) => ({ file, text: read(file) }))
+    .map((file) => ({ file, lines: codeLines(read(file)) }))
+    .map((t) => ({ ...t, text: t.lines.join("\n") }))
     .filter((t) => DB_TEST.test(t.text));
   const linesOf = (only: typeof tests) =>
-    added.filter((a) => only.some((t) => t.file === a.file)).map((a) => a.text);
+    added.flatMap((a) => {
+      const t = only.find((t) => t.file === a.file);
+      return t ? [t.lines[a.line - 1] ?? ""] : [];
+    });
   const inDbTests = linesOf(tests);
   const inDenials = linesOf(
     tests.filter((t) => /\bwithOrg\s*\(/.test(t.text) && REFUSED.test(t.text)),
