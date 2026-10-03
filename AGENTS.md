@@ -93,6 +93,10 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
   reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
   `scripts/done-gate/tests-ran.ts` lists it with why.
+- A change with product code proves its tests test it (`bun run gate proven`, in the gate and in CI): each
+  test it adds or edits must fail on main's code and pass on the change. One that deliberately checks
+  behaviour main already has says so on its first line, `// behaviour already on main: <why>`, and the PR
+  body copies it as `Behaviour already on main: <file> · <why>`.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.
@@ -131,7 +135,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    reproduction.
 3. `bun run gate` green, run bare — never pipe a gate through anything that can swallow its exit
    code. It runs typecheck, lint, guards, every test and the RLS check against the real local stack,
-   and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
+   the change's new and edited tests again on main's code, and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
    gitleaks, `bun audit` and a Docker build; CI is the verdict.
 4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
    verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
