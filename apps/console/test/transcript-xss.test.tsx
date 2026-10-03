@@ -1,6 +1,6 @@
 // Transcripts render as text (docs/security.md S7.1): a caller can literally say "<script>" and it must show as
-// inert text, never run or draw as markup. That no console code injects raw HTML at all is a lint rule
-// (apps/console/biome.json, noDangerouslySetInnerHtml; scripts/lint-structure.test.ts proves it fires).
+// inert text, never run or draw as markup. That no console code injects raw HTML at all is a guard
+// (scripts/guards/raw-html.sh; scripts/guards-sdk-raw-html.test.ts proves it fires).
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {

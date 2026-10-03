@@ -3,8 +3,9 @@
 Component and unit tests for this app, env-free by construction (`bun test` +
 `renderToStaticMarkup`, no DOM library, no DB or network, no new deps). A test shows what the code
 does: it renders, calls or drives it, never reads its source as text. Rules about which file may
-import what are lint rules (`../biome.json`, proven by `scripts/lint-structure.test.ts`), and
-what a signed-in person sees on the real stack is a browser test in `../e2e/`.
+import what are lint rules (`../biome.json`, proven by `scripts/lint-structure.test.ts`), raw
+HTML is refused by a guard (`scripts/guards/raw-html.sh`), and what a signed-in person sees on the
+real stack is a browser test in `../e2e/`.
 
 - `ui-smoke.test.tsx` — primitives render their token classes; every icon renders; AppShell draws
   the grouped nav.

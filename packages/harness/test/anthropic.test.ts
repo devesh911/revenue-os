@@ -1,5 +1,5 @@
 // The Anthropic (Claude) model adapter behind LlmProvider, which calls the API with raw `fetch` (docs/tech-stack.md
-// T19: "raw fetch, no SDK"; that no package imports the SDK is a lint rule in biome.json). Every test is ENV-FREE,
+// T19: "raw fetch, no SDK"; that no package uses the SDK is a guard, scripts/guards/anthropic-sdk.sh). Every test is ENV-FREE,
 // NETWORK-FREE and KEY-FREE:
 //   * globalThis.fetch is replaced (installFetch) by a fake that NEVER hits the network — it
 //     returns a canned Anthropic /v1/messages JSON Response and records the call args — and is
