@@ -4,6 +4,7 @@
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import type { Added } from "./diff";
 import type { Snap } from "./snapshot";
+import { readsCode, SOURCE_PATH } from "./source-reading";
 
 const PRODUCT =
   /^(apps|services|packages)\/[^/]+\/src\/|^supabase\/(migrations|seed)/;
@@ -11,13 +12,6 @@ const TEST =
   /[._](test|spec)\.[cm]?[jt]sx?$|\.e2e\.[cm]?[jt]sx?$|(^|\/)(tests?|e2e|__tests__)\//;
 const CODE = /\.[cm]?[jt]sx?$/;
 
-// A string literal naming source code: a src/ path, or a file ending .ts/.tsx/.js/.jsx.
-const SOURCE_PATH =
-  /["'`](?:[^"'`\n]*\/)?(?:src(?:\/[^"'`\n]*)?|[^"'`\n]+\.[cm]?[jt]sx?)["'`]/;
-// Data a test may read as text: a fixture, or a .json, .sql, .csv, .toml, .yml or .txt file.
-const DATA = /fixture|\.(json|sql|csv|toml|ya?ml|txt)\b/;
-// A file imported as text (`with { type: "text" }`), which reads it without readFileSync or Bun.file.
-const AS_TEXT = /\btype\s*:\s*["'`]text["'`]/;
 // Rule files: the files that decide what "done" means and how agents work, at any letter case. This is the one
 // list; AGENTS.md hard rail 7, .github/CODEOWNERS and STATE.md cite it rather than repeating it, and the CODEOWNERS
 // test keeps the two equal. Changing one is allowed: Devesh is told at every stop and in CI's log, and its pull
@@ -89,9 +83,8 @@ export function checkRules(
       a,
       stmt.code,
       stubListed,
-      readsSource.has(a.file),
+      readsCode(added, i, readsSource.has(a.file)),
       usersOf,
-      pathOf(added, i),
     );
     if (!problem) continue;
     // The reason after the marker, on any line of the statement (the formatter may move it past a wrapped
@@ -114,25 +107,12 @@ export function checkRules(
   return { problems, notes };
 }
 
-/** PURE: the line naming what the added line at `i` imports: itself, or up to two lines above it (a wrapped `import(`). */
-function pathOf(added: Added[], i: number) {
-  const a = added[i];
-  for (let k = 0; k <= 2; k++) {
-    const b = added[i - k];
-    if (!a || b?.file !== a.file || b.line !== a.line - k) break;
-    const code = uncommented(b.text);
-    if (/["'`]/.test(code.replace(AS_TEXT, ""))) return code;
-  }
-  return "";
-}
-
 function lineProblem(
   { file, text }: Added,
   stmt: string,
   stubListed: boolean,
-  readsSource: boolean,
+  readsCodeAsText: boolean,
   usersOf: (name: string, file: string) => string[],
-  path: string,
 ) {
   if (/@ts-(ignore|nocheck)\b/.test(text))
     return "switches the type checker off without a reason; fix the cause instead";
@@ -150,10 +130,7 @@ function lineProblem(
   if (TEST.test(file) && POLICY_DDL.test(stmt))
     return "creates, changes or drops a policy, which on the local stack locks every auth table and deadlocks another test run's sign-ups; policies belong in a migration";
   if (TEST.test(file))
-    return (readsSource &&
-      /\b(readFileSync|readFile|Bun\.file)\s*\(/.test(text) &&
-      !DATA.test(text)) ||
-      (AS_TEXT.test(stmt) && SOURCE_PATH.test(path) && !DATA.test(path))
+    return readsCodeAsText
       ? "reads source code as text; test what the code does (render it, call it, drive it), not what it says"
       : undefined;
   if (!PRODUCT.test(file)) return;
