@@ -179,7 +179,10 @@ record one line in `STATE.md → Decisions in force`, keep moving.
   Old IDs (D, T, S, task-N) survive only where code already cites them. When you touch a file
   whose comments cite an archived doc or an old ID, point the comment at the file that now holds
   the fact, in the same PR.
-- `docs/patterns/` holds the style to imitate: its rules bind; its examples are illustrations.
+- `docs/patterns/` holds the style to imitate: its rules bind. Each example is an excerpt of the real file named on
+  its first line, or the pattern says "do not copy" and names the roadmap line that brings the real code;
+  `bun run guards` fails any other code block, an excerpt that no longer matches its file, and a name of a file
+  the repository doesn't hold.
 
 ## Commands (scripts are the interface)
 `bun run gate` (every check, plus the done rules) · `bun run see <console path>` (screenshot and

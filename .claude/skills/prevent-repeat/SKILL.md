@@ -15,9 +15,9 @@ kind of mistake impossible or caught, so nobody has to remember it.
    1. *Make it impossible.* Change a type, a database constraint or the shape of the code so the
       mistake can't be written: one shared function instead of copies, and delete the other way of
       doing it.
-   2. *Make CI reject it.* Add a test, a Biome rule, a check in `scripts/guards.sh` or a rule in
-      `scripts/done-gate/rules.ts`. Prove it catches the mistake: put the mistake back, show the check
-      failing, then remove it again. Paste both runs in the PR.
+   2. *Make CI reject it.* Add a test, a Biome rule, a guard in `scripts/guards/` (listed in
+      `scripts/guards.sh`) or a rule in `scripts/done-gate/rules.ts`. Prove it catches the mistake: put
+      the mistake back, show the check failing, then remove it again. Paste both runs in the PR.
    3. *Teach the verifier.* For what only a look at the running product can catch, add a line under
       "Known ways work looks done but isn't" in `.claude/agents/verifier.md`.
    4. *Teach the procedure.* Add the missing step to the skill for that part of the code.
