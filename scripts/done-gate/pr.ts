@@ -1,14 +1,19 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
 // every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
-// each fix-when-touched entry it touches answered, no other workflow able to report a check named rules-from-main
-// or checks (the two main's ruleset requires), no migration on main changed or its number reused (migrations.ts), and
-// each slice it sets to done proved by a passing proof run on main, whose report its body carries (proof-link.ts).
+// each fix-when-touched entry it touches answered, each `done-gate: allow` exception and removed test shown in the
+// body (pr-quotes.ts), each coverage mark the change adds quoted in the body (pr-coverage-marks.ts), no other
+// workflow able to report a check named rules-from-main or checks (the two main's ruleset requires), no migration
+// on main changed or its number reused (migrations.ts), and each slice it sets to done proved by a passing proof run
+// on main, whose report its body carries (proof-link.ts).
 
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
+import { unquotedMarks } from "./pr-coverage-marks";
 import { firstLineProblems } from "./pr-first-line";
+import { quoteProblems } from "./pr-quotes";
 import { proofLinks } from "./proof-link";
+import { entriesOf } from "./removed-tests";
 import { ruleChangeProblems } from "./rule-changes";
 import { rulesOn } from "./rules";
 import type { Snap } from "./snapshot";
@@ -91,7 +96,7 @@ export async function judgePr(
   pr?: string,
   base = "origin/main",
 ) {
-  const { problems, notes } = rulesOn(snap);
+  const { problems, notes, exceptions } = rulesOn(snap);
   const onBase = (file: string) =>
     git(snap.repo, ["cat-file", "blob", `${base}:${file}`], {}, true);
   const table = onBase(TABLE);
@@ -124,8 +129,10 @@ export async function judgePr(
         snap.removed,
       ),
       ...fixWhenTouchedProblems(snap.files, body, table),
+      ...quoteProblems(exceptions, entriesOf(snap.added), body),
       ...secondCheck(workflows),
       ...migrationProblems(snap),
+      ...unquotedMarks(snap.added, body),
       ...(await proofLinks(
         snap.repo,
         at(snap, "ROADMAP.md"),

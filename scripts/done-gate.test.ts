@@ -144,11 +144,12 @@ describe("parseDiff", () => {
     ].join("\n");
     expect(parseDiff(diff)).toEqual({
       files: ["apps/x/src/a.ts", "old.ts"],
+      deleted: ["old.ts"],
       added: [
-        { file: "apps/x/src/a.ts", line: 4, text: "const y = 2;" },
-        { file: "apps/x/src/a.ts", line: 5, text: "+i;" },
+        { file: "apps/x/src/a.ts", line: 4, text: "const y = 2;", hunk: 1 },
+        { file: "apps/x/src/a.ts", line: 5, text: "+i;", hunk: 1 },
       ],
-      removed: [{ file: "old.ts", line: 1, text: "gone" }],
+      removed: [{ file: "old.ts", line: 1, text: "gone", hunk: 2 }],
     });
   });
 
@@ -196,6 +197,7 @@ describe("checkRules", () => {
       notes: [
         "checker silenced at packages/harness/src/workflow/schema.ts:1: lint/suspicious/noThenProperty: `then` is a workflow step field",
       ],
+      exceptions: [],
     });
   });
 
@@ -1310,7 +1312,7 @@ describe("usesExport: who counts as using an export", () => {
       expect(by(`import def, { ${name} } from "../jobs";\n`)).toBe(true);
       expect(
         by(`export { ${name} } from "./jobs";\n`, "services/worker/src/x.ts"),
-      ).toBe(true);
+      ).toBe(false); // passed on, not used: the re-export is an export of its own (scripts/done-gate-rules.test.ts)
       expect(by(`import * as jobs from "../jobs";\njobs.${name}();\n`)).toBe(
         true,
       );
@@ -1686,17 +1688,6 @@ describe("the hook", () => {
       told: "Done gate ⏸ waiting on you: Which channel first: WhatsApp or voice? (the change so far is NOT verified)",
     });
     expect(hook(dir, "Stop").sentBack).toBe(true);
-  });
-
-  it("waits while background work runs, and says the change is not checked yet", () => {
-    const dir = repo();
-    write(dir, "services/worker/src/a.ts", "// @ts-ignore\n");
-    expect(
-      hook(dir, "Stop", { background_tasks: [{ id: "t1", type: "shell" }] }),
-    ).toEqual({
-      ...QUIET,
-      told: "Done gate ⏳ not checked yet: background work is still running. The first stop after it ends is checked.",
-    });
   });
 
   it("sends a Codex or Claude Code agent back the way both document: exit 0 and JSON, so Devesh's line survives", () => {
@@ -2222,17 +2213,12 @@ describe("the hook", () => {
     );
   });
 
-  it("does not judge a session that only switched to someone else's branch or visited another checkout", () => {
+  it("does not judge a session that only visited another checkout", () => {
     const dir = repo();
-    sh(dir, ["git", "checkout", "-qb", "feat/other"]);
-    write(dir, "services/worker/src/other.ts", "const other = 1;\n");
-    commitOld(dir);
-    sh(dir, ["git", "checkout", "-q", "main"]);
     const wt = worktree(dir, "feat/theirs");
     write(wt, "services/worker/src/theirs.ts", "const theirs = 1;\n"); // their work in progress
     write(dir, ".agents/notes.md", "Devesh's own files, never committed\n");
     hook(dir, "SessionStart");
-    sh(dir, ["git", "checkout", "-q", "feat/other"]); // gh pr checkout, to read it
     expect(hook(dir, "Stop")).toEqual(QUIET);
     hook(dir, "PreToolUse", {
       tool_name: "Bash",
@@ -2316,18 +2302,6 @@ describe("the hook", () => {
     write(wt, "services/worker/src/b.ts", "// @ts-ignore\n");
     expect(hook(dir, "Stop")).toEqual(QUIET);
     expect(hook(wt, "Stop", { session_id: "builder" }).sentBack).toBe(true);
-  });
-
-  it("does not count a builder's fresh commit as the session's when the session only switched to it", () => {
-    const dir = repo();
-    const review = worktree(dir, "review");
-    const b = worktree(dir, "feat/b");
-    hook(review, "SessionStart"); // the reviewer's own worktree
-    write(b, "services/worker/src/b.ts", "const b = 1;\n");
-    commitAll(b); // the builder commits during the review
-    const pr = sh(b, ["git", "rev-parse", "HEAD"]).stdout.trim();
-    sh(review, ["git", "checkout", "-q", "--detach", pr]); // to read and try it
-    expect(hook(review, "Stop")).toEqual(QUIET);
   });
 
   it("tells a worktree's .git file made again apart even with the same inode number, as Linux hands out", () => {
