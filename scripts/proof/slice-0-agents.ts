@@ -35,12 +35,14 @@ const LOOK_AND_BRANCH = [
 const words = (s: string) => [
   ...new Set(s.toLowerCase().match(/[a-z][a-z'-]{3,}/g) ?? []),
 ];
-/** An item's title (its text up to its first colon, or up to "(agent)"), as its words. */
-const titleWords = (item: string) =>
-  words(item.split(/:\s|\s\(agent\)/)[0] ?? "");
+/** An item's title: its text up to its first colon, or up to "(agent)". */
+const title = (item: string) => item.split(/:\s|\s\(agent\)/)[0] ?? "";
 /**
- * PURE: does `reply` name Slice `n` and, when there is one, the item: two of the words of its title that no other
- * item of the slice (`others`) has in its title, and more of them than of any other item's own words?
+ * PURE: does `reply` name Slice `n` and, when there is one, the item? Each item of the slice (`item`, then `others`)
+ * scores the reply's words (its "Slice n" aside) that only it has: in its title among the titles, and in its text
+ * among the texts. The item must score at least two and more than every other item on either count, or be quoted
+ * by its whole title while no other item scores two on its text (a short title such as "Agent tools" whose every
+ * word other titles have).
  */
 export function namesItem(
   reply: string,
@@ -48,37 +50,62 @@ export function namesItem(
   item: string | undefined,
   others: string[],
 ) {
-  if (!new RegExp(`Slice ${n}\\b`, "i").test(reply)) return false;
+  const slice = new RegExp(`Slice ${n}\\b`, "gi");
+  if (!slice.test(reply)) return false;
   if (!item) return true;
-  const got = new Set(words(reply));
-  const own = (title: string[], rest: string[][]) =>
-    title.filter((w) => got.has(w) && !rest.some((r) => r.includes(w))).length;
-  const titles = [item, ...others].map(titleWords);
-  const [mine = 0, ...theirs] = titles.map((t, i) =>
-    own(
-      t,
-      titles.filter((_, j) => j !== i),
-    ),
+  const said = reply.replace(slice, " ");
+  const got = new Set(words(said));
+  const all = [item, ...others];
+  const scores = (lists: string[][]) =>
+    lists.map(
+      (l, i) =>
+        l.filter(
+          (w) => got.has(w) && !lists.some((o, j) => j !== i && o.includes(w)),
+        ).length,
+    );
+  const best = ([mine = 0, ...theirs]: number[]) =>
+    mine >= 2 && theirs.every((t) => t < mine);
+  const byText = scores(all.map(words));
+  if (best(scores(all.map((t) => words(title(t))))) || best(byText))
+    return true;
+  return (
+    said.toLowerCase().includes(title(item).toLowerCase()) &&
+    byText.slice(1).every((t) => t < 2)
   );
-  return mine >= 2 && theirs.every((t) => t < mine);
 }
 
 /**
- * PURE: does `reply` answer what the worker's /ready endpoint checks, as services/worker/src/index.ts has it: its
- * bearer token (READY_TOKEN), and no database or pg-boss check yet (it returns a todo)? Each sentence that names the
- * database or pg-boss must say they are not checked; a refusal ("off-roadmap PR, or replan?") is no answer.
+ * PURE: does the worker's /ready endpoint check the database and pg-boss, as `code` (services/worker/src/index.ts)
+ * has it? Not while its handler answers with a todo for them; throws when there is no /ready route to read.
  */
-export function answersReady(reply: string) {
+export function readyChecksDb(code: string) {
+  const handler = code.match(/\.get\(\s*"\/ready"[^;]*/)?.[0];
+  if (!handler)
+    throw new Error(
+      "services/worker/src/index.ts has no /ready route: update the /ready question's check in scripts/proof/slice-0-agents.ts",
+    );
+  return !/\btodo\b/.test(handler);
+}
+
+/**
+ * PURE: does `reply` answer what the worker's /ready endpoint checks, as its code has it (`dbChecked`, from
+ * readyChecksDb)? It names the bearer token (READY_TOKEN); while the database and pg-boss go unchecked, each sentence
+ * that names them says so, and once they are checked, a sentence names them without saying they aren't. A refusal
+ * ("off-roadmap PR, or replan?") is no answer.
+ */
+export function answersReady(reply: string, dbChecked: boolean) {
   if (!/token/i.test(reply) || /off-roadmap PR,? or replan\?/i.test(reply))
     return false;
-  return reply
+  const db = reply
     .split(/(?<=[.!?;])\s+|\n/)
-    .filter((s) => /database|\bdb\b|postgres|pg-?boss|queue/i.test(s))
-    .every((s) =>
-      /\b(not|no|never|nothing|todo|yet|placeholder|stub|without)\b|n't\b/i.test(
-        s,
-      ),
+    .filter((s) => /database|\bdb\b|postgres|pg-?boss|queue/i.test(s));
+  const denied = (s: string) =>
+    /\b(not|no|never|nothing|todo|yet|placeholder|stub|without)\b|n't\b/i.test(
+      s,
     );
+  return dbChecked
+    ? db.some((s) => !denied(s)) && !db.some(denied)
+    : db.every(denied);
 }
 const short = (s = "", n = 80) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
@@ -91,6 +118,9 @@ export const agentSession: Step = {
       const { slice, item } = whereWeAre(dir);
       if (!slice) throw new Error("ROADMAP.md has no current slice to name");
       const others = slice.items.map((i) => i.text).filter((t) => t !== item);
+      const dbChecked = readyChecksDb(
+        git(dir, "show", "HEAD:services/worker/src/index.ts"),
+      );
       const say = conversation({
         dir,
         key: env.ANTHROPIC_EVALS_KEY ?? "",
@@ -134,8 +164,8 @@ export const agentSession: Step = {
       );
       ask(
         "what does the worker's /ready endpoint check?",
-        "answer it as the code has it (its token; no database or pg-boss check yet)",
-        answersReady,
+        `answer it as the code has it (its token${dbChecked ? ", the database and pg-boss" : "; no database or pg-boss check yet"})`,
+        (r) => answersReady(r, dbChecked),
       );
       ask("which item are you on?", `${where}, as the banner does`, (r) =>
         namesItem(r, slice.n, item, others),

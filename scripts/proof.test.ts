@@ -574,7 +574,7 @@ echo "gh $*" >> "$LOG"
 case "$1 $2" in
   "issue list") printf '%s' "$ISSUES" ;;
   "issue create") echo "https://github.com/o/r/issues/42" ;;
-  "issue comment") shift 2; while [ $# -gt 0 ]; do [ "$1" = --body-file ] && { echo "--- comment"; cat "$2"; } >> "$LOG"; shift; done ;;
+  "issue comment") shift 2; while [ $# -gt 0 ]; do [ "$1" = --body-file ] && { grep -q UNPOSTABLE "$2" && exit 1; echo "--- comment"; cat "$2"; } >> "$LOG"; shift; done ;;
 esac
 `,
         { mode: 0o755 },
@@ -619,6 +619,15 @@ esac
       expect(r.log).toContain(
         `${reportHeading(1, "failed")}\nRun: https://github.com/o/r/actions/runs/9`,
       );
+    });
+
+    it("still posts the other slices' reports when one can't be posted, then fails the step", () => {
+      const r = posted("12", {
+        0: "## Proof report: Slice 0 — failed\nUNPOSTABLE\n",
+        1: "## Proof report: Slice 1 — passed\nslice one's report\n",
+      });
+      expect(r.status).not.toBe(0);
+      expect(r.log).toContain("slice one's report");
     });
 
     it("creates the issue when it is missing, mentioning Devesh so GitHub notifies him of every report", () => {

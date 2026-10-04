@@ -153,7 +153,8 @@ jobs:
           path: reports
 
       # No concurrency group: GitHub keeps one waiting run per group and cancels the rest, which would lose reports.
-      # The oldest issue of that title is the standing one; it is made once, mentioning the repository's owner.
+      # The oldest issue of that title is the standing one; it is made once, mentioning the repository's owner. A
+      # report that can't be posted fails the step only after the other slices' reports are posted.
       - name: Post each slice's report to the "Proof reports" issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -173,5 +174,6 @@ jobs:
               report="stopped-$n.md"
               printf '## Proof report: Slice %s — failed\nRun: %s\n\nThe proof job stopped before it wrote a report; the run'"'"'s log says why.\n' "$n" "$RUN_URL" > "$report"
             fi
-            gh issue comment "$issue" --body-file "$report"
+            gh issue comment "$issue" --body-file "$report" || { echo "::error::Slice $n's report was not posted"; unposted=1; }
           done
+          exit "${unposted:-0}"

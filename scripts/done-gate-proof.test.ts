@@ -1,6 +1,7 @@
 // rules-from-main (`bun run gate pr`) refuses a pull request that sets a slice to `done` unless its `Proof passed:`
 // link is a run of the proof workflow (.github/workflows/proof.yml), for that slice, that GitHub's API reports
-// concluded success with every step passed, on a commit already on main, and its body carries that run's report.
+// concluded success with every step passed, on a commit already on main; every item of the slice is ticked; and its
+// body shows that run's report heading and `Run:` line. A done slice that keeps its link keeps its fields and items.
 // GitHub's API is a stand-in server here, answering as GitHub answers (the run and its jobs, or 404).
 import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
