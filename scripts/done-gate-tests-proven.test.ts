@@ -964,7 +964,7 @@ describe("where the check runs", () => {
     });
   });
 
-  it("runs in CI's checks job right after the tests, against the pull request's base", () => {
+  it("runs in CI's checks job right after the tests, against the pull request's base, with the job's own files ignored", () => {
     const ci = Bun.YAML.parse(
       readFileSync(
         join(import.meta.dir, "..", ".github", "workflows", "ci.yml"),
@@ -976,8 +976,16 @@ describe("where the check runs", () => {
     const steps = ci.jobs.checks.steps;
     const tests = steps.findIndex((s) => s.run === "bun run gate tests");
     expect(steps[tests + 1]).toMatchObject({
-      run: 'bun run gate proven --base "$BASE"',
+      run: 'git ls-files --others --exclude-standard >> .git/info/exclude\nbun run gate proven --base "$BASE"\n',
       env: { BASE: `origin/\${{ github.base_ref || 'main' }}` },
     });
+  });
+
+  it("counts a file the job made in the checkout as no change once git ignores it, as CI's step does", () => {
+    const dir = scratch({ "results.sarif": "{}\n" }); // what gitleaks' action leaves in CI's checkout
+    expect(prove(dir).text).not.toContain("no product code changed");
+    const made = sh(dir, ["git", "ls-files", "--others", "--exclude-standard"]);
+    writeFileSync(join(dir, ".git", "info", "exclude"), made.stdout);
+    expect(prove(dir).text).toContain("no product code changed");
   });
 });
