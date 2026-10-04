@@ -89,7 +89,7 @@ function repo() {
   write(
     main,
     "ROADMAP.md",
-    `## Slice 0: Ground\nStatus: in progress\nGoal: g\nProof: p\nBlocked by: nothing\nSeen by Devesh: —\n\n- [ ] ${ITEM} (agent)\n`,
+    `## Slice 0: Ground\nStatus: in progress\nGoal: g\nProof: p\nBlocked by: nothing\nProof passed: —\n\n- [ ] ${ITEM} (agent)\n`,
   );
   sh(main, ["git", "init", "-q", "-b", "main"]);
   commit(main);

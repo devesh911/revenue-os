@@ -1,5 +1,5 @@
 // Slice 0's proof, its first two steps: the plan is in the repo, readable, and the banner every session starts with
-// names where we are.
+// names where we are, the hooks behind it passing the tests the Proof line cites.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,6 +9,7 @@ import {
   parseRoadmap,
   parseState,
 } from "../../docs/tracker/parse.js";
+import { namedTestsPass } from "./named-tests";
 import { git, sh } from "./scratch";
 import type { Step } from "./step";
 
@@ -46,8 +47,14 @@ export function whereWeAre(root: string) {
   return { slice, item: nextItem(slice)?.text };
 }
 
+// The tests the Proof line cites for the hooks behind the banner, by name.
+const PIN_TESTS = [
+  "the pin names the branch of the folder the agent works in (the hook's cwd), else its own checkout",
+  "the per-prompt pin is one line naming this branch's item, the slice, its next item and the rule",
+];
+
 export const banner: Step = {
-  does: "Runs `bun run cycle --banner`, which every agent session starts with, and checks that it names the current slice and its next item as the tracker's parser reads them from ROADMAP.md on origin/main",
+  does: `Runs \`bun run cycle --banner\`, which every agent session starts with, and checks that it names the current slice and its next item as the tracker's parser reads them from ROADMAP.md on origin/main; then runs, by name, the two tests in scripts/cycle.test.ts the Proof line cites for the hooks behind it ("${PIN_TESTS.join('" and "')}"), each of which must pass`,
   check: ({ root }) => {
     const r = sh(root, ["bun", "run", "cycle", "--banner"]);
     const { slice, item } = whereWeAre(root);
@@ -65,6 +72,7 @@ export const banner: Step = {
       throw new Error(
         `it named the next item as "${next || "(nothing)"}", not "${item ?? "(none left)"}"`,
       );
-    return `"Current slice: ${named}" and "Next item: ${next || "no item"}"`;
+    const pins = namedTestsPass(root, "scripts/cycle.test.ts", PIN_TESTS);
+    return `"Current slice: ${named}" and "Next item: ${next || "no item"}"; ${pins}`;
   },
 };

@@ -1,6 +1,6 @@
-// Slice 0's proof: the tests and guards the gate runs. Test runs started at once leave each other's data alone, a
-// pattern file naming a missing file fails the guards, an added product line no test runs is refused, and a new test
-// that already passes on main is refused.
+// Slice 0's proof: the tests and guards the gate runs. Test runs started at once leave each other's data alone and
+// two gate runs started at once both pass, a pattern file naming a missing file fails the guards, an added product
+// line no test runs is refused, and a new test that already passes on main is refused.
 
 import { onSharedStack } from "../done-gate/shared-stack";
 import { inScratch, sh, write } from "./scratch";
@@ -8,30 +8,28 @@ import type { Step } from "./step";
 import { timeLeft } from "./time-limit";
 
 const AT_ONCE = "services/worker/test/test-runs-at-once.test.ts";
+const GATES_AT_ONCE = "scripts/done-gate-at-once.test.ts";
 const tail = (out: string, n = 3) =>
   out.trim().split("\n").slice(-n).join(" / ");
 
+/** `file`'s one test, run on the local stack with its settings (`bun run local`; nothing else of this run's is handed on). */
+function passesOnStack(root: string, file: string) {
+  const r = sh(root, ["bun", "run", "local", "bun", "test", file], { CI: "1" });
+  if (r.status !== 0 || !/\b1 pass\b/.test(r.out) || !/\b0 fail\b/.test(r.out))
+    throw new Error(
+      `${file} did not pass (exit ${r.status}): ${tail(r.out, 12)}`,
+    );
+  return `${file} passed: ${tail(r.out, 4)}`;
+}
+
 export const twoRunsAtOnce: Step = {
-  does: `Runs ${AT_ONCE} on the local stack, taking its turn on it as the gate's checks do: two test runs started at once (it starts four whole-suite runs and a demo together) must both pass and leave another company's rows and queued jobs untouched`,
+  does: `Runs ${AT_ONCE} on the local stack, taking its turn on it as the gate's checks do: two test runs started at once (it starts four whole-suite runs and a demo together) must both pass and leave another company's rows and queued jobs untouched; then ${GATES_AT_ONCE}, where two gate runs started at once in two worktrees must both pass`,
   minutes: 45,
   check: ({ root }) =>
     onSharedStack(
       root,
-      () => {
-        // `bun run local` reads the local stack's settings itself; nothing else of this run's is handed on.
-        const r = sh(root, ["bun", "run", "local", "bun", "test", AT_ONCE], {
-          CI: "1",
-        });
-        if (
-          r.status !== 0 ||
-          !/\b1 pass\b/.test(r.out) ||
-          !/\b0 fail\b/.test(r.out)
-        )
-          throw new Error(
-            `it did not pass (exit ${r.status}): ${tail(r.out, 12)}`,
-          );
-        return `it passed: ${tail(r.out, 4)}`;
-      },
+      () =>
+        `${passesOnStack(root, AT_ONCE)}; ${passesOnStack(root, GATES_AT_ONCE)}`,
       timeLeft(),
     ),
 };

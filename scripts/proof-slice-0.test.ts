@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { currentSlice, nextItem, parseRoadmap } from "../docs/tracker/parse.js";
 import { stateDir } from "./done-gate/store";
+import { namedTestsPass } from "./proof/named-tests";
 import { runSteps } from "./proof/run";
 import { steps as slice0 } from "./proof/slice-0";
 import { agentSession, crossCompany } from "./proof/slice-0-agents";
@@ -67,7 +68,7 @@ const scratch = (name: string) => {
 };
 const KEY = "A second Anthropic key for the automatic test conversations";
 // The fingerprint of Slice 0's Proof line as these steps were written to it.
-const PROOF_LINE = "d36d3a9763c629d6";
+const PROOF_LINE = "c2eb7b1a1d0ef99c";
 const STATE = `PHASE: SETUP\n\n## Waiting on Devesh\n- [ ] **${KEY}**: saved in GitHub as ANTHROPIC_EVALS_KEY\n## Decisions in force\n`;
 const prove = (steps: Step[], root = ROOT, env: NodeJS.ProcessEnv = {}) =>
   runSteps(steps, {
@@ -113,7 +114,8 @@ const replaced = (dir: string, file: string, from: string, to: string) => {
   writeFileSync(join(dir, file), text.replace(from, to));
 };
 
-// The refusals whose safeguard is on main today; the others' items are still being built.
+// The refusals whose safeguard is on main today; the others' items are still being built (a new test that already
+// passes on main: the tests-proven item).
 const ON_MAIN = [
   hooksWarn,
   unexplainedRuleChange,
@@ -131,15 +133,13 @@ const ON_MAIN = [
   disallowedModel,
   wrappedMerge,
   adminMerge,
-];
-const COMING = [
   noDockerStop,
   deletedTest,
   barrelExport,
   unrunLine,
-  passesOnMain,
   interrupted,
 ];
+const COMING = [passesOnMain];
 
 describe("Slice 0's proof steps", () => {
   it("follow its Proof line: one step per check it names, in its order, each in its words", () => {
@@ -178,6 +178,15 @@ describe("Slice 0's proof steps", () => {
         (s) => s.n === 0,
       )?.Proof ?? "";
     expect(named.filter((n) => !proof.includes(n))).toEqual([]);
+    // Every phrase it quotes (a prompt, a test it cites by name) and every test file it names is in a step's words.
+    const cited = [
+      ...(proof.match(/"[^"]+"/g) ?? []).map((q) => q.slice(1, -1)),
+      ...(proof.match(/scripts\/[\w./-]+\.test\.ts/g) ?? []),
+    ];
+    expect(cited.length).toBe(11);
+    expect(
+      cited.filter((c) => !slice0.some((s) => s.does.includes(c))),
+    ).toEqual([]);
     expect(slice0.length).toBe(named.length);
     expect(
       slice0.flatMap((s, i) =>
@@ -375,6 +384,23 @@ if (two && input.hook_event_name === "Stop" && !existsSync(\`\${common}/done-gat
       Math.max(...before.map((c) => c.at));
     expect(quiet).toBeGreaterThanOrEqual(15 * 60_000);
   }, 120_000);
+});
+
+describe("the tests the Proof line cites by name", () => {
+  it("pass only when each runs alone and passes: a renamed or failing one fails the step, naming it", () => {
+    const dir = scratch("proof-0-cited-");
+    writeFileSync(
+      join(dir, "cited.test.ts"),
+      'import { expect, test } from "bun:test";\ntest("still here (its name has brackets)", () => expect(1 + 1).toBe(2));\ntest("now broken", () => expect(1 + 1).toBe(3));\n',
+    );
+    const here = "still here (its name has brackets)";
+    expect(namedTestsPass(dir, "cited.test.ts", [here])).toContain(
+      "each ran alone and passed",
+    );
+    expect(() =>
+      namedTestsPass(dir, "cited.test.ts", [here, "now broken", "renamed"]),
+    ).toThrow(/2 cited test\(s\).*"now broken".*"renamed"/s);
+  });
 });
 
 type Answer = { when?: string; first?: string; say: string; error?: boolean };

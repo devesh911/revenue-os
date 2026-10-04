@@ -67,15 +67,18 @@ function record(dir: string, rule: string) {
 type Run = { status: number; out: string };
 const lead = (r: Run) => r.out.trim().split("\n").slice(0, 3).join(" / ");
 
-/** The first problem `who` named, when it refused with each of `needles` in what it said; else why not. */
+/**
+ * The problem `who` named holding every one of `needles` (else its first), when it refused with each of them in
+ * what it said; else why not.
+ */
 function refused(who: string, r: Run, ...needles: string[]) {
   const missing = needles.filter((n) => !r.out.includes(n));
+  const named = r.out.split("\n").filter((l) => l.startsWith("- "));
   if (r.status === 1 && !missing.length)
     return (
-      r.out
-        .split("\n")
-        .find((l) => l.startsWith("- "))
-        ?.slice(2) ?? lead(r)
+      (
+        named.find((l) => needles.every((n) => l.includes(n))) ?? named[0]
+      )?.slice(2) ?? lead(r)
     );
   throw new Error(
     r.status === 0
@@ -260,14 +263,15 @@ export const deletedTest: Step = {
 };
 
 export const barrelExport: Step = {
-  does: "Runs the done rules on a scratch branch that adds an export only a barrel file re-exports (packages/shared/src/index.ts passes on `proofSample`, which nothing imports), and checks that it is refused",
+  does: "Runs the done rules on a scratch branch that adds an export only a barrel file re-exports (`proofSample` in packages/shared/src/proof-sample.ts, which packages/shared/src/index.ts passes on and nothing imports), and checks that the export itself is refused, not only the barrel's line",
   check: ({ root }) =>
     inScratch(root, ({ dir }) => {
       const barrel = "packages/shared/src/index.ts";
+      const sample = "packages/shared/src/proof-sample.ts";
       branch(dir, "barrel-export", () => {
         write(
           dir,
-          "packages/shared/src/proof-sample.ts",
+          sample,
           `// ${WHY}: nothing imports it.\nexport function proofSample() {\n  return 1;\n}\n`,
         );
         appendFileSync(
@@ -275,6 +279,6 @@ export const barrelExport: Step = {
           'export { proofSample } from "./proof-sample";\n',
         );
       });
-      return `refused: ${refused(RULES, rules(dir, "barrel-export"), "proofSample")}`;
+      return `refused: ${refused(RULES, rules(dir, "barrel-export"), `${sample}:2 exports proofSample`)}`;
     }),
 };

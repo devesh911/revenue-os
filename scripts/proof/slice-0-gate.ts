@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { snapshot } from "../done-gate/snapshot";
 import { removeTranscripts, verifierRun } from "../done-gate-verifier-run";
 import { bash, checksPassed, hook, said, standInGh, type Told } from "./gate";
+import { namedTestsPass } from "./named-tests";
 import { commit, git, inScratch, plainEnv, sh, write } from "./scratch";
 import type { Step } from "./step";
 import { timeLeft } from "./time-limit";
@@ -77,10 +78,16 @@ export const unverifiedStop: Step = {
     }),
 };
 
+// The tests the Proof line cites as also proving the merge's refusal, by name.
+const MERGE_TESTS = [
+  "refuses an agent's merge until the pull request's head commit passed the gate and, for product code, the verifier",
+  "refuses a merge the verifier could not verify: only Devesh merges it",
+];
+
 export const unverifiedMerge: Step = {
-  does: "Commits that unverified change on a branch and checks that the done gate refuses its merge (`gh pr merge 7 --squash --match-head-commit <its commit>`, against a stand-in gh)",
-  check: ({ root }) =>
-    inScratch(root, ({ dir, base }) => {
+  does: `Commits that unverified change on a branch and checks that the done gate refuses its merge (\`gh pr merge 7 --squash --match-head-commit <its commit>\`, against a stand-in gh); then runs, by name, the two tests in scripts/done-gate.test.ts the Proof line cites as also proving it ("${MERGE_TESTS.join('" and "')}"), each of which must pass`,
+  check: async ({ root }) => {
+    const refusal = await inScratch(root, ({ dir, base }) => {
       const { head, env } = pullRequest(dir, base);
       const m = hook(dir, "PreToolUse", bash(merge(head)), { env });
       if (!m.refused || !/verif|independent/.test(m.why))
@@ -88,7 +95,9 @@ export const unverifiedMerge: Step = {
           `the merge was not refused for want of the verifier: ${said(m)}`,
         );
       return `refused: ${said(m)}`;
-    }),
+    });
+    return `${refusal}; ${namedTestsPass(root, "scripts/done-gate.test.ts", MERGE_TESTS)}`;
+  },
 };
 
 export const selfPass: Step = {
