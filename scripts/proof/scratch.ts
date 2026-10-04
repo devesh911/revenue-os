@@ -51,9 +51,20 @@ export function sh(
   };
 }
 
-/** git in `dir`; its output, or an error saying what failed. */
+/**
+ * git in `dir`; its output, or an error saying what failed. git's automatic clean-up is off: newer git runs it in
+ * the background after a fetch or commit, and a clone of that repository a moment later failed copying the lock
+ * file the clean-up held (seen on GitHub's runner, git 2.55).
+ */
 export function git(dir: string, ...args: string[]) {
-  const r = sh(dir, ["git", ...args]);
+  const r = sh(dir, [
+    "git",
+    "-c",
+    "maintenance.auto=false",
+    "-c",
+    "gc.auto=0",
+    ...args,
+  ]);
   if (r.status !== 0)
     throw new Error(`git ${args.join(" ")} failed: ${r.out.trim()}`);
   return r.stdout.trim();

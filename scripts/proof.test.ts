@@ -20,7 +20,7 @@ import { prove } from "./proof/cli";
 import { dueSlices } from "./proof/due";
 import { reportText } from "./proof/report";
 import { overall, RUN_MINUTES, runSteps } from "./proof/run";
-import { sh } from "./proof/scratch";
+import { git, sh } from "./proof/scratch";
 import { steps as slice0 } from "./proof/slice-0";
 import { SLICES } from "./proof/slices";
 import { type Step, WaitingOn } from "./proof/step";
@@ -402,6 +402,19 @@ describe("Slice 0's steps", () => {
     });
     expect(first?.outcome).toBe("failed");
     expect(first?.seen).toContain("ROADMAP.md");
+  });
+});
+
+describe("the steps' scratch repositories", () => {
+  it("run every git command with git's automatic clean-up off, even where the repository asks for it", () => {
+    const dir = scratch("proof-git-");
+    git(dir, "init", "-q");
+    git(dir, "config", "gc.auto", "1"); // clean up after nearly every command
+    git(dir, "config", "maintenance.auto", "true");
+    expect([
+      git(dir, "config", "gc.auto"),
+      git(dir, "config", "maintenance.auto"),
+    ]).toEqual(["0", "false"]);
   });
 });
 
