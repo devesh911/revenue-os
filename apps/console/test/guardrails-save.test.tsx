@@ -74,6 +74,7 @@ const SAVED = {
   },
 };
 
+// behaviour already on main: main's guardrail hooks already do this; it replaces tests that read their file as text (docs/removed-tests.md)
 it("the policies the page shows are fetched from the company's guardrails, signed in", async () => {
   const sent = network(200, { policies: [SAVED.policy] });
   const { shown } = settingsHooks();
@@ -88,6 +89,7 @@ it("the policies the page shows are fetched from the company's guardrails, signe
   );
 });
 
+// behaviour already on main: main's guardrail hooks already do this; it replaces tests that read their file as text (docs/removed-tests.md)
 it("a save sends a PUT of the checked policy, signed in, to the company's guardrails, then refreshes what the page shows", async () => {
   const sent = network(200, SAVED);
   const { save, shown } = settingsHooks();
@@ -110,6 +112,7 @@ it("a save sends a PUT of the checked policy, signed in, to the company's guardr
   expect(shown.state.isInvalidated).toBe(true);
 });
 
+// behaviour already on main: main's guardrail hooks already do this; it replaces tests that read their file as text (docs/removed-tests.md)
 it("a policy the shared schema refuses never leaves the browser, and nothing is refreshed", async () => {
   const sent = network(200, SAVED);
   const { save, shown } = settingsHooks();
@@ -124,6 +127,7 @@ it("a policy the shared schema refuses never leaves the browser, and nothing is 
   expect(shown.state.isInvalidated).toBe(false);
 });
 
+// behaviour already on main: main's guardrail hooks already do this; it replaces tests that read their file as text (docs/removed-tests.md)
 it("a save the worker refuses fails with its reason, and nothing is refreshed", async () => {
   const sent = network(400, { error: "invalid_config" });
   const { save, shown } = settingsHooks();

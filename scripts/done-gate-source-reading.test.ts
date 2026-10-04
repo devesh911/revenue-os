@@ -19,6 +19,7 @@ describe("a test that reads source code as text", () => {
   const test = "apps/console/test/home.test.tsx";
   const refused = (...at: number[]) => at.map((n) => `${test}:${n} ${READS}`);
 
+  // behaviour already on main: main's copy carries scripts/done-gate/rules.ts and source-reading.ts over, so it passes there
   it("is refused when it reads the file, whatever a comment on the line says", () => {
     expect(
       problemsOf(
@@ -32,6 +33,7 @@ describe("a test that reads source code as text", () => {
     ).toEqual(refused(2, 3, 4, 5));
   });
 
+  // behaviour already on main: main's copy carries scripts/done-gate/rules.ts and source-reading.ts over, so it passes there
   it("is refused when it imports a code file with options, statically or on demand", () => {
     for (const line of [
       'import home from "../src/pages/Home/index.tsx" with { type: "text" };',
@@ -73,6 +75,7 @@ describe("a test that reads source code as text", () => {
     ).toEqual(refused(1));
   });
 
+  // behaviour already on main: main's copy carries scripts/done-gate/rules.ts and source-reading.ts over, so it passes there
   it("is not refused for importing code to run it, a data file as text, or a field typed text", () => {
     for (const line of [
       'import { HomePage } from "../src/pages/Home/index";',

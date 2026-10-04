@@ -9,14 +9,22 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { App } from "../src/app/App";
 import { AppErrorBoundary } from "../src/app/AppErrorBoundary";
 import { Boot } from "../src/app/Boot";
+import { visible } from "./test-utils";
 
 const consoleDir = join(import.meta.dir, "..");
 
 it("with its sign-in settings missing, the console loads all its code without building a client and names each missing setting", () => {
-  // A fresh Bun process, so no module is already loaded (or loaded under another test's fakes), started in an
+  // Here: Boot, given no settings, shows the configuration screen naming each one.
+  const shown = visible(renderToStaticMarkup(<Boot env={{}} />));
+  expect(shown).toContain("Console configuration incomplete");
+  expect(shown).toContain("VITE_SUPABASE_URL");
+  expect(shown).toContain("VITE_SUPABASE_ANON_KEY");
+
+  // Then a fresh Bun process, so no module is already loaded (or loaded under another test's fakes), started in an
   // empty folder with no VITE_ settings, so no settings file of this machine fills them in.
   const at = (name: string) =>
     JSON.stringify(Bun.resolveSync(name, consoleDir));

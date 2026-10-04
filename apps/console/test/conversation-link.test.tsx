@@ -11,6 +11,7 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const CONV = "22222222-2222-4222-8222-222222222222";
 
 describe("ConversationLink", () => {
+  // behaviour already on main: moved from tests/conversation-link.test.tsx unchanged in what it checks
   it("links its children to /o/<org>/conversations/<id>, in the accent colour", () => {
     const html = renderToStaticMarkup(
       <StaticRouter>
@@ -24,6 +25,7 @@ describe("ConversationLink", () => {
     );
   });
 
+  // behaviour already on main: moved from tests/conversation-link.test.tsx unchanged in what it checks
   it("renders its children as plain text, with no link, when there is no conversation", () => {
     const html = renderToStaticMarkup(
       <StaticRouter>
