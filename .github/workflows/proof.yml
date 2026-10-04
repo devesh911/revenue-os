@@ -59,7 +59,8 @@ jobs:
         id: due
         env:
           SLICE: ${{ inputs.slice }}
-        run: bun scripts/proof/due.ts
+        # The path in quotes, as an import writes it, so the gate counts due.ts as product code this runs.
+        run: bun "scripts/proof/due.ts"
 
   proof:
     needs: due
