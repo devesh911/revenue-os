@@ -147,7 +147,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 2. Branch `feat/…` or `fix/…` off up-to-date main — independent, never stacked — and record what
    it builds: `git config branch.<name>.description "<text>"`. The text is the roadmap item's
    text, `Side track: <what>` for marketing-site work, or `Off-roadmap: <what>` for an
-   off-roadmap PR. Tests at the layer you touch; integration tests run against the real local
+   off-roadmap PR. Tests at the layer you touch and where people meet it, edge cases included
+   (`.claude/agents/verifier.md`, step 5); integration tests run against the real local
    Supabase stack and real pg-boss — never mock the database; a bug fix starts from a failing
    reproduction. After each commit, and before you stop, update the branch's checkpoint:
    `bun run gate checkpoint --done "<what is done>" --failed "<what failed, or nothing>" --next

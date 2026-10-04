@@ -1,17 +1,13 @@
-// T3 RED — raw-`fetch` Anthropic (Claude) adapter behind LlmProvider (docs/tech-stack.md T19:
-// "raw fetch, no SDK"). Every test is ENV-FREE, NETWORK-FREE and KEY-FREE:
+// The Anthropic (Claude) model adapter behind LlmProvider, which calls the API with raw `fetch` (docs/tech-stack.md
+// T19: "raw fetch, no SDK"; that no package uses the SDK is a guard, scripts/guards/anthropic-sdk.sh). Every test is ENV-FREE,
+// NETWORK-FREE and KEY-FREE:
 //   * globalThis.fetch is replaced (installFetch) by a fake that NEVER hits the network — it
 //     returns a canned Anthropic /v1/messages JSON Response and records the call args — and is
 //     restored after every test (afterEach). No real socket is ever opened.
 //   * the apiKey is a dummy "test-key"; no real key, no .env, no DB. The real /v1/messages
 //     round-trip is CI/live-owned, never here.
-// TENANCY NOTE: this task adds NO database table (it is a pure provider adapter over fetch), so
-// the table-scoped cross-tenant-denial non-negotiable does not apply here — flagged in the report.
 
 import { afterEach, describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createAnthropicProvider } from "../src/llm";
 import type { Msg, ToolSpec } from "../src/types";
 
@@ -98,7 +94,7 @@ const newProvider = () =>
 const baseReq = { system: "You are a test agent.", messages: [] as Msg[] };
 const oneContact: Msg[] = [{ role: "contact", content: "hi" }];
 
-describe("createAnthropicProvider — response → LlmTurn mapping (T3)", () => {
+describe("createAnthropicProvider — response → LlmTurn mapping", () => {
   it("maps a text-only response to LlmTurn.text, with no tool calls", async () => {
     installFetch(anthropicBody({ content: [textBlock("Hello, world.")] }));
     const turn = await newProvider().complete({
@@ -191,7 +187,7 @@ describe("createAnthropicProvider — response → LlmTurn mapping (T3)", () => 
   });
 });
 
-describe("createAnthropicProvider — request shaping (T3)", () => {
+describe("createAnthropicProvider — request shaping", () => {
   it("POSTs exactly once to https://api.anthropic.com/v1/messages with x-api-key + anthropic-version headers", async () => {
     const { calls } = installFetch(
       anthropicBody({ content: [textBlock("ok")] }),
@@ -283,17 +279,5 @@ describe("createAnthropicProvider — request shaping (T3)", () => {
       },
     });
     expect(tools[0]?.input_schema.required).toEqual(["contactId", "firstName"]);
-  });
-});
-
-describe("createAnthropicProvider — no SDK, raw fetch only (T3 structural, tech-stack T19)", () => {
-  it("the adapter source imports no @anthropic-ai SDK", () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(
-      join(here, "..", "src", "llm", "anthropic.ts"),
-      "utf8",
-    );
-    expect(src).not.toMatch(/from\s+["']@anthropic-ai/);
-    expect(src).not.toMatch(/require\(\s*["']@anthropic-ai/);
   });
 });

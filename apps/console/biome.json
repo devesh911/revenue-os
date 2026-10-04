@@ -2,5 +2,24 @@
   "$schema": "https://biomejs.dev/schemas/latest/schema.json",
   "root": false,
   "extends": "//",
-  "css": { "parser": { "tailwindDirectives": true } }
+  "css": { "parser": { "tailwindDirectives": true } },
+  "overrides": [
+    {
+      "includes": ["src/**", "!src/lib/supabase.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@supabase/supabase-js": "Only src/lib/supabase.ts imports the Supabase client package, types included: use its lazy getSupabase() (and the types it re-exports), so loading the console builds no client before its settings are checked."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

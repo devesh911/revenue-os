@@ -1,7 +1,7 @@
 node_modules
 .env
 dist
-dist-e2e
+dist-e2e*
 .DS_Store
 supabase/.temp
 playwright-report
@@ -9,6 +9,8 @@ test-results
 orchestrator/
 .env.local
 .claude/worktrees/
+# A second copy of the skills (docs/fix-when-touched.md, entry 8): the skills live in .claude/skills/ only
+.agents/
 # Each checkout's own Claude Code permissions, which the app writes; lint reads this file, not a global one
 **/.claude/settings.local.json
 docker/certs/

@@ -2,8 +2,10 @@
 
 The mounted app tree and everything that is NOT a page:
 
-- `App.tsx` — providers + session + router, kept out of `main.tsx` so the boot entry stays a thin
-  env gate. Builds the QueryClient once (`lib/query.ts`: a 401 signs this device out). `lib/supabase`
+- `Boot.tsx` — what the console shows at start-up, which `main.tsx` mounts: the configuration
+  screen when env is missing, otherwise `<App />` inside the error boundary.
+- `App.tsx` — providers + session + router, kept out of `Boot.tsx` so the start-up check stays a
+  thin env gate. Builds the QueryClient once (`lib/query.ts`: a 401 signs this device out). `lib/supabase`
   is lazy, so importing this tree builds no client (boot honesty).
 - `router.tsx` — the wouter routes. `/login` is public; everything else sits behind the session
   gate, and the org-scoped shell also behind the membership gate. It reads the `routes.tsx`
