@@ -15,14 +15,11 @@ import { git } from "./git";
 import { isProduct } from "./rules";
 import { snapshot } from "./snapshot";
 import type { Store } from "./store";
-import { rulingOn } from "./verdict";
+import { rulingOn, type Verdict } from "./verdict";
 
 /** The record of sessions held to a change: the key names the session and the checkout, the value the hold. */
 export const HELD = "held";
 type Hold = { branch: string; why: string };
-type Verdict =
-  | { ok: true; message: string }
-  | { ok: false; headline: string; reason: string };
 
 // Quiet this long in a checkout, a session has stopped working there: one shell command runs 10 minutes at most, and
 // a stop's own run is seen by its process (`stopping`), for as long as a Stop hook may run.

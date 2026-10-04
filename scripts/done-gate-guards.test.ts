@@ -695,12 +695,7 @@ describe("the merge check: every agent merge names the exact commit that passed 
   it("counts a partial result (no Docker, so no database tests) only when GitHub reports `checks` passed on that exact commit", () => {
     const dir = repo();
     const { head, tree } = pullRequest(dir);
-    record(
-      dir,
-      "partial",
-      tree,
-      "typecheck, lint, guards, NOT run here (no Docker): tests, database policies, browser checks; CI runs them",
-    );
+    record(dir, "partial", tree, "typecheck, lint, guards");
     const command = `gh pr merge 7 --squash --match-head-commit ${head}`;
     const run = (over: Run = {}): Run => ({
       name: "checks",

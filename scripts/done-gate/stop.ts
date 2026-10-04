@@ -2,11 +2,11 @@
 // back to work.
 
 import { relative } from "node:path";
-import { extra, idOf, keyOf, madeHere, rootsOf } from "./checkouts";
+import { accept, idOf, keyOf, rootsOf } from "./checkouts";
 import { checkpointOwed } from "./checkpoint";
-import { git } from "./git";
 import { type HookInput, say } from "./hook-io";
 import { HELD, heldTo, judgeHeld, release } from "./interrupted";
+import { onlyMainArrived } from "./only-main";
 import { isProduct } from "./rules";
 import { snapshot } from "./snapshot";
 import type { Store } from "./store";
@@ -24,7 +24,6 @@ export async function stop(
   const { all, here, roots } = rootsOf(repo, store, session, input.cwd);
   const name = (root: string) =>
     relative(all[0] ?? repo, root) || "the main checkout";
-  const started = Number(store.get("started", session) ?? 0);
   const trees: string[] = [];
   const work: { key: string; root: string; tree: string; where?: string }[] =
     [];
@@ -55,16 +54,9 @@ export async function stop(
         }
         continue;
       }
-      // A pull, switch or reset to commits the session did not make (or that main already holds), with the
-      // checkout's own edits and new files as they were: not the session's work.
-      const head = git(root, ["rev-parse", "HEAD"], {}, true);
-      if (
-        accepted &&
-        store.get("extra", key) === extra(root, tree) &&
-        (!madeHere(root, started) ||
-          git(root, ["merge-base", "HEAD", "origin/main"], {}, true) === head)
-      ) {
-        store.put("accepted", key, tree);
+      // Only main's commits arrived (a pull, a switch to main), its own edits as they were: not the session's work.
+      if (accepted && onlyMainArrived(root, store.get("extra", key), tree)) {
+        accept(store, session, root, tree);
         continue;
       }
       work.push({
@@ -79,10 +71,12 @@ export async function stop(
       );
     }
   if (!work.length) return notes.length ? say(notes.join("\n")) : undefined;
-  if (input.background_tasks?.length || input.session_crons?.length)
-    return say(
-      "Done gate ⏳ not checked yet: background work is still running. The first stop after it ends is checked.",
-    );
+  const background = Boolean(
+    input.background_tasks?.length || input.session_crons?.length,
+  ); // only the database checks wait (not-run.ts)
+  // A verifier of this session started and not yet stopped (verifier.ts notes both), so its ruling is still to come.
+  const verifying =
+    background && store.list("verifier-running", `${session}-`).length > 0;
   for (const tree of new Set([...trees, ...work.map((w) => w.tree)])) {
     const pause = store.take("pause", tree);
     if (pause) {
@@ -92,17 +86,23 @@ export async function stop(
       );
     }
   }
-  // After the agent gave up on this exact code, only what is already known counts: no check runs again.
-  const print = work
+  // After the agent gave up on this exact code, only what is already known counts: no check runs again. Once background
+  // work it gave up during has ended, the checks on the database can run, so the same code is judged afresh.
+  const print = `${work
     .map((w) => w.tree)
     .sort()
-    .join(" ");
+    .join(" ")}${background ? " while background work ran" : ""}`;
   const gaveUp = store.get("gave-up", session) === print;
   const passed: string[] = [];
+  const waits = new Set<string>(); // keys a later stop judges again: their database checks or verifier still to come
   let failed: { headline: string; reason: string } | undefined;
   for (const w of work) {
     const j = await judgeHeld(store, session, w.root, w.tree, () =>
-      judge(snapshot(w.root), store, codex, gaveUp),
+      judge(snapshot(w.root), store, codex, {
+        cachedOnly: gaveUp,
+        background,
+        verifying,
+      }),
     );
     if (!j.ok) {
       failed = w.where
@@ -113,6 +113,7 @@ export async function stop(
         : j;
       break;
     }
+    if (j.waits) waits.add(w.key);
     passed.push(
       w.where
         ? j.message.replace("Done gate ", `Done gate (${w.where}) `)
@@ -122,7 +123,8 @@ export async function stop(
   if (!failed && !gaveUp) failed = checkpointOwed(work, store);
   if (!failed) {
     for (const w of work) {
-      store.put("accepted", w.key, w.tree);
+      if (waits.has(w.key)) continue; // its database checks or verifier are still to come: still held, not accepted
+      accept(store, session, w.root, w.tree);
       if (release(store, session, w.root))
         store.put("warned", `${w.key}-${w.tree}`, "1"); // judged, and told just now
     }
