@@ -59,10 +59,14 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   not roadmap items: (1) and (2) still apply, and their evidence lives in the PR body.
 - **A slice is done** when its proof runs automatically and passes; Devesh does not need to act.
   Every slice's `Proof:` line is written as steps a script can run and check against the real
-  product (`bun run proof <slice>`, which Slice 0's last item, the proof runner, builds). When the
+  product (`bun run proof <slice>`, whose steps live in scripts/proof/). When the
   slice's last item lands, the agent sets it to `proof ready`; when every step passes, the agent
-  sets it to `done` and writes the date and the passing run's link after `Seen by Devesh:` (the
-  proof runner item renames that field `Proof passed:`). Each run's short report (what was done,
+  sets it to `done` and writes the date and the passing run's link after `Proof passed:`, in a PR
+  whose body carries that run's report (`rules-from-main` refuses a link that is not a run of the
+  proof workflow that succeeded as a whole and passed every step of that slice, on a commit on
+  main; a body without the report's heading and `Run:` line; a done slice with an unticked item;
+  and a change to a done slice that keeps its link; `bun run cycle --banner` shows each slice's
+  latest run and what to do). Each run's short report (what was done,
   what was seen, screenshots, and a recording or transcript where a call or chat is involved) is
   posted to the standing "Proof reports" GitHub issue, so GitHub notifies Devesh; he may look at it
   or ignore it, and a done slice reopens if he says so. GitHub re-runs the proofs of `proof ready`
@@ -224,6 +228,7 @@ errors as the dev login) · `bun run cycle --banner` (where we are: current slic
 this branch's item) · `bun run local <cmd>` (any command with the running local stack's
 settings) · `bun run dev` · `bun run db:reset`
 (local only) · `bun run db:seed <pack>` · `bun run demo` · `bun run evals` · `bun run guards`
+· `bun run proof <slice>` (that slice's proof steps and short report, as the proof workflow runs them)
 
 ## Conventions
 - **Moat rules**: every conversation, message and task traces to a contact and, when known, a

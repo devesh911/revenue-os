@@ -2,9 +2,10 @@
 // every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
 // each fix-when-touched entry it touches answered, each `done-gate: allow` exception and removed test shown in the
 // body (pr-quotes.ts), each coverage mark the change adds quoted in the body (pr-coverage-marks.ts), no other
-// workflow able to report a check named rules-from-main or checks (the two main's ruleset requires), and no
-// migration on main changed or its number reused (migrations.ts). Each test the change marks as checking behaviour
-// main already has is copied into the body (already-on-main.ts).
+// workflow able to report a check named rules-from-main or checks (the two main's ruleset requires), no migration
+// on main changed or its number reused (migrations.ts), and each slice it sets to done proved by a passing proof run
+// on main, whose report its body carries (proof-link.ts). Each test the change marks as checking behaviour main
+// already has is copied into the body (already-on-main.ts).
 
 import { changeMarks, markBodyProblems } from "./already-on-main";
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
@@ -13,6 +14,7 @@ import { migrationProblems } from "./migrations";
 import { unquotedMarks } from "./pr-coverage-marks";
 import { firstLineProblems } from "./pr-first-line";
 import { quoteProblems } from "./pr-quotes";
+import { proofLinks } from "./proof-link";
 import { entriesOf } from "./removed-tests";
 import { ruleChangeProblems, shown } from "./rule-changes";
 import { rulesOn } from "./rules";
@@ -90,7 +92,7 @@ const at = (snap: Snap, file: string) =>
   git(snap.repo, ["cat-file", "blob", `${snap.tree}:${file}`], {}, true);
 
 /** `base` is main: its fix-when-touched table judges, never the branch's, and its ROADMAP.md says what is finished. */
-export function judgePr(
+export async function judgePr(
   snap: Snap,
   body: string,
   pr?: string,
@@ -134,6 +136,13 @@ export function judgePr(
       ...migrationProblems(snap),
       ...unquotedMarks(snap.added, body),
       ...markBodyProblems(changeMarks(snap), shown(body)), // each "behaviour already on main" mark, copied into the body
+      ...(await proofLinks(
+        snap.repo,
+        at(snap, "ROADMAP.md"),
+        onBase("ROADMAP.md"),
+        body,
+        base,
+      )),
     ],
     notes: [...notes, ...unreadTable(table)],
   };

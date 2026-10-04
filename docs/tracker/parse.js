@@ -3,7 +3,7 @@
 // imports so the browser can load it as is; types are in parse.d.ts.
 
 export const STATUSES = ["Works", "Tests only", "Partial", "Stub", "Missing"];
-export const seenOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(v || "");
+export const passedOk = (v) => /^\d{4}-\d{2}-\d{2}/.test(v || "");
 // A file saved with Windows line endings, or with an invisible byte-order mark first, reads the same.
 const lf = (md) => md.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 // An item's text as people retype it (a branch's description, a PR's first line): letter case, Markdown marks,
@@ -70,10 +70,16 @@ export function parseRoadmap(md) {
     const s = { n: +head[1], title: head[2].trim(), items: [] };
     for (const l of lines.slice(1)) {
       const f = l.match(
-        /^(Status|Goal|Proof|Blocked by|Seen by Devesh):\s*(.*)$/,
+        /^(Status|Goal|Proof|Blocked by|Proof passed):\s*(.*)$/,
       );
       if (f) {
         s[f[1]] = f[2].trim();
+        continue;
+      }
+      if (l.startsWith("Seen by Devesh:")) {
+        problems.push(
+          `Slice ${s.n}: the field "Seen by Devesh:" is now "Proof passed:"`,
+        );
         continue;
       }
       const it = l.match(
@@ -99,7 +105,7 @@ export function parseRoadmap(md) {
           `Slice ${s.n}: line not understood (fields and items must each stay on one line): "${l.trim()}"`,
         );
     }
-    for (const k of ["Status", "Goal", "Proof", "Blocked by", "Seen by Devesh"])
+    for (const k of ["Status", "Goal", "Proof", "Blocked by", "Proof passed"])
       if (!(k in s)) problems.push(`Slice ${s.n} is missing its "${k}:" line`);
     if (
       s.Status &&
@@ -113,8 +119,13 @@ export function parseRoadmap(md) {
       problems.push(
         `Slice ${s.n}: "Blocked by: ${b}" counts as blocked; write exactly "Blocked by: nothing" or name the blocker`,
       );
-    if (s.Status === "done" && !seenOk(s["Seen by Devesh"]))
-      problems.push(`Slice ${s.n} says done but "Seen by Devesh" has no date`);
+    if (s.Status === "done" && !passedOk(s["Proof passed"]))
+      problems.push(`Slice ${s.n} says done but "Proof passed" has no date`);
+    const open = s.items.filter((i) => !i.done).length;
+    if (s.Status === "done" && open)
+      problems.push(
+        `Slice ${s.n} says done but ${open} item${open === 1 ? " is" : "s are"} not ticked`,
+      );
     slices.push(s);
   }
   if (!slices.length) problems.push("No slices found in ROADMAP.md");

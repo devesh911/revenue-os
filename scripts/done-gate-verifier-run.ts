@@ -1,4 +1,5 @@
-// For the done gate's tests: a verifier run as Claude Code reports it to the gate's hooks. The hook inputs, in
+// For the done gate's tests, and Slice 0's proof (scripts/proof/slice-0-gate.ts), which hands the gate the same
+// recorded inputs: a verifier run as Claude Code reports it to the gate's hooks. The hook inputs, in
 // order, and the transcript and meta files Claude Code writes side by side, keep the fields of real ones recorded on
 // 2026-10-03 with Claude Code 2.1.287 (the pull request that added this file quotes them).
 
@@ -24,18 +25,24 @@ export type HookResult = {
   err: string;
 };
 
-/** The gate's hook run once, as Claude Code runs it: the input on stdin, started in the session's folder. */
+/**
+ * The gate's hook run once, as Claude Code runs it: the input on stdin, started in the session's folder with this
+ * process's environment (or `base` in its place) plus `env`, stopped after `timeout` milliseconds if given.
+ */
 export function runHook(
   gate: string,
   cwd: string,
   input: Record<string, unknown>,
   env: Record<string, string> = {},
+  base: NodeJS.ProcessEnv = process.env,
+  timeout?: number,
 ): HookResult {
   const r = spawnSync("bun", [gate, "hook"], {
     cwd,
-    env: { ...process.env, ...env },
+    env: { ...base, ...env },
     input: JSON.stringify({ session_id: "s1", cwd, ...input }),
     encoding: "utf8",
+    timeout,
   });
   return {
     status: r.status,
@@ -88,6 +95,10 @@ export type Run = {
   commands?: string[];
   /** What else happens after its last command, before it delivers its report. */
   during?: () => void;
+  /** The environment the gate's hook runs with, in place of this process's (the proof hands it only PATH and home). */
+  env?: NodeJS.ProcessEnv;
+  /** How long each hook call may take, in milliseconds. */
+  timeout?: number;
 };
 
 /** A verifier started, working and delivering its report: what the gate's hook answered at each step. */
@@ -102,7 +113,14 @@ export function verifierRun(gate: string, cwd: string, run: Run) {
   const transcript_path = run.transcript ?? sessionTranscript(session);
   const mode = auto ? "auto" : "default";
   const send = (input: Record<string, unknown>) =>
-    runHook(gate, cwd, { session_id: session, transcript_path, ...input });
+    runHook(
+      gate,
+      cwd,
+      { session_id: session, transcript_path, ...input },
+      {},
+      run.env,
+      run.timeout,
+    );
   const callId = `toolu_${agent}`;
   const call =
     run.byWorkflow || run.oldHooks

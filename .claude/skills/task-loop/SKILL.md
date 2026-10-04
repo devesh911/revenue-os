@@ -40,10 +40,12 @@ description: Use when building a roadmap item — any session implementing the n
     `gh pr merge <n> --squash --match-head-commit <the PR's full head commit>`; AGENTS.md → The loop,
     step 5, says what the done gate checks before it lets that through.
 11. After merge, republish the tracker page (see AGENTS.md → The loop, step 6).
-12. If the last item of the slice landed, set the slice to `proof ready` and run its proof
-    (`bun run proof <slice>` once Slice 0's proof runner lands). When every step passes, set the
-    slice to `done` and write the date and the passing run's link after `Seen by Devesh:` (the run
-    posts its short report to the "Proof reports" GitHub issue, which reaches Devesh); if a step
+12. If the last item of the slice landed, set the slice to `proof ready`; the proof workflow runs
+    `bun run proof <slice>` after the next deploy to main and once a day, and `bun run cycle
+    --banner` shows its latest run. When every step passes, set the slice to `done` and write the
+    date and the passing run's link after `Proof passed:` (the banner prints the line), in a PR
+    whose body carries the run's report (the run posts it to the "Proof reports" GitHub issue,
+    which reaches Devesh; `rules-from-main` checks the link and the report); if a step
     fails, add an item naming the failure and set the slice back to `in progress`; a step reported
     as waiting on something in `STATE.md → Waiting on Devesh` changes nothing (AGENTS.md →
     Definition of done).

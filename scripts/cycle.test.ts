@@ -3,6 +3,7 @@
 import { expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -27,7 +28,7 @@ const slice = (
   blocked = "nothing",
   items = "- [ ] Build the thing (agent)",
 ) =>
-  `## Slice ${n}: Title ${n}\nStatus: ${status}\nGoal: g\nProof: p\nBlocked by: ${blocked}\nSeen by Devesh: —\n\n${items}\n`;
+  `## Slice ${n}: Title ${n}\nStatus: ${status}\nGoal: g\nProof: p\nBlocked by: ${blocked}\nProof passed: —\n\n${items}\n`;
 const roadmap = (...slices: string[]) => `# Roadmap\n\n${slices.join("\n")}`;
 const STATE =
   "PHASE: SETUP\n\n## What works today\n| Area | Capability | Status | Where / why |\n|---|---|---|---|\n| Data | x | Works | y |\n## Waiting on Devesh\n## Decisions in force\n";
@@ -448,6 +449,8 @@ function scratchRepo() {
       "scripts/cycle.ts",
       "scripts/cycle-hook.sh",
       "docs/tracker/parse.js",
+      "scripts/proof/latest.ts",
+      "scripts/done-gate/proof-run.ts",
     ].map((f) => [f, readFileSync(join(ROOT, f), "utf8")]), // done-gate: allow copies the real scripts into a scratch repo to run them
     [
       "ROADMAP.md",
@@ -516,6 +519,76 @@ it("the banner says the plan may be out of date when it could not fetch origin/m
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("last fetch");
     expect(r.stdout).toContain("could be out of date");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it("the banner shows a proof-ready slice's latest proof run, read with gh, or says it could not read them", () => {
+  const { dir, work, run } = scratchRepo();
+  try {
+    // origin/main sets Slice 0 to proof ready; the banner's fetch brings it in
+    const src = join(dir, "src");
+    writeFileSync(
+      join(src, "ROADMAP.md"),
+      roadmap(slice(0, "proof ready", "nothing", "- [x] Build item Y (agent)")),
+    );
+    run(src, "commit", "-qam", "Slice 0 is proof ready");
+    // A stand-in gh: the proof workflow's runs and a run's jobs, as gh prints them, or GitHub's 404 before it runs
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    const URL = "https://github.com/o/r/actions/runs/555";
+    const listed = [
+      {
+        databaseId: 555,
+        displayTitle: "Proof of every proof-ready or done slice (schedule)",
+        status: "completed",
+        conclusion: "success",
+        createdAt: "2026-10-05T03:23:11Z",
+        url: URL,
+      },
+    ];
+    const jobs = {
+      jobs: [
+        {
+          name: "proof (0)",
+          status: "completed",
+          conclusion: "success",
+          steps: [
+            { name: "Prove Slice 0", conclusion: "success" },
+            { name: "Every step passed", conclusion: "success" },
+          ],
+        },
+      ],
+    };
+    const bannerWith = (gh: string) => {
+      writeFileSync(join(bin, "gh"), gh);
+      chmodSync(join(bin, "gh"), 0o755);
+      return spawnSync(
+        "sh",
+        [join(work, "scripts/cycle-hook.sh"), "--banner"],
+        {
+          cwd: tmpdir(),
+          encoding: "utf8",
+          input: "",
+          env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+        },
+      ).stdout;
+    };
+    expect(
+      bannerWith(
+        `#!/bin/sh\ncase "$1 $2" in\n"run list") echo '${JSON.stringify(listed)}' ;;\n"run view") echo '${JSON.stringify(jobs)}' ;;\nesac\n`,
+      ),
+    ).toContain(
+      `Slice 0 (proof ready): its latest proof run passed on 2026-10-05: ${URL}. Set it to done: "Status: done" and "Proof passed: 2026-10-05 · [run 555](${URL})"`,
+    );
+    expect(
+      bannerWith(
+        `#!/bin/sh\necho "HTTP 404: workflow proof.yml not found on the default branch" >&2\nexit 1\n`,
+      ),
+    ).toContain(
+      "Proof runs: could not read them (gh run list failed: HTTP 404: workflow proof.yml not found on the default branch)",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

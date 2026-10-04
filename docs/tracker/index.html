@@ -146,7 +146,7 @@ details.fold ul.plain{margin-top:10px}
 
   <section>
     <h2>Roadmap</h2>
-    <p class="muted" style="max-width:80ch">Each slice ends in a proof a script runs against the real product. When every step passes, the agent sets the slice to done and writes the passing run's date and link after "Seen by Devesh"; each run's short report is posted to the "Proof reports" issue on GitHub, and Devesh may reopen a slice.</p>
+    <p class="muted" style="max-width:80ch">Each slice ends in a proof a script runs against the real product. When every step passes, the agent sets the slice to done and writes the passing run's date and link after "Proof passed" (the check every pull request goes through refuses a link that is not a passing proof run on main); each run's short report is posted to the "Proof reports" issue on GitHub, and Devesh may reopen a slice.</p>
     <div class="slices" id="slices"></div>
   </section>
 
@@ -178,7 +178,7 @@ details.fold ul.plain{margin-top:10px}
 <script type="module">
 // The parsing and the current-slice rule live in parse.js, shared with the agent hooks (scripts/cycle.ts).
 // It is imported inside the try at the end, so a missing parse.js shows an error, not "Loading…".
-let currentSlice, nextItem, parseRoadmap, parseState, seenOk;
+let currentSlice, nextItem, parseRoadmap, parseState, passedOk;
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
@@ -210,7 +210,7 @@ function render(){
 
   if (current) {
     const done = current.items.filter(i => i.done).length, total = current.items.length;
-    const seen = current["Seen by Devesh"];
+    const seen = current["Proof passed"];
     document.getElementById("now").innerHTML =
       `<div class="eyebrow">Current slice</div>
        <h2>Slice ${current.n}: ${inline(current.title)} <span class="pill ${sCls(current.Status)}">${esc(current.Status)}</span></h2>
@@ -219,7 +219,7 @@ function render(){
        <dt>Next item</dt><dd>${next ? inline(next.text) : "None left for agents: set the slice to proof ready and run its proof"}</dd>
        <dt>Proof</dt><dd>${inline(current.Proof || "")}</dd>
        <dt>Blocked by</dt><dd>${inline(current["Blocked by"] || "")}</dd>
-       <dt>Seen by Devesh</dt><dd class="${seenOk(seen) ? "seen-yes" : "seen-no"}">${inline(seenOk(seen) ? seen : "not yet")}</dd></dl>`;
+       <dt>Proof passed</dt><dd class="${passedOk(seen) ? "seen-yes" : "seen-no"}">${inline(passedOk(seen) ? seen : "not yet")}</dd></dl>`;
   } else {
     const allDone = R.slices.every(s => s.Status === "done");
     document.getElementById("now").innerHTML = `<div class="eyebrow">Current slice</div><h2>${allDone ? "Every slice is done" : "No slice can be built right now"}</h2>` +
@@ -233,7 +233,7 @@ function render(){
 
   document.getElementById("slices").innerHTML = R.slices.map(s => {
     const done = s.items.filter(i => i.done).length, total = s.items.length;
-    const isCur = current && s.n === current.n, seen = s["Seen by Devesh"];
+    const isCur = current && s.n === current.n, seen = s["Proof passed"];
     return `<details class="slice ${isCur ? "current" : ""} ${s.Status === "done" ? "done" : ""}" ${isCur ? "open" : ""}>
       <summary><span class="num">${s.Status === "done" ? "✓" : s.n}</span>
         <span class="ttl"><h3>Slice ${s.n}: ${inline(s.title)}</h3><span class="goal">${inline(s.Goal || "")}</span></span>
@@ -242,7 +242,7 @@ function render(){
           <span class="count">${done}/${total} items</span></span></summary>
       <div class="body">
         <dl class="facts"><dt>Proof</dt><dd>${inline(s.Proof || "")}</dd><dt>Blocked by</dt><dd>${inline(s["Blocked by"] || "")}</dd>
-          <dt>Seen by Devesh</dt><dd class="${seenOk(seen) ? "seen-yes" : "seen-no"}">${inline(seenOk(seen) ? seen : "not yet")}</dd></dl>
+          <dt>Proof passed</dt><dd class="${passedOk(seen) ? "seen-yes" : "seen-no"}">${inline(passedOk(seen) ? seen : "not yet")}</dd></dl>
         <ul class="items">${s.items.map(i => `<li class="${i.done ? "done" : ""}"><span class="box" aria-hidden="true">${i.done ? "✓" : ""}</span>
           <span class="txt">${inline(i.text)}${i.evidence ? `<span class="ev">Evidence: ${inline(i.evidence)}</span>` : ""}</span>
           <span class="owner ${i.owner.toLowerCase()}">${esc(i.owner)}</span></li>`).join("")}</ul>
@@ -272,7 +272,7 @@ document.getElementById("filters").addEventListener("click", e => { const b = e.
 
 (async () => {
   try {
-    ({ currentSlice, nextItem, parseRoadmap, parseState, seenOk } = await import("./parse.js").catch(() => {
+    ({ currentSlice, nextItem, parseRoadmap, parseState, passedOk } = await import("./parse.js").catch(() => {
       throw new Error("Could not load parse.js. Publish it next to this page.");
     }));
     const [roadmap, state, from] = await Promise.all([load("ROADMAP.md"), load("STATE.md"), load("published.txt").catch(() => "")]);
