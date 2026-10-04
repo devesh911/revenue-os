@@ -1,5 +1,5 @@
-// Every check the gate runs on the code as it stands: typecheck, lint, guards, tests, database policies and the
-// browser checks, the database ones one run at a time.
+// Every check the gate runs on the code as it stands: typecheck, lint, guards, tests, tests proven (tests-proven.ts),
+// database policies and the browser checks, the database ones one run at a time.
 
 import { spawnSync } from "node:child_process";
 import { type AddressInfo, createConnection, createServer } from "node:net";
@@ -12,13 +12,18 @@ type Check = {
   browser?: true;
 };
 
-const CHECKS: Check[] = [
+export const CHECKS: Check[] = [
   { name: "typecheck", cmd: ["bun", "run", "typecheck"] },
   { name: "lint", cmd: ["bun", "run", "lint"] },
   { name: "guards", cmd: ["bun", "run", "guards"] },
   {
     name: "tests",
     cmd: ["bun", "run", "local", "bun", "run", "gate", "tests"],
+    db: true,
+  },
+  {
+    name: "tests proven",
+    cmd: ["bun", "run", "local", "bun", "run", "gate", "proven"],
     db: true,
   },
   { name: "database policies", cmd: ["bun", "run", "rls:check"], db: true },
@@ -75,7 +80,7 @@ export const browserEnv = async () => ({
 
 export const tail = (out: string, lines = 60) =>
   out.trimEnd().split("\n").slice(-lines).join("\n");
-const tally = (name: string, out: string) => {
+export const tally = (name: string, out: string) => {
   const n = out.match(/(\d+) pass(ed)?\b/)?.[1];
   return n ? `${n} ${name}` : name;
 };
