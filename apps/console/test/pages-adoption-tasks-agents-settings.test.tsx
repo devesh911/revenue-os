@@ -213,6 +213,7 @@ describe("Tasks — state behavior preserved (mocked useTasksQuery)", () => {
     expect(titleClasses).not.toContain("text-ink-soft");
   });
 
+  // behaviour already on main: only its name and comment changed (the old "RED until" label dropped); main's Tasks page already has these headers
   it('headers are semantic <th scope="col"> (the Table primitive)', async () => {
     tasksResult = ok({ tasks: [taskLinked] });
     expect(await render()).toContain('scope="col"');

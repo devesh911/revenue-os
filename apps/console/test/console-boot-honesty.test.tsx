@@ -23,6 +23,7 @@ describe("the sign-in client is built lazily", () => {
   });
   afterAll(restore);
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("importing src/lib/supabase.ts builds nothing until getSupabase(), then reuses one client", async () => {
     const { getSupabase } = await import("../src/lib/supabase");
     expect(createClient).not.toHaveBeenCalled();
@@ -34,6 +35,7 @@ describe("the sign-in client is built lazily", () => {
 });
 
 describe("the console's settings check", () => {
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("reports each required setting that is missing or empty, by name", () => {
     const absent = parseConsoleEnv({});
     expect(absent.ok).toBe(false);
@@ -51,6 +53,7 @@ describe("the console's settings check", () => {
     expect(anonEmpty.missing).not.toContain("VITE_SUPABASE_URL");
   });
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("returns ok and carries the values when both are present", () => {
     const res = parseConsoleEnv({
       VITE_SUPABASE_URL: "https://x.supabase.co",
@@ -62,6 +65,7 @@ describe("the console's settings check", () => {
     expect(res.env.VITE_SUPABASE_ANON_KEY).toBe("anon-key-123");
   });
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("the configuration screen names each missing setting and points to apps/console/.env.example", () => {
     const html = renderToStaticMarkup(
       <ConfigErrorScreen
@@ -89,6 +93,7 @@ describe("the landing tells an unreachable API apart from no workspace", () => {
       />,
     );
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("an unreachable API names its address and reads as unreachable, not empty", async () => {
     const html = landing({ isError: true, error: await apiErrorFor(0) });
     expect(html).toContain(API_BASE);
@@ -96,6 +101,7 @@ describe("the landing tells an unreachable API apart from no workspace", () => {
     expect(text(html)).not.toContain("not in a workspace");
   });
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("an empty list reads 'You're not in a workspace yet', not an outage", () => {
     const html = landing({ orgs: [] });
     expect(text(html)).toContain("You're not in a workspace yet");
@@ -103,10 +109,12 @@ describe("the landing tells an unreachable API apart from no workspace", () => {
     expect(visible(html)).not.toMatch(/reach/i);
   });
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("loading reads 'Loading orgs'", () => {
     expect(landing({ isLoading: true })).toContain("Loading orgs");
   });
 
+  // behaviour already on main: moved from tests/console-boot-honesty.test.tsx unchanged in what it checks
   it("the workspace switcher shows a distinct error, never 'no orgs', and 'no orgs' when empty", () => {
     const errHtml = renderToStaticMarkup(
       <OrgSwitcherView isLoading={false} isError={true} orgs={undefined} />,

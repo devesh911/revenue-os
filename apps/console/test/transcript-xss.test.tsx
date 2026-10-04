@@ -26,6 +26,7 @@ const hostile: TranscriptMessage[] = [
 ];
 
 describe("transcripts render hostile content as text", () => {
+  // behaviour already on main: moved from tests/transcript-xss.test.tsx unchanged in what it checks
   it("renders hostile transcript content as inert text, never markup", () => {
     const html = renderToStaticMarkup(<TranscriptView messages={hostile} />);
 

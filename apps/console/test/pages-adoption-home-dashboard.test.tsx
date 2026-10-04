@@ -149,6 +149,7 @@ describe("Dashboard — loading, error and data copy", () => {
     expect(text).not.toContain("New leads"); // the metric grid is hidden on error
   });
 
+  // behaviour already on main: only a comment inside it changed (its old task code dropped); main's Analytics page already shows all of this
   it("happy: renders every metric label, the metric values, the notes, title and Trends", async () => {
     const DashboardPage = await loadDashboard();
     metricsState = {

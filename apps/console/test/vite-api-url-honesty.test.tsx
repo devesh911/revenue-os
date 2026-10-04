@@ -14,6 +14,7 @@ const SUPABASE = {
 
 describe("the console's API address check — parseConsoleEnv depends on the build mode", () => {
   // The configuration screen (which renders `missing`) then names VITE_API_URL.
+  // behaviour already on main: moved from tests/vite-api-url-honesty.test.tsx unchanged in what it checks
   it("a production build with VITE_API_URL absent → ok:false and missing names VITE_API_URL", () => {
     const res = parseConsoleEnv({ PROD: true, ...SUPABASE });
     expect(res.ok).toBe(false);
@@ -26,6 +27,7 @@ describe("the console's API address check — parseConsoleEnv depends on the bui
   });
 
   // Present but invalid is as bad as absent (as VITE_SUPABASE_URL must be a URL and the anon key non-empty).
+  // behaviour already on main: moved from tests/vite-api-url-honesty.test.tsx unchanged in what it checks
   it("a production build with a non-URL or empty VITE_API_URL → ok:false and missing names VITE_API_URL", () => {
     const garbage = parseConsoleEnv({
       PROD: true,
@@ -48,6 +50,7 @@ describe("the console's API address check — parseConsoleEnv depends on the bui
     expect(empty.missing).toContain("VITE_API_URL");
   });
 
+  // behaviour already on main: moved from tests/vite-api-url-honesty.test.tsx unchanged in what it checks
   it("a production build with a valid VITE_API_URL → ok:true (no over-rejection)", () => {
     const res = parseConsoleEnv({
       PROD: true,
@@ -59,6 +62,7 @@ describe("the console's API address check — parseConsoleEnv depends on the bui
 
   // PROD false and PROD absent both count as development; the second is what local work and the other start-up
   // tests rely on.
+  // behaviour already on main: moved from tests/vite-api-url-honesty.test.tsx unchanged in what it checks
   it("a development build (PROD false or absent) with VITE_API_URL missing → ok:true", () => {
     const explicitDev = parseConsoleEnv({ PROD: false, ...SUPABASE });
     expect(explicitDev.ok).toBe(true);
@@ -67,6 +71,7 @@ describe("the console's API address check — parseConsoleEnv depends on the bui
     expect(prodAbsent.ok).toBe(true);
   });
 
+  // behaviour already on main: moved from tests/vite-api-url-honesty.test.tsx unchanged in what it checks
   it("a production build still checks the two sign-in settings", () => {
     const res = parseConsoleEnv({
       PROD: true,

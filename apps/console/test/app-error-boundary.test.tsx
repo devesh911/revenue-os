@@ -18,6 +18,7 @@ function Boom(): ReactNode {
 }
 
 describe("the console's error boundary", () => {
+  // behaviour already on main: moved from tests/app-error-boundary.test.tsx unchanged in what it checks
   it("is a class boundary with static getDerivedStateFromError and componentDidCatch", () => {
     expect(AppErrorBoundary.prototype instanceof Component).toBe(true);
     expect(typeof AppErrorBoundary.getDerivedStateFromError).toBe("function");
@@ -26,6 +27,7 @@ describe("the console's error boundary", () => {
     );
   });
 
+  // behaviour already on main: moved from tests/app-error-boundary.test.tsx unchanged in what it checks
   it("shows the fallback card, with a reload button, when a child throws while drawing", () => {
     const derived = AppErrorBoundary.getDerivedStateFromError(
       new Error("kaboom during render"),
@@ -39,6 +41,7 @@ describe("the console's error boundary", () => {
     expect(html.toLowerCase()).toContain("<button");
   });
 
+  // behaviour already on main: moved from tests/app-error-boundary.test.tsx unchanged in what it checks
   it("renders its children unchanged when nothing throws", () => {
     const html = renderToStaticMarkup(
       <AppErrorBoundary>
@@ -49,6 +52,7 @@ describe("the console's error boundary", () => {
     expect(visible(html)).not.toMatch(/something went wrong/i);
   });
 
+  // behaviour already on main: moved from tests/app-error-boundary.test.tsx unchanged in what it checks
   it("getDerivedStateFromError turns on the error view", () => {
     expect(
       AppErrorBoundary.getDerivedStateFromError(new Error("x")),

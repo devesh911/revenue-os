@@ -13,6 +13,7 @@ const words = readFileSync(
   "utf8",
 ).replace(/\s+/g, " ");
 
+// behaviour already on main: main's copy carries .claude/agents/verifier.md over, so it passes there
 it("tells the verifier to find each behaviour's and edge case's test at the layer people use", () => {
   for (const phrase of [
     "find the test that exercises it at the layer people use",
@@ -30,6 +31,7 @@ it("tells the verifier to find each behaviour's and edge case's test at the laye
     expect(words).toContain(phrase);
 });
 
+// behaviour already on main: main's copy carries .claude/agents/verifier.md over, so it passes there
 it("tells the verifier to leave running the tests to the gate, never one by hand", () => {
   for (const phrase of [
     "The step 3 gate run already ran it",
@@ -39,6 +41,7 @@ it("tells the verifier to leave running the tests to the gate, never one by hand
     expect(words).toContain(phrase);
 });
 
+// behaviour already on main: main's copy carries .claude/agents/verifier.md over, so it passes there
 it("tells the verifier to parse what one part writes with the reading part's own schema", () => {
   for (const phrase of [
     "run the writer for real and parse what it wrote with the reader's own schema",

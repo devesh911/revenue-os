@@ -97,6 +97,7 @@ describe("Settings Guardrails section — honest data states", () => {
     expect(text(await renderSettings())).toContain("Unable to load");
   });
 
+  // behaviour already on main: main's Settings page already shows none of the old placeholder's words; its two new checks replace a test that read the page's source as text
   it("a fresh org with zero policies is honest: no fabricated config, no dead placeholder", async () => {
     guardrailsResult = ok({ policies: [] });
     const html = await renderSettings();
