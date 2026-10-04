@@ -113,7 +113,7 @@ beforeAll(async () => {
   orgB = await createOrg(orgBadmin.token, "Guardrails B");
 
   // orgA: two known rows (mirrors the seed shapes). orgB: a DISTINCT quiet_hours row whose
-  // start "08:00" is the cross-tenant leak canary — it must never appear in an orgA response.
+  // start "08:00" is the cross-tenant leak canary — it must never appear in org A's policies.
   await seedPolicy(orgA, "quiet_hours", {
     start: "21:00",
     end: "09:00",
@@ -125,6 +125,12 @@ beforeAll(async () => {
     end: "22:00",
     tz: "Asia/Kolkata",
   });
+  // Org A's rows as the clock leaves them during the minute 08:00 UTC: their updated_at then holds "08:00" too,
+  // which no leak put there, so the canary check below must look at the policies, not at the answer's text.
+  await admin.query(
+    `update guardrail_policies set updated_at = '2026-10-04T08:00:30Z' where org_id = $1`,
+    [orgA],
+  );
 
   await invite(admin1.token, orgA, operator.userId, "operator");
   await invite(admin1.token, orgA, viewer.userId, "viewer");
@@ -171,10 +177,19 @@ describe("GET /orgs/:orgId/guardrail-policies — auth + tenancy", () => {
     expect(policies.map((p) => p.key).sort()).toEqual(["dnc", "quiet_hours"]);
   });
 
-  it("cross-tenant isolation: org B's '08:00' never appears in org A's response", async () => {
+  it("cross-tenant isolation: org B's '08:00' never appears in org A's policies", async () => {
     const res = await api(`/orgs/${orgA}/guardrail-policies`, admin1.token);
     expect(res.status).toBe(200);
-    expect(await res.text()).not.toContain("08:00");
+    const { policies } = (await res.json()) as { policies: Policy[] };
+    // Only the policies' settings: each row's updated_at may hold "08:00" (the clock's, not org B's).
+    expect(JSON.stringify(policies.map((p) => p.config))).not.toContain(
+      "08:00",
+    );
+    expect(policies.find((p) => p.key === "quiet_hours")?.config).toEqual({
+      start: "21:00",
+      end: "09:00",
+      tz: "contact",
+    });
   });
 });
 
