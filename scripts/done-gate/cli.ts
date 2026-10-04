@@ -15,12 +15,14 @@ import { listed, rulesOn } from "./rules";
 import { onSharedStack } from "./shared-stack";
 import { snapshot } from "./snapshot";
 import { Store, stateDir } from "./store";
+import { testsProven } from "./tests-proven";
 import { allTestsRun } from "./tests-ran";
 import { prove, rulingOn } from "./verdict";
 
 const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>" | checkpoint [--done "<…>" --failed "<…>" --next "<…>"]]
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
-       pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data`;
+       pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data
+       bun run gate proven [--base <ref>]   the change's new and edited tests fail on main's code and pass on it`;
 
 /**
  * PURE: a message holding text the pull request supplied (a file's name, its body's first line) as one log line:
@@ -127,6 +129,11 @@ export async function cli(cmd: string, args: string[]) {
     (!args.length || (args[0] === "e2e" && args.length === 1))
   ) {
     process.exit(allTestsRun(repo, args[0] === "e2e"));
+  } else if (cmd === "proven" && refs && !refs.head) {
+    // Lines the change only moved are left out as the snapshot marks them (moved.ts, read in test-edits.ts).
+    const r = testsProven(repo, changeOf("Tests proven", repo, refs.base));
+    console.log(r.text);
+    process.exit(r.ok ? 0 : 1);
   } else if (cmd === "checkpoint") {
     process.exit(checkpointCommand(toplevel(repo), store, args));
   } else if (cmd === "pause" && text) {

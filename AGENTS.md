@@ -109,6 +109,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   line, `// coverage gap: <why>`; console code only the browser checks reach,
   `// coverage: browser-only (<its .e2e.ts file under apps/console/e2e>)`; a mark alone on its line covers
   the line below it, the form JSX needs.
+- A change with product code proves its tests test it (`bun run gate proven`, in the gate and in CI): each
+  test it adds or edits must fail on main's code and pass on the change (both run in scratch copies that
+  differ only in product code, on the one local database; lines it only moves are left out). One that deliberately checks behaviour main already has says so at the end
+  of its first line or alone on the comment line just above it, `// behaviour already on main: <why>`, and
+  the PR body copies it as `Behaviour already on main: <file> · <why>`.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.
@@ -151,7 +156,7 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    that builds an item back until its checkpoint was written on the code as you leave it.
 3. `bun run gate` green, run bare — never pipe a gate through anything that can swallow its exit
    code. It runs typecheck, lint, guards, every test and the RLS check against the real local stack,
-   and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
+   the change's new and edited tests again on main's code, and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
    gitleaks, `bun audit` and a Docker build; CI is the verdict.
 4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
    verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
