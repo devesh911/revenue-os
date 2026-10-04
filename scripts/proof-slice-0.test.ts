@@ -140,8 +140,6 @@ const HERE = () => {
   here = dir;
   return dir;
 };
-// TEMPORARY, for one run on GitHub: built at load there, so a failure in the tests-proven check's copy names its cause.
-if (process.env.GITHUB_ACTIONS) HERE();
 const prove = (steps: Step[], root = HERE(), env: NodeJS.ProcessEnv = {}) =>
   runSteps(steps, {
     root,
