@@ -6,6 +6,7 @@
 //   bun run gate rules [--base <ref>]             only the rules, on the change since HEAD left <ref> (origin/main)
 //   bun run gate tests [e2e]                      bun's tests (or the browser checks); fails if any test didn't run
 //   bun run gate pause "<question>"               the next stop asks Devesh something; it is not "done"
+//   bun run gate checkpoint [--done … --failed … --next …]   show, or write, this branch's checkpoint
 //   bun run see /o/:org/contacts [more paths]     sign in as the dev login; save what each page shows
 //
 // Two moments are checked. A stop: the session's change, in each checkout it worked in and was the last to work
@@ -21,7 +22,9 @@
 // in its own delivered report (done-gate/verifier.ts); at a stop, a CANNOT_VERIFY naming what only Devesh can provide also lets the agent stop, told
 // to him as NOT verified, and then only Devesh merges. Codex has no verifier agent, so its green product change stops once,
 // marked NOT independently verified. Results are kept per code state in .git/done-gate, so the same code is
-// never checked twice.
+// never checked twice. A session that starts in a worktree whose change never passed, once the session that made it
+// has stopped, is held to that change until a stop passes on it there (done-gate/interrupted.ts); a session is shown
+// a branch's checkpoint when it starts in that checkout or before its first command there (done-gate/checkpoint.ts).
 //
 // The code lives in scripts/done-gate/, one job per file (docs/patterns/one-job-per-file.md). This file stays the
 // entry the hooks and `bun run gate` call: it hands a hook event to hook.ts and a command to cli.ts. It loads them

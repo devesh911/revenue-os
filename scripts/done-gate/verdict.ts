@@ -83,7 +83,7 @@ export async function judge(
 }
 
 /** `waits`: passed for now, but a later stop judges the same code again (database checks or a ruling to come). */
-type Verdict =
+export type Verdict =
   | { ok: true; message: string; waits: boolean }
   | { ok: false; headline: string; reason: string };
 
