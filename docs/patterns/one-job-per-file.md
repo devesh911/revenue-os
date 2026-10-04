@@ -14,11 +14,9 @@ folder beside it, one job per file, each file opening with a comment that names 
 Each file's first line names its job (an excerpt; `bun run guards` fails when it no longer matches):
 ```ts
 // scripts/done-gate/diff.ts
-// The change as git reports it: the files a diff touches, and every line it adds and removes, numbered.
-
-export type Added = { file: string; line: number; text: string };
+// The change as git reports it: the files a diff touches, the files it deletes, and every line it adds and removes,
+// numbered, with the hunk (the run of changed lines) it sits in.
 …
-/** PURE: `git diff --unified=0 --no-renames` → the files it touches (each once), and every line it adds and removes. */
 export function parseDiff(diff: string): {
 ```
 Rules: one job per file, named in a header comment on its first line · no catch-all `utils`, `helpers` or

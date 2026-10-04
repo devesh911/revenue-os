@@ -1,11 +1,15 @@
-// `bun run gate` and `bun run see` from a terminal: every check, the rules alone, the tests, a pause, or what a
-// signed-in person sees. The verifier's ruling is not among them: only its own delivered report counts (verifier.ts).
+// `bun run gate` and `bun run see` from a terminal: every check, the rules alone, the tests, a pause, the branch's
+// checkpoint, or what a signed-in person sees. The verifier's ruling is not among them: only its own delivered
+// report counts (verifier.ts).
 
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { toplevel } from "./checkouts";
+import { checkpointCommand } from "./checkpoint";
 import { browserEnv, run, tail } from "./checks";
 import { git } from "./git";
+import { NOT_RUN } from "./not-run";
 import { judgePr } from "./pr";
 import { listed, rulesOn } from "./rules";
 import { onSharedStack } from "./shared-stack";
@@ -15,7 +19,7 @@ import { testsProven } from "./tests-proven";
 import { allTestsRun } from "./tests-ran";
 import { prove, rulingOn } from "./verdict";
 
-const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>"]
+const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>" | checkpoint [--done "<…>" --failed "<…>" --next "<…>"]]
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
        pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data
        bun run gate proven [--base <ref>]   the change's new and edited tests fail on main's code and pass on it`;
@@ -74,7 +78,7 @@ export async function cli(cmd: string, args: string[]) {
     const ruling = rulingOn(store, snap.tree);
     console.log(
       proof.ok
-        ? `Done gate ✓ ${proof.checks}${proof.notes.map((n) => `\n⚠ ${n}`).join("")}`
+        ? `${proof.notRun ? `${NOT_RUN[proof.notRun]} · passed here: ` : "Done gate ✓ "}${proof.checks}${proof.notes.map((n) => `\n⚠ ${n}`).join("")}`
         : `Done gate ✗ ${proof.reason}`,
     );
     console.log(
@@ -126,11 +130,12 @@ export async function cli(cmd: string, args: string[]) {
   ) {
     process.exit(allTestsRun(repo, args[0] === "e2e"));
   } else if (cmd === "proven" && refs && !refs.head) {
-    // Lines the change only moved are left out as the snapshot marks them, once the done-rules item's moved-code
-    // detection is on main (test-edits.ts); until then none is.
+    // Lines the change only moved are left out as the snapshot marks them (moved.ts, read in test-edits.ts).
     const r = testsProven(repo, changeOf("Tests proven", repo, refs.base));
     console.log(r.text);
     process.exit(r.ok ? 0 : 1);
+  } else if (cmd === "checkpoint") {
+    process.exit(checkpointCommand(toplevel(repo), store, args));
   } else if (cmd === "pause" && text) {
     store.put("pause", snapshot(repo, false).tree, text);
     console.log(

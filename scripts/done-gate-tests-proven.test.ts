@@ -17,7 +17,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { markBodyProblems, markOn, marksIn } from "./done-gate/already-on-main";
-import { CHECKS, notRunHere, tally } from "./done-gate/checks";
+import { CHECKS, tally } from "./done-gate/checks";
 import { lineRan, parseLcov } from "./done-gate/lcov";
 import { judgePr } from "./done-gate/pr";
 import { rulesOn } from "./done-gate/rules";
@@ -956,13 +956,12 @@ it("still one", () => {
 });
 
 describe("where the check runs", () => {
-  it("is one of the gate's checks, on the shared database, and a stop without Docker names it among those not run", () => {
+  it("is one of the gate's checks, on the shared database, so a stop without Docker leaves it to CI with the tests", () => {
     expect(CHECKS.find((c) => c.name === "tests proven")).toEqual({
       name: "tests proven",
       cmd: ["bun", "run", "local", "bun", "run", "gate", "proven"],
       db: true,
     });
-    expect(notRunHere()).toContain("tests proven");
   });
 
   it("runs in CI's checks job right after the tests, against the pull request's base", () => {

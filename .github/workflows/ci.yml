@@ -36,11 +36,14 @@ jobs:
 
       # The done rules (no throwing stubs, no export nothing calls, no skipped test...) on this PR's whole
       # change, so they bind every agent and human, not only agents whose stop hook runs them.
-      # fetch-depth 0 above fetches every branch, so origin/<base> exists.
+      # fetch-depth 0 above fetches every branch, so origin/<base> exists. The pull request's own commit is judged
+      # against where it left the base, as rules-from-main and an agent's stop judge it, not GitHub's merge commit:
+      # a removed expect line is then named by the same line number in all three (docs/removed-tests.md).
       - name: Done rules (scripts/done-gate.ts)
         env:
           BASE: origin/${{ github.base_ref || 'main' }}
-        run: bun run gate rules --base "$BASE"
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bun run gate rules --base "$BASE" --head "$HEAD_SHA"
 
       - run: bun run typecheck
 

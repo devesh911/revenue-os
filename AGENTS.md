@@ -75,8 +75,12 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
 - **The done gate enforces this, so nobody has to remember it.** Whenever a Claude agent stops,
   `scripts/done-gate.ts` checks what its session changed in each checkout it worked in (and was the last
   to work in): first the rules against fake-done (throwing
-  stubs, exports nothing calls, silenced checks, skipped tests, tests that read source code), then every
-  check on the exact code, then, if product code changed, a ruling from the verifier agent
+  stubs, exports and re-exports nothing calls, silenced checks, skipped tests, tests that read source code, a
+  test file, test or `expect` line removed without a line in docs/removed-tests.md, an exception without a
+  reason), then every check on the exact code (without Docker the tests, database policies and browser checks
+  are left to CI, and while background work runs they wait for a later stop; either way Devesh sees `NOT fully
+  checked`, never a ✓), then, if product code changed (every file but docs/, Markdown, tests and the gate, CI
+  and hook files: .github/, .codex/, .claude/, scripts/done-gate*), a ruling from the verifier agent
   (`.claude/agents/verifier.md`), which runs the product and compares it with Devesh's words (when
   he gave none, the roadmap item's text, word for word): PASS,
   or CANNOT_VERIFY naming what only Devesh can provide (a real phone number, an account, a key),
@@ -88,14 +92,26 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   own attention and GitHub's required checks (`checks`, and `rules-from-main`, which runs main's copy of the
   rules) are the backstops, and `STATE.md → What works
   today` lists the gate's known holes.
+- **Interrupted work holds the next session.** A session that starts in a worktree on a branch
+  holding a change that never passed the gate, or that writes that branch's checkpoint, is held to
+  it once the session that made it has stopped (quiet for 15 minutes): each of its stops judges
+  that change as its own until one passes on that branch. Asking Devesh (`bun run gate pause`)
+  ends the hold. In the main checkout, where Devesh keeps files of his own, and in a checkout a
+  session only looks at, he is told once instead.
 - CI also runs the done rules on every pull request (`bun run gate rules`), so they bind every
   agent and human.
 - Tests and browser checks run through `bun run gate tests [e2e]`, in the gate and in CI: any test
   reported skipped or todo fails them, however it was switched off, unless `MAY_SKIP` in
-  `scripts/done-gate/tests-ran.ts` lists it with why.
+  `scripts/done-gate/tests-ran.ts` lists it with why. Bun's run also fails when a line the change adds to a
+  .ts or .tsx file under apps, services or packages is run by no test (a line it only moves, or whose comment
+  alone it edits, aside), or a new migration has no database test in the same change that uses what it adds
+  (scripts/done-gate/coverage.ts). A deliberate gap, or a line wrongly reported as not run, is marked on its
+  line, `// coverage gap: <why>`; console code only the browser checks reach,
+  `// coverage: browser-only (<its .e2e.ts file under apps/console/e2e>)`; a mark alone on its line covers
+  the line below it, the form JSX needs.
 - A change with product code proves its tests test it (`bun run gate proven`, in the gate and in CI): each
   test it adds or edits must fail on main's code and pass on the change (both run in scratch copies that
-  differ only in product code, on the one local database). One that deliberately checks behaviour main already has says so at the end
+  differ only in product code, on the one local database; lines it only moves are left out). One that deliberately checks behaviour main already has says so at the end
   of its first line or alone on the comment line just above it, `// behaviour already on main: <why>`, and
   the PR body copies it as `Behaviour already on main: <file> · <why>`.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
@@ -133,7 +149,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    text, `Side track: <what>` for marketing-site work, or `Off-roadmap: <what>` for an
    off-roadmap PR. Tests at the layer you touch; integration tests run against the real local
    Supabase stack and real pg-boss — never mock the database; a bug fix starts from a failing
-   reproduction.
+   reproduction. After each commit, and before you stop, update the branch's checkpoint:
+   `bun run gate checkpoint --done "<what is done>" --failed "<what failed, or nothing>" --next
+   "<the exact next step>"`. The gate adds Devesh's request word for word, shows the checkpoint
+   to the next session that starts in that checkout or works there, and sends a stop on a branch
+   that builds an item back until its checkpoint was written on the code as you leave it.
 3. `bun run gate` green, run bare — never pipe a gate through anything that can swallow its exit
    code. It runs typecheck, lint, guards, every test and the RLS check against the real local stack,
    the change's new and edited tests again on main's code, and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
@@ -147,9 +167,11 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    no item: it builds nothing), `Roadmap: Side track — <what>` or `Roadmap: off-roadmap — <what>`, each
    with an em dash; then what / why /
    evidence (the gate's line, the verifier's ruling, how the result was seen working), with a
-   `Rule change:` line per changed rule file (hard rail 7) and a `Fix-when-touched:` line per entry of
-   docs/fix-when-touched.md whose area the PR touches (step 6). `rules-from-main` refuses a PR without
-   them; `PR_BODY="$(cat body.md)" bun run gate pr` judges the body as it will. Watch CI: `gh pr checks <n> --watch`. Green means observed
+   `Rule change:` line per changed rule file (hard rail 7), a `Fix-when-touched:` line per entry of
+   docs/fix-when-touched.md whose area the PR touches (step 6), an `Exception: <file> · <why>` line per
+   `done-gate: allow` exception the PR adds, a copy of each line it adds to docs/removed-tests.md, and a
+   `Coverage mark: <file> · <what the mark says>` line per coverage mark the PR adds. `rules-from-main`
+   refuses a PR without them; `PR_BODY="$(cat body.md)" bun run gate pr` judges the body as it will. Watch CI: `gh pr checks <n> --watch`. Green means observed
    green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
    three or more open task PRs, stop taking new work. Merge with

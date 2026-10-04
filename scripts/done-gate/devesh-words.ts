@@ -2,7 +2,8 @@
 // ROADMAP.md on origin/main words it (found by the branch's description, which the building agent writes, so the
 // description itself is never handed over as the item), and Devesh's own typed words from Claude Code's transcript
 // of the session (a script's prompts, marked as script output, when a script started it). That transcript is a file
-// the building agent could append to: STATE.md lists it among the gate's open holes.
+// the building agent could append to: STATE.md lists it among the gate's open holes. A branch's checkpoint
+// (checkpoint.ts) reads Devesh's words and the roadmap item the same way.
 
 import { readFileSync } from "node:fs";
 import { parseRoadmap, plain } from "../../docs/tracker/parse.js";
@@ -40,7 +41,7 @@ function newestFirst(prompts: Prompt[]) {
  * or the SDK sent it), the prompts with none. Tool results, system reminders, task notifications and other agents'
  * messages are not prompts anyone typed.
  */
-function promptsOf(transcript: string) {
+export function promptsOf(transcript: string) {
   const prompts = transcript.split("\n").flatMap((line): Prompt[] => {
     if (!line.includes('"user"') && !line.includes('"queued_command"'))
       return [];
@@ -68,7 +69,7 @@ function promptsOf(transcript: string) {
 }
 
 /** A checkout's roadmap item, as `items` (ROADMAP.md on origin/main) words it, found by its branch's description. */
-function itemOf(root: string, items: string[]) {
+export function itemOf(root: string, items: string[]) {
   const branch = git(
     root,
     ["symbolic-ref", "--quiet", "--short", "HEAD"],

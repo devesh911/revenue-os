@@ -85,28 +85,28 @@ export const tally = (name: string, out: string) => {
   return n ? `${n} ${name}` : name;
 };
 
-/** What a stop without Docker says it left to CI: every check on the database. */
-export const notRunHere = () =>
-  `NOT run here (no Docker): ${CHECKS.filter((c) => c.db)
-    .map((c) => c.name)
-    .join(", ")}; CI runs them`;
+// Docker is looked up on the PATH scripts/done-gate.ts sets, which only a call handing over `env` uses.
+const docker = (arg: string) =>
+  spawnSync("docker", [arg], { stdio: "ignore", env: process.env });
+/** No Docker on this machine: `docker` is missing, or can't even say its version. */
+export const noDocker = () => {
+  const r = docker("--version");
+  return r.error !== undefined || r.status !== 0;
+};
 
-export const noDocker = () =>
-  spawnSync("docker", ["--version"]).error !== undefined;
-
-/** `complete`: every check ran. Without Docker on this machine the database checks are left to CI. */
+/**
+ * `complete`: every check ran. With `db` false (no Docker here, or background work running) the checks on the
+ * database are left out; not-run.ts says why.
+ */
 export async function runChecks(
   repo: string,
+  db = true,
 ): Promise<{ ok: boolean; text: string; complete?: boolean }> {
-  const dbUp = await reachable(54322);
-  const docker = dbUp
-    ? undefined
-    : spawnSync("docker", ["info"], { stdio: "ignore" });
-  if (docker && !docker.error)
+  if (db && !(await reachable(54322)))
     return {
       ok: false,
       text:
-        docker.status === 0
+        docker("info").status === 0
           ? "the local database is not running, so the tests can't run. Start it with `supabase start`, then stop again."
           : "Docker is installed but not running, so the tests can't run. Start Docker Desktop, then `supabase start`, then stop again.",
     };
@@ -123,13 +123,12 @@ export async function runChecks(
   const onDb = CHECKS.filter((c) => c.db);
   const failed =
     (await runEach(CHECKS.filter((c) => !c.db))) ??
-    (dbUp
+    (db
       ? await onSharedStack(repo, () => runEach(onDb)).catch(
           (e: Error) =>
             `${onDb.map((c) => c.name).join(", ")} did not run: ${e.message}`,
         )
       : undefined);
   if (failed) return { ok: false, text: failed };
-  if (!dbUp) passed.push(notRunHere());
-  return { ok: true, text: passed.join(", "), complete: dbUp };
+  return { ok: true, text: passed.join(", "), complete: db };
 }
