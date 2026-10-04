@@ -5,7 +5,7 @@
 // there, a test counts only when what the file lacks is a product file or a named export the change adds, and the
 // test, run alone on the change with coverage, runs an added line of that file beyond what loading the file runs.
 // A test that passes on main must carry the mark (already-on-main.ts). Exempt: a change with no product code,
-// moved lines, and a test MAY_SKIP lets skip (tests-ran.ts), when it skips.
+// moved lines (test-edits.ts), and a test MAY_SKIP lets skip (tests-ran.ts), when it skips.
 
 import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -16,7 +16,7 @@ import type { Added } from "./diff";
 import { type Hits, lineRan } from "./lcov";
 import { isProduct } from "./rules";
 import type { Snap } from "./snapshot";
-import { edits, type IsMoved } from "./test-edits";
+import { edits, movedLine } from "./test-edits";
 import { testOnly } from "./test-only";
 import {
   type Case,
@@ -50,13 +50,11 @@ const MARK_HOW =
 /**
  * Runs each test file the change adds or edits, alone, in a copy of the change (with coverage) and, for those
  * holding a new or edited test that passes there, in a copy of main's code. Text for Devesh, and whether every
- * such test is proven. `isMoved` leaves out lines the change only moved: the done-rules item's moved-code
- * detection, which cli.ts hands in once that item merges (until then nothing counts as moved).
+ * such test is proven. Lines the change only moved, as the snapshot marks them (test-edits.ts), are left out.
  */
 export function testsProven(
   repo: string,
   snap: Snap,
-  isMoved: IsMoved = () => false,
 ): { ok: boolean; text: string } {
   if (!snap.files.some(isProduct))
     return {
@@ -67,15 +65,15 @@ export function testsProven(
     .filter((f) => isTestFile(f) && existsSync(join(repo, f)))
     .map((file) => {
       const text = readFileSync(join(repo, file), "utf8");
-      return { file, text, ...edits(snap, file, text, isMoved) };
+      return { file, text, ...edits(snap, file, text) };
     })
     .filter((f) => f.any);
-  const moved = snap.added.some((a) => isMoved(a.file, a.line));
+  const moved = snap.added.some(movedLine);
   const none = `Tests proven ✓ no test added or edited${moved ? " outside moved lines" : ""}, so none has to fail on main's code`;
   if (!touched.length) return { ok: true, text: none };
   const helpers = testOnly(snap);
   const product = snap.files.filter((f) => isProduct(f) && !helpers.has(f));
-  const added = snap.added.filter((a) => !isMoved(a.file, a.line));
+  const added = snap.added.filter((a) => !movedLine(a));
   const copies: string[] = [];
   const copy = (files: string[]) => {
     const dir = codeCopy(repo, snap.from, files);
@@ -85,12 +83,12 @@ export function testsProven(
   const problems: string[] = [];
   const marked: string[] = [];
   const unjudged: string[] = [];
-  /** Is this test, skipped, one MAY_SKIP lets skip? Then it is noted and not judged. */
-  const maySkip = (c: Case) => {
+  /** Is this test, skipped `where`, one MAY_SKIP lets skip? Then it is noted and not judged. */
+  const maySkip = (c: Case, where: string) => {
     const why = MAY_SKIP[`${c.file} > ${c.name}`];
     if (why)
       unjudged.push(
-        `not judged: ${at(c)} is skipped, which MAY_SKIP allows (${why})`,
+        `not judged: ${at(c)} is skipped ${where}, which MAY_SKIP allows (${why})`,
       );
     return why !== undefined;
   };
@@ -120,7 +118,7 @@ export function testsProven(
       const tests = run.cases.filter((c) => {
         if (!f.touches(c.line)) return false;
         if (c.outcome === "passed") return true;
-        if (c.outcome === "failed" || !maySkip(c))
+        if (c.outcome === "failed" || !maySkip(c, "on this change"))
           problems.push(
             `${at(c)} ${c.outcome === "failed" ? "fails" : "is skipped"} on this change (in a scratch copy of it, which holds nothing git ignores); it must pass`,
           );
@@ -184,7 +182,8 @@ export function testsProven(
         );
         const mark = marks.find((m) => m.start === c.line);
         if (there?.outcome === "failed") proven++;
-        else if (there?.outcome === "skipped" && maySkip(c)) judged--;
+        else if (there?.outcome === "skipped" && maySkip(c, "on main's code"))
+          judged--;
         else if (there?.outcome === "passed" && mark)
           marked.push(markNote(mark));
         else
@@ -210,9 +209,11 @@ export function testsProven(
             ? ` (${loadOnly} of them because their file can't load there without what this change adds, each running an added line of it)`
             : "") +
           (marked.length
-            ? `; ${marked.length} more are marked as behaviour already on main, since they pass there too`
+            ? `; ${marked.length} of them pass(es) there too and carry the mark "behaviour already on main"`
             : "")
-        : none) +
+        : unjudged.length
+          ? "Tests proven ✓ no new or edited test judged: each one skipped, as MAY_SKIP allows"
+          : none) +
       took +
       notes,
   };

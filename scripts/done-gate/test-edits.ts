@@ -1,28 +1,33 @@
 // Which tests of a test file a change adds or edits: those whose lines, from the line a test starts on to where
-// the brackets it opens close (test-span.ts), hold a line the change adds, other than one it only moved, or the
-// place of a line it deletes.
+// the brackets it opens close (test-span.ts), hold a line the change adds, or the place of a line it deletes, other
+// than lines it only moved.
 
+import type { Added } from "./diff";
 import { git } from "./git";
 import type { Snap } from "./snapshot";
 import { testEnd } from "./test-span";
 
-/** Is this added line one the change only moved (the done-rules item's moved-code detection)? */
-export type IsMoved = (file: string, line: number) => boolean;
+/**
+ * PURE: did git see this added or removed line move? The done-rules item's moved-code detection marks such a line
+ * `moved` in the snapshot ("moved lines, as the done-rules item detects them"); until it is on main, none is.
+ */
+export const movedLine = (l: Added) => "moved" in l && l.moved === true;
 
 /**
  * For a test file the change leaves as `text`: whether the change touches it at all, and whether it touches the
  * test starting on line `start`.
  */
-export function edits(
-  snap: Snap,
-  file: string,
-  text: string,
-  isMoved: IsMoved = () => false,
-) {
+export function edits(snap: Snap, file: string, text: string) {
   const added = snap.added
-    .filter((a) => a.file === file && !isMoved(file, a.line))
+    .filter((a) => a.file === file && !movedLine(a))
     .map((a) => a.line);
-  // A deletion with nothing added in its place reads `@@ -<old> +<after>,0 @@`: it sits after line <after>.
+  const movedOut = new Set(
+    snap.removed
+      .filter((r) => r.file === file && movedLine(r))
+      .map((r) => r.line),
+  );
+  // A deletion with nothing added in its place reads `@@ -<old>[,<count>] +<after>,0 @@`: it sits after line
+  // <after>. One whose every line moved elsewhere is left out.
   const deleted = [
     ...git(
       snap.repo,
@@ -41,8 +46,14 @@ export function edits(
       ],
       {},
       true,
-    ).matchAll(/^@@ -\S+ \+(\d+),0 @@/gm),
-  ].map((m) => Number(m[1]));
+    ).matchAll(/^@@ -(\d+)(?:,(\d+))? \+(\d+),0 @@/gm),
+  ]
+    .filter(([, old, count = "1"]) =>
+      Array.from({ length: Number(count) }, (_, k) => Number(old) + k).some(
+        (l) => !movedOut.has(l),
+      ),
+    )
+    .map((m) => Number(m[3]));
   return {
     any: added.length + deleted.length > 0,
     touches: (start: number) => {

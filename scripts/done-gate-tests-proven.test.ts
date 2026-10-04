@@ -261,10 +261,17 @@ function scratch(
   return dir;
 }
 
-const prove = (
-  dir: string,
-  isMoved?: (file: string, line: number) => boolean,
-) => testsProven(dir, snapshot(dir), isMoved);
+const prove = (dir: string) => testsProven(dir, snapshot(dir));
+/**
+ * The snapshot as the done-rules item's moved-code detection leaves it (scripts/done-gate/moved.ts there): each
+ * added and removed line git saw move carries `moved: true`. Here the lines `moved` picks.
+ */
+const withMoves = (dir: string, moved: (l: { text: string }) => boolean) => {
+  const s = snapshot(dir);
+  const mark = (ls: typeof s.added) =>
+    ls.map((l) => (moved(l) ? { ...l, moved: true } : l));
+  return { ...s, added: mark(s.added), removed: mark(s.removed) };
+};
 /** The start of the check's text when it accepts: how many tests failed on main, of how many it judged. */
 const proven = (n: number, of: number) =>
   `Tests proven ✓ ${n} passed on this change and failed on main's code, of ${of} new or edited test(s)`;
@@ -520,6 +527,31 @@ it("old still one", () => {
         "1 of them because their file can't load there without what this change adds",
       );
     });
+
+    it("refuses a test that runs an added line of another product file, not of the one adding the missing export", () => {
+      const other = (n: number) =>
+        `export function other() {\n  return ${n};\n}\n`;
+      const r = prove(
+        scratch(
+          {
+            "apps/x/src/old.ts": E164,
+            "apps/x/src/other.ts": other(2),
+            "apps/x/test/e164.test.ts": `${file(calls)}import { other } from "../src/other";
+
+it("other is two", () => {
+  expect(other()).toBe(2);
+});
+`,
+          },
+          { "apps/x/src/other.ts": other(1) },
+        ),
+      );
+      expect(r.ok).toBe(false);
+      expect(r.text).toContain("1 problem(s)");
+      expect(r.text).toContain(
+        "e164.test.ts:9 \"other is two\" can't load on main's code because apps/x/src/old.ts lacks the export isE164",
+      );
+    });
   });
 
   it("accepts a test that fails on main by an assertion or by throwing, and refuses one that fails on the change", () => {
@@ -565,6 +597,9 @@ it("still one", () => {${mark}
     const note =
       'test marked "behaviour already on main" at apps/x/test/old.test.ts:8: a guard for the old rule';
     expect(marked.text).toContain(note);
+    expect(marked.text).toContain(
+      "of 1 new or edited test(s) in 1 file(s); 1 of them pass(es) there too and carry the mark",
+    );
     expect(rulesOn(snapshot(dir)).notes).toContain(note);
     expect(
       judgePr(snapshot(dir), "Roadmap: off-roadmap — x").problems,
@@ -752,18 +787,22 @@ it("old is one", () => { ${MARK} the gate's own code comes along to main
   expect(old()).toBe(1);
 });
 `;
+    // A mark on a test the change leaves alone is not shown.
+    const untouched = `\nit("untouched", () => { ${MARK} not this change's\n  expect(old()).toBe(1);\n});\n`;
     const dir = scratch(
       {
         ...PRODUCT,
-        "apps/x/test/old.test.ts": marked("  expect(old()).not.toBe(2);\n"),
+        "apps/x/test/old.test.ts": `${marked("  expect(old()).not.toBe(2);\n")}${untouched}`,
         "scripts/done-gate-extra.test.ts": gateTest,
       },
-      { "apps/x/test/old.test.ts": marked("") },
+      { "apps/x/test/old.test.ts": `${marked("")}${untouched}` },
     );
     const r = prove(dir);
     expect(r.ok).toBe(true);
     const notes = rulesOn(snapshot(dir)).notes;
     const body = judgePr(snapshot(dir), "x").problems.join("\n");
+    for (const shown of [r.text, notes.join("\n"), body])
+      expect(shown).not.toContain("not this change's");
     for (const [at, why] of [
       ["apps/x/test/old.test.ts:8", "guards the old rule"],
       [
@@ -795,25 +834,39 @@ it("is seven", () => {
     expect(r.ok).toBe(true);
   });
 
-  it("leaves a test MAY_SKIP lets skip unjudged when it skips, and says so", () => {
-    const r = prove(
-      scratch({
-        ...PRODUCT,
-        "scripts/dev-login.test.ts": `import { expect, it } from "bun:test";
+  it("leaves a test MAY_SKIP lets skip unjudged when it skips on either side, and says where", () => {
+    const at =
+      'not judged: scripts/dev-login.test.ts:4 "creates the dev user via /auth/v1/signup with the anon key when absent" is skipped';
+    const skipped = (when: string) =>
+      prove(
+        scratch({
+          "apps/x/src/old.ts": `${OLD}export const two = () => 2;\n`,
+          "scripts/dev-login.test.ts": `import { expect, it } from "bun:test";
+import * as x from "../apps/x/src/old";
 
-it.skipIf(true)("creates the dev user via /auth/v1/signup with the anon key when absent", () => {
-  expect(1).toBe(1);
+it.skipIf(${when})("creates the dev user via /auth/v1/signup with the anon key when absent", () => {
+  expect(x.two()).toBe(2);
 });
 `,
-      }),
+        }),
+      );
+    const none =
+      "Tests proven ✓ no new or edited test judged: each one skipped, as MAY_SKIP allows";
+    const onChange = skipped("true");
+    expect(onChange.ok).toBe(true);
+    expect(onChange.text).toContain(none);
+    expect(onChange.text).toContain(
+      `${at} on this change, which MAY_SKIP allows`,
     );
-    expect(r.ok).toBe(true);
-    expect(r.text).toContain(
-      'not judged: scripts/dev-login.test.ts:3 "creates the dev user via /auth/v1/signup with the anon key when absent" is skipped, which MAY_SKIP allows',
+    const onMain = skipped('!("two" in x)');
+    expect(onMain.ok).toBe(true);
+    expect(onMain.text).toContain(none);
+    expect(onMain.text).toContain(
+      `${at} on main's code, which MAY_SKIP allows`,
     );
   });
 
-  it("exempts a change with no product code, and moved lines", () => {
+  it("exempts a change with no product code", () => {
     const noProduct = prove(
       scratch({
         "apps/x/test/old.test.ts": `${OLD_TEST}
@@ -825,13 +878,54 @@ it("still one", () => {
     );
     expect(noProduct.ok).toBe(true);
     expect(noProduct.text).toContain("no product code changed");
-    // A stand-in for the done-rules item's moved-code detection: every line of the test file moved.
-    const moved = prove(
-      scratch({ ...PRODUCT, "apps/x/test/moved.test.ts": OLD_TEST }),
-      (file) => file === "apps/x/test/moved.test.ts",
+  });
+
+  // Moved lines, as the done-rules item's moved-code detection marks them in the snapshot, are left out.
+  it("leaves out a renamed test file, every line of which moved", () => {
+    const renamed = scratch({
+      ...PRODUCT,
+      "apps/x/test/renamed.test.ts": OLD_TEST,
+    });
+    rmSync(join(renamed, "apps/x/test/old.test.ts"));
+    const whole = testsProven(
+      renamed,
+      withMoves(renamed, () => true),
     );
-    expect(moved.ok).toBe(true);
-    expect(moved.text).toContain("no test added or edited outside moved lines");
+    expect(whole.text).toContain(
+      "Tests proven ✓ no test added or edited outside moved lines",
+    );
+    expect(whole.ok).toBe(true);
+  });
+
+  it("leaves out a line moved from one test into another, judging only the new test beside them", () => {
+    // From the end of "old works" to the start of "old is a number".
+    const two = (
+      names: string,
+      first: string,
+      second: string,
+    ) => `${OLD_TEST.replace("{ old }", names).replace("});", `${first}});`)}
+it("old is a number", () => {
+${second}  expect(typeof old()).toBe("number");
+});
+`;
+    const line = "  expect(old()).not.toBe(2); // and never two\n";
+    const within = scratch(
+      {
+        "apps/x/src/old.ts": `${OLD}export const doubled = (n: number) => n * 2;\n`,
+        "apps/x/test/old.test.ts": `${two("{ doubled, old }", "", line)}
+it("doubles", () => {
+  expect(doubled(2)).toBe(4);
+});
+`,
+      },
+      { "apps/x/test/old.test.ts": two("{ old }", line, "") },
+    );
+    const r = testsProven(
+      within,
+      withMoves(within, (l) => l.text.includes("never two")),
+    );
+    expect(r.text).toContain(proven(1, 1));
+    expect(r.ok).toBe(true);
   });
 
   it("runs as `bun run gate proven`, failing with the reason", () => {

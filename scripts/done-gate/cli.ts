@@ -126,8 +126,8 @@ export async function cli(cmd: string, args: string[]) {
   ) {
     process.exit(allTestsRun(repo, args[0] === "e2e"));
   } else if (cmd === "proven" && refs && !refs.head) {
-    // Nothing counts as moved yet: the done-rules item's moved-code detection is handed in here, as testsProven's
-    // third argument, once that item merges.
+    // Lines the change only moved are left out as the snapshot marks them, once the done-rules item's moved-code
+    // detection is on main (test-edits.ts); until then none is.
     const r = testsProven(repo, changeOf("Tests proven", repo, refs.base));
     console.log(r.text);
     process.exit(r.ok ? 0 : 1);
