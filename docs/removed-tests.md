@@ -12,6 +12,10 @@ What is not a removal:
   detection sees them. One file split into several is this.
 - A test renamed where it stands, none of its expect lines removed.
 - An expect line rewritten where it stood, in the same run of changed lines, into one that checks more than a constant.
+- An expect line re-indented in its own test, as when the test's body is wrapped in `await withOrg(…, async () => { … })`.
+
+Git sees no move in a block under 20 letters and digits, so two tiny tests swapped in a file are reported removed;
+give them names that say what they check, which also makes them long enough.
 
 What is a removal, though the text lives on: a test moved into a file no runner runs (a helper, a note); an expect
 moved on its own, without its test, even into another test; a test renamed as its expect lines go (rewritten); an
