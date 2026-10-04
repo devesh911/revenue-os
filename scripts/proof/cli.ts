@@ -63,30 +63,45 @@ export async function prove(
   return { text, result, code: result === "failed" ? 1 : 0 };
 }
 
-if (import.meta.main) {
-  const root = join(import.meta.dir, "..", "..");
-  const read = (f: string) => readFileSync(join(root, f), "utf8");
-  const [slice = "", flag, out, ...rest] = process.argv.slice(2);
+/**
+ * What `bun run proof` was asked (its arguments), checked against `root`'s ROADMAP.md: the slice, its steps and the
+ * --out folder, or why the command refuses them (exit 2).
+ */
+export function toProve(
+  args: string[],
+  root: string,
+):
+  | { n: number; steps: Step[] | undefined; out?: string }
+  | { refused: string } {
+  const [slice = "", flag, out, ...rest] = args;
   if (
     !/^\d+$/.test(slice) ||
     (flag !== undefined && (flag !== "--out" || !out)) ||
     rest.length
-  ) {
-    console.error("usage: bun run proof <slice number> [--out <folder>]");
-    process.exit(2);
-  }
+  )
+    return { refused: "usage: bun run proof <slice number> [--out <folder>]" };
   const n = Number(slice);
-  if (!parseRoadmap(read("ROADMAP.md")).slices.some((s) => s.n === n)) {
-    console.error(`ROADMAP.md has no Slice ${n}`);
+  const roadmap = readFileSync(join(root, "ROADMAP.md"), "utf8");
+  if (!parseRoadmap(roadmap).slices.some((s) => s.n === n))
+    return { refused: `ROADMAP.md has no Slice ${n}` };
+  return { n, steps: SLICES[n], out };
+}
+
+if (import.meta.main) {
+  const root = join(import.meta.dir, "..", "..");
+  const asked = toProve(process.argv.slice(2), root);
+  if ("refused" in asked) {
+    console.error(asked.refused);
     process.exit(2);
   }
+  const { n, steps, out } = asked;
   const dir = out
     ? resolve(out)
     : mkdtempSync(join(tmpdir(), `proof-slice-${n}-`));
-  const { text, code } = await prove(n, SLICES[n], {
+  const { text, code } = await prove(n, steps, {
     root,
     env: process.env,
-    state: read("STATE.md"),
+    state: readFileSync(join(root, "STATE.md"), "utf8"),
     dir,
   });
   console.log(`${text}\nThe report and its files: ${dir}`);

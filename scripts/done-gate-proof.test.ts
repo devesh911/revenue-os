@@ -83,6 +83,7 @@ const judge = (
   });
 
 describe("what a proof run says about one slice, read from its jobs", () => {
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("passed only when that slice's job succeeded and ran its every-step-passed step; waiting when it skipped it", () => {
     expect(sliceOutcome([passedJob()], 0)).toBe("passed");
     expect(sliceOutcome([passedJob(0, "skipped")], 0)).toBe("waiting");
@@ -97,6 +98,7 @@ describe("what a proof run says about one slice, read from its jobs", () => {
 });
 
 describe("a pull request that sets a slice to done", () => {
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("passes with a passing run of the proof workflow for that slice, on main, and its report in the body", async () => {
     const gh = github();
     expect(await judge({}, gh)).toEqual([]);
@@ -106,6 +108,7 @@ describe("a pull request that sets a slice to done", () => {
     ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("asks GitHub nothing when no slice becomes done, or a done slice keeps its link", async () => {
     const gh = github();
     expect(await judge({ now: MAIN }, gh)).toEqual([]);
@@ -113,6 +116,7 @@ describe("a pull request that sets a slice to done", () => {
     expect(gh.asked).toEqual([]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("checks a done slice again when its link changes", async () => {
     const was = slice("done", `2026-10-01 · [run 1](${LINK.replace(ID, "1")})`);
     const gh = github(run({ conclusion: "failure" }));
@@ -121,6 +125,7 @@ describe("a pull request that sets a slice to done", () => {
     ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses a done slice changed while it keeps its link: its title, its Proof line or its items, asking GitHub nothing", async () => {
     const gh = github();
     const rewritten = DONE.replace("Ground", "Ground, renamed")
@@ -141,6 +146,7 @@ describe("a pull request that sets a slice to done", () => {
       ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("lets a done slice keep its link while a ticked item gains evidence", async () => {
     const more = DONE.replace(
       "evidence: [#1](https://example.com)",
@@ -149,12 +155,14 @@ describe("a pull request that sets a slice to done", () => {
     expect(await judge({ main: DONE, now: more })).toEqual([]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses a slice set to done that still has an unticked item", async () => {
     expect(await judge({ now: `${DONE}- [ ] b (agent)\n` })).toEqual([
       expect.stringContaining('its item "b (agent)" is not ticked'),
     ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses a missing, foreign or malformed link, and a date that is not the run's", async () => {
     const cases: [string, string][] = [
       ["2026-10-05", "has no link to a proof run"],
@@ -169,6 +177,7 @@ describe("a pull request that sets a slice to done", () => {
       ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses a run of another workflow, one that did not succeed, and one not on main", async () => {
     const cases: [Run, string][] = [
       [run({ path: ".github/workflows/ci.yml" }), "not of the proof workflow"],
@@ -182,6 +191,7 @@ describe("a pull request that sets a slice to done", () => {
       ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses a run that did not prove that slice, or left a step waiting", async () => {
     expect(await judge({}, github(run(), [passedJob(1)]))).toEqual([
       expect.stringContaining("did not prove Slice 0"),
@@ -191,6 +201,7 @@ describe("a pull request that sets a slice to done", () => {
     ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses a body that does not carry the run's report", async () => {
     for (const body of [
       "Roadmap: Slice 0 — replan: done",
@@ -203,6 +214,7 @@ describe("a pull request that sets a slice to done", () => {
       ]);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses, saying why, when GitHub can't be asked or this repository can't be told", async () => {
     expect(
       await judge({
@@ -321,6 +333,7 @@ describe("bun run gate pr: main's copy judges a pull request that sets a slice t
           ? { jobs }
           : undefined;
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("lets it through when GitHub reports a passing proof run of Slice 0 on main's commit", async () => {
     const { dir, main } = project();
     const r = await judged(dir, answers(main));
@@ -328,6 +341,7 @@ describe("bun run gate pr: main's copy judges a pull request that sets a slice t
     expect(r.status).toBe(0);
   });
 
+  // behaviour already on main: main's copy carries the gate's own code and the tracker's parser over (scripts/done-gate/proof-run.ts, proof-link.ts, pr.ts and docs/tracker/parse.js are not product code), so it passes there
   it("refuses it when the linked run failed, left a step waiting, or GitHub does not know it", async () => {
     const { dir, main } = project();
     for (const [answer, why] of [

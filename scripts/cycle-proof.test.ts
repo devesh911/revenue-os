@@ -1,6 +1,7 @@
 // `bun run cycle --banner` shows each `proof ready` or `done` slice's latest proof run (its result and link, read
 // with `gh run list` and `gh run view` on the proof workflow, or that it could not read them) and tells the session
-// what to do about it. The slice field the passing run's date and link go in is `Proof passed:`.
+// what to do about it. The slice field the passing run's date and link go in is `Proof passed:` (how the tracker's
+// parser reads that field is in tracker-proof-passed.test.ts).
 import { afterAll, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,34 +32,6 @@ const cycle = (roadmap: string, proofRuns: Cycle["proofRuns"]): Cycle => ({
 });
 
 describe("the field a passing proof run is written in", () => {
-  it("is `Proof passed:`; a done slice needs its date there, and the old name is reported as renamed", () => {
-    const ok = parseRoadmap(
-      `# Roadmap\n\n${slice(0, "done", `2026-10-05 · [run 555](${URL0})`)}`,
-    );
-    expect(ok.problems).toEqual([]);
-    expect(ok.slices[0]?.["Proof passed"]).toBe(
-      `2026-10-05 · [run 555](${URL0})`,
-    );
-    expect(parseRoadmap(`# Roadmap\n\n${slice(0, "done")}`).problems).toEqual([
-      'Slice 0 says done but "Proof passed" has no date',
-    ]);
-    expect(
-      parseRoadmap(
-        `# Roadmap\n\n${slice(0, "in progress").replace("Proof passed:", "Seen by Devesh:")}`,
-      ).problems,
-    ).toEqual([
-      'Slice 0: the field "Seen by Devesh:" is now "Proof passed:"',
-      'Slice 0 is missing its "Proof passed:" line',
-    ]);
-  });
-
-  it("is never on a slice with an unticked item: the parser reports a done slice that has one", () => {
-    const md = `# Roadmap\n\n${slice(0, "done", `2026-10-05 · [run 555](${URL0})`)}- [ ] B, never proved (agent)\n`;
-    expect(parseRoadmap(md).problems).toEqual([
-      expect.stringContaining("Slice 0 says done but 1 item is not ticked"),
-    ]);
-  });
-
   it("is what the banner names", () => {
     const b = banner(cycle(slice(0, "in progress"), undefined));
     expect(b).toContain('"Proof passed:"');

@@ -1,28 +1,30 @@
-// Slice 0's proof steps (scripts/proof/slice-0*.ts), run as `bun run proof 0` runs them: against this checkout, in
-// scratch copies each step makes and removes. A step whose safeguard this checkout has must pass here, and every
-// refusal step must fail on a checkout whose gate, hooks and guards refuse nothing, so none passes on its own. The
-// scripted agent session and the verifier's run use a stand-in `claude` on the PATH, never a real model or key, and
-// GitHub's run records are judged as data. Two steps run only in `bun run proof 0`: the whole suite run at once
-// (it starts the suite, this file included) and the read of GitHub's real run records.
+// Slice 0's proof steps (scripts/proof/slice-0*.ts), run as `bun run proof 0` runs them: against this checkout as it
+// is on disk, committed in a scratch repository (a step proves a commit), in scratch copies each step makes and
+// removes. A step whose safeguard this checkout has must pass here, and every refusal step must fail on a checkout
+// whose gate, hooks and guards refuse nothing, so none passes on its own. The scripted agent session and the
+// verifier's run use a stand-in `claude` on the PATH, never a real model or key. Two steps run only in `bun run proof
+// 0`: the whole suite run at once (it starts the suite, this file included) and the read of GitHub's real run
+// records (judged as data in scripts/proof-slice-0-runs.test.ts).
 import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
+  copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { currentSlice, nextItem, parseRoadmap } from "../docs/tracker/parse.js";
 import { stateDir } from "./done-gate/store";
-import { namedTestsPass } from "./proof/named-tests";
 import { runSteps } from "./proof/run";
-import { steps as slice0 } from "./proof/slice-0";
 import { agentSession, crossCompany } from "./proof/slice-0-agents";
 import {
   adminMerge,
@@ -46,13 +48,13 @@ import {
   rewrittenCi,
   unexplainedRuleChange,
 } from "./proof/slice-0-rules";
-import { runRecordProblems } from "./proof/slice-0-runs";
 import {
   passesOnMain,
   patternFileGuard,
   unrunLine,
 } from "./proof/slice-0-tests";
 import { agentToolsRefused, hooksWarn } from "./proof/slice-0-tools";
+import { SLICES } from "./proof/slices";
 import type { Step } from "./proof/step";
 
 setDefaultTimeout(120_000); // a step clones this checkout and starts bun and git several times
@@ -67,27 +69,91 @@ const scratch = (name: string) => {
   return d;
 };
 const KEY = "A second Anthropic key for the automatic test conversations";
-// The fingerprint of Slice 0's Proof line as these steps were written to it.
-const PROOF_LINE = "c2eb7b1a1d0ef99c";
 const STATE = `PHASE: SETUP\n\n## Waiting on Devesh\n- [ ] **${KEY}**: saved in GitHub as ANTHROPIC_EVALS_KEY\n## Decisions in force\n`;
-const prove = (steps: Step[], root = ROOT, env: NodeJS.ProcessEnv = {}) =>
+/** git in `dir` (its background clean-up off, as scripts/proof/scratch.ts has it): its output; throws when it fails. */
+const git = (dir: string, ...args: string[]) => {
+  const r = spawnSync(
+    "git",
+    ["-c", "maintenance.auto=false", "-c", "gc.auto=0", ...args],
+    { cwd: dir, encoding: "utf8", maxBuffer: 64 << 20 },
+  );
+  if (r.status !== 0)
+    throw new Error(`git ${args.join(" ")} failed: ${r.stderr.trim()}`);
+  return r.stdout.trim();
+};
+let here: string | undefined;
+/**
+ * The repository the steps prove: this checkout's files as they are on disk (those git would track), committed on
+ * top of its commit. A step proves a commit (it clones it, or archives its gate), and this checkout's may not hold
+ * what is on disk: the tests-proven check runs this file with a change copied over main's commit, uncommitted. Its
+ * origin/main is this checkout's, or that commit where there is none (a pull request's checkout on GitHub), and it
+ * has no origin to fetch from; its packages are this checkout's, for the tests the steps run by name.
+ */
+const HERE = () => {
+  if (here) return here;
+  const dir = scratch("proof-0-here-");
+  git(dir, "init", "-q", "-b", "main");
+  const listed = git(
+    ROOT,
+    "ls-files",
+    "-z",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+  );
+  for (const f of new Set(listed.split("\0").filter(Boolean))) {
+    const from = join(ROOT, f);
+    const st = lstatSync(from, { throwIfNoEntry: false });
+    if (!st?.isFile() && !st?.isSymbolicLink()) continue; // deleted, or another repository's folder
+    mkdirSync(dirname(join(dir, f)), { recursive: true });
+    if (st.isSymbolicLink()) symlinkSync(readlinkSync(from), join(dir, f));
+    else copyFileSync(from, join(dir, f));
+  }
+  git(dir, "fetch", "-q", "--no-tags", ROOT, "HEAD"); // CI checks out a detached commit, which a clone may not
+  git(dir, "update-ref", "refs/heads/main", "FETCH_HEAD");
+  git(dir, "add", "-A", "-f");
+  git(
+    dir,
+    "-c",
+    "user.email=proof@example.invalid",
+    "-c",
+    "user.name=proof",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "this checkout as it is on disk",
+  );
+  const main = "refs/remotes/origin/main";
+  if (
+    spawnSync("git", ["rev-parse", "-q", "--verify", main], { cwd: ROOT })
+      .status === 0
+  )
+    git(dir, "fetch", "-q", "--no-tags", ROOT, `+${main}:${main}`);
+  else git(dir, "update-ref", main, "HEAD");
+  if (existsSync(join(ROOT, "node_modules")))
+    symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
+  here = dir;
+  return dir;
+};
+const prove = (steps: Step[], root = HERE(), env: NodeJS.ProcessEnv = {}) =>
   runSteps(steps, {
     root,
     env: { PATH: process.env.PATH, HOME: process.env.HOME, ...env },
     state: STATE,
     dir: scratch("proof-0-report-"),
   });
-const git = (dir: string, ...args: string[]) =>
-  spawnSync("git", args, { cwd: dir, encoding: "utf8" }).stdout.trim();
 const failures = (results: { does: string; outcome: string; seen: string }[]) =>
   results.flatMap((r) =>
     r.outcome === "passed" ? [] : [`${r.does}\n  ${r.seen}`],
   );
-/** A scratch copy of this checkout's commit with `edit` applied and committed, as `main`. */
+/** A scratch copy of the proved repository's commit with `edit` applied and committed, as `main`. */
 const copyOf = (edit: (dir: string) => void, message = "a changed copy") => {
   const dir = scratch("proof-0-copy-");
   git(dir, "init", "-q", "-b", "main");
-  git(dir, "fetch", "-q", "--no-tags", ROOT, "HEAD"); // CI checks out a detached commit, which a clone may not
+  git(dir, "fetch", "-q", "--no-tags", HERE(), "HEAD");
   git(dir, "checkout", "-q", "-B", "main", "FETCH_HEAD");
   edit(dir);
   spawnSync(
@@ -114,8 +180,7 @@ const replaced = (dir: string, file: string, from: string, to: string) => {
   writeFileSync(join(dir, file), text.replace(from, to));
 };
 
-// The refusals whose safeguard is on main today; the others' items are still being built (a new test that already
-// passes on main: the tests-proven item).
+// The refusals, each of whose safeguards is on main today.
 const ON_MAIN = [
   hooksWarn,
   unexplainedRuleChange,
@@ -137,12 +202,12 @@ const ON_MAIN = [
   deletedTest,
   barrelExport,
   unrunLine,
+  passesOnMain,
   interrupted,
 ];
-const COMING = [passesOnMain];
 
 describe("Slice 0's proof steps", () => {
-  it("follow its Proof line: one step per check it names, in its order, each in its words", () => {
+  it("follow its Proof line: one step per check it names, in its order, each in its words", async () => {
     const named = [
       "four law files",
       "`bun run cycle --banner`",
@@ -174,10 +239,19 @@ describe("Slice 0's proof steps", () => {
       "interrupted, unchecked change",
     ];
     const proof =
-      parseRoadmap(git(ROOT, "show", "HEAD:ROADMAP.md")).slices.find(
+      parseRoadmap(git(HERE(), "show", "HEAD:ROADMAP.md")).slices.find(
         (s) => s.n === 0,
       )?.Proof ?? "";
     expect(named.filter((n) => !proof.includes(n))).toEqual([]);
+    // What `bun run proof 0` reports each step did, in its order: from a run of the slice's steps whose time is
+    // already up, so that none of them runs.
+    const slice0 = await runSteps(SLICES[0] ?? [], {
+      root: HERE(),
+      env: {},
+      state: STATE,
+      dir: scratch("proof-0-report-"),
+      minutes: 0,
+    });
     // Every phrase it quotes (a prompt, a test it cites by name) and every test file it names is in a step's words.
     const cited = [
       ...(proof.match(/"[^"]+"/g) ?? []).map((q) => q.slice(1, -1)),
@@ -196,9 +270,9 @@ describe("Slice 0's proof steps", () => {
   });
 
   it("the banner step passes, naming the slice and item the tracker's parser finds on origin/main", async () => {
-    const [r] = await prove([banner]); // the banner fetches origin/main first
+    const [r] = await prove([banner]);
     const roadmap = parseRoadmap(
-      git(ROOT, "show", "origin/main:ROADMAP.md"),
+      git(HERE(), "show", "origin/main:ROADMAP.md"),
     ).slices;
     const cur = currentSlice(roadmap);
     expect(r?.outcome).toBe("passed");
@@ -233,21 +307,10 @@ describe("Slice 0's proof steps", () => {
       writeFileSync(join(dir, ".claude", "settings.json"), quiet);
       writeFileSync(join(dir, ".codex", "hooks.json"), quiet);
     }, "a gate that refuses nothing");
-    const results = await prove([...ON_MAIN, ...COMING], weak);
+    const results = await prove(ON_MAIN, weak);
     expect(results.filter((r) => r.outcome !== "failed")).toEqual([]);
     expect(results.every((r) => r.seen.length > 0)).toBe(true);
   }, 600_000);
-
-  it("its Proof line is the one these steps were written to: a change to it must revisit them", () => {
-    const proof =
-      parseRoadmap(git(ROOT, "show", "HEAD:ROADMAP.md")).slices.find(
-        (s) => s.n === 0,
-      )?.Proof ?? "";
-    // A new or reworded check needs its step (scripts/proof/slice-0*.ts); then this fingerprint is updated.
-    expect(createHash("sha256").update(proof).digest("hex").slice(0, 16)).toBe(
-      PROOF_LINE,
-    );
-  });
 });
 
 describe("main's copy of rules-from-main, as GitHub runs it", () => {
@@ -386,23 +449,6 @@ if (two && input.hook_event_name === "Stop" && !existsSync(\`\${common}/done-gat
   }, 120_000);
 });
 
-describe("the tests the Proof line cites by name", () => {
-  it("pass only when each runs alone and passes: a renamed or failing one fails the step, naming it", () => {
-    const dir = scratch("proof-0-cited-");
-    writeFileSync(
-      join(dir, "cited.test.ts"),
-      'import { expect, test } from "bun:test";\ntest("still here (its name has brackets)", () => expect(1 + 1).toBe(2));\ntest("now broken", () => expect(1 + 1).toBe(3));\n',
-    );
-    const here = "still here (its name has brackets)";
-    expect(namedTestsPass(dir, "cited.test.ts", [here])).toContain(
-      "each ran alone and passed",
-    );
-    expect(() =>
-      namedTestsPass(dir, "cited.test.ts", [here, "now broken", "renamed"]),
-    ).toThrow(/2 cited test\(s\).*"now broken".*"renamed"/s);
-  });
-});
-
 type Answer = { when?: string; first?: string; say: string; error?: boolean };
 /**
  * A stand-in `claude` that logs each call (its arguments, key, GitHub token, home and folder) and answers as
@@ -450,12 +496,12 @@ const standIn = (answers: Answer[]) => {
 };
 
 describe("the scripted fresh agent session", () => {
-  const roadmap = parseRoadmap(git(ROOT, "show", "HEAD:ROADMAP.md")).slices;
-  const cur = currentSlice(roadmap);
-  const item = nextItem(cur)?.text.split(/:\s/)[0] ?? "";
   /** Answers each scripted question as the repo's rules ask; on "dark mode" it first runs `onDarkMode`. */
-  const session = (onDarkMode = ":") =>
-    standIn([
+  const session = (onDarkMode = ":") => {
+    const roadmap = parseRoadmap(git(HERE(), "show", "HEAD:ROADMAP.md"));
+    const cur = currentSlice(roadmap.slices);
+    const item = nextItem(cur)?.text.split(/:\s/)[0] ?? "";
+    return standIn([
       {
         when: "/ready",
         say: "It checks only the READY_TOKEN bearer token, then answers ok; the database checks are not built yet.",
@@ -467,10 +513,11 @@ describe("the scripted fresh agent session", () => {
       },
       { say: `We are on Slice ${cur?.n}, item: ${item}.` },
     ]);
+  };
 
   it("waits on Devesh's evals key, naming the Waiting item, and starts no session without it", async () => {
     const claude = session();
-    const [r] = await prove([agentSession], ROOT, claude.env);
+    const [r] = await prove([agentSession], HERE(), claude.env);
     expect(r?.outcome).toBe("waiting");
     expect(r?.seen).toContain(KEY);
     expect(claude.calls()).toBe("");
@@ -478,7 +525,7 @@ describe("the scripted fresh agent session", () => {
 
   it("with the key, holds four exchanges in one session in a fresh clone of main, with only that key and a home of its own, and saves the transcript", async () => {
     const claude = session();
-    const [r] = await prove([agentSession], ROOT, {
+    const [r] = await prove([agentSession], HERE(), {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
       GH_TOKEN: "never-handed-on",
@@ -493,13 +540,14 @@ describe("the scripted fresh agent session", () => {
     expect(calls).not.toContain("another-key");
     expect(calls).toContain("gh: none");
     expect(calls).not.toContain(`home: ${process.env.HOME}\n`);
-    expect(calls).not.toContain(`cwd: ${ROOT}\n`);
+    for (const dir of [ROOT, HERE()])
+      expect(calls).not.toContain(`cwd: ${dir}\n`);
     expect(calls.match(/--resume stand-in/g)?.length).toBe(3);
   });
 
   it("fails, naming the branch, when the session makes one on 'add a dark mode to the console'", async () => {
     const claude = session("git checkout -qb feat/dark-mode");
-    const [r] = await prove([agentSession], ROOT, {
+    const [r] = await prove([agentSession], HERE(), {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
     });
@@ -509,7 +557,7 @@ describe("the scripted fresh agent session", () => {
 
   it("may run git to look around and make a branch, never to push", async () => {
     const claude = session();
-    await prove([agentSession], ROOT, {
+    await prove([agentSession], HERE(), {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
     });
@@ -526,7 +574,7 @@ describe("the scripted fresh agent session", () => {
         error: true,
       },
     ]);
-    const [r] = await prove([agentSession], ROOT, {
+    const [r] = await prove([agentSession], HERE(), {
       ...claude.env,
       ANTHROPIC_EVALS_KEY: "evals-key-for-tests",
     });
@@ -600,82 +648,5 @@ describe("the verifier's run on a change missing a cross-company test", () => {
     const changed = readFileSync(join(diffDir, "changed.txt"), "utf8");
     expect(changed).toContain("services/worker/src/routes/screens.ts");
     expect(changed).toMatch(/services\/worker\/test\/[\w-]+\.test\.ts/);
-  });
-});
-
-describe("GitHub's run records: the cloud test database changes only after checks pass", () => {
-  const at = (m: number) => `2026-10-03T07:${String(m).padStart(2, "0")}:00Z`;
-  const staging = (sha: string, start: number, apply: string) => ({
-    url: `https://example.invalid/runs/${sha}`,
-    sha,
-    jobs: [
-      {
-        name: "staging-migrations",
-        conclusion: "success",
-        startedAt: at(start),
-        steps: [{ name: "Apply migrations to staging", conclusion: apply }],
-      },
-    ],
-  });
-  const ci = (sha: string, done: number, conclusion = "success") => ({
-    sha,
-    jobs: [{ name: "checks", conclusion, completedAt: at(done) }],
-  });
-  const touches = (sha: string) => sha.startsWith("m");
-
-  it("passes when each run started after checks passed on its commit and skipped the apply step with no migration changed", () => {
-    expect(
-      runRecordProblems(
-        [staging("a1", 10, "skipped"), staging("m1", 20, "success")],
-        [ci("a1", 9), ci("m1", 19)],
-        touches,
-      ),
-    ).toEqual([]);
-  });
-
-  it("names a run that started before checks passed, one with no passed checks, one that applied with no migration changed, and a window with no skip", () => {
-    const problems = runRecordProblems(
-      [
-        staging("a1", 10, "success"),
-        staging("m1", 20, "success"),
-        staging("a2", 30, "skipped"),
-      ],
-      [ci("a1", 9), ci("m1", 21), ci("a2", 29, "failure")],
-      touches,
-    ).join("\n");
-    expect(problems).toContain("a1 changed no migration");
-    expect(problems).toContain("before `checks` passed on m1");
-    expect(problems).toContain("`checks` did not pass on a2");
-    expect(
-      runRecordProblems(
-        [staging("m1", 20, "success")],
-        [ci("m1", 19)],
-        touches,
-      ).join("\n"),
-    ).toContain("no run on a commit that changed no migration");
-    expect(runRecordProblems([], [], touches).join("\n")).toContain(
-      "no run of staging-migrations",
-    );
-  });
-
-  it("does not hold a run whose job was skipped, which never reached the cloud", () => {
-    const skipped = {
-      ...staging("b1", 40, "skipped"),
-      jobs: [
-        {
-          name: "staging-migrations",
-          conclusion: "skipped",
-          startedAt: at(40),
-          steps: [],
-        },
-      ],
-    };
-    expect(
-      runRecordProblems(
-        [skipped, staging("a1", 10, "skipped")],
-        [ci("b1", 39, "failure"), ci("a1", 9)],
-        touches,
-      ),
-    ).toEqual([]);
   });
 });

@@ -580,6 +580,7 @@ it("throws on main", () => {
     );
   });
 
+  // behaviour already on main: this change only awaits the pull-request check, now asynchronous; what it checks is main's, and main's copy carries the gate's own code over, so it passes there
   it("refuses a new test that passes on main, and accepts it once its line says why, shown at every stop and asked of the PR body", async () => {
     const test = (mark: string) => ({
       ...PRODUCT,
@@ -777,6 +778,7 @@ it("matches the local file", () => {
     );
   });
 
+  // behaviour already on main: this change only awaits the pull-request check, now asynchronous; what it checks is main's, and main's copy carries the gate's own code over, so it passes there
   it("shows a mark main already holds on a test the change edits, and a mark in the gate's own tests, at the stop and in the PR body", async () => {
     const marked = (extra: string) => `${OLD_TEST}
 it("still one", () => { ${MARK} guards the old rule
