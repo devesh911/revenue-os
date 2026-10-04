@@ -2,6 +2,7 @@
 // off a test or a checker, read source code in a test), which tests a change may not remove unexplained
 // (removed-tests.ts), which files decide what "done" means, and which are product code.
 
+import { changeMarks, markNote } from "./already-on-main";
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import { markNotes } from "./coverage-marks";
 import type { Added } from "./diff";
@@ -18,7 +19,7 @@ const APP_CODE =
 // rule-change explanation judges (rule-changes.ts); test files neither. Every other changed file needs the verifier.
 const NOT_PRODUCT = /^(docs|\.github|\.codex|\.claude)\/|^scripts\/done-gate/;
 const MARKDOWN = /\.(md|markdown)$/i;
-const TEST =
+export const TEST =
   /[._](test|spec)\.[cm]?[jt]sx?$|\.e2e\.[cm]?[jt]sx?$|(^|\/)(tests?|e2e|__tests__)\//;
 const CODE = /\.[cm]?[jt]sx?$/;
 
@@ -203,13 +204,16 @@ export const isProduct = (f: string) =>
   f !== "" && !NOT_PRODUCT.test(f) && !MARKDOWN.test(f) && !TEST.test(f);
 export const isTest = (f: string) => TEST.test(f);
 
-export const rulesOn = (snap: Snap) =>
-  checkRules(
+export const rulesOn = (snap: Snap) => {
+  const r = checkRules(
     snap.files,
     snap.added,
     (name, file) => snap.users.get(`${file} ${name}`) ?? [],
     snap.removed,
     snap.deleted,
   );
+  r.notes.push(...changeMarks(snap).map(markNote)); // tests that pass on main, and why (tests-proven.ts)
+  return r;
+};
 export const listed = (problems: string[]) =>
   `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line, or, for a removed test, the line given above to docs/removed-tests.md; Devesh sees every exception.`;

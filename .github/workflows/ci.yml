@@ -76,6 +76,12 @@ jobs:
       # Every test must run: a skipped or todo test fails, however it was switched off (scripts/done-gate/tests-ran.ts, MAY_SKIP).
       - run: bun run gate tests
 
+      # The pull request's new and edited tests must fail on main's code and pass on its own (scripts/done-gate/tests-proven.ts).
+      - name: Tests proven against main's code
+        env:
+          BASE: origin/${{ github.base_ref || 'main' }}
+        run: bun run gate proven --base "$BASE"
+
       # Console sign-in e2e against the real local stack: the wrapper exports the stack env, Playwright
       # starts the worker + a console build (dist-e2e, never the guarded dist/), and the spec seeds its own data.
       - name: Console e2e (real local stack)
