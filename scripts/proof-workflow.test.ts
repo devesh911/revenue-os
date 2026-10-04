@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { secondCheck } from "./done-gate/pr";
 import { ALL_PASSED, reportHeading } from "./done-gate/proof-run";
 
@@ -138,7 +138,9 @@ describe("proof.yml: the proof runs on GitHub after each deploy to main, once a 
     });
     const steps = proof.steps ?? [];
     const prove = steps.find((s) => s.id === "prove") as Step_;
-    expect(prove.run?.trim()).toBe('bun run proof "$SLICE" --out proof-report');
+    expect(prove.run?.trim()).toBe(
+      'bun run proof "$SLICE" --out "proof-report/slice-$SLICE"',
+    );
     expect(prove.env).toEqual({
       SLICE: expr("matrix.slice"),
       ANTHROPIC_EVALS_KEY: expr("secrets.ANTHROPIC_EVALS_KEY"),
@@ -174,8 +176,45 @@ describe("proof.yml: the proof runs on GitHub after each deploy to main, once a 
       (workflow().jobs.post?.steps ?? []).find((s) =>
         /gh issue/.test(s.run ?? ""),
       ) as Step_;
+    /**
+     * Each slice's report written where the prove step writes it, inside the folder the upload step uploads, then
+     * unpacked into `dir` as actions/download-artifact does with the post job's settings: merged, every artifact's
+     * files go straight into its path; unmerged, a lone artifact's do too (as GitHub did with Slice 0's first run),
+     * and several each go into a folder named after the artifact.
+     */
+    const unpack = (dir: string, reports: Record<number, string>) => {
+      const steps = workflow().jobs.proof?.steps ?? [];
+      const out = steps
+        .find((s) => s.id === "prove")
+        ?.run?.match(/--out "?([^"\s]+)"?/)?.[1];
+      const root = String(
+        steps.find((s) => s.uses?.startsWith("actions/upload-artifact@"))?.with
+          ?.path,
+      );
+      const get = (workflow().jobs.post?.steps ?? []).find((s) =>
+        s.uses?.startsWith("actions/download-artifact@"),
+      )?.with;
+      const slices = Object.keys(reports);
+      for (const [n, text] of Object.entries(reports)) {
+        const inArtifact = relative(root, (out ?? "").replace("$SLICE", n));
+        const at = join(
+          dir,
+          String(get?.path),
+          get?.["merge-multiple"] || slices.length === 1
+            ? ""
+            : `proof-slice-${n}`,
+          inArtifact,
+        );
+        mkdirSync(at, { recursive: true });
+        writeFileSync(join(at, "report.md"), text);
+      }
+    };
     /** Runs the posting step as GitHub would, in a folder holding the downloaded reports, with a stand-in gh. */
-    const posted = (issues: string, reports: Record<number, string>) => {
+    const posted = (
+      issues: string,
+      reports: Record<number, string>,
+      slices = "[0,1]",
+    ) => {
       const dir = scratch("proof-post-");
       const bin = join(dir, "bin");
       mkdirSync(bin);
@@ -191,15 +230,7 @@ esac
 `,
         { mode: 0o755 },
       );
-      for (const [n, text] of Object.entries(reports)) {
-        mkdirSync(join(dir, "reports", `proof-slice-${n}`), {
-          recursive: true,
-        });
-        writeFileSync(
-          join(dir, "reports", `proof-slice-${n}`, "report.md"),
-          text,
-        );
-      }
+      unpack(dir, reports);
       const log = join(dir, "log");
       const r = spawnSync("bash", ["-e", "-c", post().run ?? ""], {
         cwd: dir,
@@ -209,7 +240,7 @@ esac
           PATH: `${bin}:${process.env.PATH}`,
           LOG: log,
           ISSUES: issues,
-          SLICES: "[0,1]",
+          SLICES: slices,
           RUN_URL: "https://github.com/o/r/actions/runs/9",
           OWNER: "devesh911",
         },
@@ -232,6 +263,19 @@ esac
       expect(r.log).toContain(
         `${reportHeading(1, "failed")}\nRun: https://github.com/o/r/actions/runs/9`,
       );
+    });
+
+    // behaviour already on main: main's copy carries .github/workflows/proof.yml over (it is not product code), so it passes there
+    it("posts the report of a run that proved one slice, whose lone artifact the download unpacks straight into its folder", () => {
+      const r = posted(
+        "141",
+        { 0: "## Proof report: Slice 0 — waiting\nslice zero's report\n" },
+        "[0]",
+      );
+      expect(r.status).toBe(0);
+      expect(r.log).toContain("gh issue comment 141");
+      expect(r.log).toContain("slice zero's report");
+      expect(r.log).not.toContain("stopped before it wrote a report");
     });
 
     // behaviour already on main: main's copy carries .github/workflows/proof.yml over (it is not product code), so it passes there
