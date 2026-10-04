@@ -1,7 +1,7 @@
 // Every product line a change adds is run by at least one test: each line it adds to a .ts or .tsx file under apps,
 // services or packages (tests aside) must be one the gate's own test run ran, by the lcov report that run wrote and
 // the line rule in lcov.ts. A file in scope the report doesn't name counts as 0% covered, unless it holds only
-// types. Exempt are lines the change keeps: moved ones (moved-lines.ts) and ones whose comment alone it edits
+// types. Exempt are lines the change keeps: moved ones (the snapshot marks them, moved.ts) and ones whose comment alone it edits
 // (comment-edits.ts); and a line marked as a gap (coverage-marks.ts). A new migration needs its database test
 // (migration-tests.ts).
 
@@ -14,7 +14,6 @@ import { type Mark, markOn } from "./coverage-marks";
 import type { Added } from "./diff";
 import { type Hits, lineRan, parseLcov } from "./lcov";
 import { untestedMigrations } from "./migration-tests";
-import { movedLines } from "./moved-lines";
 import { isTest } from "./rules";
 import { snapshot } from "./snapshot";
 
@@ -128,7 +127,9 @@ export function coverageProblems(repo: string, lcov: string): string[] {
     }
   };
   const snap = snapshot(repo);
-  const moved = movedLines(snap);
+  const moved = new Set(
+    snap.added.filter((a) => a.moved).map((a) => `${a.line} ${a.file}`),
+  );
   const edited = commentEdits(snap.added, snap.removed);
   // Bun writes no report when no file but tests loaded: then every file in scope counts as not run.
   const report = existsSync(lcov) ? readFileSync(lcov, "utf8") : "";
@@ -136,7 +137,7 @@ export function coverageProblems(repo: string, lcov: string): string[] {
     ...unrunLines(snap.added, parseLcov(report, repo), {
       read,
       exists: (file) => existsSync(join(repo, file)),
-      keeps: (file, line) => moved(file, line) || edited(file, line),
+      keeps: (file, line) => moved.has(`${line} ${file}`) || edited(file, line),
     }),
     ...untestedMigrations(snap.added, read),
   ];

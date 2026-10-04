@@ -1,13 +1,22 @@
-// The done rules: what no added line may do (throw as a placeholder, export what nothing calls, switch off a
-// test or a checker, read source code in a test), and which files decide what "done" means.
+// The done rules: what no added line may do (throw as a placeholder, export or re-export what nothing calls, switch
+// off a test or a checker, read source code in a test), which tests a change may not remove unexplained
+// (removed-tests.ts), which files decide what "done" means, and which are product code.
 
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import { markNotes } from "./coverage-marks";
 import type { Added } from "./diff";
+import { movedNote } from "./moved";
+import { entriesOf, removalProblems } from "./removed-tests";
 import type { Snap } from "./snapshot";
 
-const PRODUCT =
+// Where the rules against throwing placeholders and unused exports apply: the apps', services' and packages' source,
+// and the database's migrations and seed.
+const APP_CODE =
   /^(apps|services|packages)\/[^/]+\/src\/|^supabase\/(migrations|seed)/;
+// Not product code: docs/ (docs/removed-tests.md with it), Markdown files, and the gate, CI and hook files, which the
+// rule-change explanation judges (rule-changes.ts); test files neither. Every other changed file needs the verifier.
+const NOT_PRODUCT = /^(docs|\.github|\.codex|\.claude)\/|^scripts\/done-gate/;
+const MARKDOWN = /\.(md|markdown)$/i;
 const TEST =
   /[._](test|spec)\.[cm]?[jt]sx?$|\.e2e\.[cm]?[jt]sx?$|(^|\/)(tests?|e2e|__tests__)\//;
 const CODE = /\.[cm]?[jt]sx?$/;
@@ -44,18 +53,24 @@ const POLICY_DDL = /\b(?:create|alter|drop)\s+policy\b/i;
 const SKIP =
   /(?<![\w$.!])(it|test|describe)(?:\s*\.\s*[\w$]+)*?\s*(?:\.\s*|\[\s*["'`])(?:skip|only|todo|skipIf|runIf|todoIf|if|fixme|fail|failing)\b|\bx(?:it|test|describe)\b/g;
 
+/** A `done-gate: allow` exception: the line it marks and the reason written after it. */
+export type Exception = { file: string; line: number; why: string };
+
 /**
- * PURE: the change's added lines → problems that block a stop, and notes Devesh should see.
- * `usersOf(name, file)` lists the files that use an export: other files, plus `file` itself when the
- * name is used there beyond its declaration.
+ * PURE: the change's added and removed lines (and the files it deletes) → problems that block a stop, notes Devesh
+ * should see, and the exceptions the PR body must show (pr-quotes.ts). `usersOf(name, file)` lists the files that use
+ * an export: other files, plus `file` itself when the name is used there beyond its declaration.
  */
 export function checkRules(
   files: string[],
   added: Added[],
   usersOf: (name: string, file: string) => string[],
-): { problems: string[]; notes: string[] } {
+  removed: Added[] = [],
+  deleted: string[] = [],
+): { problems: string[]; notes: string[]; exceptions: Exception[] } {
   const problems: string[] = [];
   const notes: string[] = [];
+  const exceptions: Exception[] = [];
   const stubListed = added.some(
     (a) => a.file === "STATE.md" && /\|\s*Stub\s*\|/.test(a.text),
   );
@@ -101,14 +116,33 @@ export function checkRules(
         ? raw.slice(0, raw.lastIndexOf(")")).trim()
         : raw;
     if (why === undefined) problems.push(`${a.file}:${a.line} ${problem}`);
-    else
-      notes.push(`exception at ${a.file}:${a.line}${why ? ` (${why})` : ""}`);
+    else if (!/[\p{L}\p{N}]/u.test(why))
+      problems.push(
+        `${a.file}:${a.line} ${problem}, and its \`${ALLOW}\` gives no reason: write why after it, on the same line`,
+      );
+    else {
+      exceptions.push({ file: a.file, line: a.line, why });
+      notes.push(`exception at ${a.file}:${a.line} (${why})`);
+    }
   }
+  const entries = entriesOf(added);
+  problems.push(
+    ...removalProblems(
+      added,
+      removed,
+      deleted,
+      entries,
+      (f) => CODE.test(f) && TEST.test(f),
+    ),
+  );
+  notes.push(...entries.map((e) => `removed test: ${e}`));
+  const moved = movedNote(files, added, removed);
+  if (moved) notes.push(moved);
   notes.push(...markNotes(added)); // each line no test runs on purpose, which Devesh sees
   const rules = files.filter((f) => RULE_FILES.test(f));
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);
-  return { problems, notes };
+  return { problems, notes, exceptions };
 }
 
 function lineProblem(
@@ -139,7 +173,7 @@ function lineProblem(
       !/fixture|\.(json|sql|csv|toml|ya?ml|txt)\b/.test(text)
       ? "reads source code as text; test what the code does (render it, call it, drive it), not what it says"
       : undefined;
-  if (!PRODUCT.test(file)) return;
+  if (!APP_CODE.test(file)) return;
   if (
     !stubListed &&
     /\bthrow\b.*\b(not (yet )?(implemented|wired)|unimplemented|stub)\b|\bnot(Wired|Implemented)\s*\(|\bthrow\s+(new\s+)?NotImplemented\w*/i.test(
@@ -150,6 +184,8 @@ function lineProblem(
   const name = exportsOf(stmt).find(
     (n) => !usersOf(n, file).some((f) => !TEST.test(f)),
   );
+  if (name?.startsWith("* from "))
+    return `passes on everything ${name.slice(7)} exports, but nothing outside tests imports any of it through this file; land it together with the code that calls it`;
   if (name)
     return `exports ${name === "default" ? "a default" : name}, but nothing outside tests uses it; land it together with the code that calls it`;
 }
@@ -166,7 +202,9 @@ const skips = (line: string) => {
   );
 };
 
-export const isProduct = (f: string) => PRODUCT.test(f) && !TEST.test(f);
+/** Is this changed file product code, which needs the verifier's PASS? Every file is, but those NOT_PRODUCT names. */
+export const isProduct = (f: string) =>
+  f !== "" && !NOT_PRODUCT.test(f) && !MARKDOWN.test(f) && !TEST.test(f);
 export const isTest = (f: string) => TEST.test(f);
 
 export const rulesOn = (snap: Snap) =>
@@ -174,6 +212,8 @@ export const rulesOn = (snap: Snap) =>
     snap.files,
     snap.added,
     (name, file) => snap.users.get(`${file} ${name}`) ?? [],
+    snap.removed,
+    snap.deleted,
   );
 export const listed = (problems: string[]) =>
-  `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line; Devesh sees every exception.`;
+  `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line, or, for a removed test, the line given above to docs/removed-tests.md; Devesh sees every exception.`;
