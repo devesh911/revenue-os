@@ -6,11 +6,15 @@
 //   bun run gate rules [--base <ref>]             only the rules, on the change since HEAD left <ref> (origin/main)
 //   bun run gate tests [e2e]                      bun's tests (or the browser checks); fails if any test didn't run
 //   bun run gate pause "<question>"               the next stop asks Devesh something; it is not "done"
+//   bun run gate checkpoint [--done … --failed … --next …]   show, or write, this branch's checkpoint
 //   bun run see /o/:org/contacts [more paths]     sign in as the dev login; save what each page shows
 //
 // Two moments are checked. A stop: the session's change, in each checkout it worked in and was the last to work
 // in (a hook before each command or edit notes them, and the state it found each in), must be proven; a checkout
-// it only looked at, switched or pulled is not its change. A merge: an agent's `gh pr merge` goes through only when
+// it only looked at, or moved only to commits origin/main holds (a pull, a switch to main), is not its change, but
+// one whose latest commit main does not hold is, however it got there (done-gate/only-main.ts). Without Docker,
+// or while background work runs, the checks on the database don't run at a stop, and Devesh is told so in place of
+// a ✓ (done-gate/not-run.ts). A merge: an agent's `gh pr merge` goes through only when
 // it names the pull request's head commit (`--match-head-commit`) and that commit was proven here, so work
 // committed, pushed and merged in one go is checked too; any other way of merging is refused before it runs.
 // Proven means (1) the change against main breaks none of the done rules (done-gate/rules.ts), (2) every check
@@ -18,7 +22,9 @@
 // in its own delivered report (done-gate/verifier.ts); at a stop, a CANNOT_VERIFY naming what only Devesh can provide also lets the agent stop, told
 // to him as NOT verified, and then only Devesh merges. Codex has no verifier agent, so its green product change stops once,
 // marked NOT independently verified. Results are kept per code state in .git/done-gate, so the same code is
-// never checked twice.
+// never checked twice. A session that starts in a worktree whose change never passed, once the session that made it
+// has stopped, is held to that change until a stop passes on it there (done-gate/interrupted.ts); a session is shown
+// a branch's checkpoint when it starts in that checkout or before its first command there (done-gate/checkpoint.ts).
 //
 // The code lives in scripts/done-gate/, one job per file (docs/patterns/one-job-per-file.md). This file stays the
 // entry the hooks and `bun run gate` call: it hands a hook event to hook.ts and a command to cli.ts. It loads them
