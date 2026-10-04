@@ -128,7 +128,7 @@ jobs:
           SLICE: ${{ matrix.slice }}
           ANTHROPIC_EVALS_KEY: ${{ secrets.ANTHROPIC_EVALS_KEY }}
           GH_TOKEN: ${{ github.token }}
-        run: bun run proof "$SLICE" --out proof-report
+        run: bun run proof "$SLICE" --out "proof-report/slice-$SLICE"
 
       - name: Every step passed
         if: steps.prove.outputs.result == 'passed'
@@ -147,11 +147,15 @@ jobs:
     permissions:
       issues: write
     steps:
+      # Every slice's files land in reports/slice-<n>/: each artifact holds its slice's folder, and merging them
+      # gives that one layout whatever their number (unmerged, a lone artifact is unpacked straight into reports/,
+      # which posted Slice 0's first report as "stopped before it wrote a report").
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         continue-on-error: true # a slice whose job wrote no report is posted as stopped below
         with:
           pattern: proof-slice-*
           path: reports
+          merge-multiple: true
 
       # No concurrency group: GitHub keeps one waiting run per group and cancels the rest, which would lose reports.
       # The oldest issue of that title is the standing one; it is made once, mentioning the repository's owner. A
@@ -170,7 +174,7 @@ jobs:
             issue="${url##*/}"
           fi
           for n in $(printf '%s' "$SLICES" | tr -d '[] ' | tr ',' ' '); do
-            report="reports/proof-slice-$n/report.md"
+            report="reports/slice-$n/report.md"
             if [ ! -f "$report" ]; then
               report="stopped-$n.md"
               printf '## Proof report: Slice %s — failed\nRun: %s\n\nThe proof job stopped before it wrote a report; the run'"'"'s log says why.\n' "$n" "$RUN_URL" > "$report"
