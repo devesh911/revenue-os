@@ -334,7 +334,7 @@ describe("while background work runs, a stop still judges the done rules and the
       ...QUIET,
       told: "Done gate ✓ typecheck, lint, guards, 3 tests, 3 tests proven, database policies, 3 browser checks (no product code changed, so no verifier needed)",
     });
-    expect(databaseChecksRan(dir)).toBe(3);
+    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
     expect(stop(dir)).toEqual(QUIET);
   });
 
@@ -376,7 +376,7 @@ describe("while background work runs, a stop still judges the done rules and the
       ...QUIET,
       told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
     });
-    expect(databaseChecksRan(dir)).toBe(3);
+    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
     // Once it stopped, other background work no longer stands in for a ruling on code it never saw.
     write(dir, "services/worker/src/route.ts", "const route = 2;\n");
     expect(stop(dir, BACKGROUND).sentBack).toBe(true);
@@ -396,7 +396,7 @@ describe("while background work runs, a stop still judges the done rules and the
       ...QUIET,
       told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
     });
-    expect(databaseChecksRan(dir)).toBe(3);
+    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
   });
 
   it("never lets a stop's pass while background work ran count at merge on a machine with Docker", () => {
