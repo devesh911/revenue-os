@@ -3,6 +3,7 @@
 // (removed-tests.ts), which files decide what "done" means, and which are product code.
 
 import { exportsOf, statementAt, uncommented } from "./code-text";
+import { markNotes } from "./coverage-marks";
 import type { Added } from "./diff";
 import { movedNote } from "./moved";
 import { entriesOf, removalProblems } from "./removed-tests";
@@ -137,6 +138,7 @@ export function checkRules(
   notes.push(...entries.map((e) => `removed test: ${e}`));
   const moved = movedNote(files, added, removed);
   if (moved) notes.push(moved);
+  notes.push(...markNotes(added)); // each line no test runs on purpose, which Devesh sees
   const rules = files.filter((f) => RULE_FILES.test(f));
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);
@@ -203,6 +205,7 @@ const skips = (line: string) => {
 /** Is this changed file product code, which needs the verifier's PASS? Every file is, but those NOT_PRODUCT names. */
 export const isProduct = (f: string) =>
   f !== "" && !NOT_PRODUCT.test(f) && !MARKDOWN.test(f) && !TEST.test(f);
+export const isTest = (f: string) => TEST.test(f);
 
 export const rulesOn = (snap: Snap) =>
   checkRules(

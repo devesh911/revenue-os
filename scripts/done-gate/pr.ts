@@ -1,12 +1,14 @@
 // What main's copy of the rules judges about a pull request (`bun run gate pr`, which rules-from-main runs on
 // every pull request with --head): the body's first line, the done rules, each rule change explained and recorded,
 // each fix-when-touched entry it touches answered, each `done-gate: allow` exception and removed test shown in the
-// body (pr-quotes.ts), no other workflow able to report a check named rules-from-main or checks (the two main's
-// ruleset requires), and no migration on main changed or its number reused (migrations.ts).
+// body (pr-quotes.ts), each coverage mark the change adds quoted in the body (pr-coverage-marks.ts), no other
+// workflow able to report a check named rules-from-main or checks (the two main's ruleset requires), and no
+// migration on main changed or its number reused (migrations.ts).
 
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
+import { unquotedMarks } from "./pr-coverage-marks";
 import { firstLineProblems } from "./pr-first-line";
 import { quoteProblems } from "./pr-quotes";
 import { entriesOf } from "./removed-tests";
@@ -128,6 +130,7 @@ export function judgePr(
       ...quoteProblems(exceptions, entriesOf(snap.added), body),
       ...secondCheck(workflows),
       ...migrationProblems(snap),
+      ...unquotedMarks(snap.added, body),
     ],
     notes: [...notes, ...unreadTable(table)],
   };
