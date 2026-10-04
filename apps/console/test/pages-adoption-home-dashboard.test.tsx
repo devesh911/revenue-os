@@ -1,20 +1,6 @@
-// TASK B1-RED (wave 5 B) — DataShell adoption in the Home + Dashboard pages.
-// The GREEN task rewrites pages/Home/index.tsx and pages/Dashboard/index.tsx to compose the
-// DataShell primitive (ui/primitives) in place of the hand-rolled loading/error/empty branch,
-// WITHOUT changing any visible copy or behavior. Neither page renders a <table> (both are Card
-// grids), so the Table suite / local-TH-TD-collision pins do NOT apply here — see the report.
-//
-// This file mixes two kinds of case ON PURPOSE:
-//   • SOURCE-adoption pins (RED on today's hand-rolled pages) — each page imports AND uses
-//     <DataShell> and no longer hand-rolls the loading conditional. These FAIL now for the right
-//     reason (assertion: DataShell absent / hand-rolled branch present) and pass once GREEN lands.
-//   • VISIBLE-COPY characterization guards (GREEN today AND after) — the loading / error / empty /
-//     happy copy each page renders TODAY, pinned so the refactor cannot silently change text.
-//
-// Env-free by construction (bun test + renderToStaticMarkup, no DOM library, no DB/network, no new
-// deps) — imitates apps/console/test/ui-smoke.test.tsx and tests/console-boot-honesty.test.tsx.
-// The query hooks are MOCKED via mockModule so the page renders each data state deterministically
-// with no QueryClient, network, or env (the real features/screens/api pulls lib/api → import.meta.env).
+// What the Home and Analytics (Dashboard) pages show while loading, on an error, with no data and with data, in
+// each page's own words: rendered on the server (renderToStaticMarkup) with the data hooks faked (mockModule), so
+// no network or settings are needed.
 import { afterAll, describe, expect, it } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,25 +8,11 @@ import { Route, Router } from "wouter";
 import * as realScreensApi from "../src/features/screens/api";
 import { mockModule, visible } from "./test-utils";
 
-// CWD-relative, like tests/console-boot-honesty + apps/console/test/readme-coverage (suite runs
-// from the repo/worktree root).
-const HOME_SRC = "apps/console/src/pages/Home/index.tsx";
-const DASH_SRC = "apps/console/src/pages/Dashboard/index.tsx";
-
-// DataShell imported from the primitives barrel (the ONLY import surface pages may use).
-const IMPORTS_DATASHELL =
-  /import\s*\{[^}]*\bDataShell\b[^}]*\}\s*from\s*["']\.\.\/\.\.\/ui\/primitives["']/;
-// A hand-rolled loading branch in either of today's two forms: Dashboard's `isLoading ?` ternary
-// or Home's `if (isLoading)` early return. Both vanish when DataShell owns the branch — the page
-// then passes `isLoading={isLoading}`, which matches NEITHER alternative.
-const HAND_ROLLED_LOADING = /isLoading\s*\?|if\s*\(\s*isLoading/;
-
 // ---- behavior harness: mocked query hooks + a static SSR router ----
 type QueryState = { data: unknown; isLoading: boolean; isError: boolean };
 let convoState: QueryState;
 let metricsState: QueryState;
-// task-51: the Dashboard now also drives a Trends section from useTrendsQuery. Held here so each
-// Dashboard case can put the Trends section in a state that keeps the stat-tile pins byte-identical.
+// The Dashboard also draws a Trends section from useTrendsQuery; each Dashboard case sets its state too.
 let trendsState: QueryState;
 
 // Keyed by the path the PAGES import ("../../features/screens/api") — the same resolved module.
@@ -75,42 +47,10 @@ async function loadDashboard() {
   return (await import("../src/pages/Dashboard/index")).DashboardPage;
 }
 
-// ─────────────────────────────── SOURCE-adoption pins (RED today) ───────────────────────────────
+// The exact copy each page renders. Home's error and empty copy differ from DataShell's defaults, so the page
+// passes its own errorText and emptyText.
 
-describe("Home — DataShell adoption (source · RED on today's hand-rolled page)", () => {
-  it("imports DataShell from the ui/primitives barrel", async () => {
-    expect(await Bun.file(HOME_SRC).text()).toMatch(IMPORTS_DATASHELL);
-  });
-
-  it("renders <DataShell> in place of a hand-rolled state branch", async () => {
-    expect(await Bun.file(HOME_SRC).text()).toMatch(/<DataShell\b/);
-  });
-
-  it("keeps no hand-rolled loading conditional (no `if (isLoading)` / `isLoading ?`)", async () => {
-    expect(await Bun.file(HOME_SRC).text()).not.toMatch(HAND_ROLLED_LOADING);
-  });
-});
-
-describe("Dashboard — DataShell adoption (source · RED on today's ternary)", () => {
-  it("imports DataShell from the ui/primitives barrel", async () => {
-    expect(await Bun.file(DASH_SRC).text()).toMatch(IMPORTS_DATASHELL);
-  });
-
-  it("renders <DataShell> in place of a hand-rolled state branch", async () => {
-    expect(await Bun.file(DASH_SRC).text()).toMatch(/<DataShell\b/);
-  });
-
-  it("keeps no hand-rolled state ternary (no `isLoading ?`)", async () => {
-    expect(await Bun.file(DASH_SRC).text()).not.toMatch(HAND_ROLLED_LOADING);
-  });
-});
-
-// ─────────────── VISIBLE-COPY characterization guards (GREEN today AND after GREEN) ───────────────
-// These pin the exact copy the pages render TODAY, so the DataShell refactor cannot change any
-// visible text. Home's error/empty copy differ from DataShell's defaults, so GREEN must pass
-// errorText/emptyText overrides — a miss surfaces here as a copy regression.
-
-describe("Home — visible copy is preserved across the refactor (characterization)", () => {
+describe("Home — loading, error, empty and data copy", () => {
   it("loading: shows 'Loading…' while the hero + shortcuts stay visible", async () => {
     const HomePage = await loadHome();
     convoState = { data: undefined, isLoading: true, isError: false };
@@ -189,7 +129,7 @@ const METRIC_LABELS = [
   "Open tasks",
 ];
 
-describe("Dashboard — visible copy is preserved across the refactor (characterization)", () => {
+describe("Dashboard — loading, error and data copy", () => {
   it("loading: shows 'Loading…' with the title + Trends still visible", async () => {
     const DashboardPage = await loadDashboard();
     metricsState = { data: undefined, isLoading: true, isError: false };
@@ -236,8 +176,7 @@ describe("Dashboard — visible copy is preserved across the refactor (character
     expect(text).toContain("All time"); // open_tasks note
     expect(text).toContain("Analytics");
     expect(text).toContain("Trends");
-    // task-51 RED: the placeholder copy is retired; the Trends section renders the series instead
-    // (its data/empty/loading/error states are covered in trends-analytics.test.tsx).
+    // The retired placeholder copy is gone; the Trends section's own states are in trends-analytics.test.tsx.
     expect(text).not.toContain(
       "Time-series trends arrive with the analytics API.",
     );

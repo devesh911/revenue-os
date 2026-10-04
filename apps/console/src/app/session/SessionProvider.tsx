@@ -4,7 +4,6 @@
 // never at module scope (boot honesty). reduceAuth decides when the query cache is wiped. signOut signs out THIS device only
 // and marks the sign-out deliberate, so the session gate sends it to plain /login — a session lost
 // any other way (a 401, expiry, another tab) returns with `next`.
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -15,7 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { getSupabase } from "../../lib/supabase";
+import { getSupabase, type SupabaseClient } from "../../lib/supabase";
 import { type AuthState, reduceAuth } from "./auth-state";
 
 type Session = {

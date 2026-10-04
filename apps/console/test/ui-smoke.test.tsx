@@ -1,4 +1,4 @@
-// Design-system smoke — env-free by construction (imitates tests/transcript-xss.test.tsx:
+// Design-system smoke — env-free by construction (imitates transcript-xss.test.tsx:
 // bun test + renderToStaticMarkup, no DOM library, no DB/network, no new deps). Proves the
 // ui/ vocabulary actually renders: primitives carry their token classes, every registered
 // icon renders an aria-hidden svg, and AppShell draws the sidebar nav with the active fill.

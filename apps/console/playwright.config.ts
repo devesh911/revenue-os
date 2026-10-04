@@ -23,7 +23,7 @@ import { defineConfig, devices } from "@playwright/test";
 // merely exports SUPABASE_* (CI's GITHUB_ENV) never starts a worker beside a dummy-env console.
 const apiUrl = process.env.VITE_API_URL;
 const reuseExistingServer = !process.env.CI; // stale-server landmine otherwise: always fresh in CI
-const www = !process.env.SEE_PATHS; // the marketing site's checks, except for `bun run see`
+const www = !process.env.SEE_PATHS; // the marketing site's and the no-settings console's, except for `bun run see`
 const WWW_URL = "http://localhost:4174";
 
 export default defineConfig({
@@ -98,6 +98,21 @@ export default defineConfig({
             url: WWW_URL,
             reuseExistingServer,
             timeout: 120_000,
+          },
+          // The console built with its settings empty, for e2e/no-settings.e2e.ts on 4175. Empty, not left out:
+          // Playwright passes this run's own settings through, and an empty one also outranks a settings file.
+          {
+            name: "console without settings",
+            command:
+              "bun run build --outDir dist-e2e-no-settings && bun run preview --outDir dist-e2e-no-settings --port 4175 --strictPort",
+            url: "http://localhost:4175",
+            reuseExistingServer,
+            timeout: 120_000,
+            env: {
+              VITE_SUPABASE_URL: "",
+              VITE_SUPABASE_ANON_KEY: "",
+              VITE_API_URL: "",
+            },
           },
         ]
       : []),

@@ -2,12 +2,14 @@
 // off a test or a checker, read source code in a test), which tests a change may not remove unexplained
 // (removed-tests.ts), which files decide what "done" means, and which are product code.
 
+import { changeMarks, markNote } from "./already-on-main";
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import { markNotes } from "./coverage-marks";
 import type { Added } from "./diff";
 import { movedNote } from "./moved";
 import { entriesOf, removalProblems } from "./removed-tests";
 import type { Snap } from "./snapshot";
+import { readsCode, SOURCE_PATH } from "./source-reading";
 
 // Where the rules against throwing placeholders and unused exports apply: the apps', services' and packages' source,
 // and the database's migrations and seed.
@@ -17,13 +19,10 @@ const APP_CODE =
 // rule-change explanation judges (rule-changes.ts); test files neither. Every other changed file needs the verifier.
 const NOT_PRODUCT = /^(docs|\.github|\.codex|\.claude)\/|^scripts\/done-gate/;
 const MARKDOWN = /\.(md|markdown)$/i;
-const TEST =
+export const TEST =
   /[._](test|spec)\.[cm]?[jt]sx?$|\.e2e\.[cm]?[jt]sx?$|(^|\/)(tests?|e2e|__tests__)\//;
 const CODE = /\.[cm]?[jt]sx?$/;
 
-// A string literal naming source code: a src/ path, or a file ending .ts/.tsx/.js/.jsx.
-const SOURCE_PATH =
-  /["'`](?:[^"'`\n]*\/)?(?:src(?:\/[^"'`\n]*)?|[^"'`\n]+\.[cm]?[jt]sx?)["'`]/;
 // Rule files: the files that decide what "done" means and how agents work, at any letter case. This is the one
 // list; AGENTS.md hard rail 7, .github/CODEOWNERS and STATE.md cite it rather than repeating it, and the CODEOWNERS
 // test keeps the two equal. Changing one is allowed: Devesh is told at every stop and in CI's log, and its pull
@@ -101,7 +100,7 @@ export function checkRules(
       a,
       stmt.code,
       stubListed,
-      readsSource.has(a.file),
+      readsCode(added, i, readsSource.has(a.file)),
       usersOf,
     );
     if (!problem) continue;
@@ -149,7 +148,7 @@ function lineProblem(
   { file, text }: Added,
   stmt: string,
   stubListed: boolean,
-  readsSource: boolean,
+  readsCodeAsText: boolean,
   usersOf: (name: string, file: string) => string[],
 ) {
   if (/@ts-(ignore|nocheck)\b/.test(text))
@@ -168,9 +167,7 @@ function lineProblem(
   if (TEST.test(file) && POLICY_DDL.test(stmt))
     return "creates, changes or drops a policy, which on the local stack locks every auth table and deadlocks another test run's sign-ups; policies belong in a migration";
   if (TEST.test(file))
-    return readsSource &&
-      /\b(readFileSync|readFile|Bun\.file)\s*\(/.test(text) &&
-      !/fixture|\.(json|sql|csv|toml|ya?ml|txt)\b/.test(text)
+    return readsCodeAsText
       ? "reads source code as text; test what the code does (render it, call it, drive it), not what it says"
       : undefined;
   if (!APP_CODE.test(file)) return;
@@ -207,13 +204,16 @@ export const isProduct = (f: string) =>
   f !== "" && !NOT_PRODUCT.test(f) && !MARKDOWN.test(f) && !TEST.test(f);
 export const isTest = (f: string) => TEST.test(f);
 
-export const rulesOn = (snap: Snap) =>
-  checkRules(
+export const rulesOn = (snap: Snap) => {
+  const r = checkRules(
     snap.files,
     snap.added,
     (name, file) => snap.users.get(`${file} ${name}`) ?? [],
     snap.removed,
     snap.deleted,
   );
+  r.notes.push(...changeMarks(snap).map(markNote)); // tests that pass on main, and why (tests-proven.ts)
+  return r;
+};
 export const listed = (problems: string[]) =>
   `${problems.map((p) => `- ${p}`).join("\n")}\nFix each one. For a deliberate exception, add \`${ALLOW} <why>\` to that line, or, for a removed test, the line given above to docs/removed-tests.md; Devesh sees every exception.`;

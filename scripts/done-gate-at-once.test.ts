@@ -121,6 +121,8 @@ function repo() {
     "-qm",
     "x",
   ]);
+  // origin/main at that commit, so the "tests proven" check finds the main it compares with: no product code changed.
+  sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
   return dir;
 }
 
@@ -163,7 +165,7 @@ it("runs two real gate runs at once in two worktrees against the local database,
 
   for (const r of runs) {
     expect(r.out).toContain(
-      "Done gate ✓ typecheck, lint, guards, 1 tests, database policies, browser checks",
+      "Done gate ✓ typecheck, lint, guards, 1 tests, tests proven, database policies, browser checks",
     );
     expect(r.code).toBe(0);
   }

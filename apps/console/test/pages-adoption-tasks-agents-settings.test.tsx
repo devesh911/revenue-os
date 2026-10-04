@@ -1,22 +1,7 @@
-// task-32 page-fleet adoption · B3-RED — Tasks + Settings adopt the DataShell/Table primitives
-// (ui/README.md "page skeleton"). task-50 then flips Agents from the honest static shell to a real
-// data page (the /agents endpoint is now live). Test-is-spec.
-//
-// This file mixes RED and GREEN on purpose (imitates tests/console-boot-honesty.test.tsx):
-//   • SOURCE pins (RED today) — Tasks imports DataShell + the Table suite from the barrel and drops
-//     its hand-rolled ternary + local TH/TD class consts (TS2451: those collide with the imports);
-//     Settings' OrganizationCard replaces its isLoading/isError guards with <DataShell>.
-//   • Agents DATA-PAGE pins (task-50 RED) — the /agents endpoint is live, so AgentsPage now reads
-//     useAgentsQuery and renders agents+workflows through DataShell (loading/error/data), with an
-//     honest zero-agents empty state; the retired "endpoint isn't live" copy is gone.
-//   • BEHAVIOR pins — today's loading/error/empty copy and happy-path strings per page, preserved
-//     across the refactor (copy is identical everywhere). One is RED-until-Table: Tasks headers
-//     become semantic <th scope="col"> only once the Table primitive lands.
-//
-// Env-free by construction (bun test + renderToStaticMarkup, no DOM library, no DB/network, no new
-// deps): the server-state hooks are MOCKED via mockModule so no QueryClient/provider is needed,
-// and a real wouter <Router>/<Route> supplies useParams — exactly the seams the boot-honesty and
-// contact-link suites already use. mock.module is process-global, so afterAll restores the real modules.
+// What the Tasks, Settings (its organization card) and Agents pages show while loading, on an error, with no data
+// and with data: rendered on the server (renderToStaticMarkup) inside a real wouter Router, which supplies the
+// page's :orgId, with the data hooks faked through mockModule, so no network or settings are needed. mock.module
+// is process-wide, so afterAll restores the real modules.
 import { afterAll, describe, expect, it } from "bun:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -64,7 +49,7 @@ const otherOrg = {
   role: "viewer",
 };
 
-// Task 50 — the lean agents/workflows wire rows for AgentsPage. Version digits (7 and 9) are chosen
+// The lean agents and workflows rows AgentsPage lists. Version digits (7 and 9) are chosen
 // collision-free vs the uuids ({4,8}), model ({4,6}) and dates ({0,1,2,6}) so a bare toContain on a
 // version can't match another field (the pattern pages-adoption-home-dashboard uses for "42"/"137").
 const agentFixture = {
@@ -109,7 +94,7 @@ const restoreScreens = mockModule(
 const restoreOrgs = mockModule("../src/features/orgs/api", realOrgsApi, {
   useOrgsQuery: () => orgsResult,
 });
-// task-52: SettingsPage's live Guardrails section calls useGuardrailPoliciesQuery — hold it in
+// SettingsPage's live Guardrails section calls useGuardrailPoliciesQuery — hold it in
 // loading so these OrganizationCard renders stay isolated (loading's only copy, "Loading…",
 // collides with none of the org assertions below). SPREAD the real module (same rule as
 // screens/orgs/agents): a bare factory drops sibling exports process-wide — the PR #71 class.
@@ -173,97 +158,6 @@ function renderInRouter(
   );
 }
 
-const readSrc = (path: string): Promise<string> => Bun.file(path).text();
-
-// The identifiers imported from the primitives barrel (`from "../../ui/primitives"`), as exact
-// tokens — so `.toContain("TH")` never matches the "THead" substring.
-const barrelNames = (src: string): string[] => {
-  const m = src.match(
-    /import\s*\{([^}]*)\}\s*from\s*["']\.\.\/\.\.\/ui\/primitives["']/,
-  );
-  const inner = m?.[1];
-  return inner
-    ? inner
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
-};
-
-const TASKS_SRC = "apps/console/src/pages/Tasks/index.tsx";
-const SETTINGS_SRC = "apps/console/src/pages/Settings/index.tsx";
-const AGENTS_SRC = "apps/console/src/pages/Agents/index.tsx";
-
-// ── SOURCE PINS ─────────────────────────────────────────────────────────────────────────────────
-
-describe("Tasks — adopts DataShell + the Table suite (source)", () => {
-  it("imports DataShell from the primitives barrel", async () => {
-    // RED today: Tasks imports only { Badge, Card } from the barrel.
-    expect(barrelNames(await readSrc(TASKS_SRC))).toContain("DataShell");
-  });
-
-  it("imports the Table suite (Table, THead, TH, Row, TD) from the barrel", async () => {
-    const names = barrelNames(await readSrc(TASKS_SRC));
-    // RED today: the page hand-rolls <table>/<thead>/<th>/<tr>/<td>, importing none of these.
-    for (const n of ["Table", "THead", "TH", "Row", "TD"]) {
-      expect(names).toContain(n);
-    }
-  });
-
-  it("uses <DataShell> in place of the hand-rolled loading/error/empty ternary", async () => {
-    const src = await readSrc(TASKS_SRC);
-    expect(src).toContain("<DataShell"); // RED today
-    expect(src).not.toMatch(/isLoading\s*\?/); // RED today: `{isLoading ? (` opens the ternary
-  });
-
-  it("deletes the local TH/TD class constants (they'd collide with the imports — TS2451)", async () => {
-    const src = await readSrc(TASKS_SRC);
-    expect(src).not.toMatch(/const\s+TH\s*=/); // RED today: `const TH = "…"`
-    expect(src).not.toMatch(/const\s+TD\s*=/); // RED today: `const TD = "…"`
-  });
-});
-
-describe("Settings — OrganizationCard adopts DataShell (source)", () => {
-  it("imports DataShell from the primitives barrel", async () => {
-    // RED today: Settings imports only { Badge, Card }.
-    expect(barrelNames(await readSrc(SETTINGS_SRC))).toContain("DataShell");
-  });
-
-  it("replaces the isLoading/isError guard-returns with <DataShell>", async () => {
-    const src = await readSrc(SETTINGS_SRC);
-    expect(src).toContain("<DataShell"); // RED today
-    expect(src).not.toMatch(/if\s*\(\s*isLoading\s*\)/); // RED today: `if (isLoading) return …`
-    expect(src).not.toMatch(/if\s*\(\s*isError/); // RED today: `if (isError || !data) return …`
-  });
-});
-
-// Task 50 flips this block: the /agents endpoint is live, so AgentsPage is now a real data page —
-// DataShell owns loading/error/empty, and it reads server state through useAgentsQuery. RED today
-// against the current honest static shell (imports only { Card }, no hook, no features import).
-describe("Agents — data page: DataShell + useAgentsQuery (source)", () => {
-  it("imports DataShell from the primitives barrel", async () => {
-    expect(barrelNames(await readSrc(AGENTS_SRC))).toContain("DataShell");
-  });
-
-  it("reads server state through the useAgentsQuery hook", async () => {
-    expect(await readSrc(AGENTS_SRC)).toMatch(/useAgentsQuery/);
-  });
-
-  it("imports the hook from features/agents/api", async () => {
-    expect(await readSrc(AGENTS_SRC)).toMatch(
-      /from\s+["'][^"']*\/features\/agents\/api["']/,
-    );
-  });
-
-  it("drops the retired honesty copy ('endpoint isn't live')", async () => {
-    const src = await readSrc(AGENTS_SRC);
-    expect(src).not.toContain("isn't live");
-    expect(src).not.toContain("isn't in the console yet");
-  });
-});
-
-// ── BEHAVIOR PINS ───────────────────────────────────────────────────────────────────────────────
-
 describe("Tasks — state behavior preserved (mocked useTasksQuery)", () => {
   const render = async (): Promise<string> => {
     const { TasksPage } = await import("../src/pages/Tasks/index");
@@ -319,10 +213,8 @@ describe("Tasks — state behavior preserved (mocked useTasksQuery)", () => {
     expect(titleClasses).not.toContain("text-ink-soft");
   });
 
-  it('RED until the Table primitive lands: headers are semantic <th scope="col">', async () => {
+  it('headers are semantic <th scope="col"> (the Table primitive)', async () => {
     tasksResult = ok({ tasks: [taskLinked] });
-    // RED today: the hand-rolled `<th className={TH}>` carries no scope. The Table primitive's <TH>
-    // renders `scope="col"`, so this passes only after adoption.
     expect(await render()).toContain('scope="col"');
   });
 });
