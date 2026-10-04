@@ -113,7 +113,7 @@ beforeAll(async () => {
   orgB = await createOrg(orgBadmin.token, "Guardrails B");
 
   // orgA: two known rows (mirrors the seed shapes). orgB: a DISTINCT quiet_hours row whose
-  // start "08:00" is the cross-tenant leak canary — it must never appear in an orgA response.
+  // start "08:00" is the cross-tenant leak canary — it must never appear in org A's policies.
   await seedPolicy(orgA, "quiet_hours", {
     start: "21:00",
     end: "09:00",
