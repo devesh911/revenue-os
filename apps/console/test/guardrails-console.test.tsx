@@ -102,6 +102,8 @@ describe("Settings Guardrails section — honest data states", () => {
     const html = await renderSettings();
     expect(html).not.toContain("21:00"); // nothing invented when there's no data
     expect(text(html)).not.toContain("will live here"); // dead placeholder is gone
+    expect(text(html)).not.toContain("backend wave");
+    expect(text(html)).not.toContain("hasn't shipped");
   });
 });
 

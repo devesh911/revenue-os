@@ -1,7 +1,8 @@
-// Saving a guardrail from Settings, through the hooks the Settings page calls (features/guardrails/api.ts): the save
-// sends a PUT of the policy, checked first against the shared schema the worker's route also parses, to the company's
-// guardrail-policies address with the signed-in person's token, then marks the policies the page shows as out of
-// date, so the page fetches them again. A policy that fails the schema never leaves the browser, and a save the
+// Loading and saving guardrails from Settings, through the hooks the Settings page calls (features/guardrails/api.ts):
+// the policies are fetched with a GET of the company's guardrail-policies address, signed in; the save sends a PUT
+// of the policy, checked first against the shared schema the worker's route also parses, to the same address with
+// the signed-in person's token, then marks the policies the page shows as out of date, so the page fetches them
+// again. A policy that fails the schema never leaves the browser, and a save the
 // worker refuses refreshes nothing. Only the network and the sign-in session are faked; the hooks, the API client
 // and the shared schema are the real ones. The same save in a real browser is Slice 1's browser-check item.
 import { afterAll, afterEach, expect, it } from "bun:test";
@@ -72,6 +73,20 @@ const SAVED = {
     updated_at: "2026-10-03T00:00:00Z",
   },
 };
+
+it("the policies the page shows are fetched from the company's guardrails, signed in", async () => {
+  const sent = network(200, { policies: [SAVED.policy] });
+  const { shown } = settingsHooks();
+
+  expect(await shown.fetch()).toEqual({ policies: [SAVED.policy] });
+  expect(sent).toHaveLength(1);
+  const [request] = sent;
+  expect(request?.path).toBe(`/orgs/${ORG}/guardrail-policies`);
+  expect(request?.init.method ?? "GET").toBe("GET");
+  expect(new Headers(request?.init.headers).get("authorization")).toBe(
+    "Bearer signed-in-token",
+  );
+});
 
 it("a save sends a PUT of the checked policy, signed in, to the company's guardrails, then refreshes what the page shows", async () => {
   const sent = network(200, SAVED);

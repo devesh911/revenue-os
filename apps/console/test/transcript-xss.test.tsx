@@ -44,7 +44,7 @@ describe("transcripts render hostile content as text", () => {
     // content must round-trip VERBATIM: still readable as text, and never rewritten by a
     // "sanitizer" (no invisible characters injected — transcripts are evidence-grade data)
     expect(html).toContain("onerror=");
-    expect(html).not.toContain("​"); // no zero-width "sanitizer" injections
+    expect(html).not.toContain("\u200b"); // no zero-width "sanitizer" injections
   });
 
   it("renders a null-content message without crashing and without fabricating markup", () => {
