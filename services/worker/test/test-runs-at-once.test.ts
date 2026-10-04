@@ -7,12 +7,12 @@
 // runner two tests start worked every company's queued jobs, and a dev-login test reseeded the dev workspace.
 // It assumes no worker (`bun run dev`) is running on this machine: one works every company's due jobs.
 import { afterAll, beforeAll, expect, it } from "bun:test";
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
 import { type Pack, seed } from "../../../scripts/seed";
+import { children } from "../../../tests/children";
 import { testCompanies } from "../../../tests/test-companies";
 
 const repo = join(import.meta.dir, "../../..");
@@ -68,19 +68,7 @@ const holdings = async () => ({
   ).rows.map((r) => r.name),
 });
 
-/** Runs bun with `args` from the repo root, as this run is configured; resolves to its exit code and output. */
-const bun = (args: string[]) =>
-  new Promise<{ code: number | null; out: string }>((done) => {
-    const child = spawn(process.execPath, args, { cwd: repo });
-    let out = "";
-    child.stdout.on("data", (d) => {
-      out += d;
-    });
-    child.stderr.on("data", (d) => {
-      out += d;
-    });
-    child.on("close", (code) => done({ code, out }));
-  });
+const { bun } = children();
 
 beforeAll(async () => {
   // pg-boss installs its tables on start; each queue needs its partition before a job can land in it.
@@ -138,8 +126,8 @@ it("four whole-suite runs started at once all pass, and they and a demo run leav
   // The whole suite as `bun test` finds it, in its own order, but this file, which would start itself again.
   const suite = ["test", `--path-ignore-patterns=${SELF}`];
   const runs = await Promise.all([
-    ...[1, 2, 3, 4].map(() => bun(suite)),
-    bun(["scripts/demo.ts"]),
+    ...[1, 2, 3, 4].map(() => bun(suite, repo)),
+    bun(["scripts/demo.ts"], repo),
   ]);
   // A failed run shows its failures, or the end of its output.
   const failures = (out: string) =>
