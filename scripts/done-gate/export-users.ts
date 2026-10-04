@@ -1,5 +1,6 @@
 // Whether a file uses an export: by name, through barrel files that `export *`, through a namespace, or after
-// an import() or require().
+// an import() or require(); and under which names a file passes an export on (`export { x } from`), which is no use
+// by itself: only a use of the name it passes on counts (snapshot.ts follows it).
 
 import { dirname, join } from "node:path";
 import { uncommented } from "./code-text";
@@ -20,13 +21,50 @@ export function leadsTo(spec: string, from: string, file: string) {
   return target === modulePath(file) || target === dirname(file);
 }
 
+/** PURE: the module paths `spec`, imported by `from`, may name, most likely first; none for a package name or alias. */
+export const candidatesOf = (spec: string, from: string) => {
+  if (!spec.startsWith(".")) return [];
+  const base = join(dirname(from), spec).replace(/\.[cm]?js$/, "");
+  const ends = [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"];
+  return [
+    base,
+    ...ends.map((e) => base + e),
+    ...ends.map((e) => `${base}/index${e}`),
+  ];
+};
+
 /**
- * PURE: does `source`, the text of `from`, use `name`, which `file` exports? Another file must import or
- * re-export it by name (any import block, beside a default import, renamed or not) from a module that can be
- * `file` or one of its `barrels` (modules that `export *` from it), read it as ns.name, destructure it or hand ns
- * on whole after `import * as ns` of it, or name it after an import() or require() of it. `file` itself must use it
- * beyond its declaration (a ternary branch and a `case` count), not as a property, an object key or a
- * parameter. A word that merely matches is no use.
+ * PURE: the names under which `source`, the text of `from`, passes on `name`, which `file` exports, with
+ * `export { name } from` or `export { name as other } from` a module that can be `file` or one of its `barrels`.
+ */
+export function reExportsOf(
+  source: string,
+  from: string,
+  file: string,
+  name: string,
+  barrels: string[] = [],
+): string[] {
+  return [
+    ...uncommented(source).matchAll(
+      /\bexport\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g,
+    ),
+  ].flatMap(([, list = "", spec = ""]) =>
+    [file, ...barrels].some((t) => leadsTo(spec, from, t))
+      ? list.split(",").flatMap((s) => {
+          const [passed = "", as = passed] = s.trim().split(/\s+as\s+/);
+          return passed === name && /^[\w$]+$/.test(as) ? [as] : [];
+        })
+      : [],
+  );
+}
+
+/**
+ * PURE: does `source`, the text of `from`, use `name`, which `file` exports? Another file must import it by name
+ * (any import block, beside a default import, renamed or not) from a module that can be `file` or one of its
+ * `barrels` (modules that `export *` from it), read it as ns.name, destructure it or hand ns on whole after
+ * `import * as ns` of it, or name it after an import() or require() of it; passing it on (`export { name } from`)
+ * is no use (reExportsOf). `file` itself must use it beyond its declaration (a ternary branch and a `case` count),
+ * not as a property, an object key or a parameter. A word that merely matches is no use.
  */
 export function usesExport(
   source: string,
@@ -46,7 +84,7 @@ export function usesExport(
       from !== file &&
       [
         ...code.matchAll(
-          /\b(?:(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*(?:,\s*\{[^}]*\})?|\{[^}]*\bdefault\b[^}]*\})\s*from|(?:import|require)\s*\()\s*["']([^"']+)["']/g,
+          /\b(?:import\s+(?:type\s+)?(?:[\w$]+\s*(?:,\s*\{[^}]*\})?|\{[^}]*\bdefault\b[^}]*\})\s*from|(?:import|require)\s*\()\s*["']([^"']+)["']/g,
         ),
       ].some(([, spec = ""]) => into(spec))
     );
@@ -91,7 +129,7 @@ export function usesExport(
       );
     });
   for (const [, list = "", spec = ""] of code.matchAll(
-    /\b(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g,
+    /\bimport\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g,
   ))
     if (
       into(spec) &&
