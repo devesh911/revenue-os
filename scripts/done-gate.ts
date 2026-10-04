@@ -10,7 +10,10 @@
 //
 // Two moments are checked. A stop: the session's change, in each checkout it worked in and was the last to work
 // in (a hook before each command or edit notes them, and the state it found each in), must be proven; a checkout
-// it only looked at, switched or pulled is not its change. A merge: an agent's `gh pr merge` goes through only when
+// it only looked at, or moved only to commits origin/main holds (a pull, a switch to main), is not its change, but
+// one whose latest commit main does not hold is, however it got there (done-gate/only-main.ts). Without Docker,
+// or while background work runs, the checks on the database don't run at a stop, and Devesh is told so in place of
+// a ✓ (done-gate/not-run.ts). A merge: an agent's `gh pr merge` goes through only when
 // it names the pull request's head commit (`--match-head-commit`) and that commit was proven here, so work
 // committed, pushed and merged in one go is checked too; any other way of merging is refused before it runs.
 // Proven means (1) the change against main breaks none of the done rules (done-gate/rules.ts), (2) every check
