@@ -1,11 +1,6 @@
-// task-52 RED — console Guardrails wiring: the features/guardrails/api.ts hooks and the Settings
-// "Guardrails" section. Env-free by construction (bun test + renderToStaticMarkup, no DOM library,
-// no DB/network, no new deps) — the two source-pin describes read the files as text (the repo's
-// established RED idiom, imitates pages-adoption-*), and the behavior describes render the real
-// SettingsPage with its two server-state hooks MOCKED via mockModule (process-global, so afterAll
-// restores the real modules). Interaction (an actual submit event) is NOT reachable without a DOM/interaction lib
-// (a new dep, forbidden), so "submit fires the PUT" is pinned at the source layer (useMutation +
-// PUT + invalidateQueries) — see report.
+// The console's guardrail settings: the Settings page's "Guardrails" section. These render the real SettingsPage on
+// the server with its two data hooks faked through mockModule (process-wide, so afterAll restores the real modules).
+// What the hooks themselves send, and what they refresh, is guardrails-save.test.tsx.
 import { afterAll, describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Route, Router } from "wouter";
@@ -57,7 +52,7 @@ let guardrailsResult: unknown = loadingState;
 const restoreOrgs = mockModule("../src/features/orgs/api", realOrgsApi, {
   useOrgsQuery: () => ok([orgFixture]),
 });
-// The two hooks SettingsPage calls, over the real module (which exists since task-52 GREEN).
+// The two hooks SettingsPage calls, faked over the real module.
 const restoreGuardrails = mockModule(
   "../src/features/guardrails/api",
   realGuardrailsApi,
@@ -91,60 +86,6 @@ async function renderSettings(): Promise<string> {
   );
 }
 
-// The repo RED idiom: read source as text; catch-to-empty so a missing file fails as a clean
-// assertion (`expect("").toContain(…)`), never a thrown ENOENT.
-const GUARDRAILS_API = "apps/console/src/features/guardrails/api.ts";
-const SETTINGS_SRC = "apps/console/src/pages/Settings/index.tsx";
-const readSrc = async (p: string): Promise<string> => {
-  try {
-    return await Bun.file(p).text();
-  } catch {
-    return "";
-  }
-};
-
-describe("features/guardrails/api.ts — hooks contract (source)", () => {
-  it("exports useGuardrailPoliciesQuery + useUpdateGuardrailPolicy", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toMatch(/export (function|const) useGuardrailPoliciesQuery/);
-    expect(src).toMatch(/export (function|const) useUpdateGuardrailPolicy/);
-  });
-
-  it("query GETs the org-scoped /guardrail-policies endpoint via useQuery", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toContain("/guardrail-policies");
-    expect(src).toMatch(/useQuery/);
-  });
-
-  it("mutation PUTs and validates its body with the shared GuardrailPolicyInputSchema", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toMatch(/useMutation/);
-    expect(src).toMatch(/method:\s*["']PUT["']/);
-    expect(src).toContain("@revenue-os/shared");
-    expect(src).toContain("GuardrailPolicyInputSchema");
-  });
-
-  it("mutation invalidates the guardrail-policies query key on success", async () => {
-    const src = await readSrc(GUARDRAILS_API);
-    expect(src).toMatch(/useQueryClient/);
-    expect(src).toMatch(/invalidateQueries/);
-    expect(src).toMatch(/onSuccess/);
-  });
-});
-
-describe("Settings page — wires the live Guardrails section (source)", () => {
-  it("drops the dead 'hasn't shipped' placeholder copy", async () => {
-    const src = await readSrc(SETTINGS_SRC);
-    expect(src).not.toContain("will live here");
-    expect(src).not.toContain("backend wave");
-    expect(src).not.toContain("hasn't shipped");
-  });
-
-  it("consumes the guardrail-policies query hook", async () => {
-    expect(await readSrc(SETTINGS_SRC)).toContain("useGuardrailPoliciesQuery");
-  });
-});
-
 describe("Settings Guardrails section — honest data states", () => {
   it("loading → calm 'Loading…'", async () => {
     guardrailsResult = loadingState;
@@ -156,11 +97,14 @@ describe("Settings Guardrails section — honest data states", () => {
     expect(text(await renderSettings())).toContain("Unable to load");
   });
 
+  // behaviour already on main: main's Settings page already shows none of the old placeholder's words; its two new checks replace a test that read the page's source as text
   it("a fresh org with zero policies is honest: no fabricated config, no dead placeholder", async () => {
     guardrailsResult = ok({ policies: [] });
     const html = await renderSettings();
     expect(html).not.toContain("21:00"); // nothing invented when there's no data
     expect(text(html)).not.toContain("will live here"); // dead placeholder is gone
+    expect(text(html)).not.toContain("backend wave");
+    expect(text(html)).not.toContain("hasn't shipped");
   });
 });
 

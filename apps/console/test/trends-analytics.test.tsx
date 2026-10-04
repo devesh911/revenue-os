@@ -1,12 +1,6 @@
-// Task 51 RED — the console side of the Analytics "Trends" 30-day series. Two kinds of case:
-//   • SOURCE contract (Bun.file reads): features/screens/api.ts grows useTrendsQuery mirroring
-//     useMetricsQuery exactly (R2/R6 — a `trends` queryKeys entry + a local Zod TrendsResponse whose
-//     infer is the hook's data type), and the Dashboard page adopts it, retiring the placeholder copy.
-//   • BEHAVIOR (mocked hooks + SSR render of the REAL Dashboard): the Trends section renders the
-//     series with honest loading / error / all-zero-empty / data states. Assertions pin data presence
-//     and honest states via stable text — NOT pixel layout or an invented empty-note wording.
-// Env-free by construction (bun test + renderToStaticMarkup + Bun.file, no DOM lib / DB / network /
-// new deps) — imitates apps/console/test/pages-adoption-behavior.test.tsx.
+// The Analytics screen's Trends section (the 30-day daily series): it shows the series' values and honest
+// loading, error and all-zero states, rendered on the server with the data hooks faked (mockModule). That the
+// screen asks the worker's API for the series and shows what it reports is a browser test (e2e/screens.e2e.ts).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -14,8 +8,6 @@ import { Route, Router } from "wouter";
 import * as realScreensApi from "../src/features/screens/api";
 import { mockModule, visible } from "./test-utils";
 
-const API_SRC = "apps/console/src/features/screens/api.ts";
-const DASH_SRC = "apps/console/src/pages/Dashboard/index.tsx";
 const RETIRED_COPY = "Time-series trends arrive with the analytics API.";
 const ORG = "11111111-1111-4111-8111-111111111111";
 
@@ -60,7 +52,7 @@ const METRICS_OK = {
   isError: false,
 };
 
-// ── behavior harness: mocked hooks + a static SSR router (the pages-adoption-behavior precedent) ──
+// ── mocked hooks + a static SSR router ──
 let metricsState: Query<unknown>;
 let trendsState: Query<TrendsData>;
 let DashboardPage: () => ReactElement;
@@ -89,56 +81,6 @@ const renderDash = (): string =>
     </Router>,
   );
 
-// ─────────────────────────── SOURCE contract (RED on today's api.ts / page) ───────────────────────────
-describe("features/screens/api.ts: useTrendsQuery mirrors useMetricsQuery (R2/R6)", () => {
-  let src: string;
-  beforeAll(async () => {
-    src = await Bun.file(API_SRC).text();
-  });
-
-  it("exports a useTrendsQuery hook hitting GET /orgs/:orgId/metrics/trends", () => {
-    expect(src).toMatch(/export function useTrendsQuery/);
-    expect(src).toMatch(/\/orgs\/\$\{orgId\}\/metrics\/trends/);
-  });
-
-  it('adds a `trends` queryKeys entry keyed ["trends", orgId]', () => {
-    expect(src).toMatch(
-      /trends:\s*\(orgId[^)]*\)\s*=>\s*\["trends",\s*orgId\]/,
-    );
-  });
-
-  it("defines a local Zod TrendsResponse whose infer is the data type (R6)", () => {
-    expect(src).toMatch(/const TrendsResponse = z\.object/);
-    expect(src).toMatch(
-      /export type TrendsResponse = z\.infer<typeof TrendsResponse>/,
-    );
-    for (const field of [
-      "day",
-      "new_leads",
-      "conversations_started",
-      "bookings",
-    ]) {
-      expect(src).toContain(field);
-    }
-  });
-});
-
-describe("pages/Dashboard: adopts useTrendsQuery, retires the placeholder copy", () => {
-  let src: string;
-  beforeAll(async () => {
-    src = await Bun.file(DASH_SRC).text();
-  });
-
-  it("imports and uses useTrendsQuery", () => {
-    expect(src).toMatch(/useTrendsQuery/);
-  });
-
-  it("no longer renders the retired placeholder copy", () => {
-    expect(src).not.toContain(RETIRED_COPY);
-  });
-});
-
-// ─────── BEHAVIOR: the Trends section renders the series + honest states (RED on today's page) ───────
 // metricsState is held at success in every case so any Loading…/error/data evidence can ONLY come
 // from the Trends section, never the metric tiles.
 describe("Dashboard Trends section states", () => {
