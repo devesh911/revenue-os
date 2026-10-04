@@ -444,7 +444,8 @@ const standIn = (answers: Answer[]) => {
   );
   return {
     env: { PATH: `${bin}:${process.env.PATH}` },
-    calls: () => (existsSync(log) ? readFileSync(log, "utf8") : ""), // calls.txt
+    calls: () =>
+      existsSync(log) ? readFileSync(join(bin, "calls.txt"), "utf8") : "", // the log above
   };
 };
 
