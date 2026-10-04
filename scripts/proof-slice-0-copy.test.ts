@@ -1,12 +1,13 @@
 // The Slice 0 proof tests pass in a copy of this change built as main's tests-proven check builds its own: laid over
 // main's commit and left uncommitted (scripts/done-gate/code-copy.ts), from this checkout, which on GitHub is a pull
-// request's detached commit with no branch of its own, and run as the check runs a file, with coverage
+// request's detached commit with no branch of its own, shallow as GitHub's runner left the check's copy, and run as
+// the check runs a file, with coverage
 // (scripts/done-gate/test-run.ts). They hand the steps this checkout's files as they are on disk, committed, so the
 // steps prove the change and not main's commit. The check itself runs every changed test file in turn in one copy;
 // that, this test does not repeat.
 import { afterAll, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { codeCopy } from "./done-gate/code-copy";
 import { runTestFile } from "./done-gate/test-run";
@@ -30,6 +31,11 @@ it("the Slice 0 proof tests pass in a copy of this change laid over main's commi
       ...lines("ls-files", "--others", "--exclude-standard"),
     ]),
   ]);
+  // Shallow, as the check's copy was on GitHub's runner: there git fetches from it without writing the fetched ref
+  writeFileSync(
+    join(copy, ".git", "shallow"),
+    `${lines("-C", copy, "rev-parse", "HEAD")[0]}\n`,
+  );
   const r = runTestFile(copy, "scripts/proof-slice-0.test.ts", {
     coverage: true,
     only: "follow its Proof line|the banner step passes",

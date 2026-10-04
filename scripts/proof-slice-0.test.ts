@@ -83,11 +83,12 @@ const git = (dir: string, ...args: string[]) => {
 };
 let here: string | undefined;
 /**
- * The repository the steps prove: this checkout's files as they are on disk (those git would track), committed on
- * top of its commit. A step proves a commit (it clones it, or archives its gate), and this checkout's may not hold
- * what is on disk: the tests-proven check runs this file with a change copied over main's commit, uncommitted. Its
- * origin/main is this checkout's, or that commit where there is none (a pull request's checkout on GitHub), and it
- * has no origin to fetch from; its packages are this checkout's, for the tests the steps run by name.
+ * The repository the steps prove: this checkout's files as they are on disk (those git would track), as one commit,
+ * which is also its origin/main. A step proves a commit (it clones it, or archives its gate), and this checkout's may
+ * not hold what is on disk: the tests-proven check runs this file with a change copied over main's commit,
+ * uncommitted. Nothing is fetched from this checkout, which may be shallow (on GitHub's runner the check's copy was,
+ * and git then writes no fetched ref, though the fetch succeeds); its packages are this checkout's, for the tests the
+ * steps run by name.
  */
 const HERE = () => {
   if (here) return here;
@@ -109,36 +110,6 @@ const HERE = () => {
     if (st.isSymbolicLink()) symlinkSync(readlinkSync(from), join(dir, f));
     else copyFileSync(from, join(dir, f));
   }
-  // CI checks out a detached commit, which a clone may not; fetched into a ref of its own, never read from FETCH_HEAD,
-  // which the tests-proven check's copy on GitHub's runner found "not a valid SHA1"
-  // TEMPORARY diagnosis (GitHub's tests-proven copy): what the fetch did when it leaves no ref, on one line.
-  const tFetch = Date.now();
-  const fetched = spawnSync(
-    "git",
-    ["fetch", "-v", "--no-tags", ROOT, "+HEAD:refs/proof/base"],
-    { cwd: dir, encoding: "utf8" },
-  );
-  const fetchMs = Date.now() - tFetch;
-  const said = (cwd: string, ...args: string[]) =>
-    spawnSync("git", args, { cwd, encoding: "utf8" }).stdout.trim();
-  if (said(dir, "rev-parse", "-q", "--verify", "refs/proof/base") === "")
-    throw new Error(
-      `TEMPORARY diagnosis: the fetch left no refs/proof/base: ${JSON.stringify(
-        {
-          status: fetched.status,
-          signal: fetched.signal,
-          ms: fetchMs,
-          error: String(fetched.error ?? ""),
-          out: `${fetched.stdout}${fetched.stderr}`.slice(0, 700),
-          rootHead: said(ROOT, "rev-parse", "HEAD"),
-          rootGitDir: said(ROOT, "rev-parse", "--absolute-git-dir"),
-          dirGitDir: said(dir, "rev-parse", "--absolute-git-dir"),
-          dirRefs: said(dir, "for-each-ref").slice(0, 300),
-          git: `${Bun.which("git")} ${said(dir, "--version")}`,
-        },
-      )}`,
-    );
-  git(dir, "update-ref", "refs/heads/main", "refs/proof/base");
   git(dir, "add", "-A", "-f");
   git(
     dir,
@@ -150,24 +121,15 @@ const HERE = () => {
     "commit.gpgsign=false",
     "commit",
     "-q",
-    "--allow-empty",
     "-m",
     "this checkout as it is on disk",
   );
-  const main = "refs/remotes/origin/main";
-  if (
-    spawnSync("git", ["rev-parse", "-q", "--verify", main], { cwd: ROOT })
-      .status === 0
-  )
-    git(dir, "fetch", "-q", "--no-tags", ROOT, `+${main}:${main}`);
-  else git(dir, "update-ref", main, "HEAD");
+  git(dir, "update-ref", "refs/remotes/origin/main", "HEAD");
   if (existsSync(join(ROOT, "node_modules")))
     symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
   here = dir;
   return dir;
 };
-// TEMPORARY, for one run on GitHub: built at load there, so a failure in the tests-proven check's copy names its cause.
-if (process.env.GITHUB_ACTIONS) HERE();
 const prove = (steps: Step[], root = HERE(), env: NodeJS.ProcessEnv = {}) =>
   runSteps(steps, {
     root,
