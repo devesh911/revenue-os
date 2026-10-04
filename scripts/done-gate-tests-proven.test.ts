@@ -580,7 +580,7 @@ it("throws on main", () => {
     );
   });
 
-  it("refuses a new test that passes on main, and accepts it once its line says why, shown at every stop and asked of the PR body", () => {
+  it("refuses a new test that passes on main, and accepts it once its line says why, shown at every stop and asked of the PR body", async () => {
     const test = (mark: string) => ({
       ...PRODUCT,
       "apps/x/test/old.test.ts": `${OLD_TEST}
@@ -605,7 +605,7 @@ it("still one", () => {${mark}
     );
     expect(rulesOn(snapshot(dir)).notes).toContain(note);
     expect(
-      judgePr(snapshot(dir), "Roadmap: off-roadmap — x").problems,
+      (await judgePr(snapshot(dir), "Roadmap: off-roadmap — x")).problems,
     ).toContain(
       'the PR body doesn\'t show the test marked "behaviour already on main" at apps/x/test/old.test.ts:8: add the line `Behaviour already on main: apps/x/test/old.test.ts · a guard for the old rule`',
     );
@@ -777,7 +777,7 @@ it("matches the local file", () => {
     );
   });
 
-  it("shows a mark main already holds on a test the change edits, and a mark in the gate's own tests, at the stop and in the PR body", () => {
+  it("shows a mark main already holds on a test the change edits, and a mark in the gate's own tests, at the stop and in the PR body", async () => {
     const marked = (extra: string) => `${OLD_TEST}
 it("still one", () => { ${MARK} guards the old rule
   expect(old()).toBe(1);
@@ -803,7 +803,7 @@ it("old is one", () => { ${MARK} the gate's own code comes along to main
     const r = prove(dir);
     expect(r.ok).toBe(true);
     const notes = rulesOn(snapshot(dir)).notes;
-    const body = judgePr(snapshot(dir), "x").problems.join("\n");
+    const body = (await judgePr(snapshot(dir), "x")).problems.join("\n");
     for (const shown of [r.text, notes.join("\n"), body])
       expect(shown).not.toContain("not this change's");
     for (const [at, why] of [
