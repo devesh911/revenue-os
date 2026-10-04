@@ -157,4 +157,6 @@ it("four whole-suite runs started at once all pass, and they and a demo run leav
     other: { org: 1, contacts: 1, audit: 1, usage: 1, queued: QUEUES },
     dev: devBefore,
   });
-}, 600_000);
+  // Four whole suites at once on CI's two cores: 285 s on 2026-10-04 before the tests-proven item's tests, over 600 s
+  // after; the limit grows with the suite, what it proves does not change.
+}, 1_200_000);
