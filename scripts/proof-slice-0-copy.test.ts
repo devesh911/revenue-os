@@ -21,7 +21,8 @@ afterAll(() => {
 });
 
 it("the Slice 0 proof tests pass in the tests-proven check's copy of this change, laid over main's commit", () => {
-  const [base = ""] = lines("merge-base", "origin/main", "HEAD");
+  // main's commit; in the check's own copy, which has no origin/main, the change sits uncommitted on it, at HEAD
+  const [base = "HEAD"] = lines("merge-base", "origin/main", "HEAD");
   copy = codeCopy(ROOT, base, [
     ...new Set([
       ...lines("diff", "--name-only", base),
