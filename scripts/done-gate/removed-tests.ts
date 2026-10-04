@@ -1,9 +1,10 @@
 // A removed test is a decision Devesh sees: a change that deletes a test file, a test (`it(` or `test(`) or an
 // `expect` line names each one in a line it adds to docs/removed-tests.md, which the stop, CI's log and the PR body
-// (pr-quotes.ts) all show. Two things are no removal: a test moved whole into a file a test runner runs (its first
-// line and each expect line after it landing together, as git's moved-code detection sees them, moved.ts), and an
-// expect rewritten where it stood, in the same run of changed lines, into one that checks more than a constant. A
-// test renamed is removed under its old name; an expect moved on its own, without its test, is removed.
+// (pr-quotes.ts) all show. Three things are no removal: a test moved whole into a file a test runner runs (its first
+// line and each expect line after it landing together, as git's moved-code detection sees them, moved.ts), an expect
+// git sees move within its run of changed lines and its own test (re-indented, its body wrapped in a block), and an
+// expect rewritten where it stood, in that run, into one that checks more than a constant. A test renamed as its
+// expect lines go is removed under its old name; an expect moved out of its test, without it, is removed.
 
 import { uncommented } from "./code-text";
 import type { Added } from "./diff";
