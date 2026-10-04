@@ -433,6 +433,9 @@ it("reads three rows", () => {
         "apps/x/src/old.ts": `${OLD}export const LOG = "ones.list";\n`,
         "scripts/done-gate/quote.ts":
           'export const Q = "../src/testing/sample";\n',
+        // nor does a Markdown page naming it
+        "docs/testing.md":
+          "The sample lives in `apps/x/src/testing/sample.ts`.\n",
         // a helper named only by another helper is a helper too
         "apps/x/src/testing/sample.ts":
           'import { ONE } from "./one";\n\nexport const SAMPLE = ONE;\n',
