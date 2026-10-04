@@ -1,8 +1,8 @@
 // A test file that starts children through tests/children.ts leaves none of them, and nothing they started,
-// running once it ends, however it ends. On 2026-10-04 the whole-suite runs that
-// services/worker/test/test-runs-at-once.test.ts starts outlived it for hours and loaded the machine until later
-// gate runs timed out: bun's own time limit stops a test's children but not theirs, and a test run stopped from
-// outside (the gate stops one file past its 10 minutes with SIGTERM) stops none of them.
+// running once it ends, however it ends, and nothing a child started once that child ends. On 2026-10-04 the
+// whole-suite runs that services/worker/test/test-runs-at-once.test.ts starts outlived it for hours and loaded the
+// machine until later gate runs timed out: bun's own time limit stops a test's children but not theirs, and a test
+// run stopped from outside (the gate stops one file past its 10 minutes with SIGTERM) stops none of them.
 import { expect, it } from "bun:test";
 import { spawn } from "node:child_process";
 import {
@@ -27,36 +27,44 @@ const running = (pid: number) => {
   }
 };
 
-/** A child that starts a grandchild, writes both their ids to ids.txt, then sleeps or ends at once. */
+/**
+ * A child that starts a grandchild and writes both their ids to ids.txt, then sleeps, the grandchild holding its
+ * output open as a whole-suite run's own children do, or ends at once, leaving the grandchild running.
+ */
 const child = (sleeps: boolean) =>
-  `const g = require("node:child_process").spawn("sleep", ["30"], { stdio: "ignore" });
+  `const g = require("node:child_process").spawn("sleep", ["30"], { stdio: "${sleeps ? "inherit" : "ignore"}" });
    g.unref();
    require("node:fs").writeFileSync("ids.txt", process.pid + " " + g.pid);
    ${sleeps ? "setTimeout(() => {}, 30_000);" : ""}`;
 
 it.each([
   {
-    ends: "it passes, its child done but the grandchild still running",
+    ends: "the child ends while its test goes on",
     sleeps: false,
-    limit: 10_000,
+    rest: "await ran;\n  await Bun.sleep(30_000);",
   },
-  { ends: "it runs past its time limit", sleeps: true, limit: 1_000 },
+  { ends: "the test runs past its time limit", sleeps: true, limit: 1_000 },
   {
     ends: "the run is stopped with SIGTERM, as the gate stops a file past its 10 minutes",
     sleeps: true,
-    limit: 60_000,
     stop: (run: number) => process.kill(run, "SIGTERM"),
   },
   {
-    ends: "Ctrl-C at the terminal (SIGINT to the run's process group)",
+    ends: "Ctrl-C is pressed at the terminal (SIGINT to the run's process group)",
     sleeps: true,
-    limit: 60_000,
     stop: (run: number) => process.kill(-run, "SIGINT"),
   },
-])("children and grandchildren are gone once a test ends: $ends", async ({
+  {
+    ends: "a test in the run calls process.exit",
+    sleeps: true,
+    rest: `while (!require("node:fs").existsSync("ids.txt")) await Bun.sleep(50);
+  process.exit(1);`,
+  },
+])("a child and the grandchild it started are stopped when $ends", async ({
   sleeps,
-  limit,
+  limit = 60_000,
   stop,
+  rest = "await ran;",
 }) => {
   const dir = mkdtempSync(join(tmpdir(), "children-"));
   writeFileSync(
@@ -65,7 +73,8 @@ it.each([
 import { children } from ${JSON.stringify(helper)};
 const { bun } = children();
 it("starts a child", async () => {
-  await bun(["-e", ${JSON.stringify(child(sleeps))}], import.meta.dir);
+  const ran = bun(["-e", ${JSON.stringify(child(sleeps))}], import.meta.dir);
+  ${rest}
 }, ${limit});
 `,
   );
@@ -75,7 +84,6 @@ it("starts a child", async () => {
     detached: true,
     stdio: "ignore",
   });
-  const ended = new Promise((done) => run.on("exit", done));
   let ids: number[] = [];
   try {
     for (let i = 0; !existsSync(join(dir, "ids.txt")) && i < 100; i++)
@@ -89,7 +97,6 @@ it("starts a child", async () => {
     }
     expect(ids).toHaveLength(2);
     if (run.pid) stop?.(run.pid);
-    await ended;
     for (let i = 0; ids.some(running) && i < 50; i++) await Bun.sleep(100);
     expect(ids.filter(running)).toEqual([]);
   } finally {
