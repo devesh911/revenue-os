@@ -1,8 +1,9 @@
-// The Slice 0 proof tests pass where main's tests-proven check runs them: in its copy of this change, laid over
-// main's commit and left uncommitted (scripts/done-gate/code-copy.ts), made from this checkout, which on GitHub is a
-// pull request's detached commit with no branch of its own, and run as the check runs them, with coverage
+// The Slice 0 proof tests pass in a copy of this change built as main's tests-proven check builds its own: laid over
+// main's commit and left uncommitted (scripts/done-gate/code-copy.ts), from this checkout, which on GitHub is a pull
+// request's detached commit with no branch of its own, and run as the check runs a file, with coverage
 // (scripts/done-gate/test-run.ts). They hand the steps this checkout's files as they are on disk, committed, so the
-// steps prove the change and not main's commit.
+// steps prove the change and not main's commit. The check itself runs every changed test file in turn in one copy;
+// that, this test does not repeat.
 import { afterAll, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
@@ -20,7 +21,7 @@ afterAll(() => {
   if (copy) rmSync(copy, { recursive: true, force: true });
 });
 
-it("the Slice 0 proof tests pass in the tests-proven check's copy of this change, laid over main's commit", () => {
+it("the Slice 0 proof tests pass in a copy of this change laid over main's commit, as the tests-proven check builds one", () => {
   // main's commit; in the check's own copy, which has no origin/main, the change sits uncommitted on it, at HEAD
   const [base = "HEAD"] = lines("merge-base", "origin/main", "HEAD");
   copy = codeCopy(ROOT, base, [

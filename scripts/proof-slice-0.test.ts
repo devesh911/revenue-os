@@ -109,8 +109,10 @@ const HERE = () => {
     if (st.isSymbolicLink()) symlinkSync(readlinkSync(from), join(dir, f));
     else copyFileSync(from, join(dir, f));
   }
-  git(dir, "fetch", "-q", "--no-tags", ROOT, "HEAD"); // CI checks out a detached commit, which a clone may not
-  git(dir, "update-ref", "refs/heads/main", "FETCH_HEAD");
+  // CI checks out a detached commit, which a clone may not; fetched into a ref of its own, never read from FETCH_HEAD,
+  // which the tests-proven check's copy on GitHub's runner found "not a valid SHA1"
+  git(dir, "fetch", "-q", "--no-tags", ROOT, "+HEAD:refs/proof/base");
+  git(dir, "update-ref", "refs/heads/main", "refs/proof/base");
   git(dir, "add", "-A", "-f");
   git(
     dir,
@@ -155,8 +157,8 @@ const failures = (results: { does: string; outcome: string; seen: string }[]) =>
 const copyOf = (edit: (dir: string) => void, message = "a changed copy") => {
   const dir = scratch("proof-0-copy-");
   git(dir, "init", "-q", "-b", "main");
-  git(dir, "fetch", "-q", "--no-tags", HERE(), "HEAD");
-  git(dir, "checkout", "-q", "-B", "main", "FETCH_HEAD");
+  git(dir, "fetch", "-q", "--no-tags", HERE(), "+HEAD:refs/proof/base");
+  git(dir, "checkout", "-q", "-B", "main", "refs/proof/base");
   edit(dir);
   spawnSync(
     "git",

@@ -100,8 +100,8 @@ function cloneOf(root: string): Scratch {
   const base = realpathSync(mkdtempSync(join(tmpdir(), "proof-")));
   const dir = join(base, "repo");
   git(base, "init", "-q", "-b", "main", dir);
-  git(dir, "fetch", "-q", "--no-tags", root, "HEAD");
-  git(dir, "checkout", "-q", "-B", "main", "FETCH_HEAD");
+  git(dir, "fetch", "-q", "--no-tags", root, "+HEAD:refs/proof/proved"); // a ref of its own, not FETCH_HEAD
+  git(dir, "checkout", "-q", "-B", "main", "refs/proof/proved");
   git(dir, "remote", "add", "origin", ORIGIN);
   git(dir, "update-ref", "refs/remotes/origin/main", "HEAD");
   return { dir, main: git(dir, "rev-parse", "HEAD"), base };
