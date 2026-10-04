@@ -111,7 +111,33 @@ const HERE = () => {
   }
   // CI checks out a detached commit, which a clone may not; fetched into a ref of its own, never read from FETCH_HEAD,
   // which the tests-proven check's copy on GitHub's runner found "not a valid SHA1"
-  git(dir, "fetch", "-q", "--no-tags", ROOT, "+HEAD:refs/proof/base");
+  // TEMPORARY diagnosis (GitHub's tests-proven copy): what the fetch did when it leaves no ref, on one line.
+  const tFetch = Date.now();
+  const fetched = spawnSync(
+    "git",
+    ["fetch", "-v", "--no-tags", ROOT, "+HEAD:refs/proof/base"],
+    { cwd: dir, encoding: "utf8" },
+  );
+  const fetchMs = Date.now() - tFetch;
+  const said = (cwd: string, ...args: string[]) =>
+    spawnSync("git", args, { cwd, encoding: "utf8" }).stdout.trim();
+  if (said(dir, "rev-parse", "-q", "--verify", "refs/proof/base") === "")
+    throw new Error(
+      `TEMPORARY diagnosis: the fetch left no refs/proof/base: ${JSON.stringify(
+        {
+          status: fetched.status,
+          signal: fetched.signal,
+          ms: fetchMs,
+          error: String(fetched.error ?? ""),
+          out: `${fetched.stdout}${fetched.stderr}`.slice(0, 700),
+          rootHead: said(ROOT, "rev-parse", "HEAD"),
+          rootGitDir: said(ROOT, "rev-parse", "--absolute-git-dir"),
+          dirGitDir: said(dir, "rev-parse", "--absolute-git-dir"),
+          dirRefs: said(dir, "for-each-ref").slice(0, 300),
+          git: `${Bun.which("git")} ${said(dir, "--version")}`,
+        },
+      )}`,
+    );
   git(dir, "update-ref", "refs/heads/main", "refs/proof/base");
   git(dir, "add", "-A", "-f");
   git(
@@ -140,6 +166,8 @@ const HERE = () => {
   here = dir;
   return dir;
 };
+// TEMPORARY, for one run on GitHub: built at load there, so a failure in the tests-proven check's copy names its cause.
+if (process.env.GITHUB_ACTIONS) HERE();
 const prove = (steps: Step[], root = HERE(), env: NodeJS.ProcessEnv = {}) =>
   runSteps(steps, {
     root,
