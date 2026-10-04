@@ -111,10 +111,29 @@ export function removalProblems(
     !newStarts.some(
       (s) => s.file === a.file && s.line > home.line && s.line < a.line,
     );
+  const tests = (lines: Added[]) =>
+    lines.flatMap((l, i) => {
+      const name = testName(l, lines[i + 1]);
+      return name === undefined ? [] : [{ name, line: l.line }];
+    });
+  const expects = (lines: Added[]) =>
+    lines.filter((l) => EXPECT.test(code(l.text)));
+  /** The test `l` sits in, by the last test its run of `lines` starts before it ("": the one starting above the run). */
+  const owner = (lines: Added[], l: Added) =>
+    tests(
+      lines.filter(
+        (o) => o.file === l.file && o.hunk === l.hunk && o.line < l.line,
+      ),
+    ).at(-1)?.name ?? "";
+  /** Lands in the run of lines `r` left, in the same test: an expect re-indented where it stood, its body wrapped. */
+  const inPlace = (r: Added) => (a: Added) =>
+    a.file === r.file &&
+    a.hunk === r.hunk &&
+    owner(added, a) === owner(removed, r);
   const inTests = removed.filter((r) => isTest(r.file));
   const moved = new Set<Added>();
   // Each test's first line first, then the lines after it in its run of removed lines: an expect stays only when
-  // its test's first line moved, and lands after it.
+  // its test's first line moved and it lands after it, or it lands where it stood, in the same test.
   const landedAt = new Map<Added, Added>();
   for (const r of starts(inTests)) {
     const a = land(r);
@@ -128,18 +147,15 @@ export function removalProblems(
     const prev = inTests[i - 1];
     if (prev?.file !== r.file || prev.hunk !== r.hunk) home = undefined;
     if (testName(r, inTests[i + 1]) !== undefined) home = landedAt.get(r);
-    else if (EXPECT.test(code(r.text)) ? home && land(r, after(home)) : land(r))
+    else if (
+      EXPECT.test(code(r.text))
+        ? (home && land(r, after(home))) || land(r, inPlace(r))
+        : land(r)
+    )
       moved.add(r);
   }
   const gone = inTests.filter((r) => !moved.has(r));
   const come = added.filter((a) => isTest(a.file) && !a.moved);
-  const tests = (lines: Added[]) =>
-    lines.flatMap((l, i) => {
-      const name = testName(l, lines[i + 1]);
-      return name === undefined ? [] : [{ name, line: l.line }];
-    });
-  const expects = (lines: Added[]) =>
-    lines.filter((l) => EXPECT.test(code(l.text)));
   for (const file of new Set(gone.map((l) => l.file))) {
     const out = gone.filter((l) => l.file === file);
     if (deleted.includes(file) && ![...moved].some((r) => r.file === file)) {

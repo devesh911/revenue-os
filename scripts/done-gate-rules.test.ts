@@ -684,6 +684,42 @@ describe("moved code, found by git's moved-code detection", () => {
     expect(s.out).toContain(`- ${BLOCKED} > expect at line 4:`);
   });
 
+  it("counts an expect re-indented in its own test, its body wrapped in a block, as no removal, but not one carried into the next test", () => {
+    const dir = project({ [BLOCKED]: BLOCKED_TEST });
+    const [, setup, ...checks] = BLOCKED_TEST.split("\n");
+    const wrapped = (start: string) =>
+      [
+        start,
+        "  await withOrg(org, async () => {",
+        ...[setup, ...checks.slice(0, 2)].map((l) => `  ${l}`),
+        "  });",
+        "});",
+        "",
+      ].join("\n");
+    write(
+      dir,
+      BLOCKED,
+      wrapped('it("refuses a blocked number", async () => {'),
+    );
+    expect(rules(dir).status).toBe(0);
+    write(dir, BLOCKED, wrapped('it("refuses a blocked number", () => {'));
+    expect(rules(dir).status).toBe(0);
+    // The lines between two tests rewritten, so one run of changed lines carries an expect into the next test.
+    const carried = project({ [CALLS]: TWO_TESTS });
+    write(
+      carried,
+      CALLS,
+      TWO_TESTS.replace(
+        '  expect(result.reason).toBe("blocked");\n});\n\nit("places a call", () => {\n',
+        '}); // the first\nit("places a call", async () => {\n    expect(result.reason).toBe("blocked");\n',
+      ),
+    );
+    const r = rules(carried);
+    expect(r.out).toContain(
+      `Done rules ✗ 1 problem(s) in the change since main:\n- ${CALLS} > expect at line 7: the change removes this expect line`,
+    );
+  });
+
   it("still checks moved lines for skipped tests, throwing stubs and silenced checks", () => {
     const test = [
       'it.skip("waits on the Vapi sandbox to come back", () => {',
