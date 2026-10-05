@@ -11,9 +11,10 @@ import { seenBy, showOnArrival } from "./checkpoint";
 import { type HookInput, runsIn } from "./hook-io";
 import { atWorkNow } from "./interrupted";
 import { deny, mergeGate } from "./merge-gate";
-import { mergeToolRefusal } from "./merge-reading";
+import { mergeOf, mergeToolRefusal } from "./merge-reading";
 import { recordRefusal } from "./record-guard";
 import { sessionStart } from "./session-start";
+import { simpleCommands } from "./shell-words";
 import { stop } from "./stop";
 import { Store, stateDir } from "./store";
 import { commandRefusal } from "./tools";
@@ -74,7 +75,21 @@ export async function hook(input: HookInput, codex: boolean, entry: string) {
     );
     process.exit(r.status ?? 0);
   }
-  const store = new Store(stateDir(repo));
+  let store: Store;
+  try {
+    store = new Store(stateDir(repo));
+  } catch (e) {
+    // Without the record no merge can be judged: refuse one, never let it through unchecked. Anything else fails
+    // as before (a stop is told it was NOT checked).
+    if (
+      event === "PreToolUse" &&
+      simpleCommands(String(command.tool_input?.command ?? "")).some(mergeOf)
+    )
+      return deny(
+        `it could not check this merge (${String(e).split("\n")[0]}).`,
+      );
+    throw e;
+  }
   const session = input.session_id ?? "unknown";
   // Where Claude Code keeps the session's transcript, which a checkpoint reads Devesh's words from (checkpoint.ts),
   // and a stop running, which tells a held session it may leave a change to this one (interrupted.ts).

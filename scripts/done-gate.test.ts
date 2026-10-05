@@ -2071,6 +2071,42 @@ describe("the hook", () => {
     );
   });
 
+  it("refuses a merge, never letting it through unchecked, when git can't name the folder holding the gate's record", () => {
+    // git failing, and git's answer lost, as Bun's synchronous spawn can lose it under load (oven-sh/bun#34069)
+    for (const answer of ["exit 128", "exit 0"]) {
+      const dir = repo();
+      write(
+        dir,
+        "bin/git",
+        `#!/bin/sh\ncase "$*" in *--git-common-dir*) ${answer};; esac\nexec ${Bun.which("git")} "$@"\n`,
+      );
+      chmodSync(join(dir, "bin", "git"), 0o755);
+      const head = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
+      const r = sh(
+        dir,
+        ["bun", GATE, "hook"],
+        { PATH: `${join(dir, "bin")}:${process.env.PATH}` },
+        JSON.stringify({
+          hook_event_name: "PreToolUse",
+          session_id: "s1",
+          cwd: dir,
+          tool_name: "Bash",
+          tool_input: {
+            command: `gh pr merge 5 --squash --match-head-commit ${head}`,
+          },
+        }),
+      );
+      expect(JSON.parse(r.stdout || "{}")).toMatchObject({
+        hookSpecificOutput: {
+          permissionDecision: "deny",
+          permissionDecisionReason: expect.stringContaining(
+            "it could not check this merge (Error: git",
+          ),
+        },
+      });
+    }
+  });
+
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
     hook(dir, "SessionStart"); // the session notes the checkout before it changes it
