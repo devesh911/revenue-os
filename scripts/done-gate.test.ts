@@ -2250,6 +2250,38 @@ describe("the hook", () => {
     );
   });
 
+  it("refuses a product change's merge without the verifier even when git's list of the files it changes comes back empty", () => {
+    const dir = repo();
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
+    write(dir, "services/worker/src/wa.ts", "const wa = 1;\n");
+    commitAll(dir);
+    checksPassed(dir);
+    const head = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
+    const env = fakeGh(head);
+    // A fake git beside it answers the first question for the merge's changed files with nothing (oven-sh/bun#34069).
+    const bin = env.PATH.split(":")[0] ?? "";
+    writeFileSync(
+      join(bin, "git"),
+      `#!/bin/sh\ncase " $* " in *" diff --name-only "*) [ -e "$0.asked" ] || { : > "$0.asked"; exit 0; } ;; esac\nexec ${Bun.which("git")} "$@"\n`,
+      { mode: 0o755 },
+    );
+    const r = hook(
+      dir,
+      "PreToolUse",
+      {
+        tool_name: "Bash",
+        tool_input: {
+          command: `gh pr merge 7 --squash --match-head-commit ${head}`,
+        },
+      },
+      env,
+    );
+    expect(existsSync(join(bin, "git.asked"))).toBe(true); // the list did come back empty once
+    expect(r.told).toContain(
+      `merge refused: nobody independent has seen ${head.slice(0, 7)} work`,
+    );
+  });
+
   it("does not judge a session that only visited another checkout", () => {
     const dir = repo();
     const wt = worktree(dir, "feat/theirs");
@@ -2526,6 +2558,30 @@ describe("bun run gate rules (CI runs it on every pull request)", () => {
     );
     expect(r.out).not.toContain("on-main.ts");
     expect(r.out).toContain('⚠ changed what "done" means: .codex/hooks.json');
+  });
+
+  // Under load Bun's synchronous spawn can hand back no output from a git that printed some (oven-sh/bun#34069).
+  // Here a fake git, first on the PATH, answers the first question for the change's diff with nothing.
+  it("never reads git's answer coming back empty as a change with nothing in it", () => {
+    const dir = repo();
+    sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "main"]);
+    write(dir, "services/worker/src/a.ts", "// @ts-ignore\n");
+    const bin = mkdtempSync(join(tmpdir(), "done-gate-bin-"));
+    dirs.push(bin);
+    write(
+      bin,
+      "git",
+      `#!/bin/sh\ncase " $* " in *" --no-color "*) [ -e "$0.asked" ] || { : > "$0.asked"; exit 0; } ;; esac\nexec ${Bun.which("git")} "$@"\n`,
+    );
+    chmodSync(join(bin, "git"), 0o755);
+    const r = sh(dir, ["bun", "scripts/done-gate.ts", "rules"], {
+      PATH: `${bin}:${process.env.PATH}`,
+    });
+    expect(existsSync(join(bin, "git.asked"))).toBe(true); // the diff did come back empty once
+    expect(r.stdout + r.stderr).toContain(
+      "- services/worker/src/a.ts:1 switches the type checker off",
+    );
+    expect(r.status).toBe(1);
   });
 
   it("passes a clean product change against origin/main by default, without any check or the verifier", () => {

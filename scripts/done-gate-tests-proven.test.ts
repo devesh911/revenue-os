@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -612,6 +613,43 @@ it("still one", () => {${mark}
     );
     // What a stop shows for the check counts the tests it proved, not the marked ones.
     expect(tally("tests proven", marked.text)).toBe("0 tests proven");
+  });
+
+  it("shows a mark at the stop even when git's answer reading the marked test file comes back empty", () => {
+    const dir = scratch({
+      ...PRODUCT,
+      "apps/x/test/old.test.ts": `${OLD_TEST}
+it("still one", () => { ${MARK} a guard for the old rule
+  expect(old()).toBe(1);
+});
+`,
+    });
+    // A fake git, first on the PATH, answers the first read of that file with nothing, as Bun's synchronous spawn
+    // can under load (oven-sh/bun#34069).
+    const bin = realpathSync(mkdtempSync(join(tmpdir(), "tests-proven-bin-")));
+    dirs.push(bin);
+    writeFileSync(
+      join(bin, "git"),
+      `#!/bin/sh\ncase "$*" in *:apps/x/test/old.test.ts) [ -e "$0.asked" ] || { : > "$0.asked"; exit 0; } ;; esac\nexec ${Bun.which("git")} "$@"\n`,
+      { mode: 0o755 },
+    );
+    const gate = (f: string) => join(import.meta.dir, "done-gate", f);
+    const r = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `import { rulesOn } from "${gate("rules.ts")}";\nimport { snapshot } from "${gate("snapshot.ts")}";\nconsole.log(rulesOn(snapshot(".")).notes.join("\\n"));`,
+      ],
+      {
+        cwd: dir,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      },
+    );
+    expect(existsSync(join(bin, "git.asked"))).toBe(true); // the read did come back empty once
+    expect(r.stdout).toContain(
+      'test marked "behaviour already on main" at apps/x/test/old.test.ts:8: a guard for the old rule',
+    );
   });
 
   it("takes a mark on the comment line just above a test, and no other line above it", () => {

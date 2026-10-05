@@ -4,7 +4,7 @@
 // whatever the file, so the check (tests-proven.ts), every stop (rules.ts) and the pull request's body (pr.ts) all
 // see the same ones: a note at every stop and in CI's log, and a line of the body.
 
-import { spawnSync } from "node:child_process";
+import { gitAnswer } from "./git";
 import type { Snap } from "./snapshot";
 import { edits } from "./test-edits";
 import { isTestFile } from "./test-run";
@@ -35,11 +35,11 @@ export const marksIn = (
 /** The marks on the tests the change adds or edits, in every test file it leaves. */
 export const changeMarks = (snap: Snap): Mark[] =>
   snap.files.filter(isTestFile).flatMap((f) => {
-    const blob = spawnSync("git", ["cat-file", "blob", `${snap.tree}:${f}`], {
-      cwd: snap.repo,
-      encoding: "utf8",
-      maxBuffer: 64 << 20,
-    });
+    const blob = gitAnswer(snap.repo, [
+      "cat-file",
+      "blob",
+      `${snap.tree}:${f}`,
+    ]);
     return blob.status === 0
       ? marksIn(f, blob.stdout, edits(snap, f, blob.stdout).touches)
       : []; // the change deletes it
