@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
  * output at all (oven-sh/bun#34069; the fix, oven-sh/bun#40078, is in no release yet), and the gate would read that
  * as "nothing there": no change, no file, no product code. So an answer that comes back empty is asked for once
  * more; asked again at once, every lost answer seen under load came back whole. (A full memory clean-up before each
- * spawn, as tests/setup.local.ts does against the freeze, lost six times as many answers.) Remove the second ask
+ * spawn, as tests/setup.local.ts does against the freeze, lost about 3.5 times as many answers.) Remove the second ask
  * once the pinned Bun has the fix.
  */
 export function gitAnswer(
