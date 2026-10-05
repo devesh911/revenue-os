@@ -1,8 +1,9 @@
 // Every check the gate runs on the code as it stands: typecheck, lint, guards, tests, tests proven (tests-proven.ts),
-// database policies and the browser checks, the database ones one run at a time.
+// database policies and the browser checks, the database ones one run at a time and only while no worker runs.
 
 import { spawnSync } from "node:child_process";
 import { type AddressInfo, createConnection, createServer } from "node:net";
+import { noWorkerRunning } from "./running-workers";
 import { onSharedStack } from "./shared-stack";
 
 type Check = {
@@ -124,7 +125,10 @@ export async function runChecks(
   const failed =
     (await runEach(CHECKS.filter((c) => !c.db))) ??
     (db
-      ? await onSharedStack(repo, () => runEach(onDb)).catch(
+      ? await onSharedStack(repo, () => {
+          noWorkerRunning(); // within the lock: the browser checks of another checkout's gate start one
+          return runEach(onDb);
+        }).catch(
           (e: Error) =>
             `${onDb.map((c) => c.name).join(", ")} did not run: ${e.message}`,
         )
