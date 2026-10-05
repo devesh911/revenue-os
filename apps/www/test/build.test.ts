@@ -3,14 +3,25 @@
 // which would fetch one over the network. It must emit a bundled component app that
 // carries the hero copy, and ship the security headers Cloudflare Pages reads from
 // dist/_headers (public/_headers, copied by the build).
-import { describe, expect, test } from "bun:test";
-import { execSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { createBookingClient } from "../src/lib/booking";
 
 const WWW_DIR = resolve(import.meta.dir, "..");
-const DIST_DIR = resolve(WWW_DIR, "dist");
+// What a real build writes to apps/www/dist, written to a folder of this run's own: vite empties its output folder
+// as it starts, so a folder shared with another test run (the gate runs four whole suites at once) could be emptied,
+// or have files deleted from under its build, while this run checks it.
+const DIST_DIR = mkdtempSync(join(tmpdir(), "www-dist-"));
+afterAll(() => rmSync(DIST_DIR, { recursive: true, force: true }));
 // The hero headline — the one string that proves the component
 // tree, not just an empty shell, made it into the bundle.
 const HERO = "Turn property enquiries into qualified site visits.";
@@ -50,21 +61,24 @@ async function bookingHost() {
 }
 
 describe("apps/www builds into a bundled component app with its security headers", () => {
-  test("vite build succeeds and emits a JS bundle carrying the hero copy", () => {
-    let built = false;
-    let out = "";
+  // One build for both tests, so either can run alone; the first checks it succeeded.
+  let built = false;
+  let out = "";
+  beforeAll(() => {
     try {
-      out = execSync("bun run build", {
-        cwd: WWW_DIR,
-        stdio: "pipe",
-        timeout: 240_000,
-      }).toString();
+      out = execFileSync(
+        process.execPath,
+        ["run", "build", "--outDir", DIST_DIR, "--emptyOutDir"],
+        { cwd: WWW_DIR, stdio: "pipe", timeout: 240_000 },
+      ).toString();
       built = true;
     } catch (err) {
       const e = err as { stdout?: Buffer; stderr?: Buffer };
       out = `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? String(err)}`;
-      built = false;
     }
+  }, 260_000);
+
+  test("vite build succeeds and emits a JS bundle carrying the hero copy", () => {
     expect(
       built,
       `\`bun run build\` must succeed in apps/www (vite build). Output:\n${out}`,
@@ -92,7 +106,7 @@ describe("apps/www builds into a bundled component app with its security headers
       heroInBundle,
       "the bundled JS must contain the hero headline copy",
     ).toBe(true);
-  }, 260_000);
+  });
 
   test("dist/_headers lets pages use only the site, Cal.com and Plausible, and no site frame them", async () => {
     const file = resolve(DIST_DIR, "_headers");
