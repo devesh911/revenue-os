@@ -21,14 +21,17 @@ export function simpleCommands(line: string): string[][] {
 }
 
 /**
- * PURE: each way shells read the line, as its simple commands: one, or two when a `((` changes the reading. bash, zsh
- * and ksh read `((…))` as arithmetic; dash, which has none, reads two subshells, where a `<<` starts a heredoc.
+ * PURE: each way shells read the line, as its simple commands: one, or more when a `((` or a murky `${…}` changes the
+ * reading. bash, zsh and ksh read `((…))` as arithmetic; dash, which has none, reads two subshells, where a `<<` starts
+ * a heredoc. Where a `${…}`'s end is murky, a `<<` after it starts a heredoc in one reading and is text in the other.
  */
 export function readings(line: string): string[][][] {
-  const [a = [], b = []] = [true, false].map(
-    (dparen) => read(line, 0, "", { dparen, misses: 0 }).commands,
+  const all = [true, false].flatMap((dparen) =>
+    [true, false].map(
+      (heredocs) => read(line, 0, "", { dparen, heredocs, misses: 0 }).commands,
+    ),
   );
-  return JSON.stringify(a) === JSON.stringify(b) ? [a] : [a, b];
+  return [...new Map(all.map((r) => [JSON.stringify(r), r])).values()];
 }
 
 // Words that may come before the keyword `case`: `if case …`, `! case …`, `{ case …`.
@@ -46,13 +49,13 @@ const OPENERS = new Set([
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
 const beforeProgram = (w: string) => ASSIGNMENT.test(w) || KEYWORDS.has(w);
 
-type How = { dparen: boolean; misses: number };
+type How = { dparen: boolean; heredocs: boolean; misses: number };
 const MAX_MISSES = 64;
 
 /**
  * Reads `line` from `from` to its end, or to the `stop` that closes a substitution: its commands, and where it stopped.
- * `how.dparen`: `((` may open arithmetic; `how.misses`: each `((` read ahead that was not arithmetic, and is read
- * again; `arith`: this is arithmetic, where `<<` is a shift.
+ * `how.dparen`: `((` may open arithmetic; `how.heredocs`: a `<<` after a murky `${…}` starts a heredoc; `how.misses`:
+ * each `((` read ahead that was not arithmetic, and is read again; `arith`: this is arithmetic, where `<<` is a shift.
  */
 function read(
   line: string,
@@ -69,7 +72,8 @@ function read(
   let plain = true; // no quote, escape or expansion in the word, so a shell may read it as a keyword
   let depth = 0; // parentheses opened inside a $( … )
   // Each ${ still open, and whether it opened inside double quotes. Where one ends turns murky at a bare { inside
-  // it (zsh nests it, bash doesn't) or a separator before its }: from there on, no `<<` starts a heredoc.
+  // it (zsh nests it, bash doesn't) or a separator before its }: from there on, a `<<` starts a heredoc only in the
+  // reading that says so (how.heredocs), so the line is judged both ways.
   const braces: boolean[] = [];
   let murky = false;
   let gaps: number[] = []; // where the word holds a space kept for a ${ that has not closed yet
@@ -149,6 +153,7 @@ function read(
   let i = from;
   for (; i < line.length; i++) {
     const ch = line[i] ?? "";
+    const here = !braces.length && (!murky || how.heredocs) && !arith; // a << here may start a heredoc
     const endsArm =
       ch === ";" ? line.slice(i, i + 3).match(/^;(;&?|[&|])/)?.[0] : undefined; // ;; ;& ;;& or ;|
     // Arithmetic that opens here: `$((`, or an unquoted `((`.
@@ -199,16 +204,16 @@ function read(
       else word += ch;
     } else if ((ch === "<" || ch === ">") && line[i + 1] === "(")
       i = substitute(i, i + 2, ")");
-    else if (line.startsWith("<<<", i) && !braces.length && !murky && !arith) {
+    else if (line.startsWith("<<<", i) && here) {
       end();
       out[out.length - 1]?.push("<<<"); // a here-string: the word after it is text handed to the command
       i += 2;
-    } else if (line.startsWith("<<", i) && !braces.length && !murky && !arith) {
+    } else if (line.startsWith("<<", i) && here) {
       const tag = delimiter(line, i + 2);
       if (tag) heredocs.push(tag);
       i = (tag?.end ?? i + 2) - 1;
-    } else if (ch === "#" && !inWord) {
-      // A comment, to the end of its line: its quotes are text, and its words are read as commands.
+    } else if (ch === "#" && !inWord && !braces.length) {
+      // A comment, to the end of its line: its quotes are text, and its words are read as commands. In ${…}, # is text.
       const eol = line.indexOf("\n", i);
       next();
       for (const part of line
@@ -332,6 +337,12 @@ function delimiter(line: string, at: number) {
       tag += line.slice(i + 1, close);
       expands = false;
       i = close;
+    } else if (ch === "$" && /['"]/.test(line[i + 1] ?? "")) {
+      // `$'…'` and `$"…"` quote a delimiter too: the quote is read next. Shells decode `$'…'`'s escapes; this doesn't.
+      if (/^\$'[^']*\\/.test(line.slice(i)))
+        throw new Error(
+          "it ends a heredoc at a `$'…'` delimiter holding an escape",
+        );
     } else if (ch === "$" && line[i + 1] === "(") {
       // the shells take `$(…)` in a delimiter as its text
       const start = i;

@@ -946,6 +946,15 @@ const REFUSED: [string, string][] = [
   [`echo \${x:-"}" <<EOF}\ngh release create v1\nEOF`, LOOP],
   ["# it's fine\ngh release create v1\n# done'", LOOP],
   ["# a comment; gh release create v1", LOOP], // a shell that takes no comments (zsh -i) runs it
+  // A bare { in a ${…} that closed, a `#` inside a ${…}, and a `$'…'` or `$"…"` delimiter hide nothing either (bash, zsh,
+  // sh and dash each run the last line).
+  [
+    `body="\${PAYLOAD:-{}}"\ngit commit -F - <<EOF\nDon't ship yet\nEOF\nsupabase db push`,
+    CLOUD,
+  ],
+  [`echo \${a:- #'\necho '}\nsupabase db push`, CLOUD],
+  ["cat <<$'EOF'\nhi\nEOF\nsupabase db push", CLOUD],
+  ['cat <<$"EOF"\nhi\nEOF\ngh release create v1', LOOP],
   // A backslash before a new line joins the lines; a heredoc's delimiter is its whole word, quotes removed; a `<<`
   // in arithmetic starts no heredoc in bash, zsh or ksh, while dash, which has no `((`, reads it as one.
   ["g\\\nh release create v1", LOOP],
@@ -1203,6 +1212,13 @@ describe("toolRefusal: what agents' own tools may not do", () => {
       "nests more than 64",
     );
     expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("refuses a heredoc whose `$'…'` delimiter holds an escape, which shells decode and it doesn't", () => {
+    // bash, zsh, sh and dash all end this heredoc at `EF`, then run the last line.
+    expect(() =>
+      toolRefusal("cat <<$'E\\x46'\nhi\nEF\ngh release create v1", look),
+    ).toThrow("`$'…'` delimiter holding an escape");
   });
 
   it("refuses when it can't tell which branch a bare push would push", () => {
