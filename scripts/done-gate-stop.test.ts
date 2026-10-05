@@ -526,3 +526,92 @@ describe("a stop on a machine without Docker says what did not run, never with a
     }
   });
 });
+
+describe("a stop refuses the checks on the database while a worker runs on this machine", () => {
+  /** A stand-in ps, first on the PATH the hook starts with, that prints `body` (a shell script's lines). */
+  const ps = (body: string) => {
+    const bin = scratch("ps-");
+    write(bin, "ps", `#!/bin/sh\n${body}\n`);
+    chmodSync(join(bin, "ps"), 0o755);
+    return { PATH: `${bin}:${process.env.PATH}` };
+  };
+  // Workers, from any checkout: the "api" preview (.claude/launch.json), `bun run dev`, the browser checks and the
+  // verifier (`bun services/worker/src/index.ts`), one in another worktree.
+  const WORKERS = [
+    "  101 /Users/dev/.bun/bin/bun run local bun --watch services/worker/src/index.ts",
+    "  102 bun --watch services/worker/src/index.ts",
+    "  103 /Users/dev/.bun/bin/bun services/worker/src/index.ts",
+    "  104 bun /Users/dev/revenue-os/.claude/worktrees/x/services/worker/src/index.ts",
+  ];
+  // Processes that only name the file, or run something else.
+  const OTHERS = [
+    "  201 vim services/worker/src/index.ts",
+    "  202 grep services/worker/src/index.ts",
+    "  203 /bin/zsh -c bun services/worker/src/index.ts", // its bun is listed on its own line
+    "  204 bun test services/worker/test/env-port.test.ts",
+    "  205 bun services/worker/src/index.tsx",
+    "  206 /usr/bin/bunzip2 services/worker/src/index.ts",
+  ];
+
+  it("names each worker and how to stop it, and runs none of them until it is gone", () => {
+    const dir = repo();
+    write(dir, "docs/notes.md", "hello\n");
+    const listed = OTHERS.flatMap((o, i) => [o, WORKERS[i]].filter(Boolean));
+    const r = stop(dir, {}, ps(`cat <<'EOF'\n${listed.join("\n")}\nEOF`));
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "tests, tests proven, database policies, browser checks did not run: a worker is running on this machine",
+    );
+    for (const w of WORKERS) expect(r.reason).toContain(`\n- ${w.trim()}\n`);
+    for (const o of OTHERS) expect(r.reason).not.toContain(o.trim());
+    expect(r.reason).toContain("`kill 101 102 103 104`");
+    expect(databaseChecksRan(dir)).toBe(0);
+    expect(stop(dir)).toEqual({
+      ...QUIET,
+      told: `${ALL_CHECKS} (no product code changed, so no verifier needed)`,
+    });
+    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
+  });
+
+  it("runs none of them when it can't list this machine's processes, and says why", () => {
+    const dir = repo();
+    write(dir, "docs/notes.md", "hello\n");
+    const r = stop(dir, {}, ps("echo 'ps: no such option' >&2\nexit 1"));
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "did not run: could not look for a running worker: ps failed: ps: no such option",
+    );
+    expect(databaseChecksRan(dir)).toBe(0);
+  });
+
+  // A real listing holds at least ps itself, but Bun 1.3.11's synchronous spawn can hand back no output from a ps
+  // that succeeded (oven-sh/bun#34069).
+  it("asks again when ps answers with nothing, and never reads that as no worker", () => {
+    const dir = repo();
+    write(dir, "docs/notes.md", "hello\n");
+    const r = stop(dir, {}, ps("exit 0"));
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "did not run: could not look for a running worker: ps listed no processes, asked three times",
+    );
+    expect(databaseChecksRan(dir)).toBe(0);
+    // Empty twice, then a real listing: the third answer counts.
+    const once = ps(
+      `n=$(cat "$0.n" 2>/dev/null || echo 0); echo $((n + 1)) > "$0.n"\nif [ "$n" -ge 2 ]; then echo '${WORKERS[1]}'; fi`,
+    );
+    expect(stop(dir, {}, once).reason).toContain(`\n- ${WORKERS[1]?.trim()}\n`);
+  });
+
+  it("reads a listing longer than 1 MiB, as a busy machine's is, to its end", () => {
+    const dir = repo();
+    write(dir, "docs/notes.md", "hello\n");
+    const helper = `  300 /Applications/Helper.app/Contents/MacOS/helper --type=renderer ${"x".repeat(200)}`;
+    const r = stop(
+      dir,
+      {},
+      ps(`yes '${helper}' | head -n 10000\necho '${WORKERS[0]}'`),
+    );
+    expect(r.reason).toContain(`\n- ${WORKERS[0]?.trim()}\n`);
+    expect(databaseChecksRan(dir)).toBe(0);
+  });
+});
