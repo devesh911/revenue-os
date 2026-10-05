@@ -9,14 +9,28 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { git } from "./git";
 
+/**
+ * The gate's folder inside the repository's shared git folder, the same for every checkout. Under load Bun's
+ * synchronous spawn can hand back no output from a git that succeeded (oven-sh/bun#34069), and that empty answer
+ * would name a `done-gate/` folder inside the checkout: a lock of its own, free while another run holds the real
+ * one. So git is asked again, and a run that still gets no absolute folder stops.
+ */
 export function stateDir(repo: string): string {
-  const dir = join(
-    git(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"]),
-    "done-gate",
-  );
+  let common = "";
+  for (let ask = 0; ask < 3 && !isAbsolute(common); ask++)
+    common = git(repo, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ]);
+  if (!isAbsolute(common))
+    throw new Error(
+      `git named no shared folder for the repository at ${repo} (asked three times; last answer "${common}"), so the gate can't find the lock and record every checkout shares.`,
+    );
+  const dir = join(common, "done-gate");
   mkdirSync(dir, { recursive: true });
   return dir;
 }
