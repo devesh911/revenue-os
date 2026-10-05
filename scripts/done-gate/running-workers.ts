@@ -9,11 +9,13 @@ import { spawnSync } from "node:child_process";
 const WORKER =
   /^\s*\d+\s+(?:\S*\/)?bun\s(?:.*\s)?\S*services\/worker\/src\/index\.ts(?:\s|$)/;
 
-// The ps first on the PATH scripts/done-gate.ts sets, as for `docker` (checks.ts); -ww: whole command lines.
+// The ps first on the PATH scripts/done-gate.ts sets, as for `docker` (checks.ts); -ww: whole command lines, which on
+// a busy machine pass Bun's default 1 MiB output limit.
 const ps = () =>
   spawnSync("ps", ["-A", "-ww", "-o", "pid=,args="], {
     encoding: "utf8",
     env: process.env,
+    maxBuffer: 256 << 20,
   });
 
 /** Throws, naming each worker running on this machine and how to stop it, or when it can't list the processes. */

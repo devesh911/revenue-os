@@ -601,4 +601,17 @@ describe("a stop refuses the checks on the database while a worker runs on this 
     );
     expect(stop(dir, {}, once).reason).toContain(`\n- ${WORKERS[1]?.trim()}\n`);
   });
+
+  it("reads a listing longer than 1 MiB, as a busy machine's is, to its end", () => {
+    const dir = repo();
+    write(dir, "docs/notes.md", "hello\n");
+    const helper = `  300 /Applications/Helper.app/Contents/MacOS/helper --type=renderer ${"x".repeat(200)}`;
+    const r = stop(
+      dir,
+      {},
+      ps(`yes '${helper}' | head -n 10000\necho '${WORKERS[0]}'`),
+    );
+    expect(r.reason).toContain(`\n- ${WORKERS[0]?.trim()}\n`);
+    expect(databaseChecksRan(dir)).toBe(0);
+  });
 });
