@@ -9,16 +9,27 @@ import { spawnSync } from "node:child_process";
 const WORKER =
   /^\s*\d+\s+(?:\S*\/)?bun\s(?:.*\s)?\S*services\/worker\/src\/index\.ts(?:\s|$)/;
 
-/** Throws, naming each worker running on this machine and how to stop it, or when it can't list the processes. */
-export function noWorkerRunning() {
-  // The ps first on the PATH scripts/done-gate.ts sets, as for `docker` (checks.ts); -ww: whole command lines.
-  const r = spawnSync("ps", ["-A", "-ww", "-o", "pid=,args="], {
+// The ps first on the PATH scripts/done-gate.ts sets, as for `docker` (checks.ts); -ww: whole command lines.
+const ps = () =>
+  spawnSync("ps", ["-A", "-ww", "-o", "pid=,args="], {
     encoding: "utf8",
     env: process.env,
   });
+
+/** Throws, naming each worker running on this machine and how to stop it, or when it can't list the processes. */
+export function noWorkerRunning() {
+  // A real listing holds at least ps itself, but Bun 1.3.11's synchronous spawn can hand back no output from a ps that
+  // succeeded (oven-sh/bun#34069): an empty answer is asked again, as store.ts asks git, and never read as "none".
+  let r = ps();
+  for (let ask = 1; ask < 3 && r.status === 0 && !r.stdout.trim(); ask++)
+    r = ps();
   if (r.status !== 0)
     throw new Error(
       `could not look for a running worker: ps failed: ${(r.error?.message ?? r.stderr ?? "").trim()}`,
+    );
+  if (!r.stdout.trim())
+    throw new Error(
+      "could not look for a running worker: ps listed no processes, asked three times",
     );
   const workers = r.stdout
     .split("\n")

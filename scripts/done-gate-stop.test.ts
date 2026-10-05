@@ -583,4 +583,22 @@ describe("a stop refuses the checks on the database while a worker runs on this 
     );
     expect(databaseChecksRan(dir)).toBe(0);
   });
+
+  // A real listing holds at least ps itself, but Bun 1.3.11's synchronous spawn can hand back no output from a ps
+  // that succeeded (oven-sh/bun#34069).
+  it("asks again when ps answers with nothing, and never reads that as no worker", () => {
+    const dir = repo();
+    write(dir, "docs/notes.md", "hello\n");
+    const r = stop(dir, {}, ps("exit 0"));
+    expect(r.sentBack).toBe(true);
+    expect(r.reason).toContain(
+      "did not run: could not look for a running worker: ps listed no processes, asked three times",
+    );
+    expect(databaseChecksRan(dir)).toBe(0);
+    // Empty twice, then a real listing: the third answer counts.
+    const once = ps(
+      `n=$(cat "$0.n" 2>/dev/null || echo 0); echo $((n + 1)) > "$0.n"\nif [ "$n" -ge 2 ]; then echo '${WORKERS[1]}'; fi`,
+    );
+    expect(stop(dir, {}, once).reason).toContain(`\n- ${WORKERS[1]?.trim()}\n`);
+  });
 });
