@@ -65,7 +65,7 @@ function read(
   arith = false,
 ) {
   const out: string[][] = [[]];
-  const heredocs: { tag: string; expands: boolean }[] = [];
+  const heredocs: { tag: string; expands: boolean; strip: boolean }[] = [];
   let word = "";
   let quote = "";
   let inWord = false;
@@ -227,7 +227,7 @@ function read(
       end();
       if (!leading) arm = undefined; // a pattern ends on its own line
       separate();
-      for (const { tag, expands } of heredocs.splice(0)) {
+      for (const { tag, expands, strip } of heredocs.splice(0)) {
         let at = i + 1;
         while (at < line.length) {
           let text = "";
@@ -242,7 +242,7 @@ function read(
             /(^|[^\\])(\\\\)*\\$/.test(text) &&
             at < line.length
           );
-          if (text.trim() === tag) break;
+          if ((strip ? text.replace(/^\t+/, "") : text) === tag) break; // `<<-` strips leading tabs, nothing else
         }
         if (expands) first(substitutionsIn(line.slice(i + 1, at), how)); // an unquoted tag: the body is double-quoted text
         i = at - 1;
@@ -265,7 +265,7 @@ function read(
         arm = undefined;
         next();
       }
-    } else if (endsArm && !braces.length && !murky) {
+    } else if (endsArm && !braces.length && !murky && !arith) {
       next();
       arm = []; // the next arm's patterns come next
       leading = true;
@@ -319,7 +319,8 @@ function substitutionsIn(text: string, how: How) {
  * ends. Nothing for no word, an unclosed quote, or a word across lines, which no single line can match.
  */
 function delimiter(line: string, at: number) {
-  let i = at + (line[at] === "-" ? 1 : 0);
+  const strip = line[at] === "-";
+  let i = at + (strip ? 1 : 0);
   while (/[ \t]/.test(line[i] ?? "") || line.startsWith("\\\n", i))
     i += line[i] === "\\" ? 2 : 1;
   let tag = "";
@@ -352,7 +353,9 @@ function delimiter(line: string, at: number) {
       tag += line.slice(start, i + 1);
     } else tag += ch;
   }
-  return tag && !tag.includes("\n") ? { tag, expands, end: i } : undefined;
+  return tag && !tag.includes("\n")
+    ? { tag, expands, strip, end: i }
+    : undefined;
 }
 
 // Words that open or close a compound command, not the program it runs.

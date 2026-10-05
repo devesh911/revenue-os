@@ -955,6 +955,12 @@ const REFUSED: [string, string][] = [
   [`echo \${a:- #'\necho '}\nsupabase db push`, CLOUD],
   ["cat <<$'EOF'\nhi\nEOF\nsupabase db push", CLOUD],
   ['cat <<$"EOF"\nhi\nEOF\ngh release create v1', LOOP],
+  // A `;;` in arithmetic ends no case arm (bash, zsh and sh run gh); a heredoc ends only at a line that is exactly its
+  // delimiter, after `<<-` strips leading tabs (every shell runs gh).
+  ["for ((i=1;;i<<1)); do break; done\ngh release create v1\n1", LOOP],
+  ["cat <<EOF\n EOF\nit's\nEOF\ngh pr close 5", LOOP],
+  ["cat <<EOF\nEOF \nit's\nEOF\ngh pr close 5", LOOP],
+  ["cat <<-EOF\n  EOF\nit's\n\tEOF\ngh pr close 5", LOOP],
   // A backslash before a new line joins the lines; a heredoc's delimiter is its whole word, quotes removed; a `<<`
   // in arithmetic starts no heredoc in bash, zsh or ksh, while dash, which has no `((`, reads it as one.
   ["g\\\nh release create v1", LOOP],
