@@ -6,6 +6,7 @@
 import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   copyFileSync,
   cpSync,
   existsSync,
@@ -2070,6 +2071,42 @@ describe("the hook", () => {
     );
   });
 
+  it("refuses a merge, never letting it through unchecked, when git can't name the folder holding the gate's record", () => {
+    // git failing, and git's answer lost, as Bun's synchronous spawn can lose it under load (oven-sh/bun#34069)
+    for (const answer of ["exit 128", "exit 0"]) {
+      const dir = repo();
+      write(
+        dir,
+        "bin/git",
+        `#!/bin/sh\ncase "$*" in *--git-common-dir*) ${answer};; esac\nexec ${Bun.which("git")} "$@"\n`,
+      );
+      chmodSync(join(dir, "bin", "git"), 0o755);
+      const head = sh(dir, ["git", "rev-parse", "HEAD"]).stdout.trim();
+      const r = sh(
+        dir,
+        ["bun", GATE, "hook"],
+        { PATH: `${join(dir, "bin")}:${process.env.PATH}` },
+        JSON.stringify({
+          hook_event_name: "PreToolUse",
+          session_id: "s1",
+          cwd: dir,
+          tool_name: "Bash",
+          tool_input: {
+            command: `gh pr merge 5 --squash --match-head-commit ${head}`,
+          },
+        }),
+      );
+      expect(JSON.parse(r.stdout || "{}")).toMatchObject({
+        hookSpecificOutput: {
+          permissionDecision: "deny",
+          permissionDecisionReason: expect.stringContaining(
+            "it could not check this merge (Error: git",
+          ),
+        },
+      });
+    }
+  });
+
   it("lets a CANNOT_VERIFY ruling stop, told to Devesh as NOT verified with what the verifier needs from him", () => {
     const dir = repo();
     hook(dir, "SessionStart"); // the session notes the checkout before it changes it
@@ -3866,4 +3903,55 @@ await onSharedStack(".", async () => {
     expect(errors.join("")).toBe("");
     expect(readFileSync(join(dir, "log"), "utf8")).toBe("held\n".repeat(16));
   }, 30_000);
+
+  // Under load Bun's synchronous spawn can hand back no output from a git that succeeded (oven-sh/bun#34069): one
+  // of 16 waiters then locked a `done-gate/` folder of its own inside the checkout and ran beside the real holder.
+  // Here a fake git, first on the PATH, gives that empty answer to the question of where the shared folder is.
+  const useWithGit = (dir: string, fakeGit: string) => {
+    write(
+      dir,
+      "bin/git",
+      `#!/bin/sh\n${fakeGit}\nexec ${Bun.which("git")} "$@"\n`,
+    );
+    chmodSync(join(dir, "bin", "git"), 0o755);
+    write(
+      dir,
+      "use.ts",
+      'import { onSharedStack } from "./scripts/done-gate/shared-stack.ts";\nawait onSharedStack(".", () => console.log("ran"));\n',
+    );
+    return Bun.spawn([process.execPath, "use.ts"], {
+      cwd: dir,
+      env: { ...process.env, PATH: `${join(dir, "bin")}:${process.env.PATH}` },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+  };
+
+  it("waits for a live holder even when git's answer naming the shared folder comes back empty once", async () => {
+    const dir = repo();
+    const lock = join(dir, ".git", "done-gate", "local-stack.lock");
+    mkdirSync(dirname(lock), { recursive: true });
+    writeFileSync(lock, String(process.pid)); // a holder that is still running
+    const use = useWithGit(
+      dir,
+      'if [ "$1" = rev-parse ] && [ ! -e "$0.asked" ]; then : > "$0.asked"; exit 0; fi',
+    );
+    await Bun.sleep(1200);
+    expect(use.exitCode).toBeNull(); // still waiting for the holder
+    rmSync(lock);
+    expect(await use.exited).toBe(0);
+    expect(await new Response(use.stdout).text()).toBe("ran\n");
+    expect(existsSync(join(dir, "done-gate"))).toBe(false);
+  });
+
+  it("refuses, running nothing, when git never names the shared folder, rather than lock a folder of its own", async () => {
+    const dir = repo();
+    const use = useWithGit(dir, '[ "$1" = rev-parse ] && exit 0');
+    expect(await use.exited).not.toBe(0);
+    expect(await new Response(use.stderr).text()).toContain(
+      "git named no shared folder for the repository",
+    );
+    expect(await new Response(use.stdout).text()).toBe("");
+    expect(existsSync(join(dir, "done-gate"))).toBe(false);
+  });
 });
