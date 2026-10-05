@@ -1,7 +1,33 @@
 // For guardrail, tenancy and money code, the gate breaks each new line on purpose and a test must then fail
-// (scripts/done-gate/broken-lines.ts says which files and how a line is broken). Here the pure part, on text.
-import { describe, expect, it } from "bun:test";
+// (scripts/done-gate/broken-lines.ts says which files and how a line is broken, break-check.ts runs it). The pure
+// part is checked on text; the whole run on throwaway git repos holding a tiny product, with real git and real bun
+// test runs.
+import { afterAll, describe, expect, it, setDefaultTimeout } from "bun:test";
+import { spawnSync } from "node:child_process";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { breakCheck } from "./done-gate/break-check";
 import { breaksOf, codeMask, kindOf } from "./done-gate/broken-lines";
+import { CHECKS } from "./done-gate/checks";
+import { judgePr } from "./done-gate/pr";
+import { rulesOn } from "./done-gate/rules";
+import { snapshot } from "./done-gate/snapshot";
+
+// Each repo test starts git and bun several times; with other agents busy on the machine that passes bun's 5 s.
+setDefaultTimeout(90_000);
+const dirs: string[] = [];
+afterAll(() => {
+  for (const d of dirs) rmSync(d, { recursive: true, force: true });
+});
 
 /** The broken copies of `line` in `src`, each as what was done and the line or statement shown. */
 const broken = (src: string, line: number) =>
@@ -166,5 +192,248 @@ describe("breaksOf: up to two broken copies of a line", () => {
     expect(broken(src, 2)).toEqual([
       "remove: const g = (x: number) => x >> 1;",
     ]);
+  });
+});
+
+/** Writes files into a folder, making the folders they need. */
+const put = (dir: string, files: Record<string, string>) => {
+  for (const [f, body] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, f)), { recursive: true });
+    writeFileSync(join(dir, f), body);
+  }
+};
+const sh = (dir: string, cmd: string[]) =>
+  spawnSync(cmd[0] as string, cmd.slice(1), { cwd: dir, encoding: "utf8" });
+
+const METER = "packages/harness/src/meter.ts"; // money code
+const COST = "export function cost(n: number) {\n  return n;\n}\n";
+// The change: line 2 is new.
+const GUARDED_COST =
+  "export function cost(n: number) {\n  if (n < 0) return 0;\n  return n;\n}\n";
+const testOf = (body: string) => `import { expect, it } from "bun:test";
+import { cost } from "../src/meter";
+
+it("costs", () => {
+${body}
+});
+`;
+const CATCHES = testOf(
+  "  expect(cost(-1)).toBe(0);\n  expect(cost(2)).toBe(2);",
+);
+const WEAK = testOf("  expect(cost(2)).toBeGreaterThan(-100);");
+
+/** A throwaway repo: main holds METER (cost, unguarded) and `onMain`; origin/main points at it; `change` is written in. */
+function scratch(
+  change: Record<string, string>,
+  onMain: Record<string, string> = {},
+) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "break-check-")));
+  dirs.push(dir);
+  put(dir, {
+    "package.json": '{ "name": "scratch", "private": true }\n',
+    [METER]: COST,
+    ...onMain,
+  });
+  sh(dir, ["git", "init", "-q", "-b", "main"]);
+  sh(dir, ["git", "add", "-A"]);
+  sh(dir, [
+    "git",
+    "-c",
+    "user.email=t@t",
+    "-c",
+    "user.name=t",
+    "commit",
+    "-qm",
+    "main",
+  ]);
+  sh(dir, ["git", "update-ref", "refs/remotes/origin/main", "HEAD"]);
+  put(dir, change);
+  return dir;
+}
+const check = (dir: string, budgetMs?: number) =>
+  breakCheck(dir, snapshot(dir), budgetMs);
+
+describe("breakCheck on a throwaway repo", () => {
+  it("passes a new money line whose every break a real test catches", () => {
+    const r = check(
+      scratch({
+        [METER]: GUARDED_COST,
+        "packages/harness/test/meter.test.ts": CATCHES,
+      }),
+    );
+    expect(r.text).toStartWith(
+      "Break check ✓ 1 line(s) broken in guardrail, tenancy and money code, each caught (2 break(s),",
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("fails a new line whose breaks only a test asserting nothing about it runs, naming the line, the break and the files that ran; a test under scripts/ is never asked", () => {
+    const r = check(
+      scratch({
+        [METER]: GUARDED_COST,
+        "packages/harness/test/meter.test.ts": WEAK,
+        "scripts/meter-guard.test.ts": CATCHES.replace(
+          "../src/meter",
+          "../packages/harness/src/meter",
+        ),
+      }),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.text).toContain(
+      "- packages/harness/src/meter.ts:2 (money) with a condition flipped, `if (n >= 0) return 0;`, and every test that runs it still passed: packages/harness/test/meter.test.ts",
+    );
+    expect(r.text).toContain(
+      "- packages/harness/src/meter.ts:2 (money) with its statement removed, `if (n < 0) return 0;`, and every test that runs it still passed: packages/harness/test/meter.test.ts",
+    );
+  });
+
+  it("passes a marked line and shows the mark; a mark without a reason does not hold", () => {
+    const marked = (mark: string) =>
+      scratch({
+        [METER]: GUARDED_COST.replace(
+          "  if (n < 0)",
+          `  // break-check gap: ${mark}\n  if (n < 0)`,
+        ),
+        "packages/harness/test/meter.test.ts": WEAK,
+      });
+    const ok = check(marked("refunds are checked by the billing report"));
+    expect(ok.ok).toBe(true);
+    expect(ok.text).toContain(
+      "⚠ break-check mark at packages/harness/src/meter.ts:3: refunds are checked by the billing report",
+    );
+    const bare = check(marked(""));
+    expect(bare.ok).toBe(false);
+    expect(bare.text).toContain(
+      "packages/harness/src/meter.ts:3 has a break-check mark without a reason",
+    );
+  });
+
+  it("never breaks a line outside guardrail, tenancy and money code", () => {
+    const r = check(
+      scratch(
+        {
+          "services/worker/src/scheduler.ts": GUARDED_COST,
+          "services/worker/test/scheduler.test.ts": WEAK.replace(
+            "../src/meter",
+            "../src/scheduler",
+          ),
+        },
+        { "services/worker/src/scheduler.ts": COST },
+      ),
+    );
+    expect(r).toEqual({
+      ok: true,
+      text: "Break check ✓ no new line in guardrail, tenancy or money code, so nothing to break",
+    });
+  });
+
+  it("leaves a line no test runs to the coverage check, saying so", () => {
+    const r = check(scratch({ [METER]: GUARDED_COST }));
+    expect(r.ok).toBe(true);
+    expect(r.text).toContain(
+      "⚠ packages/harness/src/meter.ts:2 is run by no test, so it wasn't broken (the coverage check reports a line no test runs)",
+    );
+  });
+
+  it("stops at its time limit and fails, naming each line not yet broken", () => {
+    const r = check(
+      scratch({
+        [METER]: GUARDED_COST,
+        "packages/harness/test/meter.test.ts": CATCHES,
+      }),
+      0,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.text).toContain(
+      "the break check's time limit of 0 min ran out after 0 break(s): not yet broken: packages/harness/src/meter.ts:2",
+    );
+  });
+
+  it("runs as `bun run gate broken`, failing with the reason", () => {
+    const dir = scratch({
+      [METER]: GUARDED_COST,
+      "packages/harness/test/meter.test.ts": WEAK,
+    });
+    for (const f of [
+      "scripts/done-gate.ts",
+      "scripts/done-gate",
+      "docs/tracker/parse.js",
+    ])
+      cpSync(join(import.meta.dir, "..", f), join(dir, f), { recursive: true });
+    const r = sh(dir, [process.execPath, "scripts/done-gate.ts", "broken"]);
+    expect(r.stdout).toContain(
+      "packages/harness/src/meter.ts:2 (money) with a condition flipped",
+    );
+    expect(r.status).toBe(1);
+  });
+
+  it("shows each mark at every stop and asks the PR body to quote it", async () => {
+    const dir = scratch({
+      [METER]: GUARDED_COST.replace(
+        "  if (n < 0) return 0;",
+        "  if (n < 0) return 0; // break-check gap: refunds are checked elsewhere",
+      ),
+    });
+    const quote =
+      "Break-check mark: packages/harness/src/meter.ts · refunds are checked elsewhere";
+    expect(rulesOn(snapshot(dir)).notes).toContain(
+      `break-check mark at packages/harness/src/meter.ts:2: refunds are checked elsewhere · the PR body quotes it: \`${quote}\``,
+    );
+    const pr = (body: string) => judgePr(snapshot(dir), body);
+    expect((await pr("Roadmap: off-roadmap — x")).problems).toContain(
+      `the PR body does not show the break-check mark at packages/harness/src/meter.ts:2: add the line \`${quote}\``,
+    );
+    expect(
+      (await pr(`Roadmap: off-roadmap — x\n\n${quote}\n`)).problems.join("\n"),
+    ).not.toContain("break-check mark");
+  });
+});
+
+describe("where the break check runs", () => {
+  it("is one of the gate's checks on the shared database, right after tests proven, and names its summary", () => {
+    const at = CHECKS.findIndex((c) => c.name === "break check");
+    expect(CHECKS[at - 1]?.name).toBe("tests proven");
+    const c = CHECKS[at];
+    expect(c?.cmd).toEqual([
+      "bun",
+      "run",
+      "local",
+      "bun",
+      "run",
+      "gate",
+      "broken",
+    ]);
+    expect(c?.db).toBe(true);
+    expect(
+      c?.said?.(
+        "Break check ✓ 3 line(s) broken in guardrail, tenancy and money code, each caught (6 break(s), 9 test file run(s), 41.0 s)\n⚠ note",
+      ),
+    ).toBe(
+      "3 line(s) broken in guardrail, tenancy and money code, each caught",
+    );
+    expect(
+      c?.said?.(
+        "Break check ✓ no new line in guardrail, tenancy or money code, so nothing to break",
+      ),
+    ).toBe(
+      "no new line in guardrail, tenancy or money code, so nothing to break",
+    );
+  });
+
+  it("runs in CI's checks job right after tests proven, against the pull request's base", () => {
+    const ci = Bun.YAML.parse(
+      readFileSync(
+        join(import.meta.dir, "..", ".github", "workflows", "ci.yml"),
+        "utf8",
+      ),
+    ) as {
+      jobs: { checks: { steps: { run?: string; env?: { BASE?: string } }[] } };
+    };
+    const steps = ci.jobs.checks.steps;
+    const proven = steps.findIndex((s) => s.run?.includes("gate proven"));
+    expect(steps[proven + 1]).toMatchObject({
+      run: 'bun run gate broken --base "$BASE"',
+      env: { BASE: `origin/\${{ github.base_ref || 'main' }}` },
+    });
   });
 });

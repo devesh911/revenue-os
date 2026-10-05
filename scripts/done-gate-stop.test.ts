@@ -141,7 +141,7 @@ const ran = (dir: string, command: string) =>
     tool_input: { command },
   });
 const ALL_CHECKS =
-  "Done gate ✓ typecheck, lint, guards, 3 tests, 3 tests proven, database policies, 3 browser checks";
+  "Done gate ✓ typecheck, lint, guards, 3 tests, 3 tests proven, break check, database policies, 3 browser checks";
 const WAITING =
   "Done gate ⏳ NOT fully checked yet: tests, database policies and browser checks wait while background work runs; the first stop after it ends runs them";
 const HERE =
@@ -332,9 +332,9 @@ describe("while background work runs, a stop still judges the done rules and the
     }); // a scheduled job counts too, and the change was not taken as checked
     expect(stop(dir)).toEqual({
       ...QUIET,
-      told: "Done gate ✓ typecheck, lint, guards, 3 tests, 3 tests proven, database policies, 3 browser checks (no product code changed, so no verifier needed)",
+      told: "Done gate ✓ typecheck, lint, guards, 3 tests, 3 tests proven, break check, database policies, 3 browser checks (no product code changed, so no verifier needed)",
     });
-    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
+    expect(databaseChecksRan(dir)).toBe(5); // tests, tests proven, break check, database policies, browser checks
     expect(stop(dir)).toEqual(QUIET);
   });
 
@@ -376,7 +376,7 @@ describe("while background work runs, a stop still judges the done rules and the
       ...QUIET,
       told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
     });
-    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
+    expect(databaseChecksRan(dir)).toBe(5); // tests, tests proven, break check, database policies, browser checks
     // Once it stopped, other background work no longer stands in for a ruling on code it never saw.
     write(dir, "services/worker/src/route.ts", "const route = 2;\n");
     expect(stop(dir, BACKGROUND).sentBack).toBe(true);
@@ -396,7 +396,7 @@ describe("while background work runs, a stop still judges the done rules and the
       ...QUIET,
       told: `${ALL_CHECKS} · verifier PASS: saw the route answer 200`,
     });
-    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
+    expect(databaseChecksRan(dir)).toBe(5); // tests, tests proven, break check, database policies, browser checks
   });
 
   it("never lets a stop's pass while background work ran count at merge on a machine with Docker", () => {
@@ -513,7 +513,7 @@ describe("a stop on a machine without Docker says what did not run, never with a
       encoding: "utf8",
     });
     expect(JSON.parse(r.stdout).systemMessage).toStartWith("Done gate ✓ ");
-    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
+    expect(databaseChecksRan(dir)).toBe(5); // tests, tests proven, break check, database policies, browser checks
   });
 
   it("asks the docker first on the PATH as the gate set it while running, on Linux too, where docker sits in /usr/bin", () => {
@@ -570,7 +570,7 @@ describe("a stop refuses the checks on the database while a worker runs on this 
       ...QUIET,
       told: `${ALL_CHECKS} (no product code changed, so no verifier needed)`,
     });
-    expect(databaseChecksRan(dir)).toBe(4); // tests, tests proven, database policies, browser checks
+    expect(databaseChecksRan(dir)).toBe(5); // tests, tests proven, break check, database policies, browser checks
   });
 
   it("runs none of them when it can't list this machine's processes, and says why", () => {

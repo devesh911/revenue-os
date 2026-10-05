@@ -116,6 +116,8 @@ export function breakCheck(
   });
   const files = [...new Set(judged.map((l) => l.file))];
   const late = () => Date.now() - started > budgetMs;
+  /** What is left of the budget, at least a second: no test run may outlast it. */
+  const left = () => Math.max(1000, budgetMs - (Date.now() - started));
   let copy: string | undefined;
   let runs = 0;
   let broken = 0;
@@ -144,7 +146,7 @@ export function breakCheck(
         judged.length = 0;
         break;
       }
-      const run = runTestFile(dir, t, { coverage: true });
+      const run = runTestFile(dir, t, { coverage: true, ms: left() });
       runs++;
       if (run.finished && run.status === 0) hits.set(t, run.hits);
       else
@@ -172,21 +174,26 @@ export function breakCheck(
           continue;
         }
         writeFileSync(join(dir, file), b.text);
-        let caught = false;
+        // A run stopped by its own limit hung on the break: caught. One stopped because the budget ran out: not judged.
+        let verdict: "caught" | "missed" | "late" = "missed";
         try {
           for (const t of runners) {
-            const run = runTestFile(dir, t, { ms: BROKEN_RUN_MS });
+            const ms = Math.min(BROKEN_RUN_MS, left());
+            const run = runTestFile(dir, t, { ms });
             runs++;
-            if (!run.finished || run.status !== 0) {
-              caught = true;
-              break;
-            }
+            if (!run.finished && ms < BROKEN_RUN_MS) verdict = "late";
+            else if (!run.finished || run.status !== 0) verdict = "caught";
+            if (verdict !== "missed") break;
           }
         } finally {
           writeFileSync(join(dir, file), original);
         }
+        if (verdict === "late") {
+          unbroken.push(`${at} (${b.how})`);
+          continue;
+        }
         broken++;
-        if (caught) caughtLines.add(at);
+        if (verdict === "caught") caughtLines.add(at);
         else
           problems.push(
             `${at} (${kindOf(file)}) ${b.how === "flip" ? "with a condition flipped" : "with its statement removed"}, \`${b.shown}\`, and every test that runs it still passed: ${runners.join(", ")}`,
