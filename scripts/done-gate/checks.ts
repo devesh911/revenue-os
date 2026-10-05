@@ -1,5 +1,6 @@
 // Every check the gate runs on the code as it stands: typecheck, lint, guards, tests, tests proven (tests-proven.ts),
-// database policies and the browser checks, the database ones one run at a time and only while no worker runs.
+// the break check (break-check.ts), database policies and the browser checks, the database ones one run at a time and
+// only while no worker runs.
 
 import { spawnSync } from "node:child_process";
 import { type AddressInfo, createConnection, createServer } from "node:net";
@@ -11,6 +12,8 @@ type Check = {
   cmd: [string, ...string[]];
   db?: true;
   browser?: true;
+  /** What the gate's summary line says of it, from what it printed; `tally` without one. */
+  said?: (out: string) => string;
 };
 
 export const CHECKS: Check[] = [
@@ -26,6 +29,14 @@ export const CHECKS: Check[] = [
     name: "tests proven",
     cmd: ["bun", "run", "local", "bun", "run", "gate", "proven"],
     db: true,
+  },
+  {
+    name: "break check",
+    cmd: ["bun", "run", "local", "bun", "run", "gate", "broken"],
+    db: true,
+    said: (out) =>
+      out.match(/^Break check ✓ (.+?)(?: \(\d+ break|$)/m)?.[1] ??
+      "break check",
   },
   { name: "database policies", cmd: ["bun", "run", "rls:check"], db: true },
   {
@@ -118,7 +129,7 @@ export async function runChecks(
       const r = run(repo, c.cmd, c.browser ? await browserEnv() : {});
       if (r.status !== 0)
         return `${c.name} failed (\`${c.cmd.join(" ")}\`):\n${tail(r.out)}`;
-      passed.push(tally(c.name, r.out));
+      passed.push(c.said?.(r.out) ?? tally(c.name, r.out));
     }
   };
   const onDb = CHECKS.filter((c) => c.db);

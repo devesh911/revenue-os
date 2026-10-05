@@ -86,6 +86,13 @@ jobs:
           git ls-files --others --exclude-standard >> .git/info/exclude
           bun run gate proven --base "$BASE"
 
+      # Each new line of guardrail, tenancy and money code, broken on purpose (a condition flipped, a statement
+      # removed), must make a test fail (scripts/done-gate/break-check.ts). The step above already ignores the job's files.
+      - name: Break check on guardrail, tenancy and money code
+        env:
+          BASE: origin/${{ github.base_ref || 'main' }}
+        run: bun run gate broken --base "$BASE"
+
       # Console sign-in e2e against the real local stack: the wrapper exports the stack env, Playwright
       # starts the worker + a console build (dist-e2e, never the guarded dist/), and the spec seeds its own data.
       - name: Console e2e (real local stack)

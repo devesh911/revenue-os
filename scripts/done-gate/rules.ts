@@ -3,6 +3,7 @@
 // (removed-tests.ts), which files decide what "done" means, and which are product code.
 
 import { changeMarks, markNote } from "./already-on-main";
+import { breakMarkNotes } from "./break-marks";
 import { exportsOf, statementAt, uncommented } from "./code-text";
 import { markNotes } from "./coverage-marks";
 import type { Added } from "./diff";
@@ -138,6 +139,7 @@ export function checkRules(
   const moved = movedNote(files, added, removed);
   if (moved) notes.push(moved);
   notes.push(...markNotes(added)); // each line no test runs on purpose, which Devesh sees
+  notes.push(...breakMarkNotes(added)); // each guarded line whose break no test notices, on purpose
   const rules = files.filter((f) => RULE_FILES.test(f));
   if (rules.length)
     notes.push(`changed what "done" means: ${rules.join(", ")}`);

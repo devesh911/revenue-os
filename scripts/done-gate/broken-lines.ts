@@ -6,7 +6,7 @@
 // so nothing inside them is ever flipped. A broken copy counts only when Bun's transpiler still reads it and what it
 // gives differs from the original's: a copy that would not parse, or a break of a type alone, is dropped.
 
-import { isTest } from "./rules";
+import { isTestFile } from "./test-run";
 
 export type Kind = "guardrail" | "tenancy" | "money";
 
@@ -44,7 +44,7 @@ export const GUARDED: { path: string; kind: Kind | null }[] = [
 
 /** PURE: the kind of guarded code a file is, if it is in scope. */
 export const kindOf = (file: string): Kind | undefined =>
-  /(?<!\.d)\.tsx?$/.test(file) && !isTest(file)
+  /(?<!\.d)\.tsx?$/.test(file) && !isTestFile(file)
     ? (GUARDED.find((g) =>
         g.path.endsWith("/") ? file.startsWith(g.path) : file === g.path,
       )?.kind ?? undefined)
