@@ -5,14 +5,17 @@
 // Test start-up used to rewrite the database login on every run (runs started together died with "tuple
 // concurrently updated"), test clean-ups deleted every company's queued calls and companies by name, the job
 // runner two tests start worked every company's queued jobs, and a dev-login test reseeded the dev workspace.
-// It assumes no worker (`bun run dev`) is running on this machine: one works every company's due jobs.
+// It refuses to start while a worker runs on this machine (scripts/done-gate/running-workers.ts): one works every
+// company's due jobs.
 import { afterAll, beforeAll, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
+import { noWorkerRunning } from "../../../scripts/done-gate/running-workers";
 import { type Pack, seed } from "../../../scripts/seed";
 import { children } from "../../../tests/children";
+import { within } from "../../../tests/deadline";
 import { testCompanies } from "../../../tests/test-companies";
 
 const repo = join(import.meta.dir, "../../..");
@@ -71,6 +74,7 @@ const holdings = async () => ({
 const { bun } = children();
 
 beforeAll(async () => {
+  noWorkerRunning();
   // pg-boss installs its tables on start; each queue needs its partition before a job can land in it.
   const boss = new PgBoss({
     connectionString: DB_URL,
@@ -125,10 +129,16 @@ afterAll(async () => {
 it("four whole-suite runs started at once all pass, and they and a demo run leave others' data alone", async () => {
   // The whole suite as `bun test` finds it, in its own order, but this file, which would start itself again.
   const suite = ["test", `--path-ignore-patterns=${SELF}`];
-  const runs = await Promise.all([
-    ...[1, 2, 3, 4].map(() => bun(suite, repo)),
-    bun(["scripts/demo.ts"], repo),
-  ]);
+  // A minute before bun's limit (the test's last line), whose clean-up would otherwise run under the comparison
+  // below (tests/deadline.ts).
+  const runs = await within(
+    1_140_000,
+    "the four whole-suite runs and the demo",
+    Promise.all([
+      ...[1, 2, 3, 4].map(() => bun(suite, repo)),
+      bun(["scripts/demo.ts"], repo),
+    ]),
+  );
   // A failed run shows its failures, or the end of its output.
   const failures = (out: string) =>
     out.match(/^\(fail\).*$|^error:.*$/gm)?.join("\n") || out.slice(-3000);
@@ -146,5 +156,5 @@ it("four whole-suite runs started at once all pass, and they and a demo run leav
     dev: devBefore,
   });
   // Four whole suites at once on CI's two cores: 285 s on 2026-10-04 before the tests-proven item's tests, over 600 s
-  // after; the limit grows with the suite, what it proves does not change.
+  // after; the limit grows with the suite, what it proves does not change, and the deadline above moves with it.
 }, 1_200_000);
