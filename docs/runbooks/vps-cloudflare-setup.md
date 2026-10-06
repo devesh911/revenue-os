@@ -1,8 +1,8 @@
 # VPS + Cloudflare setup — the exact walkthrough (Devesh-only tasks)
 
-Companion to T8 (topology), S3/S4 (the controls this implements), `docker/` (committed config),
-and `orchestrator/state/CLOUD-SETUP-RUNBOOK.md` (Supabase/GitHub half, already done). Work top to
-bottom. Where a value is secret it says WHERE to put it, never what it is.
+Companion to docs/tech-stack.md (the topology, T8), docs/security.md (the controls this implements, S3 and S4)
+and `docker/` (committed config); the Supabase and GitHub half is already set up (STATE.md says what is and
+what waits on Devesh). Work top to bottom. Where a value is secret it says WHERE to put it, never what it is.
 
 ## 0 · The picture (who talks to whom)
 
