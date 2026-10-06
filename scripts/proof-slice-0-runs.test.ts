@@ -111,9 +111,20 @@ describe("GitHub's run records: the cloud test database changes only after check
 });
 
 describe("the run-records step reads GitHub's records with gh", () => {
-  // A stand-in gh on PATH answering as GitHub did on 2026-10-05 at 14:04 UTC: the listing of ci's recent runs on
-  // main left out the runs on these commits, while each commit's own run, asked for by commit, was there.
-  it("finds each commit's ci run by its commit, so a run the recent-runs listing leaves out still counts", async () => {
+  /**
+   * Runs the step against a scratch repository (one commit changing no migration, one adding one) and a stand-in gh
+   * on PATH whose listing of ci's recent runs on main leaves out every run, as GitHub's did on 2026-10-05 at 14:04
+   * UTC, while each commit's own run, asked for by commit, is there. `tweak` changes the records first. Returns what
+   * the step saw, or the error it threw.
+   */
+  async function stepWith(
+    tweak: (r: {
+      runs: Record<string, { jobs: object[] }>;
+      ci: Record<string, object[]>;
+      clean: string;
+      migration: string;
+    }) => void = () => {},
+  ) {
     const dir = mkdtempSync(join(tmpdir(), "proof-runs-"));
     const path = process.env.PATH;
     try {
@@ -133,68 +144,38 @@ describe("the run-records step reads GitHub's records with gh", () => {
       const migration = commit("supabase/migrations/001_x.sql");
       const at = (m: number) =>
         `2026-10-05T14:${String(m).padStart(2, "0")}:00Z`;
-      const runs: Record<string, object> = {
-        "1": {
-          jobs: [
-            {
-              name: "staging-migrations",
-              conclusion: "success",
-              startedAt: at(10),
-              steps: [
-                { name: "Apply migrations to staging", conclusion: "skipped" },
-              ],
-            },
-          ],
-        },
-        "2": {
-          jobs: [
-            {
-              name: "staging-migrations",
-              conclusion: "success",
-              startedAt: at(20),
-              steps: [
-                { name: "Apply migrations to staging", conclusion: "success" },
-              ],
-            },
-          ],
-        },
-        "11": {
-          jobs: [{ name: "checks", conclusion: "success", completedAt: at(9) }],
-        },
-        "12": {
-          jobs: [
-            { name: "checks", conclusion: "success", completedAt: at(19) },
-          ],
-        },
+      const staged = (start: number, apply: string) => ({
+        jobs: [
+          {
+            name: "staging-migrations",
+            conclusion: "success",
+            startedAt: at(start),
+            steps: [{ name: "Apply migrations to staging", conclusion: apply }],
+          },
+        ],
+      });
+      const checked = (done: number) => ({
+        jobs: [
+          { name: "checks", conclusion: "success", completedAt: at(done) },
+        ],
+      });
+      const runs = {
+        "1": staged(10, "skipped"),
+        "2": staged(20, "success"),
+        "11": checked(9),
+        "12": checked(19),
       };
-      const staging = [
-        {
-          databaseId: 1,
-          headSha: clean,
-          url: "https://example.invalid/runs/1",
-        },
-        {
-          databaseId: 2,
-          headSha: migration,
-          url: "https://example.invalid/runs/2",
-        },
-      ];
+      const listed = (id: number, sha: string) => ({
+        databaseId: id,
+        headSha: sha,
+        url: `https://example.invalid/runs/${id}`,
+      });
+      const staging = [listed(1, clean), listed(2, migration)];
       const ci: Record<string, object[]> = {
-        [clean]: [
-          {
-            databaseId: 11,
-            headSha: clean,
-            url: "https://example.invalid/runs/11",
-          },
-        ],
-        [migration]: [
-          {
-            databaseId: 12,
-            headSha: migration,
-            url: "https://example.invalid/runs/12",
-          },
-        ],
+        [clean]: [listed(11, clean)],
+        [migration]: [listed(12, migration)],
       };
+      tweak({ runs, ci, clean, migration });
       const bin = join(dir, "bin");
       mkdirSync(bin);
       writeFileSync(
@@ -210,17 +191,50 @@ else console.log(JSON.stringify(ci[flag("--commit")] ?? []));
       );
       chmodSync(join(bin, "gh"), 0o755);
       process.env.PATH = `${bin}:${path}`;
-      const seen = await runRecords.check({
-        root: repo,
-        env: {},
-        file: (name) => join(dir, name),
-      });
-      expect(seen).toContain(
-        "the 2 that ran started after `checks` passed on their commit",
-      );
+      try {
+        return {
+          seen: await runRecords.check({
+            root: repo,
+            env: {},
+            file: (name) => join(dir, name),
+          }),
+          clean,
+          migration,
+        };
+      } catch (e) {
+        return { error: (e as Error).message, clean, migration };
+      }
     } finally {
       process.env.PATH = path;
       rmSync(dir, { recursive: true, force: true });
     }
+  }
+
+  it("finds each commit's ci run by its commit, so a run the recent-runs listing leaves out still counts", async () => {
+    const { seen, error } = await stepWith();
+    expect(error).toBeUndefined();
+    expect(seen).toContain(
+      "the 2 that ran started after `checks` passed on their commit",
+    );
+  });
+
+  it("says it found no ci run for a commit GitHub has none for, not that checks did not pass", async () => {
+    const { error, migration } = await stepWith(({ ci, migration }) => {
+      delete ci[migration];
+    });
+    expect(error).toContain(
+      `found no ci run on ${migration.slice(0, 7)} in GitHub's records`,
+    );
+    expect(error).not.toContain("did not pass");
+  });
+
+  it("says GitHub returned no jobs for a ci run whose jobs come back empty, not that checks did not pass", async () => {
+    const { error, migration } = await stepWith(({ runs }) => {
+      runs["12"] = { jobs: [] };
+    });
+    expect(error).toContain(
+      `GitHub returned no jobs for ci's run on ${migration.slice(0, 7)} (https://example.invalid/runs/12)`,
+    );
+    expect(error).not.toContain("did not pass");
   });
 });
