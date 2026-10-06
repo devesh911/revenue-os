@@ -112,3 +112,7 @@ jobs:
           docker build --build-arg RELEASE="$RELEASE" -f docker/Dockerfile -t revenue-os-worker:ci .
           label="$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' revenue-os-worker:ci)"
           test "$label" = "$RELEASE" || { echo "the image is labelled \"$label\", not $RELEASE"; exit 1; }
+          # A build that names no commit must fail, so no image goes out unlabelled (it reuses the layers above).
+          if docker build -f docker/Dockerfile -t revenue-os-worker:no-commit . ; then
+            echo "an image built without RELEASE was accepted"; exit 1
+          fi

@@ -1,7 +1,7 @@
 services:
   worker:
     # RELEASE: the commit being built (`RELEASE=$(git rev-parse HEAD) docker compose build`), its label and /release.
-    build: { context: .., dockerfile: docker/Dockerfile, args: { RELEASE: "${RELEASE:-}" } }
+    build: { context: .., dockerfile: docker/Dockerfile, args: { RELEASE: "${RELEASE:?set RELEASE to the commit being built: RELEASE=$(git rev-parse HEAD) docker compose ...}" } }
     env_file: ../.env
     restart: unless-stopped
     expose: ["8080"]

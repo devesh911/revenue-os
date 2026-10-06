@@ -1,5 +1,6 @@
 // The worker app's open and guarded endpoints (docs/security.md S5.9): /health is information-free (status only);
-// /ready and /release need their own bearer token. What /ready and /release answer: test/ready.test.ts.
+// /ready and /release need their own bearer token. What /ready answers: test/ready.test.ts; /release and the token:
+// test/release.test.ts; a refusal behind the worker's error handler: test/errors.test.ts.
 import { describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { requireReadyToken } from "./auth";

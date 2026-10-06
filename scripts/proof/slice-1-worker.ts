@@ -155,11 +155,10 @@ async function provesReadiness(root: string, env: NodeJS.ProcessEnv) {
     if (
       Object.keys(body).join() !== "ok,unreachable" ||
       body.ok !== false ||
-      !Array.isArray(body.unreachable) ||
-      !body.unreachable.includes("database")
+      JSON.stringify(body.unreachable) !== '["database","job queue"]'
     )
       throw new Error(
-        `with its database cut off /ready answered 503 with ${down}, not { ok: false, unreachable: [..."database"...] } alone`,
+        `with its database cut off /ready answered 503 with ${down}, not {"ok":false,"unreachable":["database","job queue"]}: the worker's own /ready must ask both (its job queue lives in the same database)`,
       );
     await r.restore();
     const back = await readyWith(200, 30_000, "once its database was back");
@@ -176,7 +175,7 @@ async function provesReadiness(root: string, env: NodeJS.ProcessEnv) {
 }
 
 export const readyWithoutDatabase: Step = {
-  does: "Starts the worker (`bun services/worker/src/index.ts`) on the local stack, reaching its database through a relay, and checks its readiness check: /ready answers 200 once it starts and 401 without the ready token; with the relay cut, so the worker can't reach its database, /ready answers 503 naming the database and nothing else; with the relay back, /ready answers 200 again; and /release names the commit being proved, and nothing else",
+  does: "Starts the worker (`bun services/worker/src/index.ts`) on the local stack, reaching its database through a relay, and checks its readiness check: /ready answers 200 once it starts and 401 without the ready token; with the relay cut, so the worker can't reach its database, /ready answers 503 naming exactly the database and the job queue (which lives in the same database), so the worker's own /ready is seen asking both; with the relay back, /ready answers 200 again; and /release names the commit being proved, and nothing else",
   minutes: 15,
   check: ({ root, env }) =>
     onSharedStack(root, () => provesReadiness(root, env), LOCK_WAIT_MS),

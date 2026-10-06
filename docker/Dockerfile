@@ -16,8 +16,9 @@ RUN bun install --frozen-lockfile --production
 COPY packages ./packages
 COPY services/worker ./services/worker
 # The commit this image is built from (CI passes github.sha): its label, and RELEASE, which GET /release shows. Last,
-# so a new commit rebuilds only these layers. Built without it, the label is empty and /release says "unknown".
+# so a new commit rebuilds only these layers. A build that names no commit id fails here, so no image is unlabelled.
 ARG RELEASE=""
+RUN echo "$RELEASE" | grep -Eqx '[0-9a-f]{7,40}' || { echo "RELEASE must be the commit id this image is built from: docker build --build-arg RELEASE=\$(git rev-parse HEAD) …"; exit 1; }
 LABEL org.opencontainers.image.revision=$RELEASE
 ENV RELEASE=$RELEASE
 USER bun
