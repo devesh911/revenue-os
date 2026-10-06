@@ -246,119 +246,116 @@ describe("catalog registration", () => {
 
 // ── Database: real persistence + RLS, on the local stack. Verifies the assertions a stubbed ctx.db
 //    cannot: rows PERSIST, the tx rolls back atomically, and RLS denies cross-tenant reach.
-describe(
-  "tool catalog — persistence & tenancy [CI-owned integration]",
-  () => {
-    let admin: pg.Pool;
-    let appService: pg.Pool;
-    let companies: ReturnType<typeof testCompanies>;
-    let orgA = "";
-    let orgB = "";
-    let contactA = "";
+describe("tool catalog — persistence & tenancy [CI-owned integration]", () => {
+  let admin: pg.Pool;
+  let appService: pg.Pool;
+  let companies: ReturnType<typeof testCompanies>;
+  let orgA = "";
+  let orgB = "";
+  let contactA = "";
 
-    beforeAll(async () => {
-      admin = new pg.Pool({
-        connectionString:
-          process.env.LOCAL_DB_URL ||
-          "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-        max: 2,
-      });
-      appService = createPool(
-        process.env.DATABASE_URL ||
-          "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
-      );
-      companies = testCompanies(admin);
-      orgA = (await companies.add("Tools A")).id;
-      orgB = (await companies.add("Tools B")).id;
-      const c = await admin.query(
-        `insert into contacts (org_id, first_name) values ($1, 'OrgA-Owned') returning id`,
-        [orgA],
-      );
-      contactA = c.rows[0].id;
+  beforeAll(async () => {
+    admin = new pg.Pool({
+      connectionString:
+        process.env.LOCAL_DB_URL ||
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      max: 2,
     });
+    appService = createPool(
+      process.env.DATABASE_URL ||
+        "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
+    );
+    companies = testCompanies(admin);
+    orgA = (await companies.add("Tools A")).id;
+    orgB = (await companies.add("Tools B")).id;
+    const c = await admin.query(
+      `insert into contacts (org_id, first_name) values ($1, 'OrgA-Owned') returning id`,
+      [orgA],
+    );
+    contactA = c.rows[0].id;
+  });
 
-    afterAll(async () => {
-      await companies.cleanup();
-      await appService.end();
-      await admin.end();
-    });
+  afterAll(async () => {
+    await companies.cleanup();
+    await appService.end();
+    await admin.end();
+  });
 
-    it("book_appointment persists an appointments row + an attributed site_visit_booked outcome", async () => {
-      await withOrg(appService, orgA, (tx) =>
-        bookAppointment.execute(
-          { orgId: orgA, db: tx },
-          { ...validBook, contactId: contactA },
-        ),
-      );
-      const appt = await admin.query(
-        `select id from appointments where org_id = $1 and contact_id = $2`,
-        [orgA, contactA],
-      );
-      expect(appt.rowCount).toBe(1);
-      const outcome = await admin.query(
-        `select kind, source, appointment_id from outcomes where org_id = $1 and contact_id = $2`,
-        [orgA, contactA],
-      );
-      expect(outcome.rowCount).toBe(1);
-      expect(outcome.rows[0].kind).toBe("site_visit_booked");
-      expect(outcome.rows[0].source).toBe("agent");
-      expect(outcome.rows[0].appointment_id).toBe(appt.rows[0].id); // outcome attributes the appointment
-    });
+  it("book_appointment persists an appointments row + an attributed site_visit_booked outcome", async () => {
+    await withOrg(appService, orgA, (tx) =>
+      bookAppointment.execute(
+        { orgId: orgA, db: tx },
+        { ...validBook, contactId: contactA },
+      ),
+    );
+    const appt = await admin.query(
+      `select id from appointments where org_id = $1 and contact_id = $2`,
+      [orgA, contactA],
+    );
+    expect(appt.rowCount).toBe(1);
+    const outcome = await admin.query(
+      `select kind, source, appointment_id from outcomes where org_id = $1 and contact_id = $2`,
+      [orgA, contactA],
+    );
+    expect(outcome.rowCount).toBe(1);
+    expect(outcome.rows[0].kind).toBe("site_visit_booked");
+    expect(outcome.rows[0].source).toBe("agent");
+    expect(outcome.rows[0].appointment_id).toBe(appt.rows[0].id); // outcome attributes the appointment
+  });
 
-    it("cross-tenant denial: org B cannot see org A's appointment or outcome (RLS)", async () => {
-      // relies on the booking from the previous test (Bun runs in source order)
-      await withOrg(appService, orgB, async (tx) => {
-        const a = await tx.query(
-          `select id from appointments where contact_id = $1`,
-          [contactA],
-        );
-        expect(a.rowCount).toBe(0);
-        const o = await tx.query(
-          `select id from outcomes where contact_id = $1`,
-          [contactA],
-        );
-        expect(o.rowCount).toBe(0);
-      });
-    });
-
-    it("atomicity: a failure anywhere in the tx rolls back BOTH the appointment and the outcome", async () => {
-      const before = await admin.query(
-        `select count(*)::int n from appointments where org_id = $1 and contact_id = $2`,
-        [orgA, contactA],
-      );
-      await expect(
-        withOrg(appService, orgA, async (tx) => {
-          await bookAppointment.execute(
-            { orgId: orgA, db: tx },
-            { ...validBook, contactId: contactA },
-          );
-          throw new Error("boom after book"); // forced failure AFTER the appointment insert
-        }),
-      ).rejects.toThrow("boom");
-      const after = await admin.query(
-        `select count(*)::int n from appointments where org_id = $1 and contact_id = $2`,
-        [orgA, contactA],
-      );
-      expect(after.rows[0].n).toBe(before.rows[0].n); // nothing from the doomed booking survived
-      const outc = await admin.query(
-        `select count(*)::int n from outcomes where org_id = $1 and appointment_id is null`,
-        [orgA],
-      );
-      expect(outc.rows[0].n).toBe(0); // no orphan outcome
-    });
-
-    it("cross-tenant denial: update_contact under org B cannot mutate org A's contact (RLS)", async () => {
-      await withOrg(appService, orgB, (tx) =>
-        updateContact.execute(
-          { orgId: orgB, db: tx },
-          { contactId: contactA, firstName: "Hacked" },
-        ),
-      );
-      const row = await admin.query(
-        `select first_name from contacts where id = $1`,
+  it("cross-tenant denial: org B cannot see org A's appointment or outcome (RLS)", async () => {
+    // relies on the booking from the previous test (Bun runs in source order)
+    await withOrg(appService, orgB, async (tx) => {
+      const a = await tx.query(
+        `select id from appointments where contact_id = $1`,
         [contactA],
       );
-      expect(row.rows[0].first_name).toBe("OrgA-Owned"); // unchanged — RLS scoped the update to org B
+      expect(a.rowCount).toBe(0);
+      const o = await tx.query(
+        `select id from outcomes where contact_id = $1`,
+        [contactA],
+      );
+      expect(o.rowCount).toBe(0);
     });
-  },
-);
+  });
+
+  it("atomicity: a failure anywhere in the tx rolls back BOTH the appointment and the outcome", async () => {
+    const before = await admin.query(
+      `select count(*)::int n from appointments where org_id = $1 and contact_id = $2`,
+      [orgA, contactA],
+    );
+    await expect(
+      withOrg(appService, orgA, async (tx) => {
+        await bookAppointment.execute(
+          { orgId: orgA, db: tx },
+          { ...validBook, contactId: contactA },
+        );
+        throw new Error("boom after book"); // forced failure AFTER the appointment insert
+      }),
+    ).rejects.toThrow("boom");
+    const after = await admin.query(
+      `select count(*)::int n from appointments where org_id = $1 and contact_id = $2`,
+      [orgA, contactA],
+    );
+    expect(after.rows[0].n).toBe(before.rows[0].n); // nothing from the doomed booking survived
+    const outc = await admin.query(
+      `select count(*)::int n from outcomes where org_id = $1 and appointment_id is null`,
+      [orgA],
+    );
+    expect(outc.rows[0].n).toBe(0); // no orphan outcome
+  });
+
+  it("cross-tenant denial: update_contact under org B cannot mutate org A's contact (RLS)", async () => {
+    await withOrg(appService, orgB, (tx) =>
+      updateContact.execute(
+        { orgId: orgB, db: tx },
+        { contactId: contactA, firstName: "Hacked" },
+      ),
+    );
+    const row = await admin.query(
+      `select first_name from contacts where id = $1`,
+      [contactA],
+    );
+    expect(row.rows[0].first_name).toBe("OrgA-Owned"); // unchanged — RLS scoped the update to org B
+  });
+});
