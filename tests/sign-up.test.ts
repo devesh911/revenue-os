@@ -50,6 +50,23 @@ describe("self sign-up is refused", () => {
     expect(await usersNamed(email)).toBe(0);
   });
 
+  // behaviour already on main: anonymous sign-ins were already off in supabase/config.toml, and the running stack is shared
+  it("refuses an empty sign-up, an anonymous account, and makes no login", async () => {
+    const anonymous = async () =>
+      (
+        await admin.query<{ n: number }>(
+          `select count(*)::int n from auth.users where is_anonymous`,
+        )
+      ).rows[0]?.n;
+    const before = await anonymous();
+    const tried = await authPost("/signup", {});
+    expect(tried.status).toBe(422);
+    expect(tried.body).toMatchObject({
+      error_code: "anonymous_provider_disabled",
+    });
+    expect(await anonymous()).toBe(before);
+  });
+
   it("still signs in a login we made, with its password", async () => {
     const made = await testUser(admin, "made-for-them");
     expect(made.token.split(".")).toHaveLength(3);

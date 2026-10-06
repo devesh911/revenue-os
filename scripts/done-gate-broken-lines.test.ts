@@ -45,6 +45,7 @@ describe("kindOf: which files are guardrail, tenancy or money code", () => {
     expect(kindOf("packages/db/src/client.ts")).toBe("tenancy");
     expect(kindOf("services/worker/src/routes/contacts.ts")).toBe("tenancy");
     expect(kindOf("services/worker/src/auth.ts")).toBe("tenancy");
+    expect(kindOf("services/worker/src/app.ts")).toBe("tenancy");
     expect(kindOf("packages/harness/src/meter.ts")).toBe("money");
     expect(kindOf("packages/db/test/rls.test.ts")).toBeUndefined();
     expect(kindOf("packages/db/src/types.d.ts")).toBeUndefined();

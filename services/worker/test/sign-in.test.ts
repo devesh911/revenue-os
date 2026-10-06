@@ -6,9 +6,11 @@
 // to load.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
+import { type AddressInfo, createServer } from "node:net";
 import { Hono } from "hono";
 import {
   createLocalJWKSet,
+  createRemoteJWKSet,
   exportJWK,
   generateKeyPair,
   type JWTPayload,
@@ -125,6 +127,26 @@ describe("every route requires sign-in unless it is on the public list", () => {
     expect((await probe.request("/orgs", { method: "POST" })).status).toBe(401);
     expect(reached.sort()).toEqual([...PUBLIC_ROUTES].sort());
   });
+
+  it("asks for sign-in when a catch-all route is reached too, mounted before or after a public route", async () => {
+    const { requireAuthUnlessPublic } = await auth();
+    const before = new Hono<AuthEnv>()
+      .use("*", requireAuthUnlessPublic)
+      .get("*", async (c, next) => {
+        await next();
+        return c.res;
+      })
+      .get("/health", (c) => c.text("reached"));
+    const after = new Hono<AuthEnv>()
+      .use("*", requireAuthUnlessPublic)
+      .get("/health", async (c, next) => {
+        await next();
+        return c.res;
+      })
+      .get("*", (c) => c.text("reached"));
+    for (const app of [before, after])
+      expect((await app.request("/health")).status).toBe(401);
+  });
 });
 
 describe("a sign-in token the worker accepts", () => {
@@ -227,6 +249,35 @@ describe("a sign-in token the worker accepts", () => {
         .encode();
       for (const token of [otherSigned, hs256, unsigned, "not.a.jwt"])
         expect((await me(token)).status).toBe(401);
+    });
+
+    it("refuses a well-formed token when the sign-in server's keys can't be fetched", async () => {
+      const { signedIn } = await auth();
+      // A port nothing listens on: taken, then let go.
+      const closed = await new Promise<number>((ok) => {
+        const s = createServer().listen(0, "127.0.0.1", () => {
+          const { port } = s.address() as AddressInfo;
+          s.close(() => ok(port));
+        });
+      });
+      const server = `http://127.0.0.1:${closed}`;
+      const route = new Hono<AuthEnv>()
+        .use(
+          "*",
+          signedIn(
+            createRemoteJWKSet(
+              new URL(`${server}/auth/v1/.well-known/jwks.json`),
+            ),
+            server,
+          ),
+        )
+        .get("/me", (c) => c.json(c.get("actor")));
+      const token = await sign({ ...good, iss: `${server}/auth/v1` });
+      const res = await route.request("/me", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "unauthorized" });
     });
 
     it("refuses a header that is not a bearer token", async () => {

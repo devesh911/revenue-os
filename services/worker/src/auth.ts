@@ -61,15 +61,17 @@ export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   "POST /webhooks/vapi/:orgId",
 ]);
 
-/** Mounted on every path: sign-in first, unless the route the request reaches is on the public list. */
+/**
+ * Mounted on every path: sign-in first, unless every route the request reaches is on the public list, so a catch-all
+ * mounted beside a public route can't take a request past sign-in.
+ */
 export const requireAuthUnlessPublic: MiddlewareHandler<AuthEnv> = (
   c,
   next,
 ) => {
-  const route = matchedRoutes(c)
-    .filter((r) => r.method !== "ALL")
-    .pop();
-  return route && PUBLIC_ROUTES.has(`${route.method} ${route.path}`)
+  const routes = matchedRoutes(c).filter((r) => r.method !== "ALL");
+  return routes.length > 0 &&
+    routes.every((r) => PUBLIC_ROUTES.has(`${r.method} ${r.path}`))
     ? next()
     : requireAuth(c, next);
 };

@@ -1,10 +1,11 @@
 // Two tenants stay isolated (the cross-tenant denial test AGENTS.md requires) — exercised at the
 // API surface: real local sign-in users, jose-verified JWTs, app_service DB path underneath. Only our operator
 // list may create a company (supabase/migrations/018_platform_operators.sql): user A is on it, user B is not.
-import { afterAll, describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it, spyOn } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
 import { type TestUser, testUser } from "../../../tests/test-users";
+import { pool } from "../src/db";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -48,12 +49,18 @@ async function createAsA(label: string) {
   return { id, ...made };
 }
 
-/** User B, who is not on our operator list, tries to make a company with `body`: the reply, and whether one was made. */
-async function strangerCreates(body: (name: string, slug: string) => string) {
+/**
+ * User A (an operator) or user B (not one) tries to make a company with `body`, or with no body when it gives
+ * undefined: the reply, and whether no company was made.
+ */
+async function tries(
+  who: "A" | "B",
+  body: (name: string, slug: string) => string | undefined,
+) {
   await users();
   let reply = { status: 0, body: {} as unknown };
-  const made = companies.add("Stranger's company", async (name, slug) => {
-    const res = await api("/orgs", userB.token, {
+  const made = companies.add(`${who}'s company`, async (name, slug) => {
+    const res = await api("/orgs", (who === "A" ? userA : userB).token, {
       method: "POST",
       body: body(name, slug),
     });
@@ -104,7 +111,7 @@ describe("org bootstrap + tenant isolation", () => {
   });
 
   it("a signed-in person not on our operator list cannot create a company", async () => {
-    const tried = await strangerCreates((name, slug) =>
+    const tried = await tries("B", (name, slug) =>
       JSON.stringify({ name, slug }),
     );
     expect(tried).toEqual({
@@ -116,16 +123,60 @@ describe("org bootstrap + tenant isolation", () => {
 
   // Asked before the body is read, so a stranger can't learn which slugs are taken (409) or probe the body's shape.
   it("refuses a stranger before reading the body: a taken slug and a body that isn't JSON get the same 403", async () => {
-    const taken = await strangerCreates((name) =>
+    const taken = await tries("B", (name) =>
       JSON.stringify({ name, slug: orgASlug }),
     );
-    const garbled = await strangerCreates(() => "{not json");
+    const garbled = await tries("B", () => "{not json");
     for (const tried of [taken, garbled])
       expect(tried).toEqual({
         status: 403,
         body: { error: "not_an_operator" },
         refused: true,
       });
+  });
+
+  it("answers an operator's missing, garbled, empty or nameless body with 400, and makes no company", async () => {
+    const bodies = [
+      () => undefined,
+      () => "{not json",
+      () => "{}",
+      (_: string, slug: string) => JSON.stringify({ name: "", slug }),
+    ];
+    for (const body of bodies)
+      expect(await tries("A", body)).toEqual({
+        status: 400,
+        body: { error: "invalid_request" },
+        refused: true,
+      });
+  });
+
+  // behaviour already on main: orgs.slug is unique and the error handler answers that with 409
+  it("answers an operator who creates a company under a taken slug with 409, and keeps one company under it", async () => {
+    const again = await tries("A", (name) =>
+      JSON.stringify({ name, slug: orgASlug }),
+    );
+    expect(again).toEqual({
+      status: 409,
+      body: { error: "conflict" },
+      refused: true,
+    });
+    const under = await admin.query(`select id from orgs where slug = $1`, [
+      orgASlug,
+    ]);
+    expect(under.rows).toEqual([{ id: orgA }]);
+  });
+
+  it("answers 500, and makes no company, when the operator list can't be asked", async () => {
+    const lookup = spyOn(pool, "query").mockImplementationOnce((() =>
+      Promise.reject(new Error("database went away"))) as never);
+    try {
+      expect(
+        await tries("A", (name, slug) => JSON.stringify({ name, slug })),
+      ).toEqual({ status: 500, body: { error: "internal" }, refused: true });
+      expect(lookup).toHaveBeenCalledTimes(1);
+    } finally {
+      lookup.mockRestore();
+    }
   });
 
   // The other door to the companies table: the database's own data interface, with the stranger's sign-in token.

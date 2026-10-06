@@ -35,6 +35,8 @@ export const GUARDED: { path: string; kind: Kind | null }[] = [
   { path: "packages/db/src/", kind: "tenancy" },
   // The sign-in token check that names the user, and the routes that check the user belongs to the company asked for.
   { path: "services/worker/src/auth.ts", kind: "tenancy" },
+  // The worker's routes, and the line that puts sign-in in front of every one of them.
+  { path: "services/worker/src/app.ts", kind: "tenancy" },
   { path: "services/worker/src/routes/", kind: "tenancy" },
   // Usage and its cost, recorded per company.
   { path: "packages/harness/src/meter.ts", kind: "money" },

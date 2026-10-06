@@ -2,7 +2,8 @@
 // sign-up: the login is made in the local database, as the dev login is (ensureLocalUser, scripts/dev-login.ts),
 // then signed in through the real local sign-in server, whose token the worker checks as it checks anyone's.
 // An operator is also put on our operator list (supabase/migrations/018_platform_operators.sql), so it may create a
-// company. Playwright imports this under Node (apps/console/e2e): keep it free of Bun-only APIs.
+// company. The browser checks make their one login with ensureLocalUser directly (apps/console/e2e/auth.e2e.ts),
+// because they sign in through the console's form and need its password, which this helper keeps to itself.
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 

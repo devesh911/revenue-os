@@ -24,7 +24,10 @@ export const orgs = new Hono<AuthEnv>()
     // taken slug (409).
     if (!(await isPlatformOperator(pool, actor.userId)))
       return c.json({ error: "not_an_operator" }, 403);
-    const body = CreateOrgSchema.parse(await c.req.json()); // S5.1 — before any other logic
+    // No body or one that isn't JSON fails the schema too, so it gets 400, never 500. S5.1: before any other logic.
+    const body = CreateOrgSchema.parse(
+      await c.req.json().catch(() => undefined),
+    );
     const org = await createOrgWithAdmin(pool, {
       ...body,
       userId: actor.userId,
