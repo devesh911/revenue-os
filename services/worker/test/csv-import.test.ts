@@ -1,13 +1,11 @@
 // Contact CSV import: upload → identities → dedupe on (org, phone);
 // duplicate rows MERGE into the existing contact instead of creating a new one.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { testUser } from "../../../tests/test-users";
 import app from "../src/index";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
@@ -20,14 +18,9 @@ let token = "";
 let orgId = "";
 
 beforeAll(async () => {
-  const email = `csv-${randomUUID()}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  token = ((await res.json()) as { access_token: string }).access_token;
-  // Made through the product's own POST /orgs, which makes the signed-up user its admin.
+  // An operator, made locally and signed in (accounts are invite-only): only operators may create a company.
+  ({ token } = await testUser(admin, "csv", { operator: true }));
+  // Made through the product's own POST /orgs, which makes the signed-in operator its admin.
   ({ id: orgId } = await companies.add("CSV Org", async (name, slug) => {
     const org = await app.fetch(
       new Request("http://localhost/orgs", {

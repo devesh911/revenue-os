@@ -1,9 +1,10 @@
-// Slice 1's proof steps (scripts/proof/slice-1*.ts). Its two worker steps run only in `bun run proof 1`, as Slice 0's
+// Slice 1's proof steps (scripts/proof/slice-1*.ts). Its three worker steps run only in `bun run proof 1`, as Slice 0's
 // whole-suite step does: each starts a real worker, which takes every company's due jobs from the one local database,
 // and the whole-suite-at-once test (services/worker/test/test-runs-at-once.test.ts) runs this suite four times at once
 // beside another company's queued calls that no test may take. What the worker answers is tested on the real
 // database with a job schema of the test's own (services/worker/test/ready.test.ts); ci.yml's image build checks the
-// image's label.
+// image's label. Who the worker and the sign-in server refuse is tested in services/worker/test/orgs.test.ts,
+// services/worker/test/sign-in.test.ts and tests/sign-up.test.ts.
 import { describe, expect, it } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,6 +12,7 @@ import { join } from "node:path";
 import { toProve } from "./proof/cli";
 import { runSteps } from "./proof/run";
 import { everyCheckHasAStep, NOT_YET, steps as slice1 } from "./proof/slice-1";
+import { signUpAndStrangerRefused } from "./proof/slice-1-sign-in";
 import { SLICES } from "./proof/slices";
 
 const ROOT = join(import.meta.dir, "..");
@@ -33,5 +35,12 @@ describe("Slice 1's steps", () => {
     expect(NOT_YET.length).toBeGreaterThan(0);
     for (const check of NOT_YET) expect(result?.seen).toContain(check);
     expect(slice1.at(-1)).toBe(everyCheckHasAStep);
+  });
+
+  it("prove a self sign-up and a stranger creating a company are each refused, first, as the Proof line orders them", () => {
+    expect(slice1[0]).toBe(signUpAndStrangerRefused);
+    expect(NOT_YET.join("\n")).not.toContain("self sign-up");
+    expect(signUpAndStrangerRefused.does).toContain("422 signup_disabled");
+    expect(signUpAndStrangerRefused.does).toContain("403 not_an_operator");
   });
 });

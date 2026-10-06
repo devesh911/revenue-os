@@ -107,6 +107,20 @@ export async function addMember(
   });
 }
 
+/** Is `userId` on our operator list, the only people who may create a company? Asked before any company exists,
+ *  so through the app.is_platform_operator SECURITY DEFINER function, granted to app_service only (migration 018).
+ *  userId MUST be a jose-verified JWT sub. */
+export async function isPlatformOperator(
+  pool: pg.Pool,
+  userId: string,
+): Promise<boolean> {
+  const r = await pool.query<{ ok: boolean }>(
+    `select app.is_platform_operator($1) as ok`,
+    [userId],
+  );
+  return r.rows[0]?.ok === true;
+}
+
 /** Cross-org by nature (login → org switcher): served by the app.user_orgs SECURITY DEFINER
  *  function, granted to app_service only. userId MUST be a jose-verified JWT sub. Ordered by name
  *  (then id) so "the first workspace" the console's / landing opens is a defined rule. */

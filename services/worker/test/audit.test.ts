@@ -3,30 +3,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { type TestUser, testUser } from "../../../tests/test-users";
 import app from "../src/index";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   max: 1,
 });
-
-async function signup(tag: string) {
-  const email = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  const body = (await res.json()) as {
-    access_token: string;
-    user: { id: string };
-  };
-  return { token: body.access_token, userId: body.user.id };
-}
 
 function api(path: string, token: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
@@ -38,12 +23,12 @@ function api(path: string, token: string, init: RequestInit = {}) {
 }
 
 const companies = testCompanies(admin);
-let user: { token: string; userId: string };
+let user: TestUser;
 let orgId = "";
 let orgName = "";
 
 beforeAll(async () => {
-  user = await signup("audit");
+  user = await testUser(admin, "audit", { operator: true });
   // Made through the product's own POST /orgs: org.create is the audited mutation under test.
   ({ id: orgId } = await companies.add("Audit Org", async (name, slug) => {
     orgName = name;

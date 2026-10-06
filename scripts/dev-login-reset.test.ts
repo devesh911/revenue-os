@@ -41,7 +41,6 @@ const grantStatus = async (password: string) =>
 it("resets a changed dev user password so DEV_LOGIN_PASSWORD signs in again", async () => {
   const opts = {
     supabaseUrl: SUPABASE_URL,
-    anonKey: ANON_KEY,
     dbUrl: LOCAL_DB_URL,
     orgIds: [],
   };

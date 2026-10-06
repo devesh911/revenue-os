@@ -3883,10 +3883,19 @@ todo("c", () => {});
       'import { test } from "bun:test";\ntest("runs", () => {});\n',
     );
     expect(tests(dir).status).toBe(0);
+    // MAY_SKIP is empty today, so this scratch copy of the gate lists one test of its own.
+    const list = join(dir, "scripts", "done-gate", "tests-ran.ts");
+    writeFileSync(
+      list,
+      readFileSync(list, "utf8").replace(
+        "MAY_SKIP: Record<string, string> = {};",
+        'MAY_SKIP: Record<string, string> = { "services/worker/test/may.test.ts > runs only somewhere": "a reason" };',
+      ),
+    );
     write(
       dir,
-      "scripts/dev-login.test.ts",
-      'import { it } from "bun:test";\nit.skipIf(true)("creates the dev user via /auth/v1/signup with the anon key when absent", () => {});\n',
+      "services/worker/test/may.test.ts",
+      'import { it } from "bun:test";\nit.skipIf(true)("runs only somewhere", () => {});\n',
     );
     const r = tests(dir);
     expect(r.out).not.toContain("did not run");

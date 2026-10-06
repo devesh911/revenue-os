@@ -51,10 +51,12 @@ const MARK_HOW =
  * Runs each test file the change adds or edits, alone, in a copy of the change (with coverage) and, for those
  * holding a new or edited test that passes there, in a copy of main's code. Text for Devesh, and whether every
  * such test is proven. Lines the change only moved, as the snapshot marks them (test-edits.ts), are left out.
+ * `allowed` is the list of tests allowed not to run: MAY_SKIP, or a test's own.
  */
 export function testsProven(
   repo: string,
   snap: Snap,
+  allowed: Record<string, string> = MAY_SKIP,
 ): { ok: boolean; text: string } {
   if (!snap.files.some(isProduct))
     return {
@@ -85,7 +87,7 @@ export function testsProven(
   const unjudged: string[] = [];
   /** Is this test, skipped `where`, one MAY_SKIP lets skip? Then it is noted and not judged. */
   const maySkip = (c: Case, where: string) => {
-    const why = MAY_SKIP[`${c.file} > ${c.name}`];
+    const why = allowed[`${c.file} > ${c.name}`];
     if (why)
       unjudged.push(
         `not judged: ${at(c)} is skipped ${where}, which MAY_SKIP allows (${why})`,

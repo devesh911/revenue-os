@@ -1,8 +1,10 @@
 // Two tenants stay isolated (the cross-tenant denial test AGENTS.md requires) — exercised at the
-// API surface: real local GoTrue users, jose-verified JWTs, app_service DB path underneath.
+// API surface: real local sign-in users, jose-verified JWTs, app_service DB path underneath. Only our operator
+// list may create a company (supabase/migrations/018_platform_operators.sql): user A is on it, user B is not.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { type TestUser, testUser } from "../../../tests/test-users";
 import app from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
@@ -15,22 +17,6 @@ const admin = new pg.Pool({
 });
 const companies = testCompanies(admin);
 
-async function signup(tag: string): Promise<{ token: string; userId: string }> {
-  const email = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  const body = (await res.json()) as {
-    access_token?: string;
-    user?: { id: string };
-  };
-  if (!body.access_token || !body.user)
-    throw new Error(`signup failed: ${JSON.stringify(body)}`);
-  return { token: body.access_token, userId: body.user.id };
-}
-
 function api(path: string, token: string | null, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
@@ -40,29 +26,48 @@ function api(path: string, token: string | null, init: RequestInit = {}) {
   );
 }
 
-let userA: { token: string; userId: string };
-let userB: { token: string; userId: string };
+let userA: TestUser;
+let userB: TestUser;
 let orgA = "";
 let orgAName = "";
+let orgASlug = "";
 
 /** User A makes a company through POST /orgs, the route under test: its id and name, and the reply. */
 async function createAsA(label: string) {
-  let made = { name: "", status: 0, role: "" };
+  let made = { name: "", slug: "", status: 0, role: "" };
   const { id } = await companies.add(label, async (name, slug) => {
     const res = await api("/orgs", userA.token, {
       method: "POST",
       body: JSON.stringify({ name, slug }),
     });
     const body = (await res.json()) as { id: string; role: string };
-    made = { name, status: res.status, role: body.role };
+    made = { name, slug, status: res.status, role: body.role };
     return body.id;
   });
   return { id, ...made };
 }
 
+/** User B, who is not on our operator list, tries to make a company with `body`: the reply, and whether one was made. */
+async function strangerCreates(body: (name: string, slug: string) => string) {
+  let reply = { status: 0, body: {} as unknown };
+  const made = companies.add("Stranger's company", async (name, slug) => {
+    const res = await api("/orgs", userB.token, {
+      method: "POST",
+      body: body(name, slug),
+    });
+    reply = { status: res.status, body: await res.json() };
+    return (reply.body as { id?: string }).id ?? "";
+  });
+  const refused = await made.then(
+    () => false,
+    (err: Error) => /not made/.test(err.message),
+  );
+  return { ...reply, refused };
+}
+
 beforeAll(async () => {
-  userA = await signup("tenant-a");
-  userB = await signup("tenant-b");
+  userA = await testUser(admin, "tenant-a", { operator: true });
+  userB = await testUser(admin, "tenant-b");
 });
 
 afterAll(async () => {
@@ -87,7 +92,56 @@ describe("org bootstrap + tenant isolation", () => {
     const made = await createAsA("Tenant A");
     expect(made.status).toBe(201);
     expect(made.role).toBe("admin");
-    ({ id: orgA, name: orgAName } = made);
+    ({ id: orgA, name: orgAName, slug: orgASlug } = made);
+  });
+
+  it("a signed-in person not on our operator list cannot create a company", async () => {
+    const tried = await strangerCreates((name, slug) =>
+      JSON.stringify({ name, slug }),
+    );
+    expect(tried).toEqual({
+      status: 403,
+      body: { error: "not_an_operator" },
+      refused: true,
+    });
+  });
+
+  // Asked before the body is read, so a stranger can't learn which slugs are taken (409) or probe the body's shape.
+  it("refuses a stranger before reading the body: a taken slug and a body that isn't JSON get the same 403", async () => {
+    const taken = await strangerCreates((name) =>
+      JSON.stringify({ name, slug: orgASlug }),
+    );
+    const garbled = await strangerCreates(() => "{not json");
+    for (const tried of [taken, garbled])
+      expect(tried).toEqual({
+        status: 403,
+        body: { error: "not_an_operator" },
+        refused: true,
+      });
+  });
+
+  // The other door to the companies table: the database's own data interface, with the stranger's sign-in token.
+  // behaviour already on main: the orgs insert policy (002_rls.sql) lets in only a company the worker's transaction names
+  it("refuses a stranger who inserts a company through the database's data interface", async () => {
+    let status = 0;
+    const made = companies.add("Data interface company", async (name, slug) => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/orgs`, {
+        method: "POST",
+        headers: {
+          apikey: ANON_KEY,
+          authorization: `Bearer ${userB.token}`,
+          "content-type": "application/json",
+          prefer: "return=representation",
+        },
+        body: JSON.stringify({ name, slug }),
+      });
+      status = res.status;
+      return res.ok
+        ? (((await res.json()) as Array<{ id: string }>)[0]?.id ?? "")
+        : "";
+    });
+    await expect(made).rejects.toThrow(/not made/);
+    expect([401, 403]).toContain(status);
   });
 
   it("GET /orgs shows each user only their own orgs", async () => {
@@ -134,7 +188,7 @@ describe("org bootstrap + tenant isolation", () => {
   });
 
   it("a viewer cannot invite members (role gate, docs/security.md S1.7)", async () => {
-    const other = await signup("outsider");
+    const other = await testUser(admin, "outsider");
     const res = await api(`/orgs/${orgA}/members`, userB.token, {
       method: "POST",
       body: JSON.stringify({ userId: other.userId, role: "viewer" }),

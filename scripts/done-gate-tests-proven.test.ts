@@ -877,22 +877,26 @@ it("is seven", () => {
     expect(r.ok).toBe(true);
   });
 
+  // MAY_SKIP is empty today, so the check is given a list of its own, as it is given MAY_SKIP in the gate.
   it("leaves a test MAY_SKIP lets skip unjudged when it skips on either side, and says where", () => {
     const at =
-      'not judged: scripts/dev-login.test.ts:4 "creates the dev user via /auth/v1/signup with the anon key when absent" is skipped';
-    const skipped = (when: string) =>
-      prove(
-        scratch({
-          "apps/x/src/old.ts": `${OLD}export const two = () => 2;\n`,
-          "scripts/dev-login.test.ts": `import { expect, it } from "bun:test";
+      'not judged: scripts/somewhere.test.ts:4 "runs only somewhere" is skipped';
+    const maySkip = {
+      "scripts/somewhere.test.ts > runs only somewhere": "a reason",
+    };
+    const skipped = (when: string) => {
+      const dir = scratch({
+        "apps/x/src/old.ts": `${OLD}export const two = () => 2;\n`,
+        "scripts/somewhere.test.ts": `import { expect, it } from "bun:test";
 import * as x from "../apps/x/src/old";
 
-it.skipIf(${when})("creates the dev user via /auth/v1/signup with the anon key when absent", () => {
+it.skipIf(${when})("runs only somewhere", () => {
   expect(x.two()).toBe(2);
 });
 `,
-        }),
-      );
+      });
+      return testsProven(dir, snapshot(dir), maySkip);
+    };
     const none =
       "Tests proven ✓ no new or edited test judged: each one skipped, as MAY_SKIP allows";
     const onChange = skipped("true");

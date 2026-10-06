@@ -4,38 +4,21 @@
 // (docs/security.md S5.8: no system_prompt / voice_config / language_config on agents; no
 // definition on workflows) and the deterministic order (key asc, then version desc).
 //
-// Real local stack (supabase + real pg): signup goes through GoTrue, so it runs with the local
+// Real local stack (supabase + real pg): accounts are invite-only, so each person is made locally
+// and signed in through the local sign-in server (tests/test-users.ts); it runs with the local
 // stack's settings (`bun run gate`, CI). Mirrors services/worker/test/screens-api.test.ts
-// (signup, POST /orgs through the shared test-company helper, admin pool seeds rows).
+// (test users, POST /orgs through the shared test-company helper, admin pool seeds rows).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { type TestUser, testUser } from "../../../tests/test-users";
 import app from "../src/index";
-
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 });
-
-async function signup(tag: string): Promise<{ token: string; userId: string }> {
-  const email = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  const body = (await res.json()) as {
-    access_token?: string;
-    user?: { id: string };
-  };
-  if (!body.access_token || !body.user)
-    throw new Error(`signup failed: ${JSON.stringify(body)}`);
-  return { token: body.access_token, userId: body.user.id };
-}
 
 function api(path: string, token: string | null, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
@@ -63,8 +46,8 @@ async function makeOrg(token: string): Promise<string> {
   return id;
 }
 
-let userA: { token: string; userId: string };
-let userB: { token: string; userId: string };
+let userA: TestUser;
+let userB: TestUser;
 let orgA = "";
 let orgB = "";
 // Distinctive key prefix isolates these fixtures from any global-template rows (org_id IS NULL,
@@ -72,8 +55,8 @@ let orgB = "";
 const PREFIX = `agents-api-${Date.now()}-`;
 
 beforeAll(async () => {
-  userA = await signup("agents-a");
-  userB = await signup("agents-b");
+  userA = await testUser(admin, "agents-a", { operator: true });
+  userB = await testUser(admin, "agents-b", { operator: true });
   orgA = await makeOrg(userA.token);
   orgB = await makeOrg(userB.token);
 

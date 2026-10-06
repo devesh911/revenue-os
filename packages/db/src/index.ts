@@ -18,6 +18,7 @@ export {
 export {
   addMember,
   createOrgWithAdmin,
+  isPlatformOperator,
   memberRole,
   type OrgRow,
   updateOrg,

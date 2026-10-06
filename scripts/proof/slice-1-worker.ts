@@ -13,12 +13,12 @@ import { onSharedStack } from "../done-gate/shared-stack";
 import { git, plainEnv, sh } from "./scratch";
 import type { Step } from "./step";
 
-const LOCK_WAIT_MS = 8 * 60_000;
+export const LOCK_WAIT_MS = 8 * 60_000;
 const IMAGE = "revenue-os-worker:proof";
 const LABEL = "org.opencontainers.image.revision";
 
 /** The local stack's addresses, as ci.yml and the proof workflow set them, or the local defaults. */
-const stack = (env: NodeJS.ProcessEnv) => ({
+export const stack = (env: NodeJS.ProcessEnv) => ({
   db:
     env.DATABASE_URL ||
     "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
@@ -26,7 +26,7 @@ const stack = (env: NodeJS.ProcessEnv) => ({
 });
 
 /** Polls `look` every half second until it gives a value, or throws `why()` after `ms`. */
-async function until<T>(
+export async function until<T>(
   look: () => Promise<T | undefined>,
   ms: number,
   why: () => string,
@@ -74,7 +74,7 @@ async function relay(host: string, port: number) {
   };
 }
 
-const freePort = () =>
+export const freePort = () =>
   new Promise<number>((ok) => {
     const s = createServer().listen(0, "127.0.0.1", () => {
       const { port } = s.address() as AddressInfo;
@@ -83,9 +83,9 @@ const freePort = () =>
   });
 
 /** A worker's last printed lines, for a failure message. */
-const tail = (out: string[]) => out.join("").slice(-1500);
+export const tail = (out: string[]) => out.join("").slice(-1500);
 
-async function stop(worker: ChildProcess) {
+export async function stop(worker: ChildProcess) {
   if (worker.exitCode !== null || worker.signalCode !== null) return;
   const gone = new Promise((r) => worker.once("exit", r));
   worker.kill("SIGTERM");

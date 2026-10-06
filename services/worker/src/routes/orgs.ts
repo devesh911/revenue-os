@@ -2,6 +2,7 @@
 import {
   addMember,
   createOrgWithAdmin,
+  isPlatformOperator,
   memberRole,
   updateOrg,
   userOrgs,
@@ -18,8 +19,12 @@ import { pool } from "../db";
 
 export const orgs = new Hono<AuthEnv>()
   .post("/orgs", async (c) => {
-    const body = CreateOrgSchema.parse(await c.req.json()); // S5.1 — before ANY logic
     const actor = c.get("actor");
+    // Only our operator list creates a company. Asked first, so a stranger learns nothing from a bad body (400) or a
+    // taken slug (409).
+    if (!(await isPlatformOperator(pool, actor.userId)))
+      return c.json({ error: "not_an_operator" }, 403);
+    const body = CreateOrgSchema.parse(await c.req.json()); // S5.1 — before any other logic
     const org = await createOrgWithAdmin(pool, {
       ...body,
       userId: actor.userId,

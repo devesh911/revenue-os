@@ -1,12 +1,13 @@
-// Console sign-in front door — the local dev login. Accounts are invite-only (no sign-up UI),
-// so a developer on a fresh local stack needs ONE known account that `db:seed` creates and makes
-// admin of the seeded orgs; then the console's email+password sign-in lands them on an org page.
+// Console sign-in front door — the local dev login. Accounts are invite-only (the sign-in server refuses a self
+// sign-up), so a developer on a fresh local stack needs ONE known account that `db:seed` makes, admin of the seeded
+// orgs and on our operator list; then the console's email+password sign-in lands them on an org page.
 // DB-backed: real local GoTrue + Postgres, and the real worker app for GET /orgs (like
 // services/worker/test/orgs.test.ts). The tests seed into workspaces of their own (the shared
 // test-company helper), never into the dev login's own, and hold the dev login's lock
 // (tests/dev-login-lock.ts) while they run, so another test run's dev-login tests wait their turn.
 import { afterAll, describe, expect, it, spyOn } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import pg from "pg";
 import { holdDevLogin } from "../tests/dev-login-lock";
@@ -16,9 +17,13 @@ import { type Pack, seed } from "./seed";
 type DevLoginModule = {
   DEV_LOGIN_EMAIL: string;
   DEV_LOGIN_PASSWORD: string;
+  ensureLocalUser: (
+    db: Pick<pg.ClientBase, "query">,
+    email: string,
+    password: string,
+  ) => Promise<string>;
   ensureDevLogin: (opts: {
     supabaseUrl: string;
-    anonKey: string;
     dbUrl: string;
     orgIds: string[];
   }) => Promise<{ userId: string }>;
@@ -33,7 +38,6 @@ const LOCAL_DB_URL =
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const LOCAL_OPTS = {
   supabaseUrl: SUPABASE_URL,
-  anonKey: ANON_KEY,
   dbUrl: LOCAL_DB_URL,
 };
 
@@ -45,15 +49,6 @@ const devLogin = await holdDevLogin(LOCAL_DB_URL);
 /** Seeds `pack` into a workspace of this file's own, never the dev login's. */
 const seedOwn = async (pack: Pack) =>
   seed(pack, (await companies.add(`Dev login ${pack}`)).slug);
-
-// The create-path test can only run when the dev user does not exist yet (fresh stack / CI). A
-// developer's long-lived local stack may already hold one; this suite never deletes it.
-const devUserPreexisted =
-  ((
-    await admin.query(`select 1 from auth.users where email = $1`, [
-      "dev@local.test",
-    ])
-  ).rowCount ?? 0) > 0;
 
 afterAll(async () => {
   await companies.cleanup();
@@ -133,37 +128,63 @@ describe("ensureDevLogin refuses non-local targets before any I/O", () => {
 });
 
 describe("ensureDevLogin against the local stack", () => {
-  // When absent, the user is created through GoTrue's sign-up endpoint with the ANON key —
-  // never an admin endpoint or a privileged key.
-  it.skipIf(devUserPreexisted)(
-    "creates the dev user via /auth/v1/signup with the anon key when absent",
-    async () => {
-      const { ensureDevLogin, DEV_LOGIN_EMAIL } = await load();
-      const fetchSpy = spyOn(globalThis, "fetch");
-      let userId = "";
-      try {
-        ({ userId } = await ensureDevLogin({ ...LOCAL_OPTS, orgIds: [] }));
-        const calls = fetchSpy.mock.calls.map(([input, init]) => ({
-          url: urlOf(input),
-          apikey: new Headers(
-            input instanceof Request ? input.headers : init?.headers,
-          ).get("apikey"),
-        }));
-        const signup = calls.filter((c) => c.url.includes("/auth/v1/signup"));
-        expect(signup.length).toBeGreaterThan(0);
-        expect(signup.every((c) => c.apikey === ANON_KEY)).toBe(true);
-        expect(calls.some((c) => c.url.includes("/auth/v1/admin"))).toBe(false);
-      } finally {
-        fetchSpy.mockRestore();
-      }
-      const row = await admin.query(
-        `select id from auth.users where email = $1`,
-        [DEV_LOGIN_EMAIL],
+  // The sign-in server refuses a self sign-up, so a login is made in the local database: never through the sign-up
+  // endpoint, an admin endpoint or a privileged key. A new address each run, so this runs on every stack, a developer's
+  // long-lived one included, where the dev login already exists.
+  it("makes a missing login in the local database, with no call to the sign-in server, and it signs in with its password", async () => {
+    const { ensureLocalUser } = await load();
+    const email = `made-locally-${randomUUID()}@example.com`;
+    const fetchSpy = spyOn(globalThis, "fetch");
+    let userId = "";
+    try {
+      userId = await ensureLocalUser(admin, email, "first-password-1");
+      expect(fetchSpy.mock.calls.map(([input]) => urlOf(input))).toEqual([]);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    const profile = await admin.query(`select id from profiles where id = $1`, [
+      userId,
+    ]);
+    expect(profile.rows).toEqual([{ id: userId }]);
+    expect((await passwordGrant(email, "first-password-1")).status).toBe(200);
+    // Run again with another password: the same login, and the new password is the one that works.
+    expect(await ensureLocalUser(admin, email, "second-password-2")).toBe(
+      userId,
+    );
+    expect((await passwordGrant(email, "first-password-1")).status).toBe(400);
+    expect((await passwordGrant(email, "second-password-2")).status).toBe(200);
+  }, 20_000);
+
+  // Only our operator list may create a company (supabase/migrations/018_platform_operators.sql); the dev login is on
+  // it, so a developer can make one through the product's own POST /orgs.
+  it("puts the dev login on our operator list, so it may create a company through POST /orgs", async () => {
+    const { ensureDevLogin, DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD } =
+      await load();
+    const { userId } = await ensureDevLogin({ ...LOCAL_OPTS, orgIds: [] });
+    const listed = await admin.query(
+      `select user_id from platform_operators where user_id = $1`,
+      [userId],
+    );
+    expect(listed.rows).toEqual([{ user_id: userId }]);
+    const { token } = await passwordGrant(DEV_LOGIN_EMAIL, DEV_LOGIN_PASSWORD);
+    const { default: app } = await import("../services/worker/src/index");
+    let status = 0;
+    await companies.add("Dev login's own company", async (name, slug) => {
+      const res = await app.fetch(
+        new Request("http://localhost/orgs", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ name, slug }),
+        }),
       );
-      expect(row.rows[0]?.id).toBe(userId);
-    },
-    20_000,
-  );
+      status = res.status;
+      return ((await res.json()) as { id: string }).id;
+    });
+    expect(status).toBe(201);
+  }, 20_000);
 
   // After seed + ensureDevLogin, the dev credentials sign in and the worker lists every
   // seeded org with role admin — the exact path the console takes after sign-in.
