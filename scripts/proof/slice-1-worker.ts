@@ -95,11 +95,10 @@ async function stop(worker: ChildProcess) {
 }
 
 /**
- * The readiness step's check, without the lock (the gate running the suite that tests it already holds it): starts
- * the worker at `root` through a relay to the database, cuts the relay and restores it, and says what /ready and
- * /release answered.
+ * Starts the worker at `root` through a relay to the database, cuts the relay and restores it, and says what /ready
+ * and /release answered. Run holding the local stack's lock.
  */
-export async function provesReadiness(root: string, env: NodeJS.ProcessEnv) {
+async function provesReadiness(root: string, env: NodeJS.ProcessEnv) {
   const { db, supabase } = stack(env);
   const dbUrl = new URL(db);
   const r = await relay(dbUrl.hostname, Number(dbUrl.port || 5432));
@@ -192,7 +191,7 @@ function inspect(root: string, format: string, what: string) {
 }
 
 /** Builds the worker image at `root` with its commit, and checks the image's label and health check. */
-export function buildImage(root: string) {
+function buildImage(root: string) {
   const commit = git(root, "rev-parse", "HEAD").trim();
   const built = sh(root, [
     "docker",
@@ -217,7 +216,7 @@ export function buildImage(root: string) {
 }
 
 /** Runs the built image on the local stack until Docker reports it healthy, and says what its /release answered. */
-export async function runImage(
+async function runImage(
   root: string,
   env: NodeJS.ProcessEnv,
   { commit, label, health }: ReturnType<typeof buildImage>,
