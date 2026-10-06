@@ -16,7 +16,7 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 | If your PR touches… | Fix this too |
 |---|---|
 | Any file in `packages/`, `services/`, `apps/console/`, `scripts/`, `tests/` or `supabase/` | 1. Comments that point at old codes or say untrue things |
-| `packages/db/`, `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
+| `packages/harness/`, `services/worker/src/scheduler.ts`, `apps/console/src/ui/primitives/`, `docs/tech-stack.md` | 2. Unused code that shows agents a second way of doing things |
 | `apps/console/test/pages-adoption-behavior.test.tsx`, `packages/channels/test/channels.test.ts`, `packages/shared/test/api-error.test.ts` | 3. Tests that read source code as text |
 | `.claude/skills/`, `.claude/agents/verifier.md`, `lessons.md` | 4. Agent instructions that restate drifting facts |
 | `docs/runbooks/`, `docs/security.md`, `docs/decisions/D36-phased-security-posture.md` | 5. Runbooks that still describe the retired orchestrator |
@@ -52,7 +52,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 **When:** the PR that next touches that package or doc.
 
 **What goes, and where:**
-- The unused copy of three tables written for the Drizzle database library, which the product does not use: `packages/db/src/schema.ts`, the `export * as schema` line and the "the ONLY DB entry" comment in `packages/db/src/index.ts:1`, `drizzle-orm` in `packages/db/package.json`, and the mention of `packages/db/src/schema.ts` in `docs/patterns/drizzle-query.md` (`bun run guards` fails once the file is gone and the mention stays). docs/tech-stack.md stopped listing Drizzle on 2026-10-03.
 - The unused functions that pick an AI model by name: `registerProvider` and `selectProvider` in `packages/harness/src/llm/index.ts` (re-exported at `packages/harness/src/index.ts:10-11`); fix that file's header, since the live worker builds its model client in `jobs.ts`.
 - The old harness demo script `packages/harness/demo-harness.ts` (outside the type check, and it no longer type-checks), plus the harness-agent skill line telling agents to run it; `bun run demo` and `bun run evals` cover it.
 - The unused text-box component `apps/console/src/ui/primitives/Textarea.tsx`, or keep it with a note saying it is a design-system piece waiting for a screen.
@@ -215,9 +214,9 @@ The September audit's 73 findings, each with where it lives now. "Moved" marks a
 | Test files are outside the typecheck gate: 49 type errors, including fakes that no longer match the real interfaces | Moved: Slice 3 · "Test files are type-checked like product code…" |
 | About 98 test files are never type-checked, and 49 type errors already hide in the worker, engine and script tests | Moved: Slice 3 · "Test files are type-checked like product code…" |
 | Test files are never type-checked; fakes have drifted from the real interfaces | Moved: Slice 3 · "Test files are type-checked like product code…" |
-| API access control is opt-in per route: sign-in only on /orgs, membership check hand-copied 12 times, and the database's backend path trusts whatever company id is in the URL | Slice 1 · "Every API route requires sign-in unless it is on a short public list…" (the membership half: Slice 5, below) |
-| 'Invite-only' accounts are not enforced: the sign-in server accepts self sign-up, and any signed-in user can create a company | Slice 1 · "Every API route requires sign-in unless it is on a short public list…" |
-| The one skipped test (dev-login sign-up path) is always skipped locally and runs in CI only because of file order; two tenancy suites skip instead of failing without DATABASE_URL | Slice 1 · "Every API route requires sign-in unless it is on a short public list…" |
+| API access control is opt-in per route: sign-in only on /orgs, membership check hand-copied 12 times, and the database's backend path trusts whatever company id is in the URL | Sign-in half settled by [#154](https://github.com/devesh911/revenue-os/pull/154) (every worker route requires sign-in but the four on PUBLIC_ROUTES in services/worker/src/auth.ts, and services/worker/test/sign-in.test.ts asks every mounted route without a token); the membership half: Slice 5, below |
+| 'Invite-only' accounts are not enforced: the sign-in server accepts self sign-up, and any signed-in user can create a company | Settled by [#154](https://github.com/devesh911/revenue-os/pull/154) (the sign-in server refuses a self sign-up, and POST /orgs refuses anyone not on our operator list, platform_operators) |
+| The one skipped test (dev-login sign-up path) is always skipped locally and runs in CI only because of file order; two tenancy suites skip instead of failing without DATABASE_URL | Settled by [#154](https://github.com/devesh911/revenue-os/pull/154) (the dev login is made in the local database, its test runs everywhere and MAY_SKIP is empty; packages/harness/test/tools.test.ts and retrieval.test.ts no longer skip) |
 | The database treats every backend request as an admin of whatever company id it is handed; the only wall is 12 hand-copied route lines | Moved: Slice 5 · "One shared membership and role check (admin, operator, viewer)…" |
 | The 'is this user a member, with which role' check is hand-copied into 12 API handlers, in 3 different styles, and the database does not back it up | Moved: Slice 5 · "One shared membership and role check (admin, operator, viewer)…" |
 | The transcript API route has no route-level test; the membership check that stops one company reading another's call transcripts is untested | Moved: Slice 5 · "One shared membership and role check (admin, operator, viewer)…" |
