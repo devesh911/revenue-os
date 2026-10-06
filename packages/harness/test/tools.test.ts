@@ -1,9 +1,9 @@
 // The production tool catalog (book_appointment, update_contact, send_confirmation). Two tiers:
 //   • ENV-FREE unit — Zod validation, injected-port dispatch, catalog registration. Stub the
 //     ctx.db door in-memory; no Postgres. These run in every worktree.
-//   • [CI-owned integration] — real rows PERSIST via withOrg + real RLS (rollback atomicity,
-//     cross-tenant denial). skipIf(no DATABASE_URL): they run wherever the local stack's
-//     settings are set (`bun run gate`, CI).
+//   • Database — real rows PERSIST via withOrg + real RLS (rollback atomicity, cross-tenant
+//     denial), on the local stack, like every database test: never skipped, so a missing database
+//     fails them rather than switching off the tenancy checks.
 import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import pg from "pg";
@@ -244,15 +244,11 @@ describe("catalog registration", () => {
   });
 });
 
-// ── [CI-owned integration] real persistence + RLS. skipIf(no DATABASE_URL) — env-free worktrees
-//    skip these by rail; CI (supabase up) runs them. Verifies the assertions a stubbed ctx.db
+// ── Database: real persistence + RLS, on the local stack. Verifies the assertions a stubbed ctx.db
 //    cannot: rows PERSIST, the tx rolls back atomically, and RLS denies cross-tenant reach.
-const hasDb = Boolean(process.env.DATABASE_URL);
-
-describe.skipIf(!hasDb)(
+describe(
   "tool catalog — persistence & tenancy [CI-owned integration]",
   () => {
-    // Pools built in beforeAll (never when skipped) — no idle handles in env-free worktrees.
     let admin: pg.Pool;
     let appService: pg.Pool;
     let companies: ReturnType<typeof testCompanies>;

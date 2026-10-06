@@ -18,8 +18,8 @@
 //   • ENV-FREE unit — a stubbed OrgScopedDb routed by TABLE NAME; no Postgres. Retrieval may
 //     use any SQL it likes, but it MUST read contact_memories + conversations through
 //     ctx.db (the RLS-bound door, docs/security.md S8.3) or the stub never sees it and the tests fail.
-//   • [CI-owned integration] — real rows, real ordering, real RLS. skipIf(no DATABASE_URL):
-//     they run wherever the local stack's settings are set (`bun run gate`, CI).
+//   • Database — real rows, real ordering, real RLS, on the local stack, like every database test:
+//     never skipped, so a missing database fails them rather than switching off the tenancy checks.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import pg from "pg";
@@ -393,13 +393,10 @@ describe("memory block determinism", () => {
   });
 });
 
-// ── [CI-owned integration] real rows, real ORDER BY, real RLS ──────────────────────────────
-// skipIf(no DATABASE_URL): env-free worktrees skip by rail; CI (supabase up) runs them. These
-// prove what a stub cannot — that Postgres, not the test's fixture order, produces the
+// ── Database: real rows, real ORDER BY, real RLS, on the local stack ───────────────────────
+// These prove what a stub cannot — that Postgres, not the test's fixture order, produces the
 // kind-priority ladder, that superseded rows really vanish, and that RLS denies cross-tenant.
-const hasDb = Boolean(process.env.DATABASE_URL);
-
-describe.skipIf(!hasDb)(
+describe(
   "memory retrieval — ordering & tenancy [CI-owned integration]",
   () => {
     let admin: pg.Pool;
