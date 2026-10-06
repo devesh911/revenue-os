@@ -1,7 +1,9 @@
 // Slice 0's proof: GitHub's run records show that on main the cloud test database changes only after the tests pass.
 // Each recent run of staging-migrations on main must have started after ci's `checks` job passed on the same commit,
 // and must have skipped its apply step when that commit changed no migration. Read with `gh run list` and `gh run view`
-// (reads only, with the run's GitHub token); a record that can't be read fails the step, saying why.
+// (reads only, with the run's GitHub token); a record that can't be read fails the step, saying why. Each commit's ci
+// run is asked for by its commit: on 2026-10-05 the listing of ci's last 100 runs on main held none of the nine runs
+// the step judged, though each had passed, and the step reported `checks` as not passing on all nine commits.
 
 import { spawnSync } from "node:child_process";
 import { git, plainEnv } from "./scratch";
@@ -20,7 +22,7 @@ type Job = {
   steps?: { name: string; conclusion: string | null }[];
 };
 export type StagingRun = { url: string; sha: string; jobs: Job[] };
-export type CiRun = { sha: string; jobs: Job[] };
+export type CiRun = { sha: string; url?: string; jobs: Job[] };
 
 /**
  * PURE: recent staging-migrations runs on main, ci's runs on main and whether a commit changed a migration → what
@@ -45,11 +47,19 @@ export function runRecordProblems(
   let skippedClean = 0;
   for (const { run, job } of ran) {
     const short = run.sha.slice(0, 7);
-    const checks = ci
-      .filter((c) => c.sha === run.sha)
+    const own = ci.filter((c) => c.sha === run.sha);
+    const checks = own
       .flatMap((c) => c.jobs)
       .find((j) => j.name === "checks" && j.conclusion === "success");
-    if (!checks?.completedAt)
+    if (!own.length)
+      problems.push(
+        `${run.url}: found no ci run on ${short} in GitHub's records, so nothing shows \`checks\` passed before the job ran`,
+      );
+    else if (own.every((c) => !c.jobs.length))
+      problems.push(
+        `${run.url}: GitHub returned no jobs for ci's run on ${short} (${own.map((c) => c.url).join(", ")}), so nothing shows \`checks\` passed before the job ran`,
+      );
+    else if (!checks?.completedAt)
       problems.push(
         `${run.url}: \`checks\` did not pass on ${short}, yet the job ran`,
       );
@@ -92,11 +102,11 @@ const repoOf = (env: NodeJS.ProcessEnv) =>
   env.GITHUB_REPOSITORY ? ["-R", env.GITHUB_REPOSITORY] : [];
 
 export const runRecords: Step = {
-  does: `Reads GitHub's run records (gh run list and gh run view, reads only) of the last ${RECENT} staging-migrations runs on main and of ci, and checks that the step that updates the cloud test database starts only after \`checks\` has passed on the same commit and is skipped when no migration changed`,
+  does: `Reads GitHub's run records (gh run list and gh run view, reads only) of the last ${RECENT} staging-migrations runs on main and of ci's run on each of their commits, and checks that the step that updates the cloud test database starts only after \`checks\` has passed on the same commit and is skipped when no migration changed`,
   check: ({ root, env }) => {
     const R = repoOf(env);
     type Listed = { databaseId: number; headSha: string; url: string };
-    const list = (workflow: string, limit: number) =>
+    const list = (workflow: string, limit: number, commit?: string) =>
       gh<Listed[]>(root, env, [
         "run",
         "list",
@@ -105,6 +115,7 @@ export const runRecords: Step = {
         workflow,
         "--branch",
         "main",
+        ...(commit ? ["--commit", commit] : []),
         "--status",
         "completed",
         "--limit",
@@ -126,10 +137,15 @@ export const runRecords: Step = {
       sha: r.headSha,
       jobs: jobs(r.databaseId),
     }));
-    const shas = new Set(staging.map((r) => r.sha));
-    const ci = list("ci.yml", 100)
-      .filter((r) => shas.has(r.headSha))
-      .map((r) => ({ sha: r.headSha, jobs: jobs(r.databaseId) }));
+    const ci = [...new Set(staging.map((r) => r.sha))].flatMap((sha) =>
+      list("ci.yml", 10, sha)
+        .filter((r) => r.headSha === sha)
+        .map((r) => ({
+          sha,
+          url: r.url,
+          jobs: jobs(r.databaseId),
+        })),
+    );
     const changed = (sha: string) => {
       try {
         return !!git(
