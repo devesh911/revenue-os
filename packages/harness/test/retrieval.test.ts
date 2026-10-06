@@ -18,8 +18,8 @@
 //   • ENV-FREE unit — a stubbed OrgScopedDb routed by TABLE NAME; no Postgres. Retrieval may
 //     use any SQL it likes, but it MUST read contact_memories + conversations through
 //     ctx.db (the RLS-bound door, docs/security.md S8.3) or the stub never sees it and the tests fail.
-//   • Database — real rows, real ordering, real RLS, on the local stack, like every database test:
-//     never skipped, so a missing database fails them rather than switching off the tenancy checks.
+//   • [CI-owned integration] — real rows, real ordering, real RLS. skipIf(no DATABASE_URL):
+//     they run wherever the local stack's settings are set (`bun run gate`, CI).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { createPool, withOrg } from "@revenue-os/db";
 import pg from "pg";
@@ -393,133 +393,151 @@ describe("memory block determinism", () => {
   });
 });
 
-// ── Database: real rows, real ORDER BY, real RLS, on the local stack ───────────────────────
-// These prove what a stub cannot — that Postgres, not the test's fixture order, produces the
+// ── [CI-owned integration] real rows, real ORDER BY, real RLS ──────────────────────────────
+// skipIf(no DATABASE_URL): env-free worktrees skip by rail; CI (supabase up) runs them. These
+// prove what a stub cannot — that Postgres, not the test's fixture order, produces the
 // kind-priority ladder, that superseded rows really vanish, and that RLS denies cross-tenant.
-describe("memory retrieval — ordering & tenancy [CI-owned integration]", () => {
-  let admin: pg.Pool;
-  let appService: pg.Pool;
-  let companies: ReturnType<typeof testCompanies>;
-  let orgA = "";
-  let orgB = "";
-  let convA = "";
-  const ORGB_SECRET = "ORGB-SECRET budget is 9 crore";
+const hasDb = Boolean(process.env.DATABASE_URL);
 
-  beforeAll(async () => {
-    admin = new pg.Pool({
-      connectionString:
-        process.env.LOCAL_DB_URL ||
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-      max: 2,
-    });
-    appService = createPool(
-      process.env.DATABASE_URL ||
-        "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
-    );
-    companies = testCompanies(admin);
-    orgA = (await companies.add("Memory A")).id;
-    orgB = (await companies.add("Memory B")).id;
-    const contactA = (
-      await admin.query(
-        `insert into contacts (org_id, first_name) values ($1,'OrgA-Owned') returning id`,
-        [orgA],
-      )
-    ).rows[0].id;
-    const contactB = (
-      await admin.query(
-        `insert into contacts (org_id, first_name) values ($1,'OrgB-Owned') returning id`,
-        [orgB],
-      )
-    ).rows[0].id;
-    convA = (
-      await admin.query(
-        `insert into conversations (org_id, contact_id, channel, direction)
-           values ($1,$2,'voice','outbound') returning id`,
-        [orgA, contactA],
-      )
-    ).rows[0].id;
+describe.skipIf(!hasDb)(
+  "memory retrieval — ordering & tenancy [CI-owned integration]",
+  () => {
+    let admin: pg.Pool;
+    let appService: pg.Pool;
+    let companies: ReturnType<typeof testCompanies>;
+    let orgA = "";
+    let orgB = "";
+    let convA = "";
+    const ORGB_SECRET = "ORGB-SECRET budget is 9 crore";
 
-    const mem = async (
-      org: string,
-      contact: string,
-      kind: string,
-      content: string,
-      createdAt: string,
-    ) =>
-      (
+    beforeAll(async () => {
+      admin = new pg.Pool({
+        connectionString:
+          process.env.LOCAL_DB_URL ||
+          "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+        max: 2,
+      });
+      appService = createPool(
+        process.env.DATABASE_URL ||
+          "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
+      );
+      companies = testCompanies(admin);
+      orgA = (await companies.add("Memory A")).id;
+      orgB = (await companies.add("Memory B")).id;
+      const contactA = (
         await admin.query(
-          `insert into contact_memories (org_id, contact_id, kind, content, created_at)
-             values ($1,$2,$3,$4,$5) returning id`,
-          [org, contact, kind, content, createdAt],
+          `insert into contacts (org_id, first_name) values ($1,'OrgA-Owned') returning id`,
+          [orgA],
+        )
+      ).rows[0].id;
+      const contactB = (
+        await admin.query(
+          `insert into contacts (org_id, first_name) values ($1,'OrgB-Owned') returning id`,
+          [orgB],
+        )
+      ).rows[0].id;
+      convA = (
+        await admin.query(
+          `insert into conversations (org_id, contact_id, channel, direction)
+           values ($1,$2,'voice','outbound') returning id`,
+          [orgA, contactA],
         )
       ).rows[0].id;
 
-    // Inserted in a NON-canonical order on purpose: only the query's ORDER BY can produce
-    // the expected sequence (insertion order would produce a different one).
-    await mem(orgA, contactA, "fact", M_FACT, "2026-07-19T10:00:00Z");
-    await mem(orgA, contactA, "objection", M_OBJECTION, "2026-07-18T10:00:00Z");
-    await mem(orgA, contactA, "preference", M_PREF_OLD, "2026-07-02T10:00:00Z");
-    const prefNew = await mem(
-      orgA,
-      contactA,
-      "preference",
-      M_PREF_NEW,
-      "2026-07-20T10:00:00Z",
-    );
-    await mem(orgA, contactA, "summary", M_SUMMARY, "2026-07-01T10:00:00Z");
-    // The trap: the NEWEST preference is superseded. If the live filter is missing it sorts
-    // to the front of its kind and the model is told an out-of-date thing as current truth.
-    const dead = await mem(
-      orgA,
-      contactA,
-      "preference",
-      "SUPERSEDED: prefers phone calls, never WhatsApp",
-      "2026-07-25T10:00:00Z",
-    );
-    await admin.query(
-      `update contact_memories set superseded_by = $1 where id = $2`,
-      [prefNew, dead],
-    );
-    await mem(orgB, contactB, "fact", ORGB_SECRET, "2026-07-21T10:00:00Z");
-  });
+      const mem = async (
+        org: string,
+        contact: string,
+        kind: string,
+        content: string,
+        createdAt: string,
+      ) =>
+        (
+          await admin.query(
+            `insert into contact_memories (org_id, contact_id, kind, content, created_at)
+             values ($1,$2,$3,$4,$5) returning id`,
+            [org, contact, kind, content, createdAt],
+          )
+        ).rows[0].id;
 
-  afterAll(async () => {
-    await companies.cleanup();
-    await appService.end();
-    await admin.end();
-  });
-
-  it("returns LIVE rows only, ordered summary → preference(recent first) → objection → fact", async () => {
-    const rows = await withOrg(appService, orgA, (tx) =>
-      memFn()({ orgId: orgA, db: tx }, convA),
-    );
-    expect(rows.map((r) => r.content)).toEqual([
-      M_SUMMARY,
-      M_PREF_NEW,
-      M_PREF_OLD,
-      M_OBJECTION,
-      M_FACT,
-    ]);
-    expect(rows.some((r) => r.content.startsWith("SUPERSEDED"))).toBe(false);
-    expect(rows.some((r) => r.content === ORGB_SECRET)).toBe(false);
-  });
-
-  it("cross-tenant denial: org B reading org A's conversation gets NO memories and NO block", async () => {
-    await withOrg(appService, orgB, async (tx) => {
-      const ctx: OrgCtx = { orgId: orgB, db: tx };
-      expect(await memFn()(ctx, convA)).toEqual([]); // RLS hides the conversation itself
-      const { system } = await assembleContext(ctx, convA, BASE);
-      expect(system).toBe(BASE); // no frame, no label, not one leaked byte
-      expect(system).not.toContain(M_SUMMARY);
+      // Inserted in a NON-canonical order on purpose: only the query's ORDER BY can produce
+      // the expected sequence (insertion order would produce a different one).
+      await mem(orgA, contactA, "fact", M_FACT, "2026-07-19T10:00:00Z");
+      await mem(
+        orgA,
+        contactA,
+        "objection",
+        M_OBJECTION,
+        "2026-07-18T10:00:00Z",
+      );
+      await mem(
+        orgA,
+        contactA,
+        "preference",
+        M_PREF_OLD,
+        "2026-07-02T10:00:00Z",
+      );
+      const prefNew = await mem(
+        orgA,
+        contactA,
+        "preference",
+        M_PREF_NEW,
+        "2026-07-20T10:00:00Z",
+      );
+      await mem(orgA, contactA, "summary", M_SUMMARY, "2026-07-01T10:00:00Z");
+      // The trap: the NEWEST preference is superseded. If the live filter is missing it sorts
+      // to the front of its kind and the model is told an out-of-date thing as current truth.
+      const dead = await mem(
+        orgA,
+        contactA,
+        "preference",
+        "SUPERSEDED: prefers phone calls, never WhatsApp",
+        "2026-07-25T10:00:00Z",
+      );
+      await admin.query(
+        `update contact_memories set superseded_by = $1 where id = $2`,
+        [prefNew, dead],
+      );
+      await mem(orgB, contactB, "fact", ORGB_SECRET, "2026-07-21T10:00:00Z");
     });
-  });
 
-  it("cross-tenant denial: org A's assembled prompt never carries org B's memory", async () => {
-    const { system } = await withOrg(appService, orgA, (tx) =>
-      assembleContext({ orgId: orgA, db: tx }, convA, BASE),
-    );
-    expect(system).toContain(MEM_OPEN);
-    expect(system).toContain(M_SUMMARY);
-    expect(system).not.toContain(ORGB_SECRET);
-  });
-});
+    afterAll(async () => {
+      await companies.cleanup();
+      await appService.end();
+      await admin.end();
+    });
+
+    it("returns LIVE rows only, ordered summary → preference(recent first) → objection → fact", async () => {
+      const rows = await withOrg(appService, orgA, (tx) =>
+        memFn()({ orgId: orgA, db: tx }, convA),
+      );
+      expect(rows.map((r) => r.content)).toEqual([
+        M_SUMMARY,
+        M_PREF_NEW,
+        M_PREF_OLD,
+        M_OBJECTION,
+        M_FACT,
+      ]);
+      expect(rows.some((r) => r.content.startsWith("SUPERSEDED"))).toBe(false);
+      expect(rows.some((r) => r.content === ORGB_SECRET)).toBe(false);
+    });
+
+    it("cross-tenant denial: org B reading org A's conversation gets NO memories and NO block", async () => {
+      await withOrg(appService, orgB, async (tx) => {
+        const ctx: OrgCtx = { orgId: orgB, db: tx };
+        expect(await memFn()(ctx, convA)).toEqual([]); // RLS hides the conversation itself
+        const { system } = await assembleContext(ctx, convA, BASE);
+        expect(system).toBe(BASE); // no frame, no label, not one leaked byte
+        expect(system).not.toContain(M_SUMMARY);
+      });
+    });
+
+    it("cross-tenant denial: org A's assembled prompt never carries org B's memory", async () => {
+      const { system } = await withOrg(appService, orgA, (tx) =>
+        assembleContext({ orgId: orgA, db: tx }, convA, BASE),
+      );
+      expect(system).toContain(MEM_OPEN);
+      expect(system).toContain(M_SUMMARY);
+      expect(system).not.toContain(ORGB_SECRET);
+    });
+  },
+);
