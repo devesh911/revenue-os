@@ -26,8 +26,10 @@ const SAFE = [
   "core.hooksPath=/dev/null",
 ];
 
+const STEP_MS = 10 * 60_000;
 const step = (what: string, cmd: string, args: string[], cwd?: string) => {
-  const r = spawnSync(cmd, args, { cwd, encoding: "utf8" });
+  // A time limit, so a step whose exit Bun 1.3.11 loses (oven-sh/bun#34069) can't hold the gate forever.
+  const r = spawnSync(cmd, args, { cwd, encoding: "utf8", timeout: STEP_MS });
   if (r.status !== 0)
     throw new Error(
       `${what} failed: ${`${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n").slice(-5).join("\n")}`,

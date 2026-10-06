@@ -66,12 +66,17 @@ export function casesOf(report: string): Case[] {
 
 /**
  * Runs `file`, named from `dir`, alone in `dir` as CI does (CI=1); with `coverage`, records which lines ran; with
- * `only`, a test name pattern, runs just the tests it matches (bun reports the others skipped).
+ * `only`, a test name pattern, runs just the tests it matches (bun reports the others skipped); with `ms`, stops it
+ * after that long instead of RUN_MS.
  */
 export function runTestFile(
   dir: string,
   file: string,
-  { coverage = false, only }: { coverage?: boolean; only?: string } = {},
+  {
+    coverage = false,
+    only,
+    ms = RUN_MS,
+  }: { coverage?: boolean; only?: string; ms?: number } = {},
 ): FileRun {
   const out = mkdtempSync(join(tmpdir(), "done-gate-run-"));
   const junit = join(out, "junit.xml");
@@ -94,7 +99,7 @@ export function runTestFile(
         env: { ...process.env, CI: "1" },
         encoding: "utf8",
         maxBuffer: 256 << 20,
-        timeout: RUN_MS,
+        timeout: ms,
       },
     );
     return {

@@ -11,6 +11,7 @@ import { changeMarks, markBodyProblems } from "./already-on-main";
 import { fixWhenTouchedProblems, TABLE, unreadTable } from "./fix-when-touched";
 import { git } from "./git";
 import { migrationProblems } from "./migrations";
+import { unquotedBreakMarks } from "./pr-break-marks";
 import { unquotedMarks } from "./pr-coverage-marks";
 import { firstLineProblems } from "./pr-first-line";
 import { quoteProblems } from "./pr-quotes";
@@ -135,6 +136,7 @@ export async function judgePr(
       ...secondCheck(workflows),
       ...migrationProblems(snap),
       ...unquotedMarks(snap.added, body),
+      ...unquotedBreakMarks(snap.added, body),
       ...markBodyProblems(changeMarks(snap), shown(body)), // each "behaviour already on main" mark, copied into the body
       ...(await proofLinks(
         snap.repo,
