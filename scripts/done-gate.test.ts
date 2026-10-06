@@ -964,6 +964,9 @@ const REFUSED: [string, string][] = [
   // In double quotes a backslash escapes ", \, $, ` and a new line (every shell ends at `EF` and `E"F`).
   ['cat <<"E\\\nF"\nit\'s\nEF\ngh release create v1', LOOP],
   ['cat <<"E\\"F"\nit\'s\nE"F\ngh release create v1', LOOP],
+  // bash and zsh read `$[…]` as arithmetic, where `<<` is a shift, brackets inside it too; dash doesn't.
+  ["echo $[1<<2]\ngh release create v1\n2", LOOP],
+  ["echo $[ 1 + a[1] << 2 ]\ngh release create v1\n2", LOOP],
   // A backslash before a new line joins the lines; a heredoc's delimiter is its whole word, quotes removed; a `<<`
   // in arithmetic starts no heredoc in bash, zsh or ksh, while dash, which has no `((`, reads it as one.
   ["g\\\nh release create v1", LOOP],

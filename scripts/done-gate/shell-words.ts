@@ -70,7 +70,7 @@ function read(
   let quote = "";
   let inWord = false;
   let plain = true; // no quote, escape or expansion in the word, so a shell may read it as a keyword
-  let depth = 0; // parentheses opened inside a $( … )
+  let depth = 0; // parentheses opened inside a $( … ), or brackets inside a $[ … ]
   // Each ${ still open, and whether it opened inside double quotes. Where one ends turns murky at a bare { inside
   // it (zsh nests it, bash doesn't) or a separator before its }: from there on, a `<<` starts a heredoc only in the
   // reading that says so (how.heredocs), so the line is judged both ways.
@@ -132,15 +132,18 @@ function read(
     plain = false;
     return inner.end;
   };
-  // Arithmetic from `open` to the `))` that closes it, read with no heredocs; nothing if the `)` matching the
-  // second `(` is not followed by another, where shells read subshells instead.
-  const arithmetic = (open: number) => {
-    const inner = read(line, open, ")", how, true);
-    if (line[inner.end + 1] === ")") return inner;
+  // Arithmetic from `open` to the `close` that ends it (`))`, or the `]` of `$[`), read with no heredocs, and where
+  // it ends; nothing if the `)` matching the second `(` is not followed by another, where shells read subshells
+  // instead, or a `$[` never closes.
+  const arithmetic = (open: number, close: string) => {
+    const inner = read(line, open, close[0] ?? "", how, true);
+    const last = inner.end + close.length - 1;
+    if (line.slice(inner.end, last + 1) === close)
+      return { commands: inner.commands, last };
     // Each miss reads its text again, so deep nesting would take minutes: refuse to read it instead.
     if (++how.misses > MAX_MISSES)
       throw new Error(
-        `it nests more than ${MAX_MISSES} \`((\` that are not arithmetic`,
+        `it nests more than ${MAX_MISSES} \`((\` or \`$[\` that are not arithmetic`,
       );
   };
   // A ; & | ( ) or new line ends the command, and any ${ still open there.
@@ -156,15 +159,17 @@ function read(
     const here = !braces.length && (!murky || how.heredocs) && !arith; // a << here may start a heredoc
     const endsArm =
       ch === ";" ? line.slice(i, i + 3).match(/^;(;&?|[&|])/)?.[0] : undefined; // ;; ;& ;;& or ;|
-    // Arithmetic that opens here: `$((`, or an unquoted `((`.
+    // Arithmetic that opens here: `$((`, bash's and zsh's `$[` (not dash's), or an unquoted `((`.
     const expr =
       quote === "'"
         ? undefined
         : line.startsWith("$((", i)
-          ? arithmetic(i + 3)
-          : how.dparen && !arith && !quote && line.startsWith("((", i)
-            ? arithmetic(i + 2)
-            : undefined;
+          ? arithmetic(i + 3, "))")
+          : how.dparen && line.startsWith("$[", i)
+            ? arithmetic(i + 2, "]")
+            : how.dparen && !arith && !quote && line.startsWith("((", i)
+              ? arithmetic(i + 2, "))")
+              : undefined;
     if (quote === "'") {
       if (ch === "'") quote = "";
       else word += ch;
@@ -177,10 +182,10 @@ function read(
       plain = false;
     } else if (expr && ch === "$") {
       first(expr.commands);
-      word += line.slice(i, expr.end + 2);
+      word += line.slice(i, expr.last + 1);
       inWord = true;
       plain = false;
-      i = expr.end + 1;
+      i = expr.last;
     } else if (ch === "$" && line[i + 1] === "(") i = substitute(i, i + 2, ")");
     else if (ch === "`") i = substitute(i, i + 1, "`");
     else if (ch === "$" && line[i + 1] === "{") {
@@ -273,9 +278,14 @@ function read(
     } else if (expr && ch === "(") {
       separate();
       first(expr.commands);
-      i = expr.end + 1;
+      i = expr.last;
     } else if (ch === ")" && stop === ")" && depth === 0) break;
-    else if (";&|()".includes(ch)) {
+    else if (stop === "]" && (ch === "[" || ch === "]")) {
+      if (ch === "]" && depth === 0) break;
+      depth += ch === "[" ? 1 : -1; // brackets inside a $[ … ]
+      word += ch;
+      inWord = true;
+    } else if (";&|()".includes(ch)) {
       arm = undefined;
       depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
       separate();
