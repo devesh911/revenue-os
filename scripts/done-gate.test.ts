@@ -967,6 +967,27 @@ const REFUSED: [string, string][] = [
   [`echo \${x:-"}" <<EOF}\ngh release create v1\nEOF`, LOOP],
   ["# it's fine\ngh release create v1\n# done'", LOOP],
   ["# a comment; gh release create v1", LOOP], // a shell that takes no comments (zsh -i) runs it
+  // A bare { in a ${…} that closed, a `#` inside a ${…}, and a `$'…'` or `$"…"` delimiter hide nothing either (bash, zsh,
+  // sh and dash each run the last line).
+  [
+    `body="\${PAYLOAD:-{}}"\ngit commit -F - <<EOF\nDon't ship yet\nEOF\nsupabase db push`,
+    CLOUD,
+  ],
+  [`echo \${a:- #'\necho '}\nsupabase db push`, CLOUD],
+  ["cat <<$'EOF'\nhi\nEOF\nsupabase db push", CLOUD],
+  ['cat <<$"EOF"\nhi\nEOF\ngh release create v1', LOOP],
+  // A `;;` in arithmetic ends no case arm (bash, zsh and sh run gh); a heredoc ends only at a line that is exactly its
+  // delimiter, after `<<-` strips leading tabs (every shell runs gh).
+  ["for ((i=1;;i<<1)); do break; done\ngh release create v1\n1", LOOP],
+  ["cat <<EOF\n EOF\nit's\nEOF\ngh pr close 5", LOOP],
+  ["cat <<EOF\nEOF \nit's\nEOF\ngh pr close 5", LOOP],
+  ["cat <<-EOF\n  EOF\nit's\n\tEOF\ngh pr close 5", LOOP],
+  // In double quotes a backslash escapes ", \, $, ` and a new line (every shell ends at `EF` and `E"F`).
+  ['cat <<"E\\\nF"\nit\'s\nEF\ngh release create v1', LOOP],
+  ['cat <<"E\\"F"\nit\'s\nE"F\ngh release create v1', LOOP],
+  // bash and zsh read `$[…]` as arithmetic, where `<<` is a shift, brackets inside it too; dash doesn't.
+  ["echo $[1<<2]\ngh release create v1\n2", LOOP],
+  ["echo $[ 1 + a[1] << 2 ]\ngh release create v1\n2", LOOP],
   // A backslash before a new line joins the lines; a heredoc's delimiter is its whole word, quotes removed; a `<<`
   // in arithmetic starts no heredoc in bash, zsh or ksh, while dash, which has no `((`, reads it as one.
   ["g\\\nh release create v1", LOOP],
@@ -1224,6 +1245,37 @@ describe("toolRefusal: what agents' own tools may not do", () => {
       "nests more than 64",
     );
     expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("refuses a heredoc it can't end where shells do: a `$'…'` delimiter holding an escape, or one across lines", () => {
+    // bash, zsh, sh and dash all end this heredoc at `EF`, then run the last line.
+    expect(() =>
+      toolRefusal("cat <<$'E\\x46'\nhi\nEF\ngh release create v1", look),
+    ).toThrow("`$'…'` delimiter holding an escape");
+    // dash ends this one at the lines `E` and `F`, one after the other, and runs gh; bash and zsh never end it.
+    expect(() =>
+      toolRefusal("cat <<'E\nF'\nit's\nE\nF\ngh release create v1", look),
+    ).toThrow("delimiter crosses a line");
+  });
+
+  it("refuses an operator a backslash-newline splits, which shells join first, and lets an ordinary continuation through", () => {
+    // bash, zsh, sh and dash run gh after `$\`-newline-`{`; bash, sh and dash after `<\`-newline-`<`.
+    for (const split of [
+      `echo $\\\n{x:-<<EOF}\ngh release create v1\nEOF`,
+      "cat <\\\n<EOF\nit's\nEOF\ngh release create v1",
+      "cat <<\\\n< 'x'\ngh release create v1\nx",
+      "(\\\n(1<<2))\ngh release create v1\n2",
+      "cat <<\\\n-EOF\n\tEOF\nit's\nEOF\ngh release create v1",
+    ])
+      expect(() => toolRefusal(split, look)).toThrow(
+        "splits an operator across lines",
+      );
+    expect(
+      toolRefusal(
+        "gh pr checks 12 \\\n  --watch && \\\n  gh pr view 12 |\\\n  head -5",
+        look,
+      ),
+    ).toBeUndefined();
   });
 
   it("refuses when it can't tell which branch a bare push would push", () => {
