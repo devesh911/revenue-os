@@ -1,7 +1,7 @@
 // Two tenants stay isolated (the cross-tenant denial test AGENTS.md requires) — exercised at the
 // API surface: real local sign-in users, jose-verified JWTs, app_service DB path underneath. Only our operator
 // list may create a company (supabase/migrations/018_platform_operators.sql): user A is on it, user B is not.
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
 import { type TestUser, testUser } from "../../../tests/test-users";
@@ -34,6 +34,7 @@ let orgASlug = "";
 
 /** User A makes a company through POST /orgs, the route under test: its id and name, and the reply. */
 async function createAsA(label: string) {
+  await users();
   let made = { name: "", slug: "", status: 0, role: "" };
   const { id } = await companies.add(label, async (name, slug) => {
     const res = await api("/orgs", userA.token, {
@@ -49,6 +50,7 @@ async function createAsA(label: string) {
 
 /** User B, who is not on our operator list, tries to make a company with `body`: the reply, and whether one was made. */
 async function strangerCreates(body: (name: string, slug: string) => string) {
+  await users();
   let reply = { status: 0, body: {} as unknown };
   const made = companies.add("Stranger's company", async (name, slug) => {
     const res = await api("/orgs", userB.token, {
@@ -65,10 +67,16 @@ async function strangerCreates(body: (name: string, slug: string) => string) {
   return { ...reply, refused };
 }
 
-beforeAll(async () => {
-  userA = await testUser(admin, "tenant-a", { operator: true });
-  userB = await testUser(admin, "tenant-b");
-});
+let made: Promise<void> | undefined;
+/**
+ * Makes user A, on our operator list, and user B, not on it, once, inside the first test that needs them: where
+ * logins can't be made yet (main's code, before invite-only), that test fails, rather than the file's set-up.
+ */
+const users = () =>
+  (made ??= (async () => {
+    userA = await testUser(admin, "tenant-a", { operator: true });
+    userB = await testUser(admin, "tenant-b");
+  })());
 
 afterAll(async () => {
   await companies.cleanup();
@@ -123,6 +131,7 @@ describe("org bootstrap + tenant isolation", () => {
   // The other door to the companies table: the database's own data interface, with the stranger's sign-in token.
   // behaviour already on main: the orgs insert policy (002_rls.sql) lets in only a company the worker's transaction names
   it("refuses a stranger who inserts a company through the database's data interface", async () => {
+    await users();
     let status = 0;
     const made = companies.add("Data interface company", async (name, slug) => {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/orgs`, {
