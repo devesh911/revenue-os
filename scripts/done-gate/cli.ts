@@ -5,6 +5,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { breakCheck } from "./break-check";
 import { toplevel } from "./checkouts";
 import { checkpointCommand } from "./checkpoint";
 import { browserEnv, run, tail } from "./checks";
@@ -22,7 +23,8 @@ import { prove, rulingOn } from "./verdict";
 const USAGE = `usage: bun run gate [rules [--base <ref>] [--head <ref>] | pr [--base <ref>] [--head <ref>] | tests [e2e] | pause "<question>" | checkpoint [--done "<…>" --failed "<…>" --next "<…>"]]
        bun run see <console path> [more paths]   (":org" in a path becomes the seeded workspace)
        pr reads the pull request's body from PR_BODY and its number from PR_NUMBER; --head judges a commit as data
-       bun run gate proven [--base <ref>]   the change's new and edited tests fail on main's code and pass on it`;
+       bun run gate proven [--base <ref>]   the change's new and edited tests fail on main's code and pass on it
+       bun run gate broken [--base <ref>]   each new line of guardrail, tenancy and money code, broken on purpose, makes a test fail`;
 
 /**
  * PURE: a message holding text the pull request supplied (a file's name, its body's first line) as one log line:
@@ -132,6 +134,10 @@ export async function cli(cmd: string, args: string[]) {
   } else if (cmd === "proven" && refs && !refs.head) {
     // Lines the change only moved are left out as the snapshot marks them (moved.ts, read in test-edits.ts).
     const r = testsProven(repo, changeOf("Tests proven", repo, refs.base));
+    console.log(r.text);
+    process.exit(r.ok ? 0 : 1);
+  } else if (cmd === "broken" && refs && !refs.head) {
+    const r = breakCheck(repo, changeOf("Break check", repo, refs.base));
     console.log(r.text);
     process.exit(r.ok ? 0 : 1);
   } else if (cmd === "checkpoint") {
