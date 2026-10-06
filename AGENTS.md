@@ -118,6 +118,13 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
   differ only in product code, on the one local database; lines it only moves are left out). One that deliberately checks behaviour main already has says so at the end
   of its first line or alone on the comment line just above it, `// behaviour already on main: <why>`, and
   the PR body copies it as `Behaviour already on main: <file> · <why>`.
+- Guardrail, tenancy and money code (the paths `GUARDED` in `scripts/done-gate/broken-lines.ts` lists) is
+  broken on purpose (`bun run gate broken`, in the gate and in CI): for each line a change adds there, a
+  condition on it is flipped and the statement it starts is removed, in a scratch copy, and at least one of the
+  tests that run that line must then fail. TypeScript only: SQL is not broken. It has its own time limit and,
+  when that runs out, fails naming the lines not yet broken. A deliberate gap is marked at the end of the line
+  or alone on the comment line above it, `// break-check gap: <why>`, and the PR body copies it as
+  `Break-check mark: <file> · <why>`.
 - Codex reads hooks from the main checkout's `.codex/hooks.json`, not from a worktree's.
 - The shared-database lock covers checks run through `bun run gate` or `bun run see`; running tests
   any other way (`bun test`, `bun run e2e`, `bun run gate tests`) can collide with another agent's run.
@@ -161,7 +168,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    that builds an item back until its checkpoint was written on the code as you leave it.
 3. `bun run gate` green, run bare — never pipe a gate through anything that can swallow its exit
    code. It runs typecheck, lint, guards, every test and the RLS check against the real local stack,
-   the change's new and edited tests again on main's code, and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
+   the change's new and edited tests again on main's code, the break check on guardrail, tenancy and money
+   code, and the browser checks. Never skip, silence or weaken a check to get past it. CI also runs
    gitleaks, `bun audit` and a Docker build; CI is the verdict.
 4. See it work (`bun run see <console path>` saves what a signed-in person sees), then run the
    verifier agent with Devesh's request word for word (when he gave none, the roadmap item's text,
@@ -175,7 +183,8 @@ https://claude.ai/artifact/AA8oywPgYW1VgSefP4Va2E
    `Rule change:` line per changed rule file (hard rail 7), a `Fix-when-touched:` line per entry of
    docs/fix-when-touched.md whose area the PR touches (step 6), an `Exception: <file> · <why>` line per
    `done-gate: allow` exception the PR adds, a copy of each line it adds to docs/removed-tests.md, and a
-   `Coverage mark: <file> · <what the mark says>` line per coverage mark the PR adds. `rules-from-main`
+   `Coverage mark: <file> · <what the mark says>` line per coverage mark the PR adds, and a
+   `Break-check mark: <file> · <why>` line per break-check mark it adds. `rules-from-main`
    refuses a PR without them; `PR_BODY="$(cat body.md)" bun run gate pr` judges the body as it will. Watch CI: `gh pr checks <n> --watch`. Green means observed
    green on GitHub.
 5. Merge per the PHASE rule: one PR at a time, confirm `base == main`, never loop merges. At
