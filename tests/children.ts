@@ -50,8 +50,13 @@ export function children() {
         child.stderr.on("data", (d) => {
           out += d;
         });
-        child.on("close", (code) => {
+        // The group goes when the child ends ("exit"), not when its output closes ("close"): something the child
+        // started may hold that output open, and "close" would wait for it.
+        child.on("exit", () => {
           if (group) stop(group);
+        });
+        child.on("close", (code) => {
+          if (group && groups.has(group)) stop(group);
           done({ code, out });
         });
       }),
