@@ -6,7 +6,7 @@
 // while its worker runs, as the gate's browser checks do: a worker takes every company's due jobs from the one local
 // database (scripts/done-gate/running-workers.ts).
 
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
 import { onSharedStack } from "../done-gate/shared-stack";
@@ -14,7 +14,10 @@ import { git, plainEnv, sh } from "./scratch";
 import type { Step } from "./step";
 
 const LOCK_WAIT_MS = 8 * 60_000;
-const IMAGE = "revenue-os-worker:proof";
+// Each proved commit gets an image of its own, so two runs proving different commits never run each other's.
+const imageOf = (commit: string) => `revenue-os-worker:proof-${commit}`;
+// Every container the step runs carries this label, so one a stopped or timed-out run left behind can be found.
+const PROOF_LABEL = "revenue-os.proof=worker-image";
 const LABEL = "org.opencontainers.image.revision";
 
 /** The local stack's addresses, as ci.yml and the proof workflow set them, or the local defaults. */
@@ -200,25 +203,38 @@ function buildImage(root: string) {
     "-f",
     "docker/Dockerfile",
     "-t",
-    IMAGE,
+    imageOf(commit),
     ".",
   ]);
   if (built.status !== 0)
     throw new Error(`docker build failed:\n${built.out.slice(-1500)}`);
-  const label = inspect(root, `{{ index .Config.Labels "${LABEL}" }}`, IMAGE);
+  const image = imageOf(commit);
+  const label = inspect(root, `{{ index .Config.Labels "${LABEL}" }}`, image);
   if (label !== commit)
     throw new Error(`the image's ${LABEL} label is "${label}", not ${commit}`);
-  const health = inspect(root, "{{ json .Config.Healthcheck.Test }}", IMAGE);
+  const health = inspect(root, "{{ json .Config.Healthcheck.Test }}", image);
   if (!health.includes("/ready"))
     throw new Error(`the image's health check does not ask /ready: ${health}`);
-  return { commit, label, health };
+  return { commit, image, label, health };
+}
+
+/**
+ * Removes `containers`, with a time limit of its own rather than the step's: a step that ran out of time still
+ * removes its container.
+ */
+function removeContainers(containers: string[]) {
+  if (containers.length)
+    spawnSync("docker", ["rm", "-f", ...containers], {
+      env: plainEnv(),
+      timeout: 30_000,
+    });
 }
 
 /** Runs the built image on the local stack until Docker reports it healthy, and says what its /release answered. */
 async function runImage(
   root: string,
   env: NodeJS.ProcessEnv,
-  { commit, label, health }: ReturnType<typeof buildImage>,
+  { commit, image, label, health }: ReturnType<typeof buildImage>,
 ) {
   // The container reaches the local stack on the machine running it through host.docker.internal.
   const { db, supabase } = stack(env);
@@ -228,12 +244,20 @@ async function runImage(
       .replace(/\/\/(127\.0\.0\.1|localhost):/, "//host.docker.internal:");
   const token = randomBytes(32).toString("hex");
   const name = `revenue-os-proof-${randomBytes(4).toString("hex")}`;
+  // Under the shared stack's lock no other run's container is running, so any labelled one is a leftover.
+  removeContainers(
+    sh(root, ["docker", "ps", "-aq", "--filter", `label=${PROOF_LABEL}`])
+      .stdout.split("\n")
+      .filter(Boolean),
+  );
   const ran = sh(root, [
     "docker",
     "run",
     "-d",
     "--name",
     name,
+    "--label",
+    PROOF_LABEL,
     "--add-host",
     "host.docker.internal:host-gateway",
     "-p",
@@ -244,7 +268,7 @@ async function runImage(
     `SUPABASE_URL=${onHost(supabase)}`,
     "-e",
     `READY_TOKEN=${token}`,
-    IMAGE,
+    image,
   ]);
   try {
     if (ran.status !== 0)
@@ -279,7 +303,7 @@ async function runImage(
       );
     return `the image is labelled ${LABEL}=${label}; its health check (${health}) turned the container healthy; its /release answered ${release}, and 401 without the token`;
   } finally {
-    sh(root, ["docker", "rm", "-f", name]);
+    removeContainers([name]);
   }
 }
 

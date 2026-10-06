@@ -23,6 +23,11 @@ export async function withOrg<T>(
 ): Promise<T> {
   const org = OrgIdSchema.parse(orgId);
   const client = await pool.connect();
+  // A connection the database drops while this transaction holds it is an 'error' on the client, which the pool stops
+  // listening for once the client is checked out; unheard, it ends the process. Heard here, the work fails through its
+  // own query, and release() discards the dead client (the pool drops one that can no longer be queried).
+  const onLost = () => {};
+  client.on("error", onLost);
   try {
     await client.query("begin");
     await client.query("select set_config('request.org_id', $1, true)", [org]);
@@ -37,6 +42,7 @@ export async function withOrg<T>(
     }
     throw err;
   } finally {
+    client.removeListener("error", onLost);
     client.release();
   }
 }
