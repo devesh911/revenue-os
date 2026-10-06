@@ -1,5 +1,6 @@
-// Task 1 acceptance: `bun test` green on the empty project — this is the first real test.
-// S5.9: /health must be information-free (status only); /ready needs its own bearer token.
+// The worker app's open and guarded endpoints (docs/security.md S5.9): /health is information-free (status only);
+// /ready and /release need their own bearer token. What /ready answers: test/ready.test.ts; /release and the token:
+// test/release.test.ts; a refusal behind the worker's error handler: test/errors.test.ts.
 import { describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { requireReadyToken } from "./auth";
@@ -21,6 +22,15 @@ describe("worker health endpoints", () => {
     const res = await app.fetch(
       new Request("http://localhost/ready", {
         headers: { "x-edge-auth": "whatever-cloudflare-stamped" },
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("GET /release is mounted behind the ready token", async () => {
+    const res = await app.fetch(
+      new Request("http://localhost/release", {
+        headers: { authorization: `Bearer ${"b".repeat(64)}` },
       }),
     );
     expect(res.status).toBe(401);

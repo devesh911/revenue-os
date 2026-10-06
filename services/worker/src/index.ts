@@ -1,13 +1,15 @@
-// ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (docs/tech-stack.md
-// T5/T7/T8; the agent harness is T26).
-// Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (G1).
+// ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (docs/tech-stack.md, its API framework,
+// jobs and hosting sections; the agent harness is its harness architecture section).
+// Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (AGENTS.md → Conventions).
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { ZodError } from "zod";
-import { type AuthEnv, requireAuth, requireReadyToken } from "./auth";
+import { type AuthEnv, requireAuth } from "./auth";
+import { pool } from "./db";
 import { env } from "./env";
-import { startJobs } from "./jobs";
+import { onError } from "./errors";
+import { jobQueueReachable, startJobs } from "./jobs";
 import { logger } from "./logger";
+import { databaseReachable, opsRoutes } from "./ready";
 import { agents } from "./routes/agents";
 import { contacts } from "./routes/contacts";
 import { conversations } from "./routes/conversations";
@@ -31,8 +33,17 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ ok: true })); // information-free (docs/security.md S5.9)
-app.get("/ready", requireReadyToken(env.READY_TOKEN), (c) =>
-  c.json({ ok: true, todo: "db + pgboss checks (task 1)" }),
+// /ready and /release, behind their own token: the container's health check and the deploy ask them (src/ready.ts).
+app.route(
+  "/",
+  opsRoutes({
+    token: env.READY_TOKEN,
+    release: env.RELEASE,
+    checks: {
+      database: databaseReachable(pool),
+      "job queue": jobQueueReachable,
+    },
+  }),
 );
 
 app.use("/orgs", requireAuth);
@@ -43,23 +54,12 @@ app.route("/", contacts);
 app.route("/", conversations);
 app.route("/", screens);
 app.route("/", guardrailPolicies);
-app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (docs/security.md S6.2)
+// Vapi's calls: one secret shared by every company, compared in constant time with the x-vapi-secret header
+// (src/vapi/receive.ts); it is not a signature of the body.
+app.route("/", vapiWebhook);
 
-// Clients get clean statuses, never internals; detail goes to the log (docs/security.md S5.8).
-app.onError((err, c) => {
-  if (err instanceof ZodError) return c.json({ error: "invalid_request" }, 400);
-  if (
-    typeof err === "object" &&
-    err !== null &&
-    (err as { code?: string }).code === "23505"
-  ) {
-    return c.json({ error: "conflict" }, 409);
-  }
-  logger.error({ err }, "unhandled route error");
-  return c.json({ error: "internal" }, 500);
-});
+app.onError(onError); // clean statuses, never internals (src/errors.ts)
 
-// TODO: mount packages/harness loop consumers
 // pg-boss consumers boot with the server, never on test import (import.meta.main is
 // false under bun test). Half-configured boot = refuse to run, same posture as env.ts.
 if (import.meta.main) {

@@ -1,8 +1,8 @@
 # VPS + Cloudflare setup — the exact walkthrough (Devesh-only tasks)
 
-Companion to T8 (topology), S3/S4 (the controls this implements), `docker/` (committed config),
-and `orchestrator/state/CLOUD-SETUP-RUNBOOK.md` (Supabase/GitHub half, already done). Work top to
-bottom. Where a value is secret it says WHERE to put it, never what it is.
+Companion to docs/tech-stack.md (the topology, T8), docs/security.md (the controls this implements, S3 and S4)
+and `docker/` (committed config); the Supabase and GitHub half is already set up (STATE.md says what is and
+what waits on Devesh). Work top to bottom. Where a value is secret it says WHERE to put it, never what it is.
 
 ## 0 · The picture (who talks to whom)
 
@@ -104,10 +104,10 @@ mkdir -p ~/app/docker/certs && chmod 700 ~/app/docker/certs
 nano ~/app/docker/certs/origin.pem   # paste "Origin Certificate"
 nano ~/app/docker/certs/origin.key   # paste "Private Key"
 chmod 600 ~/app/docker/certs/origin.*
-cd ~/app/docker && docker compose --env-file ../.env up -d
+cd ~/app/docker && RELEASE=$(git -C ~/app rev-parse HEAD) docker compose --env-file ../.env up -d
 ```
 
-`--env-file ../.env` on EVERY compose command here (`alias dc='docker compose --env-file ../.env'`):
+`--env-file ../.env` on EVERY compose command here (`alias dc='RELEASE=$(git -C ~/app rev-parse HEAD) docker compose --env-file ../.env'`: the image must name the commit it is built from):
 it is how compose hands API_HOST + EDGE_SHARED_SECRET to Caddy, and without it compose refuses to
 start — by design, since a blank secret would let an empty `X-Edge-Auth` header through.
 Verify from your laptop: `curl https://api.<domain>/health` → `{"ok":true}` **via Cloudflare**,

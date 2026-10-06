@@ -104,5 +104,15 @@ jobs:
         env:
           LOCAL_DB_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
+      # Labelled with the commit it is built from, which the step then reads back from the image.
       - name: Build worker image (build only; deploy is .github/workflows/deploy.yml) # docs/tech-stack.md T14
-        run: docker build -f docker/Dockerfile -t revenue-os-worker:ci .
+        env:
+          RELEASE: ${{ github.sha }}
+        run: |
+          docker build --build-arg RELEASE="$RELEASE" -f docker/Dockerfile -t revenue-os-worker:ci .
+          label="$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' revenue-os-worker:ci)"
+          test "$label" = "$RELEASE" || { echo "the image is labelled \"$label\", not $RELEASE"; exit 1; }
+          # A build that names no commit must fail, so no image goes out unlabelled (it reuses the layers above).
+          if docker build -f docker/Dockerfile -t revenue-os-worker:no-commit . ; then
+            echo "an image built without RELEASE was accepted"; exit 1
+          fi

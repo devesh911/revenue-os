@@ -180,6 +180,11 @@ export async function startJobs(
   boss = b;
 }
 
+/** The job runner is started and reaches its queue tables (pg-boss's schema) in the database: GET /ready asks it. */
+export async function jobQueueReachable(): Promise<boolean> {
+  return boss !== null && (await boss.isInstalled());
+}
+
 export async function stopJobs(): Promise<void> {
   if (!boss) return;
   const b = boss;

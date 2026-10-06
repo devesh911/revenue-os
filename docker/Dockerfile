@@ -15,6 +15,17 @@ COPY services/worker/package.json ./services/worker/package.json
 RUN bun install --frozen-lockfile --production
 COPY packages ./packages
 COPY services/worker ./services/worker
+# The commit this image is built from (CI passes github.sha): its label, and RELEASE, which GET /release shows. Last,
+# so a new commit rebuilds only these layers. A build that names no commit id fails here, so no image is unlabelled.
+ARG RELEASE=""
+RUN echo "$RELEASE" | grep -Eqx '[0-9a-f]{7,40}' || { echo "RELEASE must be the commit id this image is built from: docker build --build-arg RELEASE=\$(git rev-parse HEAD) …"; exit 1; }
+LABEL org.opencontainers.image.revision=$RELEASE
+ENV RELEASE=$RELEASE
 USER bun
 EXPOSE 8080
+# Healthy only while GET /ready answers ready: the worker reaches its database and its job queue. It sends the
+# container's own READY_TOKEN, so a container started without one is never healthy (/ready then refuses everyone).
+# Bun's fetch, as the image has no curl.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --start-interval=2s --retries=3 \
+  CMD ["bun", "-e", "const r = await fetch('http://127.0.0.1:' + (process.env.PORT || 8080) + '/ready', { headers: { authorization: 'Bearer ' + process.env.READY_TOKEN }, signal: AbortSignal.timeout(4000) }).catch(() => null); process.exit(r?.ok ? 0 : 1)"]
 CMD ["bun", "services/worker/src/index.ts"]

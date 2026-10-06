@@ -35,9 +35,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 
 **Known spots on main:**
 - About 101 of 243 source files carry an old code. Bare `T2` to `T9` are the worst, because docs/tech-stack.md reuses those numbers for different topics (for example `packages/channels/src/types.ts:1` says "T5" meaning an old task, while tech-stack's T5 is the web framework).
-- `services/worker/src/index.ts:35`: the readiness check (`/ready`) shows an internal to-do note to whoever calls it. Slice 1's readiness item replaces this reply; if you touch the file first, drop the note.
-- `services/worker/src/index.ts`, the comment on the `app.route("/", vapiWebhook)` line says it is protected by a "per-assistant shared secret on the raw body". It is one secret shared by every company, compared with the `x-vapi-secret` header (`services/worker/src/vapi/receive.ts`), not a signature of the body. Say that. (Added 2026-10-01: a leftover of a finding the last replan called settled.)
-- `services/worker/src/index.ts:62`: "TODO: mount packages/harness loop consumers", which `jobs.ts` already does.
 - `packages/harness/src/policies.ts:3-4` says the do-not-call, calling-hours, attempt-limit and spending-limit checks arrive later; the first three already exist there and the spending limit does not exist yet.
 - `packages/harness/src/types.ts:47` says company settings can tighten a tool's approval level; nothing does that.
 - `packages/harness/src/loop.ts:22-25`, `packages/db/src/screens.ts:1`.
