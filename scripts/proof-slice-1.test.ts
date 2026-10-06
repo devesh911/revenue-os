@@ -16,16 +16,13 @@ import { SLICES } from "./proof/slices";
 const ROOT = join(import.meta.dir, "..");
 
 describe("Slice 1's steps", () => {
-  it("are the ones `bun run proof 1` runs", () => {
+  it("are the ones `bun run proof 1` runs, and the last fails while a check the Proof line names has no step, naming each one", async () => {
     expect(SLICES[1]).toBe(slice1);
     expect(toProve(["1"], ROOT)).toEqual({
       n: 1,
       steps: slice1,
       out: undefined,
     });
-  });
-
-  it("the last step fails while a check the Proof line names has no step, naming each one", async () => {
     const [result] = await runSteps([everyCheckHasAStep], {
       root: ROOT,
       env: {},

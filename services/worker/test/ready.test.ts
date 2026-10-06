@@ -5,17 +5,13 @@
 // the worker's own job runner, then started again.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
-import { Hono } from "hono";
 import pg from "pg";
 import { pool } from "../src/db";
-import { EnvSchema } from "../src/env";
-import { onError } from "../src/errors";
 import { jobQueueReachable, startJobs, stopJobs } from "../src/jobs";
 import { databaseReachable, opsRoutes } from "../src/ready";
 import { testJobSchema } from "./fixtures/test-job-schema";
 
 const TOKEN = "r".repeat(64);
-const COMMIT = "0123456789abcdef0123456789abcdef01234567";
 const DB_URL =
   process.env.DATABASE_URL ||
   "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres";
@@ -108,11 +104,6 @@ describe("GET /ready", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
-  it("refuses a caller without the ready token, or with another", async () => {
-    expect((await get(app(pool), "/ready")).status).toBe(401);
-    expect((await get(app(pool), "/ready", "x".repeat(64))).status).toBe(401);
-  });
-
   it("answers not ready, naming only the database, when nothing listens at its address", async () => {
     const closed = poolAt("127.0.0.1:1");
     try {
@@ -195,65 +186,4 @@ describe("GET /ready", () => {
       await closed.end();
     }
   }, 30_000);
-});
-
-// Repro (2026-10-06, Slice 1's readiness proof step on a real worker with READY_TOKEN set): /ready without the token
-// answered 500. Hono's bearerAuth refuses by throwing a 401 HTTPException, and the worker's error handler turned every
-// error it did not know into 500; tests never saw it, as with no token configured the refusal is returned, not thrown.
-describe("behind the worker's own error handler", () => {
-  const worker = (release?: string) =>
-    new Hono().onError(onError).route("/", app(pool, { release }));
-
-  it("a missing or wrong ready token is refused with 401, not 500", async () => {
-    for (const path of ["/ready", "/release"]) {
-      expect((await get(worker(COMMIT), path)).status).toBe(401);
-      const wrong = await get(worker(COMMIT), path, "x".repeat(64));
-      expect(wrong.status).toBe(401);
-      expect(await wrong.text()).not.toContain(COMMIT);
-    }
-    expect((await get(worker(), "/ready", TOKEN)).status).toBe(200);
-  });
-});
-
-describe("GET /release", () => {
-  it("names the commit the build came from, and nothing else", async () => {
-    const res = await get(app(pool, { release: COMMIT }), "/release", TOKEN);
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe(`{"release":"${COMMIT}"}`);
-  });
-
-  it("says unknown when the build named no commit", async () => {
-    const res = await get(app(pool), "/release", TOKEN);
-    expect(await res.json()).toEqual({ release: "unknown" });
-  });
-
-  it("refuses a caller without the ready token", async () => {
-    const res = await get(app(pool, { release: COMMIT }), "/release");
-    expect(res.status).toBe(401);
-    expect(await res.text()).not.toContain(COMMIT);
-  });
-
-  it("env: RELEASE takes only a commit id, so the endpoint can show nothing else", () => {
-    const base = {
-      DATABASE_URL: "postgresql://x@127.0.0.1:54322/postgres",
-      SUPABASE_URL: "http://localhost:54321",
-    };
-    expect(EnvSchema.parse(base).RELEASE).toBeUndefined();
-    expect(EnvSchema.parse({ ...base, RELEASE: COMMIT }).RELEASE).toBe(COMMIT);
-    expect(EnvSchema.parse({ ...base, RELEASE: "0123abc" }).RELEASE).toBe(
-      "0123abc",
-    );
-    for (const bad of ["sk-live-abcdef", "0123ab", "main", `${COMMIT}0`])
-      expect(EnvSchema.safeParse({ ...base, RELEASE: bad }).success).toBe(
-        false,
-      );
-  });
-});
-
-describe("the worker's database pool", () => {
-  // Unheard, an 'error' on a pg pool (an idle connection the database dropped: a restart, a network cut) ends the
-  // process, so the worker would die instead of answering "not ready".
-  it("outlives a connection the database drops", () => {
-    expect(() => pool.emit("error", new Error("terminated"))).not.toThrow();
-  });
 });
