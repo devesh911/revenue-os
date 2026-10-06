@@ -4,10 +4,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { ZodError } from "zod";
-import { type AuthEnv, requireAuth, requireReadyToken } from "./auth";
+import { type AuthEnv, requireAuth } from "./auth";
+import { pool } from "./db";
 import { env } from "./env";
-import { startJobs } from "./jobs";
+import { jobQueueReachable, startJobs } from "./jobs";
 import { logger } from "./logger";
+import { databaseReachable, opsRoutes } from "./ready";
 import { agents } from "./routes/agents";
 import { contacts } from "./routes/contacts";
 import { conversations } from "./routes/conversations";
@@ -31,8 +33,17 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ ok: true })); // information-free (docs/security.md S5.9)
-app.get("/ready", requireReadyToken(env.READY_TOKEN), (c) =>
-  c.json({ ok: true, todo: "db + pgboss checks (task 1)" }),
+// /ready and /release, behind their own token: the container's health check and the deploy ask them (src/ready.ts).
+app.route(
+  "/",
+  opsRoutes({
+    token: env.READY_TOKEN,
+    release: env.RELEASE,
+    checks: {
+      database: databaseReachable(pool),
+      "job queue": jobQueueReachable,
+    },
+  }),
 );
 
 app.use("/orgs", requireAuth);

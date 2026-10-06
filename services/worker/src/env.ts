@@ -28,6 +28,15 @@ export const EnvSchema = z.object({
     .string()
     .min(32, "READY_TOKEN too short — openssl rand -hex 32")
     .optional(),
+  // The commit this build came from (docker/Dockerfile's RELEASE build argument), shown by GET /release. Only a
+  // commit id is accepted, so nothing else, a secret pasted in by mistake included, can ever be shown there.
+  RELEASE: z
+    .string()
+    .regex(
+      /^[0-9a-f]{7,40}$/,
+      "RELEASE must be a commit id (7 to 40 hex characters)",
+    )
+    .optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -39,4 +48,5 @@ export const env = EnvSchema.parse({
   CORS_ORIGINS: process.env.CORS_ORIGINS,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   READY_TOKEN: process.env.READY_TOKEN || undefined, // blank (copied .env.example) = unset
+  RELEASE: process.env.RELEASE || undefined, // blank (an image built without it) = unknown
 });

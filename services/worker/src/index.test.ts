@@ -25,6 +25,15 @@ describe("worker health endpoints", () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it("GET /release is mounted behind the ready token", async () => {
+    const res = await app.fetch(
+      new Request("http://localhost/release", {
+        headers: { authorization: `Bearer ${"b".repeat(64)}` },
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
 });
 
 describe("requireReadyToken", () => {
