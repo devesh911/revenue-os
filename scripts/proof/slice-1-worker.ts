@@ -191,11 +191,8 @@ function inspect(root: string, format: string, what: string) {
   return r.stdout.trim();
 }
 
-/**
- * The image step's check, without the lock: builds the worker image at `root` labelled with its commit, runs it on
- * the local stack until its health check says healthy, and says what its label and /release answered.
- */
-export async function provesImage(root: string, env: NodeJS.ProcessEnv) {
+/** Builds the worker image at `root` with its commit, and checks the image's label and health check. */
+export function buildImage(root: string) {
   const commit = git(root, "rev-parse", "HEAD").trim();
   const built = sh(root, [
     "docker",
@@ -216,6 +213,15 @@ export async function provesImage(root: string, env: NodeJS.ProcessEnv) {
   const health = inspect(root, "{{ json .Config.Healthcheck.Test }}", IMAGE);
   if (!health.includes("/ready"))
     throw new Error(`the image's health check does not ask /ready: ${health}`);
+  return { commit, label, health };
+}
+
+/** Runs the built image on the local stack until Docker reports it healthy, and says what its /release answered. */
+export async function runImage(
+  root: string,
+  env: NodeJS.ProcessEnv,
+  { commit, label, health }: ReturnType<typeof buildImage>,
+) {
   // The container reaches the local stack on the machine running it through host.docker.internal.
   const { db, supabase } = stack(env);
   const onHost = (url: string) =>
@@ -282,6 +288,9 @@ export async function provesImage(root: string, env: NodeJS.ProcessEnv) {
 export const imageNamesItsCommit: Step = {
   does: `Builds the worker image (docker/Dockerfile) with the commit being proved as its RELEASE, checks the image's ${LABEL} label is that commit and its health check asks /ready, runs it on the local stack with a ready token and waits for Docker to report it healthy, then checks its /release names that commit and nothing else, and refuses a caller without the token`,
   minutes: 20,
-  check: ({ root, env }) =>
-    onSharedStack(root, () => provesImage(root, env), LOCK_WAIT_MS),
+  // The build runs no worker, so it waits for no lock and holds none.
+  check: ({ root, env }) => {
+    const built = buildImage(root);
+    return onSharedStack(root, () => runImage(root, env, built), LOCK_WAIT_MS);
+  },
 };
