@@ -1,4 +1,4 @@
-// The ONLY sanctioned DB entry (db-design §1, S1.3): every unit of work runs inside a
+// The ONLY sanctioned DB entry (docs/db-design.md, and docs/security.md S1.3): every unit of work runs inside a
 // transaction that sets request.org_id, connected as the RLS-bound app_service role.
 // Raw pool access outside withOrg is a review-blocking smell.
 // G1: runtime-agnostic — no bun:* imports, no Bun globals.

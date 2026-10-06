@@ -52,7 +52,6 @@ This list is the clean-up that gets no roadmap slice: stale comments, unused cod
 **When:** the PR that next touches that package or doc.
 
 **What goes, and where:**
-- The unused copy of three tables written for the Drizzle database library, which the product does not use: `packages/db/src/schema.ts`, the `export * as schema` line and the "the ONLY DB entry" comment in `packages/db/src/index.ts:1`, `drizzle-orm` in `packages/db/package.json`, and the mention of `packages/db/src/schema.ts` in `docs/patterns/drizzle-query.md` (`bun run guards` fails once the file is gone and the mention stays). docs/tech-stack.md stopped listing Drizzle on 2026-10-03.
 - The unused functions that pick an AI model by name: `registerProvider` and `selectProvider` in `packages/harness/src/llm/index.ts` (re-exported at `packages/harness/src/index.ts:10-11`); fix that file's header, since the live worker builds its model client in `jobs.ts`.
 - The old harness demo script `packages/harness/demo-harness.ts` (outside the type check, and it no longer type-checks), plus the harness-agent skill line telling agents to run it; `bun run demo` and `bun run evals` cover it.
 - The unused text-box component `apps/console/src/ui/primitives/Textarea.tsx`, or keep it with a note saying it is a design-system piece waiting for a screen.
