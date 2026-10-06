@@ -3,37 +3,19 @@
 // 403 for a non-member, and never leak/mutate another org's rows. PUT is admin-only (docs/security.md S1.7) and its
 // strict Zod validation (packages/shared GuardrailPolicyInputSchema) is the safety boundary for the
 // FAIL-OPEN quiet_hours hook — a malformed config must be rejected (400) with NOTHING written.
-// Real GoTrue users, jose-verified JWTs, app_service DB path underneath: runs with the local
-// stack's settings (`bun run gate`, CI).
+// Real users, made locally and signed in through the local sign-in server (accounts are invite-only), jose-verified
+// JWTs, app_service DB path underneath: runs with the local stack's settings (`bun run gate`, CI).
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { type TestUser, testUser } from "../../../tests/test-users";
 import app from "../src/index";
-
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 });
-
-async function signup(tag: string): Promise<{ token: string; userId: string }> {
-  const email = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  const body = (await res.json()) as {
-    access_token?: string;
-    user?: { id: string };
-  };
-  if (!body.access_token || !body.user)
-    throw new Error(`signup failed: ${JSON.stringify(body)}`);
-  return { token: body.access_token, userId: body.user.id };
-}
 
 function api(path: string, token: string | null, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
@@ -94,20 +76,20 @@ type Policy = {
   updated_at: string;
 };
 
-let admin1: { token: string; userId: string }; // orgA admin
-let orgBadmin: { token: string; userId: string }; // orgB admin (cross-tenant / non-member of A)
-let operator: { token: string; userId: string };
-let viewer: { token: string; userId: string };
-let outsider: { token: string; userId: string }; // no org membership at all
+let admin1: TestUser; // orgA admin
+let orgBadmin: TestUser; // orgB admin (cross-tenant / non-member of A)
+let operator: TestUser;
+let viewer: TestUser;
+let outsider: TestUser; // no org membership at all
 let orgA = "";
 let orgB = "";
 
 beforeAll(async () => {
-  admin1 = await signup("gp-admin");
-  orgBadmin = await signup("gp-badmin");
-  operator = await signup("gp-op");
-  viewer = await signup("gp-viewer");
-  outsider = await signup("gp-outsider");
+  admin1 = await testUser(admin, "gp-admin", { operator: true });
+  orgBadmin = await testUser(admin, "gp-badmin", { operator: true });
+  operator = await testUser(admin, "gp-op");
+  viewer = await testUser(admin, "gp-viewer");
+  outsider = await testUser(admin, "gp-outsider");
 
   orgA = await createOrg(admin1.token, "Guardrails A");
   orgB = await createOrg(orgBadmin.token, "Guardrails B");

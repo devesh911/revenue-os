@@ -1,4 +1,4 @@
-// app_service client (sets request.org_id per tx) + drizzle schema mirror — the ONLY DB entry
+// The database package: the app_service client (withOrg sets request.org_id per transaction) and the queries behind it.
 // G1: runtime-agnostic — no bun:* imports, no Bun globals in this package.
 
 export {
@@ -18,12 +18,12 @@ export {
 export {
   addMember,
   createOrgWithAdmin,
+  isPlatformOperator,
   memberRole,
   type OrgRow,
   updateOrg,
   userOrgs,
 } from "./orgs";
-export * as schema from "./schema";
 export {
   type ContactRow,
   type ConversationRow,

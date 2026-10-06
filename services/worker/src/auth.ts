@@ -1,9 +1,12 @@
-// S1.5 — jose JWT verification: signature via GoTrue's JWKS (ES256/RS256 pinned — `none` and
-// HS-downgrade rejected by construction), iss, aud, exp, clock skew ≤ 60s.
-// jose caches the remote JWK set and refetches on unknown kid (key rotation safe).
+// Sign-in on every route but a short public list (docs/security.md S1.5). A sign-in token is checked with jose:
+// its signature against the sign-in server's published keys (ES256/RS256 only, so `none` and a downgrade to a
+// shared-secret HS256 token are refused), its issuer, its audience, and its expiry, with at most 60 s of clock skew;
+// a token without an expiry or a user id is refused too. jose caches the published keys and fetches them again for
+// a key id it does not know, so a key rotation needs no restart.
 import type { MiddlewareHandler } from "hono";
 import { bearerAuth } from "hono/bearer-auth";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { matchedRoutes } from "hono/route";
+import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from "jose";
 import { env } from "./env";
 
 export interface Actor {
@@ -12,32 +15,68 @@ export interface Actor {
 
 export type AuthEnv = { Variables: { actor: Actor } };
 
-const jwks = createRemoteJWKSet(
-  new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
-);
-
-export const requireAuth: MiddlewareHandler<AuthEnv> = async (c, next) => {
-  const header = c.req.header("authorization");
-  if (!header?.startsWith("Bearer "))
-    return c.json({ error: "unauthorized" }, 401);
-  try {
-    const { payload } = await jwtVerify(header.slice(7), jwks, {
-      algorithms: ["ES256", "RS256"],
-      issuer: `${env.SUPABASE_URL}/auth/v1`,
-      audience: "authenticated",
-      clockTolerance: 60,
-    });
-    if (typeof payload.sub !== "string" || payload.sub.length === 0) {
+/**
+ * Refuses with 401 a caller whose sign-in token the sign-in server at `server` didn't issue, signed with one of its
+ * `keys`; names the user otherwise.
+ */
+export function signedIn(
+  keys: JWTVerifyGetKey,
+  server: string,
+): MiddlewareHandler<AuthEnv> {
+  return async (c, next) => {
+    const header = c.req.header("authorization");
+    const payload = header?.startsWith("Bearer ")
+      ? await jwtVerify(header.slice(7), keys, {
+          algorithms: ["ES256", "RS256"],
+          issuer: `${server}/auth/v1`,
+          audience: "authenticated",
+          clockTolerance: 60,
+          requiredClaims: ["exp", "sub"],
+        }).then(
+          (r) => r.payload,
+          () => undefined,
+        )
+      : undefined;
+    if (typeof payload?.sub !== "string" || payload.sub.length === 0)
       return c.json({ error: "unauthorized" }, 401);
-    }
     c.set("actor", { userId: payload.sub });
     await next();
-  } catch {
-    return c.json({ error: "unauthorized" }, 401);
-  }
+  };
+}
+
+const requireAuth = signedIn(
+  createRemoteJWKSet(
+    new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
+  ),
+  env.SUPABASE_URL,
+);
+
+// The short public list: the only routes that answer without sign-in, each behind a check of its own. /health says
+// nothing (docs/security.md S5.9); /ready and /release take the ready token (src/ready.ts); Vapi's webhook takes the
+// shared secret in its header (src/vapi/receive.ts).
+export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
+  "GET /health",
+  "GET /ready",
+  "GET /release",
+  "POST /webhooks/vapi/:orgId",
+]);
+
+/**
+ * Mounted on every path: sign-in first, unless every route the request reaches is on the public list, so a catch-all
+ * mounted beside a public route can't take a request past sign-in.
+ */
+export const requireAuthUnlessPublic: MiddlewareHandler<AuthEnv> = (
+  c,
+  next,
+) => {
+  const routes = matchedRoutes(c).filter((r) => r.method !== "ALL");
+  return routes.length > 0 &&
+    routes.every((r) => PUBLIC_ROUTES.has(`${r.method} ${r.path}`))
+    ? next()
+    : requireAuth(c, next);
 };
 
-// S5.9: /ready carries its OWN token. X-Edge-Auth cannot gate it — Cloudflare's Transform Rule
+// /ready carries its OWN token (docs/security.md S5.9). X-Edge-Auth cannot gate it: Cloudflare's Transform Rule
 // stamps that header on EVERY forwarded request, strangers' included. No token = fail closed.
 // bearerAuth compares in constant time.
 export const requireReadyToken = (
