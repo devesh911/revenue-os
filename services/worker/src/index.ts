@@ -3,10 +3,10 @@
 // Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (AGENTS.md → Conventions).
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { ZodError } from "zod";
 import { type AuthEnv, requireAuth } from "./auth";
 import { pool } from "./db";
 import { env } from "./env";
+import { onError } from "./errors";
 import { jobQueueReachable, startJobs } from "./jobs";
 import { logger } from "./logger";
 import { databaseReachable, opsRoutes } from "./ready";
@@ -58,19 +58,7 @@ app.route("/", guardrailPolicies);
 // (src/vapi/receive.ts); it is not a signature of the body.
 app.route("/", vapiWebhook);
 
-// Clients get clean statuses, never internals; detail goes to the log (docs/security.md S5.8).
-app.onError((err, c) => {
-  if (err instanceof ZodError) return c.json({ error: "invalid_request" }, 400);
-  if (
-    typeof err === "object" &&
-    err !== null &&
-    (err as { code?: string }).code === "23505"
-  ) {
-    return c.json({ error: "conflict" }, 409);
-  }
-  logger.error({ err }, "unhandled route error");
-  return c.json({ error: "internal" }, 500);
-});
+app.onError(onError); // clean statuses, never internals (src/errors.ts)
 
 // pg-boss consumers boot with the server, never on test import (import.meta.main is
 // false under bun test). Half-configured boot = refuse to run, same posture as env.ts.

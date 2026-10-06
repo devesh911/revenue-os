@@ -5,9 +5,11 @@
 // the worker's own job runner, then started again.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
+import { Hono } from "hono";
 import pg from "pg";
 import { pool } from "../src/db";
 import { EnvSchema } from "../src/env";
+import { onError } from "../src/errors";
 import { jobQueueReachable, startJobs, stopJobs } from "../src/jobs";
 import { databaseReachable, opsRoutes } from "../src/ready";
 import { testJobSchema } from "./fixtures/test-job-schema";
@@ -193,6 +195,24 @@ describe("GET /ready", () => {
       await closed.end();
     }
   }, 30_000);
+});
+
+// Repro (2026-10-06, Slice 1's readiness proof step on a real worker with READY_TOKEN set): /ready without the token
+// answered 500. Hono's bearerAuth refuses by throwing a 401 HTTPException, and the worker's error handler turned every
+// error it did not know into 500; tests never saw it, as with no token configured the refusal is returned, not thrown.
+describe("behind the worker's own error handler", () => {
+  const worker = (release?: string) =>
+    new Hono().onError(onError).route("/", app(pool, { release }));
+
+  it("a missing or wrong ready token is refused with 401, not 500", async () => {
+    for (const path of ["/ready", "/release"]) {
+      expect((await get(worker(COMMIT), path)).status).toBe(401);
+      const wrong = await get(worker(COMMIT), path, "x".repeat(64));
+      expect(wrong.status).toBe(401);
+      expect(await wrong.text()).not.toContain(COMMIT);
+    }
+    expect((await get(worker(), "/ready", TOKEN)).status).toBe(200);
+  });
 });
 
 describe("GET /release", () => {
