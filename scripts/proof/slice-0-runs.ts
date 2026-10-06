@@ -2,8 +2,8 @@
 // Each recent run of staging-migrations on main must have started after ci's `checks` job passed on the same commit,
 // and must have skipped its apply step when that commit changed no migration. Read with `gh run list` and `gh run view`
 // (reads only, with the run's GitHub token); a record that can't be read fails the step, saying why. Each commit's ci
-// run is asked for by its commit: on 2026-10-05 the listing of ci's recent runs on main left out three runs that had
-// passed, and the step reported `checks` as not passing on those commits.
+// run is asked for by its commit: on 2026-10-05 the listing of ci's last 100 runs on main held none of the nine runs
+// the step judged, though each had passed, and the step reported `checks` as not passing on all nine commits.
 
 import { spawnSync } from "node:child_process";
 import { git, plainEnv } from "./scratch";

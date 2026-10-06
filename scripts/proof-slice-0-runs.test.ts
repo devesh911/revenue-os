@@ -114,8 +114,8 @@ describe("the run-records step reads GitHub's records with gh", () => {
   /**
    * Runs the step against a scratch repository (one commit changing no migration, one adding one) and a stand-in gh
    * on PATH whose listing of ci's recent runs on main leaves out every run, as GitHub's did on 2026-10-05 at 14:04
-   * UTC, while each commit's own run, asked for by commit, is there. `tweak` changes the records first. Returns what
-   * the step saw, or the error it threw.
+   * UTC, while each commit's own run, asked for by commit, is there. `tweak` changes the records first, and may name
+   * commits whose lookup gh fails on, as when GitHub can't be reached. Returns what the step saw, or the error it threw.
    */
   async function stepWith(
     tweak: (r: {
@@ -123,6 +123,7 @@ describe("the run-records step reads GitHub's records with gh", () => {
       ci: Record<string, object[]>;
       clean: string;
       migration: string;
+      failing: string[];
     }) => void = () => {},
   ) {
     const dir = mkdtempSync(join(tmpdir(), "proof-runs-"));
@@ -175,18 +176,22 @@ describe("the run-records step reads GitHub's records with gh", () => {
         [clean]: [listed(11, clean)],
         [migration]: [listed(12, migration)],
       };
-      tweak({ runs, ci, clean, migration });
+      const failing: string[] = [];
+      tweak({ runs, ci, clean, migration, failing });
       const bin = join(dir, "bin");
       mkdirSync(bin);
       writeFileSync(
         join(bin, "gh"),
         `#!${process.execPath}
 const a = process.argv.slice(2);
-const runs = ${JSON.stringify(runs)}, staging = ${JSON.stringify(staging)}, ci = ${JSON.stringify(ci)};
+const runs = ${JSON.stringify(runs)}, staging = ${JSON.stringify(staging)}, ci = ${JSON.stringify(ci)}, failing = ${JSON.stringify(failing)};
 const flag = (f) => (a.includes(f) ? a[a.indexOf(f) + 1] : undefined);
 if (a[1] === "view") console.log(JSON.stringify(runs[a[2]]));
 else if (flag("--workflow") === "staging-migrations.yml") console.log(JSON.stringify(staging));
-else console.log(JSON.stringify(ci[flag("--commit")] ?? []));
+else if (failing.includes(flag("--commit"))) {
+  console.error("failed to get runs: HTTP 502: Bad Gateway");
+  process.exit(1);
+} else console.log(JSON.stringify(ci[flag("--commit")] ?? []));
 `,
       );
       chmodSync(join(bin, "gh"), 0o755);
@@ -234,6 +239,16 @@ else console.log(JSON.stringify(ci[flag("--commit")] ?? []));
     });
     expect(error).toContain(
       `GitHub returned no jobs for ci's run on ${migration.slice(0, 7)} (https://example.invalid/runs/12)`,
+    );
+    expect(error).not.toContain("did not pass");
+  });
+
+  it("says it could not read GitHub's records when gh fails on a commit's lookup, not that checks did not pass", async () => {
+    const { error } = await stepWith(({ failing, migration }) => {
+      failing.push(migration);
+    });
+    expect(error).toContain(
+      "could not read GitHub's run records (gh run list): failed to get runs: HTTP 502: Bad Gateway",
     );
     expect(error).not.toContain("did not pass");
   });
