@@ -415,9 +415,7 @@ describe("where the break check runs", () => {
       c?.said?.(
         "Break check ✓ no new line in guardrail, tenancy or money code, so nothing to break",
       ),
-    ).toBe(
-      "no new line in guardrail, tenancy or money code, so nothing to break",
-    );
+    ).toBe("break check"); // nothing broken: the gate's line just names the check
   });
 
   it("runs in CI's checks job right after tests proven, against the pull request's base", () => {

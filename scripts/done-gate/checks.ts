@@ -34,8 +34,9 @@ export const CHECKS: Check[] = [
     name: "break check",
     cmd: ["bun", "run", "local", "bun", "run", "gate", "broken"],
     db: true,
+    // How many lines it broke, or just its name when it broke none.
     said: (out) =>
-      out.match(/^Break check ✓ (.+?)(?: \(\d+ break|$)/m)?.[1] ??
+      out.match(/^Break check ✓ (\d+ line\(s\) broken.+?) \(\d+ break/m)?.[1] ??
       "break check",
   },
   { name: "database policies", cmd: ["bun", "run", "rls:check"], db: true },

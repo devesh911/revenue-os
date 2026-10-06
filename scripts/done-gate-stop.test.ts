@@ -560,7 +560,7 @@ describe("a stop refuses the checks on the database while a worker runs on this 
     const r = stop(dir, {}, ps(`cat <<'EOF'\n${listed.join("\n")}\nEOF`));
     expect(r.sentBack).toBe(true);
     expect(r.reason).toContain(
-      "tests, tests proven, database policies, browser checks did not run: a worker is running on this machine",
+      "tests, tests proven, break check, database policies, browser checks did not run: a worker is running on this machine",
     );
     for (const w of WORKERS) expect(r.reason).toContain(`\n- ${w.trim()}\n`);
     for (const o of OTHERS) expect(r.reason).not.toContain(o.trim());
