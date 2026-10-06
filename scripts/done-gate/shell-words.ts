@@ -315,8 +315,9 @@ function substitutionsIn(text: string, how: How) {
 
 /**
  * The heredoc delimiter whose word starts at `at` (after `<<`, and `-` if any): the text of the line that ends the
- * body, with quotes and backslashes removed, whether the body expands (neither was in the word), and where the word
- * ends. Nothing for no word, an unclosed quote, or a word across lines, which no single line can match.
+ * body, with quotes and backslashes removed, whether the body expands (neither was in the word), whether `<<-` strips
+ * leading tabs, and where the word ends. Nothing for no word or an unclosed quote. A word across lines is refused:
+ * dash ends the body at those lines, one after the other, and bash and zsh never do.
  */
 function delimiter(line: string, at: number) {
   const strip = line[at] === "-";
@@ -332,12 +333,21 @@ function delimiter(line: string, at: number) {
         tag += line[i] ?? "";
         expands = false;
       }
-    } else if (ch === "'" || ch === '"') {
+    } else if (ch === "'") {
       const close = line.indexOf(ch, i + 1);
       if (close < 0) return;
       tag += line.slice(i + 1, close);
       expands = false;
       i = close;
+    } else if (ch === '"') {
+      // In double quotes a backslash escapes ", \, $, ` and a new line, which it removes.
+      const quoted = /^"((?:[^"\\]|\\[\s\S])*)"/.exec(line.slice(i));
+      if (!quoted) return;
+      tag += (quoted[1] ?? "").replace(/\\([\n"\\$`])/g, (_, c) =>
+        c === "\n" ? "" : c,
+      );
+      expands = false;
+      i += (quoted[0] ?? "").length - 1;
     } else if (ch === "$" && /['"]/.test(line[i + 1] ?? "")) {
       // `$'…'` and `$"…"` quote a delimiter too: the quote is read next. Shells decode `$'…'`'s escapes; this doesn't.
       if (/^\$'[^']*\\/.test(line.slice(i)))
@@ -353,9 +363,9 @@ function delimiter(line: string, at: number) {
       tag += line.slice(start, i + 1);
     } else tag += ch;
   }
-  return tag && !tag.includes("\n")
-    ? { tag, expands, strip, end: i }
-    : undefined;
+  if (tag.includes("\n"))
+    throw new Error("it starts a heredoc whose delimiter crosses a line");
+  return tag ? { tag, expands, strip, end: i } : undefined;
 }
 
 // Words that open or close a compound command, not the program it runs.

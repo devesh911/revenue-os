@@ -961,6 +961,9 @@ const REFUSED: [string, string][] = [
   ["cat <<EOF\n EOF\nit's\nEOF\ngh pr close 5", LOOP],
   ["cat <<EOF\nEOF \nit's\nEOF\ngh pr close 5", LOOP],
   ["cat <<-EOF\n  EOF\nit's\n\tEOF\ngh pr close 5", LOOP],
+  // In double quotes a backslash escapes ", \, $, ` and a new line (every shell ends at `EF` and `E"F`).
+  ['cat <<"E\\\nF"\nit\'s\nEF\ngh release create v1', LOOP],
+  ['cat <<"E\\"F"\nit\'s\nE"F\ngh release create v1', LOOP],
   // A backslash before a new line joins the lines; a heredoc's delimiter is its whole word, quotes removed; a `<<`
   // in arithmetic starts no heredoc in bash, zsh or ksh, while dash, which has no `((`, reads it as one.
   ["g\\\nh release create v1", LOOP],
@@ -1220,11 +1223,15 @@ describe("toolRefusal: what agents' own tools may not do", () => {
     expect(Date.now() - started).toBeLessThan(5000);
   });
 
-  it("refuses a heredoc whose `$'…'` delimiter holds an escape, which shells decode and it doesn't", () => {
+  it("refuses a heredoc it can't end where shells do: a `$'…'` delimiter holding an escape, or one across lines", () => {
     // bash, zsh, sh and dash all end this heredoc at `EF`, then run the last line.
     expect(() =>
       toolRefusal("cat <<$'E\\x46'\nhi\nEF\ngh release create v1", look),
     ).toThrow("`$'…'` delimiter holding an escape");
+    // dash ends this one at the lines `E` and `F`, one after the other, and runs gh; bash and zsh never end it.
+    expect(() =>
+      toolRefusal("cat <<'E\nF'\nit's\nE\nF\ngh release create v1", look),
+    ).toThrow("delimiter crosses a line");
   });
 
   it("refuses when it can't tell which branch a bare push would push", () => {
