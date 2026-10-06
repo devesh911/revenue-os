@@ -1,6 +1,6 @@
-// ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (docs/tech-stack.md
-// T5/T7/T8; the agent harness is T26).
-// Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (G1).
+// ONE process: Hono API + webhook receivers + pg-boss consumers + scheduler (docs/tech-stack.md, its API framework,
+// jobs and hosting sections; the agent harness is its harness architecture section).
+// Bun-specific code is allowed HERE (app entrypoint) — never in packages/* (AGENTS.md → Conventions).
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { ZodError } from "zod";
@@ -54,7 +54,9 @@ app.route("/", contacts);
 app.route("/", conversations);
 app.route("/", screens);
 app.route("/", guardrailPolicies);
-app.route("/", vapiWebhook); // authn = per-assistant shared secret on the raw body (docs/security.md S6.2)
+// Vapi's calls: one secret shared by every company, compared in constant time with the x-vapi-secret header
+// (src/vapi/receive.ts); it is not a signature of the body.
+app.route("/", vapiWebhook);
 
 // Clients get clean statuses, never internals; detail goes to the log (docs/security.md S5.8).
 app.onError((err, c) => {
@@ -70,7 +72,6 @@ app.onError((err, c) => {
   return c.json({ error: "internal" }, 500);
 });
 
-// TODO: mount packages/harness loop consumers
 // pg-boss consumers boot with the server, never on test import (import.meta.main is
 // false under bun test). Half-configured boot = refuse to run, same posture as env.ts.
 if (import.meta.main) {

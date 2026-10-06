@@ -1,4 +1,4 @@
-// One pool per process, connected as app_service (S1.2/S1.3). All queries via @revenue-os/db.
+// One pool per process, connected as app_service (docs/security.md S1.2/S1.3). All queries via @revenue-os/db.
 import { createPool } from "@revenue-os/db";
 import { env } from "./env";
 import { logger } from "./logger";
