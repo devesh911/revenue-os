@@ -2,7 +2,6 @@
 // this machine (the one check, scripts/local-url.ts), then makes sure the tests can log in as app_service, writing
 // that login only on a stack that doesn't have it yet (scripts/app-service-login.ts), so runs can start together.
 // It also works around a Bun bug that froze whole test runs (below).
-import { mock } from "bun:test";
 import childProcess from "node:child_process";
 import { ensureAppServiceLogin } from "../scripts/app-service-login";
 import { isLocalUrl } from "../scripts/local-url";
@@ -11,28 +10,16 @@ import { isLocalUrl } from "../scripts/local-url";
 // a memory clean-up that runs while it waits releases the main event loop's handles against the spawn's own loop
 // (oven-sh/bun#34069; the fix, oven-sh/bun#40078, is in no release yet). It froze one whole-suite run in about five
 // when four ran at once here, and the test step on GitHub. A full clean-up just before each synchronous spawn leaves
-// nothing for one to release while it waits. Remove this once the pinned Bun has the fix. The same wrapper replaces
-// the module's property (`childProcess.spawnSync`) and, through mock.module, each named import
-// (`import { spawnSync } from "node:child_process"`, as the done gate's code has it), which the property alone never
-// reached; each wrapper carries a mark tests/setup-local-spawn.test.ts looks for.
-const GC_FIRST = Symbol.for("revenue-os.gc-before-sync-spawn");
-const wrapped: Record<string, unknown> = {};
+// nothing for one to release while it waits. Remove this once the pinned Bun has the fix.
 for (const name of ["spawnSync", "execFileSync", "execSync"] as const) {
   const real = childProcess[name] as (...args: unknown[]) => unknown;
-  wrapped[name] = Object.assign(
-    (...args: unknown[]) => {
+  Object.assign(childProcess, {
+    [name]: (...args: unknown[]) => {
       Bun.gc(true);
       return real(...args);
     },
-    { [GC_FIRST]: true },
-  );
+  });
 }
-Object.assign(childProcess, wrapped);
-mock.module("node:child_process", () => ({
-  ...childProcess,
-  ...wrapped,
-  default: childProcess,
-}));
 const realSpawnSync = Bun.spawnSync;
 Object.assign(Bun, {
   spawnSync: (...args: Parameters<typeof Bun.spawnSync>) => {
