@@ -71,9 +71,19 @@ export function checkRules(
   const problems: string[] = [];
   const notes: string[] = [];
   const exceptions: Exception[] = [];
-  const stubListed = added.some(
-    (a) => a.file === "STATE.md" && /\|\s*Stub\s*\|/.test(a.text),
-  );
+  // A placeholder passes only when a Stub row the change adds or edits names its own file (by path, or by file
+  // name alone), so rewording an unrelated Stub row lets nothing through.
+  const stubRows = added
+    .filter((a) => a.file === "STATE.md" && /\|\s*Stub\s*\|/.test(a.text))
+    .map((a) => a.text);
+  const stubListed = (file: string) => {
+    const name = file.split("/").pop() ?? file;
+    return stubRows.some(
+      (row) =>
+        row.includes(file) ||
+        row.split(/[\s|`(),;:]+/).some((word) => word === name),
+    );
+  };
   // A test that reads files AND names a source path (outside its imports) is reading code as text.
   const readsSource = new Set(
     added
@@ -149,7 +159,7 @@ export function checkRules(
 function lineProblem(
   { file, text }: Added,
   stmt: string,
-  stubListed: boolean,
+  stubListed: (file: string) => boolean,
   readsCodeAsText: boolean,
   usersOf: (name: string, file: string) => string[],
 ) {
@@ -174,12 +184,12 @@ function lineProblem(
       : undefined;
   if (!APP_CODE.test(file)) return;
   if (
-    !stubListed &&
+    !stubListed(file) &&
     /\bthrow\b.*\b(not (yet )?(implemented|wired)|unimplemented|stub)\b|\bnot(Wired|Implemented)\s*\(|\bthrow\s+(new\s+)?NotImplemented\w*/i.test(
       stmt,
     )
   )
-    return "adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change";
+    return `adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change, naming its file (${file})`;
   const name = exportsOf(stmt).find(
     (n) => !usersOf(n, file).some((f) => !TEST.test(f)),
   );
