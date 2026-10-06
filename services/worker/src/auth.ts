@@ -15,17 +15,20 @@ export interface Actor {
 
 export type AuthEnv = { Variables: { actor: Actor } };
 
-/** Refuses with 401 a caller whose sign-in token `keys` and `issuer` don't vouch for; names the user otherwise. */
+/**
+ * Refuses with 401 a caller whose sign-in token the sign-in server at `server` didn't issue, signed with one of its
+ * `keys`; names the user otherwise.
+ */
 export function signedIn(
   keys: JWTVerifyGetKey,
-  issuer: string,
+  server: string,
 ): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
     const header = c.req.header("authorization");
     const payload = header?.startsWith("Bearer ")
       ? await jwtVerify(header.slice(7), keys, {
           algorithms: ["ES256", "RS256"],
-          issuer,
+          issuer: `${server}/auth/v1`,
           audience: "authenticated",
           clockTolerance: 60,
           requiredClaims: ["exp", "sub"],
@@ -45,7 +48,7 @@ const requireAuth = signedIn(
   createRemoteJWKSet(
     new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
   ),
-  `${env.SUPABASE_URL}/auth/v1`,
+  env.SUPABASE_URL,
 );
 
 // The short public list: the only routes that answer without sign-in, each behind a check of its own. /health says

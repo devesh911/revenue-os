@@ -34,6 +34,7 @@ const broken = (src: string, line: number) =>
   breaksOf(src, line).map((b) => `${b.how}: ${b.shown}`);
 
 describe("kindOf: which files are guardrail, tenancy or money code", () => {
+  // behaviour already on main: the gate's files are the same in both copies, which differ only in product code
   it("names each kind by path, and leaves out tests, type declarations and other files", () => {
     expect(kindOf("packages/harness/src/policies.ts")).toBe("guardrail");
     expect(kindOf("packages/channels/src/whatsapp.ts")).toBe("guardrail");
@@ -49,7 +50,7 @@ describe("kindOf: which files are guardrail, tenancy or money code", () => {
     expect(kindOf("packages/db/src/types.d.ts")).toBeUndefined();
     expect(kindOf("packages/db/src/notes.md")).toBeUndefined();
     expect(kindOf("services/worker/src/scheduler.ts")).toBeUndefined();
-    expect(kindOf("packages/db/src/schema.ts")).toBeUndefined(); // describes tables, runs no query
+    expect(kindOf("packages/db/src/schema.ts")).toBe("tenancy"); // no file under packages/db/src is left out
     expect(kindOf("apps/console/src/main.tsx")).toBeUndefined();
   });
 });

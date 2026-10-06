@@ -32,8 +32,6 @@ export const GUARDED: { path: string; kind: Kind | null }[] = [
     kind: "guardrail",
   },
   // withOrg (client.ts) sets the company the database's per-company rules see; every query here filters by company.
-  // schema.ts only describes the tables for drizzle and runs no query, so it is left out.
-  { path: "packages/db/src/schema.ts", kind: null },
   { path: "packages/db/src/", kind: "tenancy" },
   // The sign-in token check that names the user, and the routes that check the user belongs to the company asked for.
   { path: "services/worker/src/auth.ts", kind: "tenancy" },

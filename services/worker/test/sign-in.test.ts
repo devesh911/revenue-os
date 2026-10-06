@@ -64,6 +64,12 @@ const ask = (route: string, token?: string) => {
 describe("every route requires sign-in unless it is on the public list", () => {
   it("lists only routes the worker really serves, and they are few", async () => {
     const [routes, { PUBLIC_ROUTES }] = await Promise.all([mounted(), auth()]);
+    expect([...PUBLIC_ROUTES].sort()).toEqual([
+      "GET /health",
+      "GET /ready",
+      "GET /release",
+      "POST /webhooks/vapi/:orgId",
+    ]);
     expect(routes.filter((r) => PUBLIC_ROUTES.has(r)).sort()).toEqual(
       [...PUBLIC_ROUTES].sort(),
     );
@@ -138,22 +144,17 @@ describe("a sign-in token the worker accepts", () => {
   });
 
   describe("with keys of the test's own", () => {
-    const ISSUER = `${SUPABASE_URL}/auth/v1`;
     let sign: (
       claims: JWTPayload,
       opts?: { exp?: number | string | null },
     ) => Promise<string>;
     let otherKey: CryptoKey;
-    let probe: Hono<AuthEnv>;
+    let keys: Parameters<typeof createLocalJWKSet>[0];
 
     beforeAll(async () => {
-      const { signedIn } = await auth();
       const mine = await generateKeyPair("ES256", { extractable: true });
       otherKey = (await generateKeyPair("ES256")).privateKey;
-      const jwk = { ...(await exportJWK(mine.publicKey)), kid: "mine" };
-      probe = new Hono<AuthEnv>()
-        .use("*", signedIn(createLocalJWKSet({ keys: [jwk] }), ISSUER))
-        .get("/me", (c) => c.json(c.get("actor")));
+      keys = { keys: [{ ...(await exportJWK(mine.publicKey)), kid: "mine" }] };
       sign = (claims, { exp = "1h" } = {}) => {
         const jwt = new SignJWT(claims)
           .setProtectedHeader({ alg: "ES256", kid: "mine" })
@@ -164,8 +165,17 @@ describe("a sign-in token the worker accepts", () => {
       };
     });
 
-    const me = (token: string) =>
-      probe.request("/me", { headers: { authorization: `Bearer ${token}` } });
+    /** A route behind the worker's token check, trusting this test's keys from the local sign-in server's address. */
+    const probe = async () => {
+      const { signedIn } = await auth();
+      return new Hono<AuthEnv>()
+        .use("*", signedIn(createLocalJWKSet(keys), SUPABASE_URL))
+        .get("/me", (c) => c.json(c.get("actor")));
+    };
+    const me = async (token: string) =>
+      (await probe()).request("/me", {
+        headers: { authorization: `Bearer ${token}` },
+      });
     const good = {
       sub: "6f1f4d0e-0000-4000-8000-000000000001",
       aud: "authenticated",
@@ -220,12 +230,12 @@ describe("a sign-in token the worker accepts", () => {
     });
 
     it("refuses a header that is not a bearer token", async () => {
-      const token = await sign(good);
+      const [token, route] = await Promise.all([sign(good), probe()]);
       for (const authorization of [token, `Basic ${token}`, `bearer ${token}`])
         expect(
-          (await probe.request("/me", { headers: { authorization } })).status,
+          (await route.request("/me", { headers: { authorization } })).status,
         ).toBe(401);
-      expect((await probe.request("/me")).status).toBe(401);
+      expect((await route.request("/me")).status).toBe(401);
     });
   });
 });

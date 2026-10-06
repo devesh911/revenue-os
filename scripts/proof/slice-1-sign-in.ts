@@ -14,32 +14,32 @@ import { plainEnv, sh } from "./scratch";
 import {
   freePort,
   LOCK_WAIT_MS,
-  stack,
+  localStack,
   stop,
   tail,
   until,
 } from "./slice-1-worker";
 import type { Step } from "./step";
 
-/** The local stack's settings: the proof workflow sets them; on this machine they are read from the running stack. */
-function settings(root: string, env: NodeJS.ProcessEnv) {
+/**
+ * The local stack's settings: the proof workflow sets them; on this machine they are read from the running stack.
+ * Refused unless on this machine, with app_service's login on (localStack).
+ */
+async function settings(root: string, env: NodeJS.ProcessEnv) {
   const known = env.SUPABASE_ANON_KEY && env.LOCAL_DB_URL;
   const local = known
     ? {}
     : buildLocalEnv(sh(root, ["supabase", "status", "-o", "env"]).stdout, env);
   const all = { ...env, ...local };
   return {
-    ...stack(all),
+    ...(await localStack(all)),
     anonKey: all.SUPABASE_ANON_KEY ?? "",
-    owner:
-      all.LOCAL_DB_URL ||
-      "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   };
 }
 
 /** Run holding the local stack's lock: what the sign-in server, the worker and the data interface answered. */
 async function provesInviteOnly(root: string, env: NodeJS.ProcessEnv) {
-  const s = settings(root, env);
+  const s = await settings(root, env);
   const owner = new pg.Client({ connectionString: s.owner });
   await owner.connect();
   const rows = async (sql: string, value: string) =>

@@ -9,7 +9,9 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { type AddressInfo, connect, createServer, type Socket } from "node:net";
+import { ensureAppServiceLogin } from "../app-service-login";
 import { onSharedStack } from "../done-gate/shared-stack";
+import { isLocalUrl } from "../local-url";
 import { git, plainEnv, sh } from "./scratch";
 import type { Step } from "./step";
 
@@ -17,13 +19,28 @@ export const LOCK_WAIT_MS = 8 * 60_000;
 const IMAGE = "revenue-os-worker:proof";
 const LABEL = "org.opencontainers.image.revision";
 
-/** The local stack's addresses, as ci.yml and the proof workflow set them, or the local defaults. */
-export const stack = (env: NodeJS.ProcessEnv) => ({
-  db:
-    env.DATABASE_URL ||
-    "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
-  supabase: env.SUPABASE_URL || "http://127.0.0.1:54321",
-});
+/**
+ * The local stack's addresses, as ci.yml and the proof workflow set them, or the local defaults: refused unless each
+ * is on this machine, and with app_service able to log in, which test start-up arranges for the tests (a proof run
+ * starts no test first, so on a fresh runner the worker's own login would fail).
+ */
+export async function localStack(env: NodeJS.ProcessEnv) {
+  const s = {
+    db:
+      env.DATABASE_URL ||
+      "postgresql://app_service:app_service_local@127.0.0.1:54322/postgres",
+    supabase: env.SUPABASE_URL || "http://127.0.0.1:54321",
+    owner:
+      env.LOCAL_DB_URL ||
+      "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+  };
+  if (!isLocalUrl(s.supabase))
+    throw new Error(
+      "refuses to run against a sign-in server not on this machine",
+    );
+  await ensureAppServiceLogin(s.owner, s.db);
+  return s;
+}
 
 /** Polls `look` every half second until it gives a value, or throws `why()` after `ms`. */
 export async function until<T>(
@@ -99,7 +116,7 @@ export async function stop(worker: ChildProcess) {
  * and /release answered. Run holding the local stack's lock.
  */
 async function provesReadiness(root: string, env: NodeJS.ProcessEnv) {
-  const { db, supabase } = stack(env);
+  const { db, supabase } = await localStack(env);
   const dbUrl = new URL(db);
   const r = await relay(dbUrl.hostname, Number(dbUrl.port || 5432));
   const port = await freePort();
@@ -221,7 +238,7 @@ async function runImage(
   { commit, label, health }: ReturnType<typeof buildImage>,
 ) {
   // The container reaches the local stack on the machine running it through host.docker.internal.
-  const { db, supabase } = stack(env);
+  const { db, supabase } = await localStack(env);
   const onHost = (url: string) =>
     url
       .replace(/@(127\.0\.0\.1|localhost):/, "@host.docker.internal:")
