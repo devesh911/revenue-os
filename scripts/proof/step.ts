@@ -28,6 +28,12 @@ export type Step = {
   minutes?: number; // how long its check may take before the step fails (10 unless set)
   /** Returns what was seen. Throws, saying what was seen instead, when the product does not do what it should. */
   check: (ctx: Context) => string | Promise<string>;
+  /**
+   * Removes what the check started outside the run (a container, a process), run as soon as the step ends: also when
+   * it ran past its time, whose check is no longer awaited, so nothing it started outlives the step. Synchronous, with
+   * its own time limits, as the step's clock has run out by then.
+   */
+  cleanUp?: () => void;
 };
 
 /**

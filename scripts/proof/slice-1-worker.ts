@@ -218,10 +218,7 @@ function buildImage(root: string) {
   return { commit, image, label, health };
 }
 
-/**
- * Removes `containers`, with a time limit of its own rather than the step's: a step that ran out of time still
- * removes its container.
- */
+/** Removes `containers`, with a time limit of its own rather than the step's, whose clock may have run out. */
 function removeContainers(containers: string[]) {
   if (containers.length)
     spawnSync("docker", ["rm", "-f", ...containers], {
@@ -229,6 +226,22 @@ function removeContainers(containers: string[]) {
       timeout: 30_000,
     });
 }
+
+/** Every container carrying the step's label: under the shared stack's lock, only leftovers of stopped runs. */
+const leftovers = () =>
+  (
+    spawnSync("docker", ["ps", "-aq", "--filter", `label=${PROOF_LABEL}`], {
+      env: plainEnv(),
+      encoding: "utf8",
+      timeout: 30_000,
+    }).stdout ?? ""
+  )
+    .split("\n")
+    .filter(Boolean);
+
+// The container this run's step 2 started, until it is removed: the step's clean-up removes it when the step ends,
+// also when it ran out of time and its check is no longer awaited.
+let started: string | undefined;
 
 /** Runs the built image on the local stack until Docker reports it healthy, and says what its /release answered. */
 async function runImage(
@@ -245,11 +258,8 @@ async function runImage(
   const token = randomBytes(32).toString("hex");
   const name = `revenue-os-proof-${randomBytes(4).toString("hex")}`;
   // Under the shared stack's lock no other run's container is running, so any labelled one is a leftover.
-  removeContainers(
-    sh(root, ["docker", "ps", "-aq", "--filter", `label=${PROOF_LABEL}`])
-      .stdout.split("\n")
-      .filter(Boolean),
-  );
+  removeContainers(leftovers());
+  started = name;
   const ran = sh(root, [
     "docker",
     "run",
@@ -304,6 +314,7 @@ async function runImage(
     return `the image is labelled ${LABEL}=${label}; its health check (${health}) turned the container healthy; its /release answered ${release}, and 401 without the token`;
   } finally {
     removeContainers([name]);
+    started = undefined;
   }
 }
 
@@ -314,5 +325,9 @@ export const imageNamesItsCommit: Step = {
   check: ({ root, env }) => {
     const built = buildImage(root);
     return onSharedStack(root, () => runImage(root, env, built), LOCK_WAIT_MS);
+  },
+  cleanUp: () => {
+    if (started) removeContainers([started]);
+    started = undefined;
   },
 };

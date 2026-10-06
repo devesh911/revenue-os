@@ -135,6 +135,36 @@ describe("running a slice's steps", () => {
     expect(r?.seen).toContain("did not finish");
   });
 
+  it("runs each step's clean-up once the step ends, also when it ran past its time, before the next step", async () => {
+    const order: string[] = [];
+    const results = await run([
+      {
+        does: "hangs, having started something outside the run",
+        minutes: 0.001,
+        check: () => new Promise<string>(() => {}),
+        cleanUp: () => {
+          order.push("hung step cleaned up");
+        },
+      },
+      {
+        does: "passes",
+        check: () => {
+          order.push("next step ran");
+          return "ok";
+        },
+        cleanUp: () => {
+          order.push("passed step cleaned up");
+        },
+      },
+    ]);
+    expect(results.map((r) => r.outcome)).toEqual(["failed", "passed"]);
+    expect(order).toEqual([
+      "hung step cleaned up",
+      "next step ran",
+      "passed step cleaned up",
+    ]);
+  });
+
   it("stops a command a step runs when the step's time is up, and fails the step", async () => {
     const started = Date.now();
     const [r] = await run([
