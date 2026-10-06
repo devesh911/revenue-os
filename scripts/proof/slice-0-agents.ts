@@ -75,14 +75,15 @@ export function namesItem(
 }
 
 /**
- * PURE: does the worker's /ready endpoint check the database and pg-boss, as `code` (services/worker/src/index.ts)
- * has it? Not while its handler answers with a todo for them; throws when there is no /ready route to read.
+ * PURE: does the worker's /ready endpoint check the database and pg-boss, as `code` (services/worker/src/index.ts and
+ * ready.ts, where /ready lives since Slice 1) has it? Not while its handler answers with a todo for them; throws when
+ * there is no /ready route to read.
  */
 export function readyChecksDb(code: string) {
   const handler = code.match(/\.get\(\s*"\/ready"[^;]*/)?.[0];
   if (!handler)
     throw new Error(
-      "services/worker/src/index.ts has no /ready route: update the /ready question's check in scripts/proof/slice-0-agents.ts",
+      "services/worker/src/index.ts and services/worker/src/ready.ts have no /ready route: update the /ready question's check in scripts/proof/slice-0-agents.ts",
     );
   return !/\btodo\b/.test(handler);
 }
@@ -119,7 +120,15 @@ export const agentSession: Step = {
       if (!slice) throw new Error("ROADMAP.md has no current slice to name");
       const others = slice.items.map((i) => i.text).filter((t) => t !== item);
       const dbChecked = readyChecksDb(
-        git(dir, "show", "HEAD:services/worker/src/index.ts"),
+        ["index.ts", "ready.ts"]
+          .map((f) => {
+            try {
+              return git(dir, "show", `HEAD:services/worker/src/${f}`);
+            } catch {
+              return ""; // ready.ts is new in Slice 1; an older commit has only index.ts
+            }
+          })
+          .join("\n"),
       );
       const say = conversation({
         dir,

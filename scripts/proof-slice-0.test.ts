@@ -496,7 +496,7 @@ describe("the scripted fresh agent session", () => {
     return standIn([
       {
         when: "/ready",
-        say: "It checks only the READY_TOKEN bearer token, then answers ok; the database checks are not built yet.",
+        say: "It checks the READY_TOKEN bearer token, then that the worker reaches its database and its job queue (pg-boss), each within 2 seconds.",
       },
       {
         when: "dark mode",
