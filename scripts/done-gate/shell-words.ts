@@ -8,13 +8,15 @@ import { join } from "node:path";
  * what a command runs, not a shell: `;`, `&`, `|`, new lines and `(…)` separate commands, and a heredoc's body
  * and a case arm's patterns (`a|b)`) are text, not commands. A substitution (`$(…)`, backquotes, `<(…)`, `>(…)`)
  * runs a command line of its own, even inside double quotes or an unquoted heredoc: its commands come first
- * (nested ones too), and its text stays in the word that holds it. `${…}` is text to its closing brace: a `<<` in
- * it starts no heredoc, and an assignment before the program (`id=${r%% *}`) stays one word across its spaces;
- * anywhere else they end a word, as bash splits what it expands to. A comment's quotes are text, so they can't
- * hide the lines after it, and its words are read as commands all the same, as zsh -i runs them. A backslash before a
- * new line joins the lines (not in single quotes or a quoted heredoc). A heredoc's delimiter is its whole word, quotes
- * removed; any quote or backslash in it keeps the body from expanding. Arithmetic (`$((…))`, and `((…))` when the
- * parenthesis matching its second `(` is followed by `)`, as bash, zsh and ksh decide) starts no heredoc.
+ * (nested ones too), and its text stays in the word that holds it. `${…}` is text to its closing brace: a `<<` or
+ * `#` in it starts no heredoc or comment, and an assignment before the program (`id=${r%% *}`) stays one word across
+ * its spaces; anywhere else they end a word, as bash splits what it expands to. A comment's quotes are text, so they
+ * can't hide the lines after it, and its words are read as commands all the same, as zsh -i runs them. A backslash
+ * before a new line joins the lines (not in single quotes or a quoted heredoc); one that splits an operator is refused.
+ * A heredoc's delimiter is its whole word, quotes removed; any quote or backslash in it keeps the body from expanding,
+ * and its body ends at a line that is exactly the delimiter. Arithmetic (`$((…))`, bash's and zsh's `$[…]`, and
+ * `((…))` when the parenthesis matching its second `(` is followed by `)`, as bash, zsh and ksh decide) starts no
+ * heredoc.
  */
 export function simpleCommands(line: string): string[][] {
   return readings(line).flat();
