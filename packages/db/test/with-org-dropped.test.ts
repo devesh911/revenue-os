@@ -37,8 +37,9 @@ async function relay() {
 }
 
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
-const one = async (tx: { query: (q: string) => Promise<{ rows: { n: number }[] }> }) =>
-  (await tx.query("select 1 as n")).rows[0]?.n;
+const one = async (tx: {
+  query: (q: string) => Promise<{ rows: { n: number }[] }>;
+}) => (await tx.query("select 1 as n")).rows[0]?.n;
 
 describe("withOrg when the database drops its connection", () => {
   it("fails that unit of work while it waits, keeps the process alive, and hands out a working connection next", async () => {
