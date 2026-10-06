@@ -1237,6 +1237,26 @@ describe("toolRefusal: what agents' own tools may not do", () => {
     ).toThrow("delimiter crosses a line");
   });
 
+  it("refuses an operator a backslash-newline splits, which shells join first, and lets an ordinary continuation through", () => {
+    // bash, zsh, sh and dash run gh after `$\`-newline-`{`; bash, sh and dash after `<\`-newline-`<`.
+    for (const split of [
+      `echo $\\\n{x:-<<EOF}\ngh release create v1\nEOF`,
+      "cat <\\\n<EOF\nit's\nEOF\ngh release create v1",
+      "cat <<\\\n< 'x'\ngh release create v1\nx",
+      "(\\\n(1<<2))\ngh release create v1\n2",
+      "cat <<\\\n-EOF\n\tEOF\nit's\nEOF\ngh release create v1",
+    ])
+      expect(() => toolRefusal(split, look)).toThrow(
+        "splits an operator across lines",
+      );
+    expect(
+      toolRefusal(
+        "gh pr checks 12 \\\n  --watch && \\\n  gh pr view 12 |\\\n  head -5",
+        look,
+      ),
+    ).toBeUndefined();
+  });
+
   it("refuses when it can't tell which branch a bare push would push", () => {
     expect(
       toolRefusal("git push", { ...look, branchOf: () => undefined }),

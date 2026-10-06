@@ -26,6 +26,12 @@ export function simpleCommands(line: string): string[][] {
  * a heredoc. Where a `${…}`'s end is murky, a `<<` after it starts a heredoc in one reading and is text in the other.
  */
 export function readings(line: string): string[][][] {
+  // Shells join a backslash-newline's lines before they look for an operator; this reader looks for each one whole.
+  for (const [, a, b] of line.matchAll(SPLIT))
+    if (OPERATOR.test(`${a}${b}`))
+      throw new Error(
+        `it splits an operator across lines (\`${a}\` and \`${b}\` around a backslash-newline): write it on one line`,
+      );
   const all = [true, false].flatMap((dparen) =>
     [true, false].map(
       (heredocs) => read(line, 0, "", { dparen, heredocs, misses: 0 }).commands,
@@ -33,6 +39,11 @@ export function readings(line: string): string[][][] {
   );
   return [...new Map(all.map((r) => [JSON.stringify(r), r])).values()];
 }
+
+// Two characters around a backslash-newline, and the operators the reader looks for whole that they could spell:
+// `<<`, `<(`, `>(`, `$(`, `${`, `$[`, `$'`, `$"`, `((`, `))`, `;;`, `;&`, `;|`, and the `<-` of `<<-`.
+const SPLIT = /([<>$();])(?:\\\n)+(?=([-<({['"&|;)]))/g;
+const OPERATOR = /^(<[<(-]|>\(|\$[({['"]|\(\(|\)\)|;[;&|])$/;
 
 // Words that may come before the keyword `case`: `if case …`, `! case …`, `{ case …`.
 const OPENERS = new Set([
