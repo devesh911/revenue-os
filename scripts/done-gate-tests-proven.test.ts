@@ -878,6 +878,7 @@ it("is seven", () => {
   });
 
   // MAY_SKIP is empty today, so the check is given a list of its own, as it is given MAY_SKIP in the gate.
+  // behaviour already on main: a listed test is left unjudged as before; only the test's example changed
   it("leaves a test MAY_SKIP lets skip unjudged when it skips on either side, and says where", () => {
     const at =
       'not judged: scripts/somewhere.test.ts:4 "runs only somewhere" is skipped';

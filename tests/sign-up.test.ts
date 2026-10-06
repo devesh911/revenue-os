@@ -4,8 +4,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { ensureLocalUser } from "../scripts/dev-login";
-import { signIn } from "./test-users";
+import { testUser } from "./test-users";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
@@ -52,10 +51,8 @@ describe("self sign-up is refused", () => {
   });
 
   it("still signs in a login we made, with its password", async () => {
-    const email = `made-for-them-${randomUUID()}@example.com`;
-    await ensureLocalUser(admin, email, "their-password-1");
-    expect((await signIn(email, "their-password-1")).split(".")).toHaveLength(
-      3,
-    );
+    const made = await testUser(admin, "made-for-them");
+    expect(made.token.split(".")).toHaveLength(3);
+    expect(await usersNamed(made.email)).toBe(1);
   });
 });

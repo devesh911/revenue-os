@@ -4,7 +4,7 @@
 // only app.is_platform_operator, which answers yes or no and which no other role may call. Fixtures are made as
 // `postgres`, whom row-level security lets through; the code under test connects as app_service.
 import { afterAll, describe, expect, it } from "bun:test";
-import { createPool, isPlatformOperator, withOrg } from "@revenue-os/db";
+import { createPool, withOrg } from "@revenue-os/db";
 import { Pool } from "pg";
 import { testCompanies } from "./test-companies";
 import { testUser } from "./test-users";
@@ -31,6 +31,7 @@ afterAll(async () => {
 
 describe("our operator list", () => {
   it("names only the people on it", async () => {
+    const { isPlatformOperator } = await import("@revenue-os/db");
     const operator = await testUser(admin, "listed", { operator: true });
     const stranger = await testUser(admin, "unlisted");
     expect(await isPlatformOperator(appService, operator.userId)).toBe(true);
@@ -40,6 +41,7 @@ describe("our operator list", () => {
     );
   });
 
+  // behaviour already on main: migration 018 is applied to the one local database both copies of the code run against
   it("is closed to the worker's own role, inside a company's transaction and outside one", async () => {
     const { id } = await companies.add("Operator list reader");
     await expect(
@@ -59,6 +61,7 @@ describe("our operator list", () => {
     ).rejects.toThrow(/permission denied/);
   });
 
+  // behaviour already on main: migration 018 is applied to the one local database both copies of the code run against
   it("lets only the worker's role ask whether someone is on it", async () => {
     const someone = crypto.randomUUID();
     for (const role of ["anon", "authenticated", "service_role"]) {

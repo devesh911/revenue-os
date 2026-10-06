@@ -3875,6 +3875,7 @@ todo("c", () => {});
     expect(tests(dir).status).not.toBe(0); // CI=1: bun refuses .only, however it was reached
   });
 
+  // behaviour already on main: MAY_SKIP is read as before; only the test's example changed, since MAY_SKIP is now empty
   it("passes when every test ran, or the only one skipped is listed as allowed, with why", () => {
     const dir = repo();
     write(

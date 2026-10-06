@@ -5,7 +5,6 @@
 // company. Playwright imports this under Node (apps/console/e2e): keep it free of Bun-only APIs.
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { ensureLocalUser } from "../scripts/dev-login";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
@@ -35,6 +34,9 @@ export async function testUser(
 ): Promise<TestUser> {
   const email = `${tag}-${randomUUID()}@example.com`;
   const password = `test-${randomUUID()}`;
+  // Loaded when called, so a test file that uses this still loads where the dev login's code has no ensureLocalUser
+  // (main's, before invite-only): there, the test fails at this call rather than its whole file failing to load.
+  const { ensureLocalUser } = await import("../scripts/dev-login");
   const userId = await ensureLocalUser(db, email, password);
   if (operator)
     await db.query(`insert into platform_operators (user_id) values ($1)`, [

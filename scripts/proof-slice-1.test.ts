@@ -12,7 +12,6 @@ import { join } from "node:path";
 import { toProve } from "./proof/cli";
 import { runSteps } from "./proof/run";
 import { everyCheckHasAStep, NOT_YET, steps as slice1 } from "./proof/slice-1";
-import { signUpAndStrangerRefused } from "./proof/slice-1-sign-in";
 import { SLICES } from "./proof/slices";
 
 const ROOT = join(import.meta.dir, "..");
@@ -37,9 +36,12 @@ describe("Slice 1's steps", () => {
     expect(slice1.at(-1)).toBe(everyCheckHasAStep);
   });
 
-  it("prove a self sign-up and a stranger creating a company are each refused, first, as the Proof line orders them", () => {
-    expect(slice1[0]).toBe(signUpAndStrangerRefused);
+  it("prove a self sign-up and a stranger creating a company are each refused, first, as the Proof line orders them", async () => {
     expect(NOT_YET.join("\n")).not.toContain("self sign-up");
+    const { signUpAndStrangerRefused } = await import(
+      "./proof/slice-1-sign-in"
+    );
+    expect(slice1[0]).toBe(signUpAndStrangerRefused);
     expect(signUpAndStrangerRefused.does).toContain("422 signup_disabled");
     expect(signUpAndStrangerRefused.does).toContain("403 not_an_operator");
   });

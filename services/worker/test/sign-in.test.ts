@@ -1,7 +1,9 @@
 // Sign-in on every route but a short public list (src/auth.ts, PUBLIC_ROUTES), through the worker's real routes
-// (src/app.ts): every route it mounts is asked without a sign-in token, so a new route is covered as soon as it is
-// mounted. What a token must be to pass (signature, expiry, issuer, audience, user) is checked with keys of this
-// test's own, since the local sign-in server's private key never leaves it.
+// (src/app.ts, served by src/index.ts): every route it mounts is asked without a sign-in token, so a new route is
+// covered as soon as it is mounted. What a token must be to pass (signature, expiry, issuer, audience, user) is
+// checked with keys of this test's own, since the local sign-in server's private key never leaves it. The new code is
+// loaded inside each test, so on main's code, which lacks it, each test fails on its own instead of the file failing
+// to load.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
@@ -15,13 +17,8 @@ import {
 } from "jose";
 import pg from "pg";
 import { testUser } from "../../../tests/test-users";
-import { app } from "../src/app";
-import {
-  type AuthEnv,
-  PUBLIC_ROUTES,
-  requireAuthUnlessPublic,
-  signedIn,
-} from "../src/auth";
+import type { AuthEnv } from "../src/auth";
+import worker from "../src/index";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
 const admin = new pg.Pool({
@@ -32,19 +29,24 @@ const admin = new pg.Pool({
 });
 afterAll(() => admin.end());
 
+const auth = () => import("../src/auth");
+
 /** Every route the worker mounts, as "METHOD /path", its sign-in middleware left out. */
-const routes = [
-  ...new Set(
-    app.routes
-      .filter((r) => r.method !== "ALL")
-      .map((r) => `${r.method} ${r.path}`),
-  ),
-];
+async function mounted() {
+  const { app } = await import("../src/app");
+  return [
+    ...new Set(
+      app.routes
+        .filter((r) => r.method !== "ALL")
+        .map((r) => `${r.method} ${r.path}`),
+    ),
+  ];
+}
 
 /** Asks the worker's real routes `method path`, each `:param` filled with a random id. */
 const ask = (route: string, token?: string) => {
   const [method = "GET", path = "/"] = route.split(" ");
-  return app.fetch(
+  return worker.fetch(
     new Request(
       `http://localhost${path.replace(/:[^/]+/g, () => randomUUID())}`,
       {
@@ -60,7 +62,8 @@ const ask = (route: string, token?: string) => {
 };
 
 describe("every route requires sign-in unless it is on the public list", () => {
-  it("lists only routes the worker really serves, and they are few", () => {
+  it("lists only routes the worker really serves, and they are few", async () => {
+    const [routes, { PUBLIC_ROUTES }] = await Promise.all([mounted(), auth()]);
     expect(routes.filter((r) => PUBLIC_ROUTES.has(r)).sort()).toEqual(
       [...PUBLIC_ROUTES].sort(),
     );
@@ -68,6 +71,7 @@ describe("every route requires sign-in unless it is on the public list", () => {
   });
 
   it("refuses a caller with no sign-in token on every other route, before the route runs", async () => {
+    const [routes, { PUBLIC_ROUTES }] = await Promise.all([mounted(), auth()]);
     const signedInRoutes = routes.filter((r) => !PUBLIC_ROUTES.has(r));
     expect(signedInRoutes.length).toBeGreaterThan(10);
     for (const route of signedInRoutes) {
@@ -84,6 +88,7 @@ describe("every route requires sign-in unless it is on the public list", () => {
     expect((await ask("GET /no-such-route", token)).status).toBe(404);
   });
 
+  // behaviour already on main: /health has always answered without sign-in; this keeps it so
   it("answers /health without sign-in", async () => {
     const res = await ask("GET /health");
     expect(res.status).toBe(200);
@@ -93,6 +98,7 @@ describe("every route requires sign-in unless it is on the public list", () => {
   // /ready, /release and Vapi's webhook answer 401 from their own checks without their token or secret, so through
   // the real app a refusal can't tell whose it was: here each public route is reached with no sign-in at all.
   it("lets a request reach each public route without sign-in, and no other", async () => {
+    const { PUBLIC_ROUTES, requireAuthUnlessPublic } = await auth();
     const reached: string[] = [];
     const probe = new Hono<AuthEnv>().use("*", requireAuthUnlessPublic);
     for (const route of [...PUBLIC_ROUTES, "GET /orgs", "POST /orgs"]) {
@@ -141,6 +147,7 @@ describe("a sign-in token the worker accepts", () => {
     let probe: Hono<AuthEnv>;
 
     beforeAll(async () => {
+      const { signedIn } = await auth();
       const mine = await generateKeyPair("ES256", { extractable: true });
       otherKey = (await generateKeyPair("ES256")).privateKey;
       const jwk = { ...(await exportJWK(mine.publicKey)), kid: "mine" };
