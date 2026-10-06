@@ -418,6 +418,7 @@ describe("checkRules", () => {
     expect(problemsOf(listed)).toEqual([]);
   });
 
+  // behaviour already on main: main's copy carries scripts/done-gate/rules.ts over (gate code is not product code), so it passes there; this change's only product code is the source-map-js pin
   it("lets a placeholder through only when the Stub row the change adds or edits names its own file", () => {
     const sms = add(
       "services/worker/src/sms.ts",
@@ -437,6 +438,7 @@ describe("checkRules", () => {
     expect(problemsOf([...sms, ...own])).toEqual([]);
   });
 
+  // behaviour already on main: main's copy carries scripts/done-gate/rules.ts over (gate code is not product code), so it passes there; this change's only product code is the source-map-js pin
   it("reads a throw the formatter wrapped over several lines as one statement, and knows NotImplementedError", () => {
     const file = "services/worker/src/sms.ts";
     const wrapped = add(

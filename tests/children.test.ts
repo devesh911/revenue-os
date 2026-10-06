@@ -67,6 +67,7 @@ it.each([
     rest: `while (!require("node:fs").existsSync("ids.txt")) await Bun.sleep(50);
   process.exit(1);`,
   },
+  // behaviour already on main: main's copy carries tests/children.ts over (a test helper, not product code), so it passes there; this change's only product code is the source-map-js pin
 ])("a child and the grandchild it started are stopped when $ends", async ({
   sleeps,
   holds,
