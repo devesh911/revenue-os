@@ -418,6 +418,25 @@ describe("checkRules", () => {
     expect(problemsOf(listed)).toEqual([]);
   });
 
+  it("lets a placeholder through only when the Stub row the change adds or edits names its own file", () => {
+    const sms = add(
+      "services/worker/src/sms.ts",
+      '  throw new Error("sendSms not implemented");',
+    );
+    const unrelated = add(
+      "STATE.md",
+      "| WhatsApp | Send a WhatsApp message | Stub | services/worker/src/jobs.ts WA_STUB throws (reworded) |",
+    );
+    expect(problemsOf([...sms, ...unrelated])).toEqual([
+      "services/worker/src/sms.ts:1 adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change, naming its file (services/worker/src/sms.ts)",
+    ]);
+    const own = add(
+      "STATE.md",
+      "| SMS | Send an SMS | Stub | services/worker/src/sms.ts throws |",
+    );
+    expect(problemsOf([...sms, ...own])).toEqual([]);
+  });
+
   it("reads a throw the formatter wrapped over several lines as one statement, and knows NotImplementedError", () => {
     const file = "services/worker/src/sms.ts";
     const wrapped = add(
@@ -427,7 +446,7 @@ describe("checkRules", () => {
       "  );",
     );
     expect(problemsOf(wrapped)).toEqual([
-      `${file}:1 adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change`,
+      `${file}:1 adds a placeholder that throws; build the real thing, or list it as Stub in STATE.md → What works today in this same change, naming its file (${file})`,
     ]);
     expect(
       problemsOf(add(file, "  throw new NotImplementedError();")),

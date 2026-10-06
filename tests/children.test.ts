@@ -29,10 +29,11 @@ const running = (pid: number) => {
 
 /**
  * A child that starts a grandchild and writes both their ids to ids.txt, then sleeps, the grandchild holding its
- * output open as a whole-suite run's own children do, or ends at once, leaving the grandchild running.
+ * output open as a whole-suite run's own children do, or ends at once, leaving the grandchild running (holding the
+ * child's output open, or not).
  */
-const child = (sleeps: boolean) =>
-  `const g = require("node:child_process").spawn("sleep", ["30"], { stdio: "${sleeps ? "inherit" : "ignore"}" });
+const child = (sleeps: boolean, holds = sleeps) =>
+  `const g = require("node:child_process").spawn("sleep", ["30"], { stdio: "${holds ? "inherit" : "ignore"}" });
    g.unref();
    require("node:fs").writeFileSync("ids.txt", process.pid + " " + g.pid);
    ${sleeps ? "setTimeout(() => {}, 30_000);" : ""}`;
@@ -41,6 +42,12 @@ it.each([
   {
     ends: "the child ends while its test goes on",
     sleeps: false,
+    rest: "await ran;\n  await Bun.sleep(30_000);",
+  },
+  {
+    ends: "the child ends while the grandchild it started holds the child's output open",
+    sleeps: false,
+    holds: true,
     rest: "await ran;\n  await Bun.sleep(30_000);",
   },
   { ends: "the test runs past its time limit", sleeps: true, limit: 1_000 },
@@ -62,6 +69,7 @@ it.each([
   },
 ])("a child and the grandchild it started are stopped when $ends", async ({
   sleeps,
+  holds,
   limit = 60_000,
   stop,
   rest = "await ran;",
@@ -73,7 +81,7 @@ it.each([
 import { children } from ${JSON.stringify(helper)};
 const { bun } = children();
 it("starts a child", async () => {
-  const ran = bun(["-e", ${JSON.stringify(child(sleeps))}], import.meta.dir);
+  const ran = bun(["-e", ${JSON.stringify(child(sleeps, holds))}], import.meta.dir);
   ${rest}
 }, ${limit});
 `,
