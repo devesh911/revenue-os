@@ -34,6 +34,8 @@ The line, newest first under "Lines" (a leading "- " is allowed):
 
 ## Lines
 
+- 2026-10-06 · scripts/dev-login.test.ts > creates the dev user via /auth/v1/signup with the anon key when absent · the sign-in server refuses a self sign-up now (Slice 1, invite-only), so the dev login is made in the local database; "makes a missing login in the local database, with no call to the sign-in server, and it signs in with its password" checks that on every stack, and "puts the dev login on our operator list, so it may create a company through POST /orgs" checks the rest
+- 2026-10-06 · apps/console/e2e/auth.e2e.ts > expect at line 50 · it checked the self sign-up's reply, and the zero-workspace user is now made in the local database (ensureLocalUser), which throws when it makes no login
 - 2026-10-04 · apps/console/test/guardrails-console.test.tsx > exports useGuardrailPoliciesQuery + useUpdateGuardrailPolicy · it read the hooks' file as text; apps/console/test/guardrails-save.test.tsx now imports both hooks and runs them
 - 2026-10-04 · apps/console/test/guardrails-console.test.tsx > query GETs the org-scoped /guardrail-policies endpoint via useQuery · it read the file as text; the first test in apps/console/test/guardrails-save.test.tsx runs the real query hook and sees a signed-in GET of /orgs/<org>/guardrail-policies
 - 2026-10-04 · apps/console/test/guardrails-console.test.tsx > mutation PUTs and validates its body with the shared GuardrailPolicyInputSchema · it read the file as text; apps/console/test/guardrails-save.test.tsx runs the real save and sees a signed-in PUT whose body went through the shared schema, and a policy the schema refuses never sent

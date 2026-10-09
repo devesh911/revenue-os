@@ -6,18 +6,16 @@
 //
 // Runtime inputs — read INSIDE each test, so `bun run e2e -- --list` collects with none of them set:
 //   E2E_ORG_ID / E2E_ORG_NAME — the seeded workspace the dev login administers;
-//   VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — to mint a throwaway zero-workspace user through
-//     GoTrue sign-up (the anon key is designed-public, and is never printed);
+//   LOCAL_DB_URL — the local database as its superuser, to make a throwaway zero-workspace user there and sign it
+//     in (accounts are invite-only: the sign-in server refuses a self sign-up), as the dev login is made;
 //   DEV_LOGIN_EMAIL / DEV_LOGIN_PASSWORD — exported by scripts/dev-login.ts (imported lazily).
 // Every test gets a fresh browser context, i.e. starts signed out. FILENAME: *.e2e.ts, not
 // *.spec.ts (see smoke.e2e.ts — bun's repo-wide test glob would otherwise run it).
 import { randomUUID } from "node:crypto";
-import {
-  type APIRequestContext,
-  expect,
-  type Page,
-  test,
-} from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import pg from "pg";
+import { ensureLocalUser } from "../../../scripts/dev-login";
+import { isLocalUrl } from "../../../scripts/local-url";
 
 type Credentials = { email: string; password: string };
 
@@ -37,17 +35,23 @@ async function devLogin(): Promise<Credentials> {
   return { email: mod.DEV_LOGIN_EMAIL, password: mod.DEV_LOGIN_PASSWORD };
 }
 
-// A brand-new confirmed-on-signup local user who belongs to no workspace.
-async function zeroOrgUser(request: APIRequestContext): Promise<Credentials> {
+// A brand-new local user, made in the local database, who belongs to no workspace and is not an operator.
+async function zeroOrgUser(): Promise<Credentials> {
+  const dbUrl = env("LOCAL_DB_URL");
+  if (!isLocalUrl(dbUrl))
+    throw new Error(
+      "the auth e2e spec makes users only in a database on this machine",
+    );
   const creds = {
     email: `e2e-noorg-${randomUUID()}@local.test`,
     password: `E2e-${randomUUID()}`,
   };
-  const res = await request.post(
-    `${env("VITE_SUPABASE_URL").replace(/\/$/, "")}/auth/v1/signup`,
-    { headers: { apikey: env("VITE_SUPABASE_ANON_KEY") }, data: creds },
-  );
-  expect(res.ok(), `GoTrue sign-up returned HTTP ${res.status()}`).toBe(true);
+  const db = new pg.Pool({ connectionString: dbUrl });
+  try {
+    await ensureLocalUser(db, creds.email, creds.password);
+  } finally {
+    await db.end();
+  }
   return creds;
 }
 
@@ -88,10 +92,9 @@ test("a signed-out deep link detours through /login with next and returns to it"
 // of the previous user's workspace (the query cache was wiped on the user switch).
 test("after sign-out, a zero-workspace user sees the empty state and none of the previous workspace", async ({
   page,
-  request,
 }) => {
   const orgName = env("E2E_ORG_NAME");
-  const noOrg = await zeroOrgUser(request);
+  const noOrg = await zeroOrgUser();
 
   await page.goto("/login");
   await signIn(page, await devLogin());

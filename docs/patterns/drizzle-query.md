@@ -1,6 +1,6 @@
 # Pattern: company-scoped SQL query (the file name is historical)
-No query in this codebase uses Drizzle, so the Drizzle example that stood here is deleted, and so is Drizzle's
-unused copy of three tables (2026-10-06). Every query is
+No query in this codebase uses Drizzle, so the Drizzle example that stood here is deleted, and so are Drizzle's unused
+copy of three tables and the library itself (entry 2 of `docs/fix-when-touched.md`). Every query is
 parameterised SQL through `tx.query` inside `withOrg` (`packages/db/src/client.ts`), with the company in its where
 clause as well as in the database's own per-company rules:
 

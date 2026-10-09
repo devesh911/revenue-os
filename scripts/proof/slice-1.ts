@@ -3,13 +3,13 @@
 // check has its step, `bun run proof 1` fails on the last step, naming the checks no step makes yet, and never reads
 // as passed.
 
+import { signUpAndStrangerRefused } from "./slice-1-sign-in";
 import { imageNamesItsCommit, readyWithoutDatabase } from "./slice-1-worker";
 import type { Step } from "./step";
 
 // The checks the Proof line names that no step makes yet, in its words.
 export const NOT_YET = [
   "`bun run demo` takes one scripted lead from enrolment to a booked site visit, each printed step reaching its outcome",
-  "a self sign-up and a stranger creating a company are each refused",
   "a do-not-call lead and a lead with no WhatsApp opt-in are each refused a message",
   "a user from another company is refused this company's data",
   "an attempt to attach one company's record to another company is rejected",
@@ -28,6 +28,7 @@ export const everyCheckHasAStep: Step = {
 };
 
 export const steps: Step[] = [
+  signUpAndStrangerRefused,
   readyWithoutDatabase,
   imageNamesItsCommit,
   everyCheckHasAStep,

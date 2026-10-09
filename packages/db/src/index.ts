@@ -1,5 +1,4 @@
-// The app_service client (withOrg sets request.org_id per transaction) and the queries built on it: the one way
-// into the database.
+// The database package: the app_service client (withOrg sets request.org_id per transaction) and the queries behind it.
 // G1: runtime-agnostic — no bun:* imports, no Bun globals in this package.
 
 export {
@@ -19,6 +18,7 @@ export {
 export {
   addMember,
   createOrgWithAdmin,
+  isPlatformOperator,
   memberRole,
   type OrgRow,
   updateOrg,

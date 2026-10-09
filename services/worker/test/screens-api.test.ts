@@ -4,32 +4,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { type TestUser, testUser } from "../../../tests/test-users";
 import app from "../src/index";
-
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 });
-
-async function signup(tag: string): Promise<{ token: string; userId: string }> {
-  const email = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  const body = (await res.json()) as {
-    access_token?: string;
-    user?: { id: string };
-  };
-  if (!body.access_token || !body.user)
-    throw new Error(`signup failed: ${JSON.stringify(body)}`);
-  return { token: body.access_token, userId: body.user.id };
-}
 
 function api(path: string, token: string | null, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
@@ -43,16 +25,16 @@ function api(path: string, token: string | null, init: RequestInit = {}) {
 const ENDPOINTS = ["tasks", "contacts", "conversations", "metrics"] as const;
 const companies = testCompanies(admin);
 
-let userA: { token: string; userId: string };
-let userB: { token: string; userId: string };
+let userA: TestUser;
+let userB: TestUser;
 let orgA = "";
 let contactId = "";
 let contactNoConvoId = "";
 let activeConvId = "";
 
 beforeAll(async () => {
-  userA = await signup("screens-a");
-  userB = await signup("screens-b");
+  userA = await testUser(admin, "screens-a", { operator: true });
+  userB = await testUser(admin, "screens-b");
   // Made through the product's own POST /orgs, which makes user A its admin.
   ({ id: orgA } = await companies.add("Screens Org", async (name, slug) => {
     const res = await api("/orgs", userA.token, {

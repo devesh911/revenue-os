@@ -2,14 +2,14 @@
 // session): through the worker's own app, the request answers 500 with nothing internal, the worker keeps running,
 // and the next request is served. The request's transaction (withOrg) waits on a row this test's admin connection
 // holds locked, and that waiting backend is ended with pg_terminate_backend, so only this test's company is held.
-// Real sign-in and the app_service database path underneath: runs with the local stack's settings.
+// Real sign-in (a test user made by tests/test-users.ts) and the app_service database path underneath: runs with the
+// local stack's settings.
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { testUser } from "../../../tests/test-users";
 import app from "../src/index";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
@@ -39,14 +39,7 @@ const putAutonomy = () =>
   });
 
 beforeAll(async () => {
-  const email = `dropped-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  token = ((await res.json()) as { access_token?: string }).access_token ?? "";
-  if (!token) throw new Error("sign-up failed");
+  ({ token } = await testUser(admin, "dropped", { operator: true }));
   ({ id: orgId } = await companies.add(
     "Dropped connection",
     async (name, slug) => {

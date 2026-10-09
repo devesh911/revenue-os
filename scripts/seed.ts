@@ -76,10 +76,10 @@ export async function seed(
 // `bun run db:seed <pack> [slug]`: into the pack's own workspace, or into the workspace `slug` (a test's own).
 if (import.meta.main) {
   const [pack, slug] = process.argv.slice(2) as [Pack, string | undefined];
-  const { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: anonKey } = process.env;
-  if (!supabaseUrl || !anonKey) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  if (!supabaseUrl) {
     console.error(
-      "SUPABASE_URL / SUPABASE_ANON_KEY missing — run `bun run db:seed <pack>`, which fills them from the local stack",
+      "SUPABASE_URL missing — run `bun run db:seed <pack>`, which fills it from the local stack",
     );
     process.exit(1);
   }
@@ -87,7 +87,6 @@ if (import.meta.main) {
   console.log(`seeded pack '${pack}' into org ${orgId}`);
   await ensureDevLogin({
     supabaseUrl,
-    anonKey,
     dbUrl: localDbUrl(),
     orgIds: [orgId],
   });

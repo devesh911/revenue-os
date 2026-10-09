@@ -12,32 +12,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { type TestUser, testUser } from "../../../tests/test-users";
 import app from "../src/index";
-
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 });
-
-async function signup(tag: string): Promise<{ token: string; userId: string }> {
-  const email = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({ email, password: "test-password-123!" }),
-  });
-  const body = (await res.json()) as {
-    access_token?: string;
-    user?: { id: string };
-  };
-  if (!body.access_token || !body.user)
-    throw new Error(`signup failed: ${JSON.stringify(body)}`);
-  return { token: body.access_token, userId: body.user.id };
-}
 
 function api(path: string, token: string | null, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
@@ -108,13 +90,14 @@ const A_CONVS = 3;
 const A_BOOKINGS = 6;
 const A_TODAY_BOOKINGS = 2;
 
-let userA: { token: string; userId: string };
-let userB: { token: string; userId: string };
+let userA: TestUser;
+let userB: TestUser;
 let orgA = "";
 
 beforeAll(async () => {
-  userA = await signup("trends-a");
-  userB = await signup("trends-b");
+  // Both create a company through POST /orgs, so both are on our operator list.
+  userA = await testUser(admin, "trends-a", { operator: true });
+  userB = await testUser(admin, "trends-b", { operator: true });
   orgA = await bootstrapOrg(userA.token, "a");
   // In-window activity spread across three distinct days (leaves gaps to gap-fill).
   await seedDay(orgA, 0, A_TODAY_BOOKINGS); // today   → last bucket

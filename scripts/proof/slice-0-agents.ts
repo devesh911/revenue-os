@@ -214,10 +214,9 @@ export async function openTaskCount(
 import { afterAll, beforeAll, expect, it } from "bun:test";
 import pg from "pg";
 import { testCompanies } from "../../../tests/test-companies";
+import { testUser } from "../../../tests/test-users";
 import app from "../src/index";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const admin = new pg.Pool({
   connectionString:
     process.env.LOCAL_DB_URL ||
@@ -239,15 +238,7 @@ const api = (path: string, init: RequestInit = {}, auth = token) =>
   );
 
 beforeAll(async () => {
-  const res = await fetch(\`\${SUPABASE_URL}/auth/v1/signup\`, {
-    method: "POST",
-    headers: { "content-type": "application/json", apikey: ANON_KEY },
-    body: JSON.stringify({
-      email: \`open-tasks-\${Date.now()}@example.com\`,
-      password: "test-password-123!",
-    }),
-  });
-  token = ((await res.json()) as { access_token: string }).access_token;
+  ({ token } = await testUser(admin, "open-tasks", { operator: true }));
   ({ id: org } = await companies.add("Open tasks", async (name, slug) => {
     const made = await api("/orgs", {
       method: "POST",

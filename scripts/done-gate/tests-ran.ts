@@ -8,11 +8,9 @@ import { join } from "node:path";
 import { coverageProblems, gapsTold } from "./coverage";
 
 // Tests allowed not to run, as "file > name", and why. Any other test that bun or Playwright reports as skipped
-// or todo fails the tests or browser checks (`bun run gate tests`), however it was switched off.
-export const MAY_SKIP: Record<string, string> = {
-  "scripts/dev-login.test.ts > creates the dev user via /auth/v1/signup with the anon key when absent":
-    "it runs only where the dev login does not exist yet, as in CI",
-};
+// or todo fails the tests or browser checks (`bun run gate tests`), however it was switched off. Empty: the one
+// test it listed, the dev login's sign-up, went with self sign-up (Slice 1), and its replacement runs everywhere.
+export const MAY_SKIP: Record<string, string> = {};
 
 /** PURE: a JUnit report, bun's or Playwright's → every test it lists as skipped or todo, as "file > name". */
 export function notRun(report: string): string[] {
