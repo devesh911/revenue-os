@@ -247,6 +247,40 @@ describe("org bootstrap + tenant isolation", () => {
     expect(membership?.role).toBe("viewer");
   });
 
+  it("answers an admin who adds a user id that names no one with 404 user_not_found, and writes no row", async () => {
+    const nobody = crypto.randomUUID();
+    const res = await api(`/orgs/${orgA}/members`, userA.token, {
+      method: "POST",
+      body: JSON.stringify({ userId: nobody, role: "viewer" }),
+    });
+    expect({ status: res.status, body: await res.json() }).toEqual({
+      status: 404,
+      body: { error: "user_not_found" },
+    });
+    const rows = await admin.query(
+      `select 1 from org_members where user_id = $1`,
+      [nobody],
+    );
+    expect(rows.rowCount).toBe(0);
+  });
+
+  // behaviour already on main: a second membership breaks org_members' primary key, and the error handler answers 409
+  it("answers an admin who adds someone already a member with 409, and keeps their role", async () => {
+    const res = await api(`/orgs/${orgA}/members`, userA.token, {
+      method: "POST",
+      body: JSON.stringify({ userId: userB.userId, role: "admin" }),
+    });
+    expect({ status: res.status, body: await res.json() }).toEqual({
+      status: 409,
+      body: { error: "conflict" },
+    });
+    const rows = await admin.query(
+      `select role from org_members where org_id = $1 and user_id = $2`,
+      [orgA, userB.userId],
+    );
+    expect(rows.rows).toEqual([{ role: "viewer" }]);
+  });
+
   it("a viewer cannot invite members (role gate, docs/security.md S1.7)", async () => {
     const other = await testUser(admin, "outsider");
     const res = await api(`/orgs/${orgA}/members`, userB.token, {

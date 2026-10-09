@@ -94,17 +94,26 @@ export async function memberRole(
   });
 }
 
+/** Adds `member` to the company: false, with nothing written, when member.userId names no one (no profiles row). */
 export async function addMember(
   pool: pg.Pool,
   orgId: string,
   member: AddMember,
-): Promise<void> {
-  await withOrg(pool, orgId, async (tx) => {
-    await tx.query(
-      `insert into org_members (org_id, user_id, role) values ($1, $2, $3)`,
-      [orgId, member.userId, member.role],
-    );
-  });
+): Promise<boolean> {
+  try {
+    await withOrg(pool, orgId, async (tx) => {
+      await tx.query(
+        `insert into org_members (org_id, user_id, role) values ($1, $2, $3)`,
+        [orgId, member.userId, member.role],
+      );
+    });
+    return true;
+  } catch (err) {
+    // Only this foreign key is the caller's mistake; any other failure, another foreign key included, is a fault.
+    if ((err as pg.DatabaseError).constraint === "org_members_user_id_fkey")
+      return false;
+    throw err;
+  }
 }
 
 /** Is `userId` on our operator list, the only people who may create a company? Asked before any company exists,
