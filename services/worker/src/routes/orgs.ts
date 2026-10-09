@@ -16,6 +16,7 @@ import {
 import { Hono } from "hono";
 import type { AuthEnv } from "../auth";
 import { pool } from "../db";
+import { jsonBody } from "../json-body";
 
 export const orgs = new Hono<AuthEnv>()
   .post("/orgs", async (c) => {
@@ -24,10 +25,7 @@ export const orgs = new Hono<AuthEnv>()
     // taken slug (409).
     if (!(await isPlatformOperator(pool, actor.userId)))
       return c.json({ error: "not_an_operator" }, 403);
-    // No body or one that isn't JSON fails the schema too, so it gets 400, never 500. S5.1: before any other logic.
-    const body = CreateOrgSchema.parse(
-      await c.req.json().catch(() => undefined),
-    );
+    const body = CreateOrgSchema.parse(await jsonBody(c)); // S5.1: before any other logic
     const org = await createOrgWithAdmin(pool, {
       ...body,
       userId: actor.userId,
@@ -40,7 +38,7 @@ export const orgs = new Hono<AuthEnv>()
   })
   .patch("/orgs/:orgId", async (c) => {
     const orgId = OrgIdSchema.parse(c.req.param("orgId"));
-    const body = UpdateOrgSchema.parse(await c.req.json());
+    const body = UpdateOrgSchema.parse(await jsonBody(c));
     const actor = c.get("actor");
     const callerRole = await memberRole(pool, orgId, actor.userId); // S1.7 — admin gate
     if (callerRole !== "admin") return c.json({ error: "forbidden" }, 403);
@@ -49,7 +47,7 @@ export const orgs = new Hono<AuthEnv>()
   })
   .post("/orgs/:orgId/members", async (c) => {
     const orgId = OrgIdSchema.parse(c.req.param("orgId"));
-    const body = AddMemberSchema.parse(await c.req.json());
+    const body = AddMemberSchema.parse(await jsonBody(c));
     const actor = c.get("actor");
     const callerRole = await memberRole(pool, orgId, actor.userId); // S1.7 — admin gate
     if (callerRole !== "admin") return c.json({ error: "forbidden" }, 403);
