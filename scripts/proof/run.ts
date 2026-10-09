@@ -114,6 +114,14 @@ export async function runSteps(
         outcome: "failed",
         seen: `did not finish ${limit}: it ran ${Math.round((Date.now() - started) / 1000)} s, and said ${result.seen}`,
       };
+    try {
+      step.cleanUp?.();
+    } catch (e) {
+      result = {
+        outcome: "failed",
+        seen: `${result.seen}; then its clean-up failed: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
     const files = named.filter((f) => existsSync(join(o.dir, f)));
     results.push({ does: step.does, ...result, files });
   }
