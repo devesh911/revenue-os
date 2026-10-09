@@ -36,4 +36,19 @@ describe("behind the worker's own error handler", () => {
     }
     expect((await get(worker(), "/ready", TOKEN)).status).toBe(200);
   });
+
+  // A request body that isn't JSON is turned into a 400 where it is read (src/json-body.ts), never here: a
+  // SyntaxError from the server's own code is a fault.
+  // behaviour already on main: the handler maps only ZodError to 400; this keeps a bad-body fix from widening it
+  it("a SyntaxError the route's own code throws is 500 internal, not 400", async () => {
+    const route = new Hono().onError(onError).get("/", (c) => {
+      JSON.parse("{oops");
+      return c.json({});
+    });
+    const res = await route.request("/");
+    expect({ status: res.status, body: await res.json() }).toEqual({
+      status: 500,
+      body: { error: "internal" },
+    });
+  });
 });
