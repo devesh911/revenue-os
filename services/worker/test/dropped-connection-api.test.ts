@@ -74,18 +74,25 @@ describe("a request whose database connection is ended while it waits", () => {
         await holder.query<{ pid: number }>("select pg_backend_pid() as pid")
       ).rows[0]?.pid;
       const waiting = putAutonomy();
-      // The request's transaction is now waiting on the locked row: end its connection.
-      let ended = 0;
-      for (let i = 0; i < 100 && !ended; i++) {
+      // The request's transaction is now waiting on the locked row: end its connection, and no other. It is found
+      // first and ended by its own query, as Postgres may call pg_terminate_backend for every row of pg_stat_activity
+      // before it checks the rest of the where clause, which ended every connection the shared database let it.
+      let waiters: number[] = [];
+      for (let i = 0; i < 100 && !waiters.length; i++) {
         await new Promise((ok) => setTimeout(ok, 50));
-        ended = (
-          await admin.query(
-            "select count(*)::int as n from pg_stat_activity where $1 = any(pg_blocking_pids(pid)) and pg_terminate_backend(pid)",
+        waiters = (
+          await admin.query<{ pid: number }>(
+            "select pid from pg_stat_activity where usename = 'app_service' and $1 = any(pg_blocking_pids(pid))",
             [holderPid],
           )
-        ).rows[0]?.n;
+        ).rows.map((r) => r.pid);
       }
-      expect(ended).toBe(1);
+      expect(waiters).toHaveLength(1);
+      const ended = await admin.query<{ ok: boolean }>(
+        "select pg_terminate_backend($1) as ok",
+        [waiters[0]],
+      );
+      expect(ended.rows[0]?.ok).toBe(true);
       const res = await waiting;
       expect(res.status).toBe(500);
       expect(await res.json()).toEqual({ error: "internal" });
