@@ -256,8 +256,8 @@ const leftovers = () =>
     .split("\n")
     .filter(Boolean);
 
-// The container this run's step 2 started, until it is removed: the step's clean-up removes it when the step ends,
-// also when it ran out of time and its check is no longer awaited.
+// The container this run's image step started, until it is removed: the step's clean-up removes it when the step
+// ends, also when it ran out of time and its check is no longer awaited.
 let started: string | undefined;
 
 /** Runs the built image on the local stack until Docker reports it healthy, and says what its /release answered. */
