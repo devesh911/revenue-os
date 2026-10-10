@@ -281,6 +281,71 @@ describe("org bootstrap + tenant isolation", () => {
     expect(rows.rows).toEqual([{ role: "viewer" }]);
   });
 
+  // behaviour already on main: the error handler answers every foreign-key failure with 500; this keeps the unknown-user catch from widening
+  it("answers 500, not 404, and adds no one, when adding a member breaks any other foreign key", async () => {
+    // A trigger, installed once and never dropped (as in scheduler-apply-poison.test.ts: dropping one on the local
+    // stack locks auth's tables), breaks org_members_org_id_fkey for one fixed user id, before the user is checked.
+    const faulted = "0000f417-0000-4000-8000-000000000000";
+    await admin.query(`
+      do $$ begin
+        perform pg_advisory_xact_lock(hashtext('test_fault_member_fk'));
+        create or replace function public.test_fault_member_fk() returns trigger language plpgsql as $f$
+        begin
+          if new.user_id = '${faulted}' then
+            raise exception 'members fault injection' using errcode = '23503',
+              constraint = 'org_members_org_id_fkey';
+          end if;
+          return new;
+        end $f$;
+        if not exists (select 1 from pg_trigger
+                        where tgrelid = 'public.org_members'::regclass and tgname = 'test_fault_member_fk') then
+          create trigger test_fault_member_fk before insert on public.org_members
+            for each row execute function public.test_fault_member_fk();
+        end if;
+      end $$`);
+    const res = await api(`/orgs/${orgA}/members`, userA.token, {
+      method: "POST",
+      body: JSON.stringify({ userId: faulted, role: "viewer" }),
+    });
+    expect({ status: res.status, body: await res.json() }).toEqual({
+      status: 500,
+      body: { error: "internal" },
+    });
+    const rows = await admin.query(
+      `select 1 from org_members where user_id = $1`,
+      [faulted],
+    );
+    expect(rows.rowCount).toBe(0);
+  });
+
+  // behaviour already on main: AddMemberSchema refuses each of these bodies before the route reaches the database
+  it("answers an admin's blank, malformed or missing user id, or missing role, with 400, and adds no one", async () => {
+    const members = async () =>
+      (
+        await admin.query(
+          `select user_id, role from org_members where org_id = $1 order by user_id`,
+          [orgA],
+        )
+      ).rows;
+    const before = await members();
+    for (const body of [
+      { userId: "", role: "viewer" },
+      { userId: "not-a-uuid", role: "viewer" },
+      {},
+      { userId: crypto.randomUUID() },
+    ]) {
+      const res = await api(`/orgs/${orgA}/members`, userA.token, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      expect({ status: res.status, body: await res.json() }).toEqual({
+        status: 400,
+        body: { error: "invalid_request" },
+      });
+    }
+    expect(await members()).toEqual(before);
+  });
+
   it("a viewer cannot invite members (role gate, docs/security.md S1.7)", async () => {
     const other = await testUser(admin, "outsider");
     const res = await api(`/orgs/${orgA}/members`, userB.token, {
