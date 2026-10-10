@@ -13,6 +13,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { bookingCopy } from "../src/content/booking";
 import { hero, sampleCall } from "../src/content/hero";
 import { bookDemo, motionToggle } from "../src/content/site";
+import { ignoreMediaKeys } from "./media-keys";
 
 // The headers _headers gives every page: the indented "Name: value" lines under "/*".
 const headers: Record<string, string> = {};
@@ -57,6 +58,7 @@ test("a visitor's whole visit breaks none of the content security policy", async
       seen.push(`${e.violatedDirective} refused ${e.blockedURI}`),
     );
   });
+  await page.addInitScript(ignoreMediaKeys);
   await withHeaders(page, new URL(String(baseURL)).origin);
   const response = await page.goto("/");
   expect(response?.headers()["content-security-policy"]).toBe(

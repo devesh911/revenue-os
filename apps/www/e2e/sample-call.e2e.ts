@@ -8,6 +8,7 @@
 import { expect, test } from "@playwright/test";
 import { sampleCall } from "../src/content/hero";
 import { contrast } from "./contrast";
+import { ignoreMediaKeys } from "./media-keys";
 
 const clock = `${Math.floor(sampleCall.seconds / 60)}:${String(sampleCall.seconds % 60).padStart(2, "0")}`;
 
@@ -25,6 +26,7 @@ test("the sample call plays in place and pauses, and its transcript opens, reada
       return play.call(this);
     };
   });
+  await page.addInitScript(ignoreMediaKeys);
   await page.goto("/");
   const audio = () =>
     page.evaluate(() => {
